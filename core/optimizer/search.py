@@ -4,7 +4,7 @@ from core.models.base_model import BaseModel
 from core.datasets.base_dataset import BaseDataset
 import abc
 import numpy as np
-from core.optimizers.metrics import compute_recall, compute_regret
+from core.optimizer.metrics import compute_recall, compute_regret
 
 EMPTY_ARRAY: np.ndarray = np.array([])  
 

@@ -1,4 +1,4 @@
-from core.optimizers.search.base_search import SearchProtocol
+from core.optimizer.search import SearchProtocol
 from core.dataclasses import TaskState, Candidate
 from typing import List
 

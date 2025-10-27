@@ -22,8 +22,8 @@ from core.dataclasses import (
     TaskState,
 )
 from core.utils.logger import Logger
-from core.optimizers.acquisition.base_acquisition import BaseAcquisition
-from core.optimizers.search.base_search import BaseSearch
+from core.optimizer.acquisition import Acquisition
+from core.optimizer.search import BaseSearch
 
 
 def select_top_k(candidates: LabeledCandidates, k: int) -> List[Candidate]:
@@ -39,7 +39,7 @@ class Optimizer:
 
     def __init__(
         self,
-        acquisition: BaseAcquisition,
+        acquisition: Acquisition,
         search: BaseSearch,
     ) -> None:
         """Initialize the optimizer."""

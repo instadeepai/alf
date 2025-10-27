@@ -3,12 +3,12 @@ from typing import Callable, List
 import numpy as np
 from core.dataclasses import LabeledCandidates, Candidate, Predictions
 from core.surrogate.surrogate import Surrogate
-from core.optimizers.acquisition.acquisition_functions import ACQ_DICT, EMPTY_ARRAY
+from core.optimizer.acquisition_functions import ACQ_DICT, EMPTY_ARRAY
 from core.dataclasses.task_state import TaskState
 from typing import Dict
 
 
-class BaseAcquisition(abc.ABC):
+class Acquisition(abc.ABC):
     """Base class for all acquisition functions."""
 
     def __init__(self, name: str, surrogate: Surrogate) -> None:

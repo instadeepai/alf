@@ -5,9 +5,9 @@ import shutil
 
 from testbed.datasets.gfp import GFPDataset
 from core.surrogate.surrogate import Surrogate
-from core.optimizers.optimizer import Optimizer
-from core.optimizers.acquisition.base_acquisition import BaseAcquisition
-from core.optimizers.search.base_search import DatasetSearch
+from core.optimizer.optimizer import Optimizer
+from core.optimizer.acquisition import Acquisition
+from core.optimizer.search import DatasetSearch
 from core.oracle.oracle import Oracle
 from core.utils.logger import TerminalLogger
 from core.tasks.design_task import DesignTask
@@ -37,7 +37,7 @@ def surrogate_model():
 @pytest.fixture
 def acquisition(surrogate_model):
     """Fixture to create acquisition function."""
-    return BaseAcquisition(name="greedy", surrogate=surrogate_model)
+    return Acquisition(name="greedy", surrogate=surrogate_model)
 
 
 @pytest.fixture

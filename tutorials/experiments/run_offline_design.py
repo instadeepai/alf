@@ -12,9 +12,9 @@ This script demonstrates how to run an offline design task using:
 from testbed.datasets.gfp import GFPDataset
 from testbed.models.cnn import CNNModel
 from core.surrogate.surrogate import Surrogate
-from core.optimizers.optimizer import Optimizer
-from core.optimizers.acquisition.base_acquisition import BaseAcquisition
-from core.optimizers.search.base_search import DatasetSearch
+from core.optimizer.optimizer import Optimizer
+from core.optimizer.acquisition import Acquisition
+from core.optimizer.search import DatasetSearch
 from core.oracle.oracle import Oracle
 from core.utils.logger import TerminalLogger
 from core.tasks.design_task import DesignTask
@@ -42,7 +42,7 @@ gfp_dataset = GFPDataset(
 surrogate = Surrogate(model=CNNModel())
 
 # Initialize acquisition function
-acquisition = BaseAcquisition(name="greedy", surrogate=surrogate)
+acquisition = Acquisition(name="greedy", surrogate=surrogate)
 
 # Initialize search strategy
 search = DatasetSearch(dataset=gfp_dataset)
