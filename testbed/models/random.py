@@ -1,7 +1,7 @@
 from typing import List, Union, Any, Optional
 import numpy as np
 from core.dataclasses import Candidate, LabeledCandidates, Predictions
-from core.models.base_model import BaseModel
+from core.model.base_model import BaseModel
 from core.utils.logger import Logger
 
 class RandomModel(BaseModel):

@@ -1,7 +1,7 @@
 from typing import List, Dict
 from core.dataclasses import Candidate, TaskState
-from core.models.base_model import BaseModel
-from core.datasets.base_dataset import BaseDataset
+from core.model.base_model import BaseModel
+from core.dataset.base_dataset import BaseDataset
 import abc
 import numpy as np
 from core.optimizer.metrics import compute_recall, compute_regret

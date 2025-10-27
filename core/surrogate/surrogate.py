@@ -1,6 +1,6 @@
 from typing import List, Union
 from core.dataclasses import Candidate, LabeledCandidates, Predictions
-from core.models.base_model import BaseModel
+from core.model.base_model import BaseModel
 from core.utils.logger import Logger
 import numpy as np
 

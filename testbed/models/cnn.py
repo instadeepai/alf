@@ -25,7 +25,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from core.dataclasses import Candidate, LabeledCandidates, Predictions, Results
 from core.utils.constants import PROTEIN_ALPHABET
 from core.utils.logger import Logger
-from core.models.base_model import BaseModel
+from core.model.base_model import BaseModel
 
 logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
 log = logging.getLogger("rich")

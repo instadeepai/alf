@@ -1,7 +1,7 @@
 from typing import List, Union, Tuple
 from core.dataclasses import Candidate, LabeledCandidates
-from core.models.base_model import BaseModel
-from core.datasets.base_dataset import BaseDataset
+from core.model.base_model import BaseModel
+from core.dataset.base_dataset import BaseDataset
 import time
 import numpy as np
 from core.dataclasses.task_state import TaskState

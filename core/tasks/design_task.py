@@ -18,8 +18,6 @@ from typing import Any, Optional
 from core.utils.logger import Logger
 from core.tasks.base_task import BaseTask
 from core.dataclasses.task_state import TaskState
-from core.datasets.base_dataset import BaseDataset
-from core.surrogate.surrogate import Surrogate
 from core.optimizer.optimizer import Optimizer
 from core.oracle.oracle import Oracle
 
