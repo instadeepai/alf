@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import requests
 
-from core.datasets.base_dataset import BaseDataset
+from core.dataset.base_dataset import BaseDataset
 from core.dataclasses import Candidate, LabeledCandidates
 
 logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")

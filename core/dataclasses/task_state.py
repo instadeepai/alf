@@ -12,7 +12,7 @@ logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
 log = logging.getLogger("rich")
 
 if TYPE_CHECKING:
-    from core.datasets.base_dataset import BaseDataset
+    from core.dataset.base_dataset import BaseDataset
     from core.surrogate.surrogate import Surrogate
 
 

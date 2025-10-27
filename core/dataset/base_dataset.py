@@ -66,33 +66,66 @@ class BaseDataset(abc.ABC):
         """Split dataset into train, test, validation splits."""
         assert self._raw_dataset is not None, "Dataset must be loaded before splitting"
 
-        datasets_dict: dict[str, LabeledCandidates] = {}
+        # Calculate split sizes
+        train_plus_validation_size = int(len(self._raw_dataset) * self.split_ratio["train"])
+        validation_size = int(train_plus_validation_size * self.split_ratio["validation"])
+        train_size = train_plus_validation_size - validation_size
+        test_size = int(len(self._raw_dataset) * self.split_ratio["test"])
 
-        num_train = int(len(self._raw_dataset) * self.split_ratio["train"])
-        # The validation split is a subset of the train split
-        num_validation = int(num_train * self.split_ratio["validation"])
-        num_train -= num_validation
-        num_test = int(len(self._raw_dataset) * self.split_ratio["test"])
-
+        # Perform split based on type
         if self.split_type == "random":
-            shuffled_candidates = self._raw_dataset.shuffle(seed=self.seed)
-            datasets_dict["train"] = shuffled_candidates[:num_train]
-            datasets_dict["validation"] = shuffled_candidates[num_train:num_train+num_validation]
-            datasets_dict["test"] = shuffled_candidates[num_train+num_validation:num_train+num_validation+num_test]
-            datasets_dict["candidate_pool"] = shuffled_candidates[num_train+num_validation+num_test:]
+            datasets_dict = self._split_random(train_size, validation_size, test_size)
         elif self.split_type == "low_vs_high":
-            sorted_indices = self._raw_dataset.labels.argsort()[::-1]
-            indices_for_train_and_val = self.rng.permutation(sorted_indices[:num_train+num_test])
-            indices_for_test_and_pool = self.rng.permutation(sorted_indices[num_train+num_test:])
-            datasets_dict["train"] = self._raw_dataset[indices_for_train_and_val[:num_train]]
-            datasets_dict["validation"] = self._raw_dataset[indices_for_train_and_val[num_train:]]
-            datasets_dict["test"] = self._raw_dataset[indices_for_test_and_pool[:num_test]]
-            datasets_dict["candidate_pool"] = self._raw_dataset[indices_for_test_and_pool[num_test:]]
+            datasets_dict = self._split_low_vs_high(train_size, validation_size, test_size)
         else:
             raise ValueError(f"Invalid split type: {self.split_type}")
 
         self.init_candidate_pool = copy.deepcopy(datasets_dict["candidate_pool"])
         return datasets_dict
+
+    def _split_random(self, train_size: int, validation_size: int, test_size: int) -> dict[str, LabeledCandidates]:
+        """Split dataset randomly into train, validation, test, and candidate pool."""
+        shuffled_candidates = self._raw_dataset.shuffle(seed=self.seed)
+        
+        start_idx = 0
+        train = shuffled_candidates[start_idx:start_idx + train_size]
+        start_idx += train_size
+        
+        validation = shuffled_candidates[start_idx:start_idx + validation_size]
+        start_idx += validation_size
+        
+        test = shuffled_candidates[start_idx:start_idx + test_size]
+        start_idx += test_size
+        
+        candidate_pool = shuffled_candidates[start_idx:]
+        
+        return {
+            "train": train,
+            "validation": validation,
+            "test": test,
+            "candidate_pool": candidate_pool
+        }
+
+    def _split_low_vs_high(self, train_size: int, validation_size: int, test_size: int) -> dict[str, LabeledCandidates]:
+        """Split dataset so train/validation contain low-scoring candidates, test/pool contain high-scoring."""
+        # Sort indices by label (highest to lowest)
+        sorted_indices = self._raw_dataset.labels.argsort()[::-1]
+        
+        # Low-scoring candidates go to train/validation, high-scoring to test/pool
+        train_plus_validation_size = train_size + validation_size
+        low_scoring_indices = sorted_indices[:train_plus_validation_size]
+        high_scoring_indices = sorted_indices[train_plus_validation_size:]
+        
+        # Randomly shuffle within each group
+        shuffled_low = self._raw_dataset[self.rng.permutation(low_scoring_indices)]
+        shuffled_high = self._raw_dataset[self.rng.permutation(high_scoring_indices)]
+            
+        return {
+            "train": shuffled_low[:train_size],
+            "validation": shuffled_low[train_size:],
+            "test": shuffled_high[:test_size],
+            "candidate_pool": shuffled_high[test_size:]
+        }
 
     def setup(self) -> None:
         """Setup the dataset."""

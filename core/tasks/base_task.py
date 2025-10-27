@@ -3,7 +3,7 @@ from typing import Optional, Any
 from core.dataclasses import Results
 from core.dataclasses.task_state import TaskState
 import logging
-from core.datasets.base_dataset import BaseDataset
+from core.dataset.base_dataset import BaseDataset
 from core.surrogate.surrogate import Surrogate
 
 logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
