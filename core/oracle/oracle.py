@@ -9,7 +9,7 @@ from core.dataclasses.task_state import TaskState
 
 class Oracle:
     """Oracle model is used to evaluate the candidates.
-    For offline optimization tasks, the oracle is the ground truth dataset.
+    For offline optimization tasks, the oracle is the dataset.
     For online optimization tasks, the oracle is a model.
     """
 
