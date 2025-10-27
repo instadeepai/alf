@@ -113,6 +113,5 @@ class Optimizer:
             metrics.update(state.surrogate.get_training_summary_metrics())
 
         metrics.update(self.search_fn.get_metrics(state))
-        metrics.update(self.acq_fn.get_metrics(state))
 
         return metrics
