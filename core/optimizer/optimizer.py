@@ -60,7 +60,8 @@ class Optimizer:
             acquired_candidates = state.dataset.train_dataset.candidates
         else:
             search_candidates = self.search_fn(state)
-            acquisition_candidates = self.acq_fn(search_candidates, best_f=state.dataset.train_dataset.labels.max())
+            best_f = state.dataset.train_dataset.labels.max()
+            acquisition_candidates = self.acq_fn(search_candidates, best_f=best_f)
             acquired_candidates = select_top_k(acquisition_candidates, state.acq_batch_size).candidates
 
         t1 = time.perf_counter()
