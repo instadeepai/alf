@@ -87,10 +87,10 @@ class TestPredictionsValidation:
 
 
 class TestPredictionsSavePredictions:
-    """Test cases for Predictions save_predictions method."""
+    """Test cases for Predictions save method."""
 
     def test_save_predictions_basic(self):
-        """Test basic save_predictions functionality."""
+        """Test basic save functionality."""
         # Create temporary directory
         with tempfile.TemporaryDirectory() as temp_dir:
             # Setup test data
@@ -106,7 +106,7 @@ class TestPredictionsSavePredictions:
             targets = np.array([1.1, 2.1, 3.1])
             
             # Save predictions
-            predictions.save_predictions(temp_dir, candidates, targets, "test_predictions.csv")
+            predictions.save(temp_dir, candidates, targets, "test_predictions.csv")
             
             # Check if file was created
             file_path = os.path.join(temp_dir, "test_predictions.csv")
@@ -143,7 +143,7 @@ class TestPredictionsSavePredictions:
             targets = np.array([1.1, 2.1])
             
             # Save predictions
-            predictions.save_predictions(temp_dir, candidates, targets, "test_empirical.csv")
+            predictions.save(temp_dir, candidates, targets, "test_empirical.csv")
             
             # Load and verify content
             file_path = os.path.join(temp_dir, "test_empirical.csv")
@@ -174,7 +174,7 @@ class TestPredictionsSavePredictions:
             targets = np.array([1.1, 2.1, 3.1])
             
             # Save predictions
-            predictions.save_predictions(temp_dir, candidates, targets, "test_no_var.csv")
+            predictions.save(temp_dir, candidates, targets, "test_no_var.csv")
             
             # Load and verify content
             file_path = os.path.join(temp_dir, "test_no_var.csv")
@@ -198,7 +198,7 @@ class TestPredictionsSavePredictions:
             targets = np.array([1.1, 2.1])
             
             # Save predictions
-            predictions.save_predictions(temp_dir, candidates, targets, "test_no_emp.csv")
+            predictions.save(temp_dir, candidates, targets, "test_no_emp.csv")
             
             # Load and verify content
             file_path = os.path.join(temp_dir, "test_no_emp.csv")

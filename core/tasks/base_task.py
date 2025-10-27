@@ -51,7 +51,7 @@ class BaseTask(abc.ABC):
 
             if self.save_round_predictions and save_path:
                 assert filename, "Filename must be provided to save predictions"
-                predictions.save_predictions(
+                predictions.save(
                     save_path,
                     state.dataset.test_dataset.candidates,
                     state.dataset.test_dataset.labels,
