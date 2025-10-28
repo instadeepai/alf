@@ -1,4 +1,3 @@
-import abc
 from typing import Callable, List
 import numpy as np
 from core.dataclasses import LabeledCandidates, Candidate, Predictions

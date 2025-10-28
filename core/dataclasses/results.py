@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import numpy as np
 from core.dataclasses.predictions import Predictions
 from core.utils.metrics import metric_registry

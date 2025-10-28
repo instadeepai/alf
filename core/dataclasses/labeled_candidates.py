@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Any, Optional, Union, Dict
+from typing import List, Any, Optional, Union
 import numpy as np
 
 from core.dataclasses.candidate import Candidate

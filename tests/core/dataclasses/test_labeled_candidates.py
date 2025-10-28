@@ -3,7 +3,6 @@ import numpy as np
 import torch
 import networkx as nx
 import pandas as pd
-from typing import List, Any, Dict
 
 from core.dataclasses.candidate import Candidate
 from core.dataclasses.labeled_candidates import LabeledCandidates

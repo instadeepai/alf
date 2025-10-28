@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import Any, Optional
-import numpy as np
 
 @dataclass
 class Candidate:

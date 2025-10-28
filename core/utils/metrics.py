@@ -15,7 +15,6 @@
 import warnings
 from functools import wraps
 from typing import Any, Callable, Optional, Tuple, Union
-from inspect import signature
 
 import numpy as np
 from scipy.stats import norm, pearsonr, spearmanr
