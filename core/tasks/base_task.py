@@ -61,10 +61,10 @@ class BaseTask(abc.ABC):
             state.round_metrics.update({f"plots/test/{key}": value for key, value in results.figures.items()})
             state.round_metrics.update({f"surrogate/test_{key}": value for key, value in results.metrics.items()})
 
-            # Summarize the datasplits
-            dataset_summary = state.dataset.summarize()
+            # Get dataset metrics
+            dataset_metrics = state.dataset.get_metrics()
             state.round_metrics.update(
-                {f"dataset/{k}": v for k, v in dataset_summary.items()}
+                {f"dataset/{k}": v for k, v in dataset_metrics.items()}
             )
 
             metrics_list: list = []

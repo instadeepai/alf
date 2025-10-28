@@ -1,8 +1,15 @@
 from typing import Any, Dict, Tuple, List, Union
 import abc
 from core.dataclasses.labeled_candidates import Candidate, LabeledCandidates
+from core.dataset.splitting_utils import split_dataset
 import numpy as np
 import copy
+import logging
+from core.utils.io import input_handler
+import os
+
+logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
+log = logging.getLogger("rich")
 
 
 class BaseDataset(abc.ABC):
@@ -73,59 +80,9 @@ class BaseDataset(abc.ABC):
         test_size = int(len(self._raw_dataset) * self.split_ratio["test"])
 
         # Perform split based on type
-        if self.split_type == "random":
-            datasets_dict = self._split_random(train_size, validation_size, test_size)
-        elif self.split_type == "low_vs_high":
-            datasets_dict = self._split_low_vs_high(train_size, validation_size, test_size)
-        else:
-            raise ValueError(f"Invalid split type: {self.split_type}")
-
+        datasets_dict = split_dataset(self.split_type, self._raw_dataset, train_size, validation_size, test_size, self.seed)
         self.init_candidate_pool = copy.deepcopy(datasets_dict["candidate_pool"])
         return datasets_dict
-
-    def _split_random(self, train_size: int, validation_size: int, test_size: int) -> dict[str, LabeledCandidates]:
-        """Split dataset randomly into train, validation, test, and candidate pool."""
-        shuffled_candidates = self._raw_dataset.shuffle(seed=self.seed)
-        
-        start_idx = 0
-        train = shuffled_candidates[start_idx:start_idx + train_size]
-        start_idx += train_size
-        
-        validation = shuffled_candidates[start_idx:start_idx + validation_size]
-        start_idx += validation_size
-        
-        test = shuffled_candidates[start_idx:start_idx + test_size]
-        start_idx += test_size
-        
-        candidate_pool = shuffled_candidates[start_idx:]
-        
-        return {
-            "train": train,
-            "validation": validation,
-            "test": test,
-            "candidate_pool": candidate_pool
-        }
-
-    def _split_low_vs_high(self, train_size: int, validation_size: int, test_size: int) -> dict[str, LabeledCandidates]:
-        """Split dataset so train/validation contain low-scoring candidates, test/pool contain high-scoring."""
-        # Sort indices by label (highest to lowest)
-        sorted_indices = self._raw_dataset.labels.argsort()[::-1]
-        
-        # Low-scoring candidates go to train/validation, high-scoring to test/pool
-        train_plus_validation_size = train_size + validation_size
-        low_scoring_indices = sorted_indices[:train_plus_validation_size]
-        high_scoring_indices = sorted_indices[train_plus_validation_size:]
-        
-        # Randomly shuffle within each group
-        shuffled_low = self._raw_dataset[self.rng.permutation(low_scoring_indices)]
-        shuffled_high = self._raw_dataset[self.rng.permutation(high_scoring_indices)]
-            
-        return {
-            "train": shuffled_low[:train_size],
-            "validation": shuffled_low[train_size:],
-            "test": shuffled_high[:test_size],
-            "candidate_pool": shuffled_high[test_size:]
-        }
 
     def setup(self) -> None:
         """Setup the dataset."""
@@ -135,7 +92,6 @@ class BaseDataset(abc.ABC):
 
     def update_splits(self, acquired_candidates: LabeledCandidates) -> None:
         """Update the splits with the acquired candidates."""
-        
         # Remove acquired candidates from candidate pool if they are in it
         self.splits["candidate_pool"].remove(acquired_candidates.candidates)
         
@@ -145,17 +101,17 @@ class BaseDataset(abc.ABC):
         self.splits["train"].append(shuffled_acquired_candidates[:-num_val])
         self.splits["validation"].append(shuffled_acquired_candidates[-num_val:])
 
-    def save_splits(self, save_path: str, _verbose: bool = False) -> None:
-        """Save the splits to a file."""
-        pass
-
-    def summarize(self) -> dict[str, Union[float, int, np.number]]:
-        """Summarize the dataset."""
-        summary = {}
+    def save_splits(self, output_dir: str, _verbose: bool = False) -> None:
+        """Save the datasplits to the output directory."""
         for key, split in self.splits.items():
-            summary[f"num_{key}"] = len(split)
-            summary[f"{key}_mean"] = np.mean(split.labels)
-        return summary
+            if key not in ["train", "validation", "test"]:
+                continue
+            if _verbose:
+                log.info(f"Saving {key} split to {output_dir}")
+            input_handler.save_csv(
+                os.path.join(output_dir, f"{key}.csv"),
+                split.to_dataframe(),
+            )
     
     def query(self, candidates: List[Candidate]) -> LabeledCandidates:
         """Return the labels for the candidates."""
@@ -165,4 +121,8 @@ class BaseDataset(abc.ABC):
 
     def get_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Get the metrics for the dataset."""
-        return {}
+        metrics = {}
+        for key, split in self.splits.items():
+            metrics[f"num_{key}"] = len(split)
+            metrics[f"{key}_mean"] = np.mean(split.labels)
+        return metrics

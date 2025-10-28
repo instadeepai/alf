@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Any, Optional, Union
 import numpy as np
+import pandas as pd
 
 from core.dataclasses.candidate import Candidate
 
@@ -101,3 +102,16 @@ class LabeledCandidates:
         assert self.validate_candidates(candidates), "Candidates must be in this collection"
         self.labels = np.delete(self.labels, [self.candidates.index(cand) for cand in candidates])
         self.candidates = [cand for cand in self.candidates if cand not in candidates]
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """Convert the labeled candidates to a pandas dataframe."""
+        rows = []
+        for cand, label in zip(self.candidates, self.labels):
+            d = {"data": cand.stringify(), "label": label}
+            if cand.features is not None and isinstance(cand.features, dict):
+                for k, v in cand.features.items():
+                    d[k] = v
+            rows.append(d)
+
+        return pd.DataFrame.from_records(rows)
+

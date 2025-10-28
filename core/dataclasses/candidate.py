@@ -14,3 +14,11 @@ class Candidate:
 
     def __repr__(self) -> str:
         return f"Candidate(data={self.data}, modality={self.modality}, features={self.features})"
+    
+    def stringify(self) -> str:
+        """Convert the candidate data to a string."""
+        if self.modality == "sequence":
+            return self.data
+        else:
+            raise ValueError(f"Unsupported modality: {self.modality}")
+    
