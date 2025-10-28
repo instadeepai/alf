@@ -51,7 +51,6 @@ class DesignTask(BaseTask):
             state.update(labeled_candidates)
             state = optimizer.tell(state=state, logger=logger)
 
-            # Evaluate Surrogate
             state = self.evaluate(
                 state=state,
                 round_i=round_i,

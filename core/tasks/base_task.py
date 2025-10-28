@@ -61,7 +61,6 @@ class BaseTask(abc.ABC):
             state.round_metrics.update({f"plots/test/{key}": value for key, value in results.figures.items()})
             state.round_metrics.update({f"surrogate/test_{key}": value for key, value in results.metrics.items()})
 
-        # Get dataset metrics
         dataset_metrics = state.dataset.get_metrics()
         state.round_metrics.update(
             {f"dataset/{k}": v for k, v in dataset_metrics.items()}

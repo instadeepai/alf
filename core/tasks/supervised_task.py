@@ -32,7 +32,6 @@ class SupervisedTask(BaseTask):
         t1 = time.perf_counter()
         state.round_metrics = {"tell_time": t1 - t0}
 
-        # Evaluate Surrogate
         state = self.evaluate(
             state=state,
             round_i="supervised evaluation",

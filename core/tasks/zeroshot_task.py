@@ -39,7 +39,6 @@ class ZeroShotTask(BaseTask):
             f"Zero-shot evaluation on test data with {len(state.dataset.test_dataset)} sequences"
         )
 
-        # Evaluate Surrogate
         state = self.evaluate(
             state=state,
             round_i="zero-shot evaluation",
