@@ -81,7 +81,4 @@ class BaseTask(abc.ABC):
                 state.save(save_path, _verbose=True)
 
             return state
-
-            
-
-        
+      
