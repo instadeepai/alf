@@ -44,11 +44,7 @@ class DesignTask(BaseTask):
         if save_path:
             state.dataset.save_splits(save_path, _verbose=True)
 
-        # Run the optimization loop:
         for round_i in range(state.num_acq_rounds + 1):
-
-            # optimizer.setup(surrogate)  # Is this required every loop?
-            # state.set_train_schedule(self.train_schedule, round_i)
             state.round_metrics = {"round": round_i}
             acquired_candidates, state =  optimizer.ask(state)
             labeled_candidates, state = oracle.evaluate(acquired_candidates, state)
@@ -64,6 +60,7 @@ class DesignTask(BaseTask):
             )
             logger.write(state.round_metrics, timestep=round_i)
 
-            # TODO: Add termination condition
-            
+            if state.should_terminate():
+                break
+        
         return

@@ -36,6 +36,15 @@ class TaskState:
             self.dataset.update_splits(acquired_candidates)
         self.round += 1
 
+    def stringify_metrics(self) -> str:
+        """Stringify the metrics."""
+        metrics_list: list = []
+        for key, value in self.round_metrics.items():
+            # Skip the "round" key explicitly; only accept float and int types
+            if (key != "round") and isinstance(value, (float, int)):
+                metrics_list.append(f"{key}: {value:.3f}")
+        return "\t".join(metrics_list)
+
     def save_metrics(
         self,
         output_dir: str,
@@ -45,11 +54,9 @@ class TaskState:
         if _verbose:
             log.info(f"Saving metrics history to {output_dir}")
 
-        # Drop plot entries (e.g., plt.Figure)
         numeric_metrics = {
             k: v for k, v in self.round_metrics.items() if not isinstance(v, plt.Figure)
         }
-
         metrics_df = pd.DataFrame.from_records([numeric_metrics])
 
         if input_handler.isfile(os.path.join(output_dir, "metrics.csv")):
@@ -58,15 +65,28 @@ class TaskState:
 
         input_handler.save_csv(os.path.join(output_dir, "metrics.csv"), metrics_df)
 
-    # def save_history(self, output_dir: str, _verbose: bool = False) -> None:
-    #     """Save the multiround history of acquisitions to the output directory"""
-    #     pass
+    def save_history(self, output_dir: str, _verbose: bool = False) -> None:
+        """Save the multiround history of acquisitions to the output directory"""
+        if _verbose:
+            log.info(f"Saving acquisition history to {output_dir}")
+
+        for acq_round, acq_points in enumerate(self.history):
+            input_handler.save_csv(
+                os.path.join(output_dir, f"acq_round_{acq_round}.csv"),
+                acq_points.to_dataframe(),
+            )
 
     def save(self, save_path: str, _verbose: bool = False) -> None:
         self.save_metrics(save_path, _verbose)
-        # self.save_history(save_path, _verbose)
-
+        self.save_history(save_path, _verbose)
 
     def should_terminate(self) -> bool:
         """Check if the task should be terminated."""
-        raise NotImplementedError("should_terminate not implemented for TaskState")
+        if len(self.dataset.candidate_pool) < self.acq_batch_size:
+            log.info(
+                "Optimizer is signalling that optimization is complete, i.e. batch size "
+                + f"({self.acq_batch_size}) > remaining candidate pool"
+                + f"({len(self.dataset.candidate_pool)}), breaking"
+            )
+            return True
+        return False

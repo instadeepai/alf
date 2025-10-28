@@ -61,24 +61,16 @@ class BaseTask(abc.ABC):
             state.round_metrics.update({f"plots/test/{key}": value for key, value in results.figures.items()})
             state.round_metrics.update({f"surrogate/test_{key}": value for key, value in results.metrics.items()})
 
-            # Get dataset metrics
-            dataset_metrics = state.dataset.get_metrics()
-            state.round_metrics.update(
-                {f"dataset/{k}": v for k, v in dataset_metrics.items()}
-            )
+        # Get dataset metrics
+        dataset_metrics = state.dataset.get_metrics()
+        state.round_metrics.update(
+            {f"dataset/{k}": v for k, v in dataset_metrics.items()}
+        )
 
-            metrics_list: list = []
-            for key, value in state.round_metrics.items():
-                # Skip the "round" key explicitly; only accept float and int types
-                if (key != "round") and isinstance(value, (float, int)):
-                    metrics_list.append(f"{key}: {value:.3f}")
+        metrics_str = state.stringify_metrics()
+        log.info(f"Round {round_i}:\t{metrics_str}")  # noqa: E231
 
-            metrics_str = "\t".join(metrics_list)
+        if save_path:
+            state.save(save_path, _verbose=True)
 
-            log.info(f"Round {round_i}:\t{metrics_str}")  # noqa: E231
-
-            if save_path:
-                state.save(save_path, _verbose=True)
-
-            return state
-      
+        return state
