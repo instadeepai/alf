@@ -22,7 +22,7 @@ class TaskState:
 
     dataset: "BaseDataset"
     surrogate: "Surrogate"
-    step_count: int = 0
+    round: int = 0
     acq_batch_size: int = 0
     num_acq_rounds: int = 0
     save_round_predictions: bool = False
@@ -32,9 +32,9 @@ class TaskState:
 
     def update(self, acquired_candidates: LabeledCandidates) -> None:
         self.history.append(copy.copy(acquired_candidates))
-        if self.step_count != 0:
+        if self.round != 0:
             self.dataset.update_splits(acquired_candidates)
-        self.step_count += 1
+        self.round += 1
 
     def save_metrics(
         self,
