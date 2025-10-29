@@ -53,7 +53,7 @@ class DesignTask(BaseTask):
 
             state = self.evaluate(
                 state=state,
-                round_i=round_i,
+                round_name=round_i,
                 save_path=save_path,
                 filename=f"round_{round_i}_predictions.csv",
             )

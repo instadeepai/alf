@@ -34,7 +34,7 @@ class SupervisedTask(BaseTask):
 
         state = self.evaluate(
             state=state,
-            round_i="supervised evaluation",
+            round_name="supervised evaluation",
             save_path=save_path,
             filename="supervised_predictions.csv",
         )

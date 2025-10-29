@@ -41,7 +41,7 @@ class ZeroShotTask(BaseTask):
 
         state = self.evaluate(
             state=state,
-            round_i="zero-shot evaluation",
+            round_name="zero-shot evaluation",
             save_path=save_path,
             filename="zero_shot_predictions.csv",
         )
