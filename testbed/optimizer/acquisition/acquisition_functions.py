@@ -8,7 +8,7 @@ class ExpectedImprovement(AcquisitionFunction):
     """Expected improvement acquisition function."""
 
     def acquire(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Acquire the candidates."""
+        """Scores the candidates based on the surrogate model's predictions."""
         best_f = state.dataset.train_dataset.labels.max()
         if predictions.empirical_dist is not None:
             return np.mean(np.maximum(predictions.empirical_dist - best_f, 0), -1)
@@ -32,7 +32,7 @@ class Greedy(AcquisitionFunction):
     """Greedy acquisition function."""
 
     def acquire(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Acquire the candidates."""
+        """Scores the candidates based on the surrogate model's predictions."""
         return predictions.means
 
 
@@ -44,7 +44,7 @@ class UCB(AcquisitionFunction):
         self.alpha = alpha
 
     def acquire(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Acquire the candidates."""
+        """Scores the candidates based on the surrogate model's predictions."""
         if predictions.variances is not None:
             sigma = np.sqrt(predictions.variances)
             mu = predictions.means
@@ -68,7 +68,7 @@ class ThompsonSampling(AcquisitionFunction):
     """
 
     def acquire(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Acquire the candidates."""
+        """Scores the candidates based on the surrogate model's predictions."""
         if predictions.empirical_dist is not None:
             samples = predictions.empirical_dist
             ranks = samples.argsort(axis=0).argsort(axis=0) + 1
