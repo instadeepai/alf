@@ -22,7 +22,7 @@ from core.dataclasses import (
     TaskState,
 )
 from core.utils.logger import Logger
-from core.optimizer.acquisition import Acquisition
+from core.optimizer.acquisition import AcquisitionFunction
 from core.optimizer.search import BaseSearch
 
 
@@ -39,11 +39,11 @@ class Optimizer:
 
     def __init__(
         self,
-        acquisition: Acquisition,
+        acquisition: AcquisitionFunction,
         search: BaseSearch,
     ) -> None:
         """Initialize the optimizer."""
-        self.acq_fn = acquisition
+        self.acquisition = acquisition
         self.search_fn = search
 
     def ask(
@@ -60,8 +60,7 @@ class Optimizer:
             acquired_candidates = state.dataset.train_dataset.candidates
         else:
             search_candidates = self.search_fn(state)
-            best_f = state.dataset.train_dataset.labels.max()
-            acquisition_candidates = self.acq_fn(search_candidates, best_f=best_f)
+            acquisition_candidates = self.acquisition(search_candidates, state)
             acquired_candidates = select_top_k(acquisition_candidates, state.acq_batch_size).candidates
 
         t1 = time.perf_counter()
