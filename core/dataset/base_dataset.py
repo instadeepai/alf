@@ -69,18 +69,31 @@ class BaseDataset(abc.ABC):
         assert "split_type" in split_config, "Split type must be set"
         assert "train" and "test" and "validation" in split_config["split_ratio"], "Train, test, and validation splits ratio must be set"
 
+        train_split_ratio = split_config["split_ratio"]["train"]
+        validation_split_ratio = split_config["split_ratio"]["validation"]
+        test_split_ratio = split_config["split_ratio"]["test"]
+        if "candidate_pool" in split_config["split_ratio"]:
+            candidate_pool_split_ratio = split_config["split_ratio"]["candidate_pool"]
+            assert train_split_ratio + validation_split_ratio + test_split_ratio + candidate_pool_split_ratio <= 1, "Split ratios must sum to less than or equal to 1"
+        else:
+            assert train_split_ratio + validation_split_ratio + test_split_ratio <= 1, "Split ratios must sum to less than or equal to 1"
+
     def _split_dataset(self) -> Tuple[Dict[str, LabeledCandidates], LabeledCandidates]:
         """Split dataset into train, test, validation splits."""
         assert self._raw_dataset is not None, "Dataset must be loaded before splitting"
 
         # Calculate split sizes
-        train_plus_validation_size = int(len(self._raw_dataset) * self.split_ratio["train"])
-        validation_size = int(train_plus_validation_size * self.split_ratio["validation"])
-        train_size = train_plus_validation_size - validation_size
+        train_size = int(len(self._raw_dataset) * self.split_ratio["train"])
+        validation_size = int(len(self._raw_dataset) * self.split_ratio["validation"])
         test_size = int(len(self._raw_dataset) * self.split_ratio["test"])
+        if "candidate_pool" in self.split_ratio:
+            candidate_pool_size = int(len(self._raw_dataset) * self.split_ratio["candidate_pool"])
+        else:
+            log.warning("Candidate pool ratio not set, using remaining dataset size")
+            candidate_pool_size = len(self._raw_dataset) - train_size - validation_size - test_size
 
         # Perform split based on type
-        datasets_dict = split_dataset(self.split_type, self._raw_dataset, train_size, validation_size, test_size, self.seed)
+        datasets_dict = split_dataset(self.split_type, self._raw_dataset, train_size, validation_size, test_size, candidate_pool_size, self.seed)
         self.init_candidate_pool = copy.deepcopy(datasets_dict["candidate_pool"])
         return datasets_dict
 

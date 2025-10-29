@@ -25,7 +25,7 @@ def split_random(dataset: LabeledCandidates, train_size: int, validation_size: i
     test = shuffled_candidates[start_idx:start_idx + test_size]
     start_idx += test_size
     
-    candidate_pool = shuffled_candidates[start_idx:]
+    candidate_pool = shuffled_candidates[start_idx:start_idx + candidate_pool_size]
     
     return {
         "train": train,
