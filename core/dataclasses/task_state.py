@@ -26,7 +26,6 @@ class TaskState:
     acq_batch_size: int = 0
     num_acq_rounds: int = 0
     save_round_predictions: bool = False
-    alphabet: Any = None
     history: List = field(default_factory=list)
     round_metrics: dict[str, Any] = field(default_factory=dict)
 
