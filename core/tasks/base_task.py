@@ -39,7 +39,7 @@ class BaseTask(abc.ABC):
     def evaluate(
         self,  
         state: TaskState, 
-        round_i: int, 
+        round_name: int | str, 
         save_path: Optional[str], 
         filename: str,
     ) -> TaskState:
@@ -66,10 +66,6 @@ class BaseTask(abc.ABC):
             {f"dataset/{k}": v for k, v in dataset_metrics.items()}
         )
 
-        metrics_str = state.stringify_metrics()
-        log.info(f"Round {round_i}:\t{metrics_str}")  # noqa: E231
-
-        if save_path:
-            state.save(save_path, _verbose=True)
-
+        state.print_metrics(round_name)
+        state.save(save_path, _verbose=True)
         return state

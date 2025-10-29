@@ -36,24 +36,21 @@ class TaskState:
             self.dataset.update_splits(acquired_candidates)
         self.round += 1
 
-    def stringify_metrics(self) -> str:
+    def print_metrics(self, round_name: int | str) -> None:
         """Stringify the metrics."""
         metrics_list: list = []
         for key, value in self.round_metrics.items():
             # Skip the "round" key explicitly; only accept float and int types
             if (key != "round") and isinstance(value, (float, int)):
                 metrics_list.append(f"{key}: {value:.3f}")
-        return "\t".join(metrics_list)
+        metrics_str = "\t".join(metrics_list)
+        log.info(f"Round {round_name}:\t{metrics_str}")  # noqa: E231
 
     def save_metrics(
         self,
         output_dir: str,
-        _verbose: bool = False,
     ) -> None:
         """Save the multiround metrics to the output directory"""
-        if _verbose:
-            log.info(f"Saving metrics history to {output_dir}")
-
         numeric_metrics = {
             k: v for k, v in self.round_metrics.items() if not isinstance(v, plt.Figure)
         }
@@ -65,20 +62,22 @@ class TaskState:
 
         input_handler.save_csv(os.path.join(output_dir, "metrics.csv"), metrics_df)
 
-    def save_history(self, output_dir: str, _verbose: bool = False) -> None:
+    def save_history(self, output_dir: str) -> None:
         """Save the multiround history of acquisitions to the output directory"""
-        if _verbose:
-            log.info(f"Saving acquisition history to {output_dir}")
-
         for acq_round, acq_points in enumerate(self.history):
             input_handler.save_csv(
                 os.path.join(output_dir, f"acq_round_{acq_round}.csv"),
                 acq_points.to_dataframe(),
             )
 
-    def save(self, save_path: str, _verbose: bool = False) -> None:
-        self.save_metrics(save_path, _verbose)
-        self.save_history(save_path, _verbose)
+    def save(self, save_path: str | None, _verbose: bool = False) -> None:
+        """Save the metrics and history to the output directory"""
+        if _verbose:
+            log.info(f"Saving metrics and history to {save_path}")
+
+        if save_path:
+            self.save_metrics(save_path)
+            self.save_history(save_path)
 
     def should_terminate(self) -> bool:
         """Check if the task should be terminated."""
