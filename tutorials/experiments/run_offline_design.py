@@ -45,7 +45,7 @@ surrogate = Surrogate(model=CNNModel())
 acquisition = Acquisition(name="greedy", surrogate=surrogate)
 
 # Initialize search strategy
-search = DatasetSearch(dataset=gfp_dataset)
+search = DatasetSearch()
 
 # Initialize optimizer
 optimizer = Optimizer(acquisition=acquisition, search=search)

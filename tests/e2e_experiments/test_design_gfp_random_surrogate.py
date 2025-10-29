@@ -41,9 +41,9 @@ def acquisition(surrogate_model):
 
 
 @pytest.fixture
-def search(gfp_dataset):
+def search():
     """Fixture to create search strategy."""
-    return DatasetSearch(dataset=gfp_dataset)
+    return DatasetSearch()
 
 
 @pytest.fixture
