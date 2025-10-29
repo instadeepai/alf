@@ -13,7 +13,7 @@ from testbed.datasets.gfp import GFPDataset
 from testbed.models.cnn import CNNModel
 from core.surrogate.surrogate import Surrogate
 from core.optimizer.optimizer import Optimizer
-from core.optimizer.acquisition import Acquisition
+from testbed.optimizer.acquisition.acquisition_functions import Greedy
 from core.optimizer.search import DatasetSearch
 from core.oracle.oracle import Oracle
 from core.utils.logger import TerminalLogger
@@ -42,7 +42,7 @@ gfp_dataset = GFPDataset(
 surrogate = Surrogate(model=CNNModel())
 
 # Initialize acquisition function
-acquisition = Acquisition(name="greedy", surrogate=surrogate)
+acquisition = Greedy()
 
 # Initialize search strategy
 search = DatasetSearch(dataset=gfp_dataset)
