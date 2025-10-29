@@ -111,7 +111,8 @@ class Optimizer:
         }
 
         if state.surrogate:
-            metrics.update(state.surrogate.get_training_summary_metrics())
+            surrogate_metrics = state.surrogate.get_training_summary_metrics()
+            metrics.update({f"surrogate/{k}": v for k, v in surrogate_metrics.items()})
 
         metrics.update(self.search_fn.get_metrics(state))
 
