@@ -43,7 +43,7 @@ class BaseTask(abc.ABC):
         save_path: Optional[str], 
         filename: str,
     ) -> TaskState:
-        """Evaluate the surrogate model and return the updated state."""
+        """Evaluate the surrogate model on the test dataset and return the updated state."""
 
         if len(state.dataset.test_dataset) > 0 and state.surrogate:
             predictions = state.surrogate.predict(state.dataset.test_dataset.candidates)

@@ -18,6 +18,7 @@ class LabeledCandidates:
             "Candidates and labels must have the same length"
 
     def __len__(self) -> int:
+        """Return the number of candidates in the collection."""
         return len(self.candidates)
 
     def __getitem__(self, index: Union[int, slice]) -> "LabeledCandidates":

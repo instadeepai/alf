@@ -31,6 +31,7 @@ class TaskState:
     round_metrics: dict[str, Any] = field(default_factory=dict)
 
     def update(self, acquired_candidates: LabeledCandidates) -> None:
+        """Update the task state, including the dataset, with the acquired candidates."""
         self.history.append(copy.copy(acquired_candidates))
         if self.round != 0:
             self.dataset.update_splits(acquired_candidates)

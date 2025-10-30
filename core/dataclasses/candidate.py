@@ -13,6 +13,7 @@ class Candidate:
             self.features = {}
 
     def __repr__(self) -> str:
+        """Return a string representation of the candidate."""
         return f"Candidate(data={self.data}, modality={self.modality}, features={self.features})"
     
     def stringify(self) -> str:

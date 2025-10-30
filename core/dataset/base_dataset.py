@@ -61,6 +61,7 @@ class BaseDataset(abc.ABC):
         return self.splits["candidate_pool"]
 
     def __repr__(self) -> str:
+        """Return a string representation of the dataset."""
         return f"Dataset(name={self.name}, modality={self.modality}, seed={self.seed}, train_size={len(self.train_dataset)}, validation_size={len(self.validation_dataset)}, test_size={len(self.test_dataset)}, candidate_pool_size={len(self.candidate_pool)})"
     
     def validate_split_config(self, split_config: dict[str, Any]) -> None:
