@@ -175,6 +175,18 @@ class TestCandidateFeatures:
         assert candidate.features == features
 
 
+class TestCandidateStringify:
+    """Tests for Candidate.stringify method."""
+
+    def test_stringify_sequence(self):
+        candidate = Candidate(data="ACDEFG", modality="sequence")
+        assert candidate.stringify() == "ACDEFG"
+
+    def test_stringify_unsupported_modality_raises(self):
+        candidate = Candidate(data=123, modality="numeric")
+        with pytest.raises(ValueError, match="Unsupported modality"):
+            candidate.stringify()
+
 @pytest.mark.parametrize("modality,data_factory", [
     ("sequence", lambda: "ATCGATCG"),
     ("image", lambda: np.random.rand(32, 32, 3)),

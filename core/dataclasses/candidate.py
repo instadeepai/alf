@@ -20,5 +20,7 @@ class Candidate:
         if self.modality == "sequence":
             return self.data
         else:
+            # TODO: Implement stringification for other modalities
+            # Once implemented, add test cases to test_candidate.py
             raise ValueError(f"Unsupported modality: {self.modality}")
     

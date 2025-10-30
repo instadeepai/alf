@@ -138,6 +138,131 @@ class TestLabeledCandidatesMethods:
         assert labeled_candidates.data == expected_data
 
 
+class TestLabeledCandidatesGetItem:
+    """Tests for __getitem__ behavior."""
+
+    def test_getitem_int_returns_singleton_collection(self):
+        candidates = [
+            Candidate(data="a", modality="sequence"),
+            Candidate(data="b", modality="sequence"),
+        ]
+        labels = np.array([0, 1])
+        lc = LabeledCandidates(candidates=candidates, labels=labels)
+
+        item = lc[1]
+        assert isinstance(item, LabeledCandidates)
+        assert len(item) == 1
+        assert item.candidates[0].data == "b"
+        np.testing.assert_array_equal(item.labels, np.array([1]))
+
+    def test_getitem_slice_returns_subcollection(self):
+        candidates = [
+            Candidate(data="a", modality="sequence"),
+            Candidate(data="b", modality="sequence"),
+            Candidate(data="c", modality="sequence"),
+        ]
+        labels = np.array([0, 1, 0])
+        lc = LabeledCandidates(candidates=candidates, labels=labels)
+
+        sub = lc[1:3]
+        assert len(sub) == 2
+        assert [c.data for c in sub.candidates] == ["b", "c"]
+        np.testing.assert_array_equal(sub.labels, np.array([1, 0]))
+
+    def test_getitem_invalid_index_type_raises(self):
+        candidates = [Candidate(data="a", modality="sequence")]
+        labels = np.array([0])
+        lc = LabeledCandidates(candidates=candidates, labels=labels)
+        with pytest.raises(TypeError, match="Indices must be integers or slices"):
+            _ = lc["bad"]  # type: ignore[index]
+
+
+class TestLabeledCandidatesValidateShuffleSortRemove:
+    """Tests for validate_candidates, shuffle, sort, and remove methods."""
+
+    def test_validate_candidates(self):
+        c1 = Candidate(data="a", modality="sequence")
+        c2 = Candidate(data="b", modality="sequence")
+        lc = LabeledCandidates(candidates=[c1], labels=np.array([1]))
+        assert lc.validate_candidates([c1]) is True
+        assert lc.validate_candidates([c2]) is False
+
+    def test_shuffle_deterministic(self):
+        candidates = [
+            Candidate(data=str(i), modality="sequence") for i in range(5)
+        ]
+        labels = np.array([0, 1, 2, 3, 4])
+        lc = LabeledCandidates(candidates=candidates, labels=labels)
+
+        shuffled1 = lc.shuffle(seed=42)
+        shuffled2 = lc.shuffle(seed=42)
+        assert [c.data for c in shuffled1.candidates] == [c.data for c in shuffled2.candidates]
+        np.testing.assert_array_equal(shuffled1.labels, shuffled2.labels)
+        # Ensure original is unchanged length-wise and content-wise
+        assert [c.data for c in lc.candidates] == [str(i) for i in range(5)]
+        np.testing.assert_array_equal(lc.labels, labels)
+
+    def test_sort_ascending_and_descending(self):
+        candidates = [
+            Candidate(data="x", modality="sequence"),
+            Candidate(data="y", modality="sequence"),
+            Candidate(data="z", modality="sequence"),
+        ]
+        labels = np.array([2.0, 1.0, 3.0])
+        lc = LabeledCandidates(candidates=candidates, labels=labels)
+
+        asc = lc.sort(ascending=True)
+        desc = lc.sort(ascending=False)
+
+        np.testing.assert_array_equal([c.data for c in asc.candidates], ["y", "x", "z"])
+        np.testing.assert_array_equal(asc.labels, np.array([1.0, 2.0, 3.0]))
+
+        np.testing.assert_array_equal([c.data for c in desc.candidates], ["z", "x", "y"])
+        np.testing.assert_array_equal(desc.labels, np.array([3.0, 2.0, 1.0]))
+
+    def test_remove_with_list_and_with_collection(self):
+        c1 = Candidate(data="a", modality="sequence")
+        c2 = Candidate(data="b", modality="sequence")
+        c3 = Candidate(data="c", modality="sequence")
+        lc = LabeledCandidates(candidates=[c1, c2, c3], labels=np.array([1, 2, 3]))
+
+        # remove with list
+        lc.remove([c2])
+        assert [c.data for c in lc.candidates] == ["a", "c"]
+        np.testing.assert_array_equal(lc.labels, np.array([1, 3]))
+
+        # remove with LabeledCandidates
+        lc2 = LabeledCandidates(candidates=[c1], labels=np.array([1]))
+        lc.remove(lc2)
+        assert [c.data for c in lc.candidates] == ["c"]
+        np.testing.assert_array_equal(lc.labels, np.array([3]))
+
+    def test_remove_raises_when_candidate_not_present(self):
+        c1 = Candidate(data="a", modality="sequence")
+        c2 = Candidate(data="b", modality="sequence")
+        lc = LabeledCandidates(candidates=[c1], labels=np.array([1]))
+        with pytest.raises(AssertionError, match="Candidates must be in this collection"):
+            lc.remove([c2])
+
+
+class TestLabeledCandidatesToDataFrame:
+    """Tests for to_dataframe ensuring features and stringify are used."""
+
+    def test_to_dataframe_with_features(self):
+        c1 = Candidate(data="SEQ1", modality="sequence", features={"a": 1, "b": "x"})
+        c2 = Candidate(data="SEQ2", modality="sequence", features={"a": 2})
+        lc = LabeledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+
+        df = lc.to_dataframe()
+        assert list(df.columns) == ["data", "label", "a", "b"] or list(df.columns) == ["data", "label", "b", "a"]
+        assert len(df) == 2
+        # data should come from stringify (for sequence equals raw string)
+        assert df.loc[0, "data"] == "SEQ1"
+        assert df.loc[1, "data"] == "SEQ2"
+        # features flattened
+        assert df.loc[0, "a"] == 1
+        assert df.loc[1, "a"] == 2
+
 class TestLabeledCandidatesAppend:
     """Test cases for LabeledCandidates append method."""
 
