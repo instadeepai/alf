@@ -47,8 +47,8 @@ class DatasetSearch(BaseSearch):
 
     def __call__(self, task_state: TaskState, **kwargs) -> List[Candidate]:
         """Get the candidate pool from the dataset."""
-        labeled_candidates = task_state.dataset.candidate_pool
-        return labeled_candidates.candidates
+        candidate_pool = task_state.dataset.candidate_pool
+        return candidate_pool.candidates
     
     def get_metrics(self, task_state: TaskState) -> Dict[str, float]:
         """Return recall and regret metrics for the dataset search method."""
