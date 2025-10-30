@@ -6,9 +6,9 @@ from core.utils.constants import PROTEIN_ALPHABET
 class SingleMutantSearch(SearchProtocol):
     """Search protocol for single mutant search."""
 
-    def __init__(self, protein_alphabet: str = PROTEIN_ALPHABET):
-        """Initialize the single mutant search protocol with the protein alphabet."""
-        self.protein_alphabet = protein_alphabet
+    def __init__(self, alphabet: str = PROTEIN_ALPHABET):
+        """Initialize the single mutant search protocol with the alphabet."""
+        self.alphabet = alphabet
 
     def __call__(self, task_state: TaskState) -> List[Candidate]:
         """Apply the search protocol to return a pool of candidates."""
@@ -17,7 +17,7 @@ class SingleMutantSearch(SearchProtocol):
         best_sequence = train_dataset.candidates[best_id].data
         single_mutant_pool = []
         for i in range(len(best_sequence)):
-            for j in range(len(self.protein_alphabet)):
-                if best_sequence[i] != self.protein_alphabet[j]:
-                    single_mutant_pool.append(Candidate(data=best_sequence[:i] + self.protein_alphabet[j] + best_sequence[i+1:], label=None))
+            for j in range(len(self.alphabet)):
+                if best_sequence[i] != self.alphabet[j]:
+                    single_mutant_pool.append(Candidate(data=best_sequence[:i] + self.alphabet[j] + best_sequence[i+1:], label=None))
         return single_mutant_pool
