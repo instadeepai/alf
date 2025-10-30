@@ -11,7 +11,7 @@ from core.oracle.oracle import Oracle
 from core.utils.logger import TerminalLogger
 from core.tasks.design_task import DesignTask
 from testbed.models.random import RandomModel
-from testbed.optimizer.acquisition.acquisition_functions import Greedy
+from testbed.optimizer.acquisition.greedy import Greedy
 
 
 @pytest.fixture

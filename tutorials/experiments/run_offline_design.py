@@ -13,7 +13,7 @@ from testbed.datasets.gfp import GFPDataset
 from testbed.models.cnn import CNNModel
 from core.surrogate.surrogate import Surrogate
 from core.optimizer.optimizer import Optimizer
-from testbed.optimizer.acquisition.acquisition_functions import Greedy
+from testbed.optimizer.acquisition.greedy import Greedy
 from core.optimizer.search import DatasetSearch
 from core.oracle.oracle import Oracle
 from core.utils.logger import TerminalLogger
