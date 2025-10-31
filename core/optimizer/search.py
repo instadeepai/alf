@@ -45,13 +45,10 @@ class GeneratorSearch(BaseSearch):
 class DatasetSearch(BaseSearch):
     """Offline search method based on a dataset defining the search pool."""
 
-    def __init__(self, dataset: BaseDataset):
-        self.dataset: BaseDataset = dataset
-    
     def __call__(self, task_state: TaskState, **kwargs) -> List[Candidate]:
         """Get the candidate pool from the dataset."""
-        labeled_candidates = self.dataset.candidate_pool
-        return labeled_candidates.candidates
+        candidate_pool = task_state.dataset.candidate_pool
+        return candidate_pool.candidates
     
     def get_metrics(self, task_state: TaskState) -> Dict[str, float]:
         """Return recall and regret metrics for the dataset search method."""
