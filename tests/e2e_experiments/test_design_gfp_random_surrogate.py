@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import shutil
 
-from testbed.datasets.gfp import GFPDataset
+from testbed.datasets.gfp import GFP
 from core.surrogate.surrogate import Surrogate
 from core.optimizer.optimizer import Optimizer
 from core.optimizer.acquisition import Acquisition
@@ -17,7 +17,7 @@ from testbed.models.random import RandomModel
 @pytest.fixture
 def gfp_dataset():
     """Fixture to create a GFP dataset for testing."""
-    return GFPDataset(
+    return GFP(
         name="gfp", 
         modality="sequence", 
         seed=51505, 

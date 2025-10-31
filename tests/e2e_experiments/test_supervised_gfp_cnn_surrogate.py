@@ -5,7 +5,7 @@ import pandas as pd
 import shutil
 from pathlib import Path
 
-from testbed.datasets.gfp import GFPDataset
+from testbed.datasets.gfp import GFP
 from testbed.models.cnn import CNNModel, CNNTrainConfig
 from core.utils.logger import TerminalLogger
 from core.tasks.supervised_task import SupervisedTask
@@ -29,7 +29,7 @@ def set_seed():
 @pytest.fixture
 def gfp_dataset():
     """Fixture to create a GFP dataset for testing."""
-    return GFPDataset(
+    return GFP(
         name="gfp", 
         modality="sequence", 
         seed=51505, 

@@ -1,12 +1,12 @@
 import pytest
 import numpy as np
-from testbed.datasets.gfp import GFPDataset
+from testbed.datasets.gfp import GFP
 
 
 @pytest.fixture
 def gfp_dataset():
     """Create a GFP dataset fixture for testing."""
-    return GFPDataset(
+    return GFP(
         name="gfp",
         modality="sequence", 
         seed=51505,

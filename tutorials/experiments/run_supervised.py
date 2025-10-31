@@ -8,7 +8,7 @@ This script demonstrates how to run a supervised task using:
 - Dataset-based search strategy
 """
 
-from testbed.datasets.gfp import GFPDataset
+from testbed.datasets.gfp import GFP
 from testbed.models.cnn import CNNModel
 from core.surrogate.surrogate import Surrogate
 from core.oracle.oracle import Oracle
@@ -27,7 +27,7 @@ split_config = {
 }
 
 # Initialize dataset
-gfp_dataset = GFPDataset(
+gfp_dataset = GFP(
     name="gfp",
     modality="sequence",
     seed=51505,

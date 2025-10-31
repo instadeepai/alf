@@ -9,7 +9,7 @@ This script demonstrates how to run an offline design task using:
 - Multiple acquisition rounds with batch sampling
 """
 
-from testbed.datasets.gfp import GFPDataset
+from testbed.datasets.gfp import GFP
 from testbed.models.cnn import CNNModel
 from core.surrogate.surrogate import Surrogate
 from core.optimizer.optimizer import Optimizer
@@ -31,7 +31,7 @@ split_config = {
 }
 
 # Initialize dataset
-gfp_dataset = GFPDataset(
+gfp_dataset = GFP(
     name="gfp",
     modality="sequence",
     seed=51505,

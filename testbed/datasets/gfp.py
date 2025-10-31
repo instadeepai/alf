@@ -17,7 +17,7 @@ FILENAME = "gfp_dataset.csv"
 URL = "https://raw.githubusercontent.com/dhbrookes/CbAS/master/data/gfp_data.csv"
 
 
-class GFPDataset(BaseDataset):
+class GFP(BaseDataset):
     def __init__(
         self,  name: str, modality: str, seed: int, split_config: dict[str, Any]
     ):

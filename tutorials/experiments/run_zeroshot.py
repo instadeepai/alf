@@ -6,7 +6,7 @@ This script demonstrates how to run a zero-shot task using:
 - Random surrogate model
 """
 
-from testbed.datasets.gfp import GFPDataset
+from testbed.datasets.gfp import GFP
 from testbed.models.random import RandomModel
 from core.surrogate.surrogate import Surrogate
 from core.utils.logger import TerminalLogger
@@ -24,7 +24,7 @@ split_config = {
 }
 
 # Initialize dataset
-gfp_dataset = GFPDataset(
+gfp_dataset = GFP(
     name="gfp",
     modality="sequence",
     seed=51505,

@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import shutil
 
-from testbed.datasets.gfp import GFPDataset
+from testbed.datasets.gfp import GFP
 from testbed.models.random import RandomModel
 from core.surrogate.surrogate import Surrogate
 from core.utils.logger import TerminalLogger
@@ -21,7 +21,7 @@ def gfp_dataset():
         },
         "split_type": "random"
     }
-    return GFPDataset(
+    return GFP(
         name="gfp",
         modality="sequence",
         seed=51505,
