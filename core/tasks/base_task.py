@@ -1,5 +1,5 @@
 import abc
-from typing import Optional, Any
+from typing import Optional
 from core.dataclasses import Results
 from core.dataclasses.task_state import TaskState
 import logging
@@ -13,12 +13,11 @@ log = logging.getLogger("rich")
 class BaseTask(abc.ABC):
     """Base class for all tasks."""
 
-    def __init__(self, task_type: str, acq_batch_size: int = 0, num_acq_rounds: int = 0, save_round_predictions: bool = False, alphabet: Any = None) -> None:
+    def __init__(self, task_type: str, acq_batch_size: int = 0, num_acq_rounds: int = 0, save_round_predictions: bool = False) -> None:
         self.task_type = task_type
         self.acq_batch_size = acq_batch_size
         self.num_acq_rounds = num_acq_rounds
         self.save_round_predictions = save_round_predictions
-        self.alphabet = alphabet
 
     def setup(self, dataset: BaseDataset, surrogate: Surrogate) -> TaskState:
         """Setup the task."""
@@ -28,7 +27,6 @@ class BaseTask(abc.ABC):
             acq_batch_size=self.acq_batch_size,
             num_acq_rounds=self.num_acq_rounds,
             save_round_predictions=self.save_round_predictions,
-            alphabet=self.alphabet,
         )
 
     @abc.abstractmethod
