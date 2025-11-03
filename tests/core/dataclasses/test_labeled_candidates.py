@@ -4,8 +4,8 @@ import torch
 import networkx as nx
 import pandas as pd
 
-from core.dataclasses.candidate import Candidate
-from core.dataclasses.labeled_candidates import LabeledCandidates
+from alf.core.dataclasses.candidate import Candidate
+from alf.core.dataclasses.labeled_candidates import LabeledCandidates
 
 
 class TestLabeledCandidatesInitialization:

@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from testbed.datasets.gfp import GFP
+from alf.tools.datasets.gfp import GFP
 
 
 @pytest.fixture

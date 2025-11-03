@@ -4,7 +4,7 @@ import torch
 import networkx as nx
 import pandas as pd
 
-from core.dataclasses.candidate import Candidate
+from alf.core.dataclasses.candidate import Candidate
 
 
 class TestCandidateInitialization:

@@ -16,8 +16,8 @@ import numpy as np
 import pytest
 import torch
 
-from core.dataclasses import Candidate, LabeledCandidates
-from testbed.models.cnn import (
+from alf.core.dataclasses import Candidate, LabeledCandidates
+from alf.tools.models.cnn import (
     CNNModelConfig,
     CNNModel,
     CNNTrainConfig,

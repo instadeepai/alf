@@ -3,11 +3,11 @@ import numpy as np
 import pandas as pd
 import shutil
 
-from testbed.datasets.gfp import GFP
-from testbed.models.random import RandomModel
-from core.surrogate.surrogate import Surrogate
-from core.utils.logger import TerminalLogger
-from core.tasks.zeroshot_task import ZeroShotTask
+from alf.tools.datasets.gfp import GFP
+from alf.tools.models.random import RandomModel
+from alf.core.surrogate.surrogate import Surrogate
+from alf.core.utils.logger import TerminalLogger
+from alf.core.tasks.zeroshot_task import ZeroShotTask
 
 
 @pytest.fixture

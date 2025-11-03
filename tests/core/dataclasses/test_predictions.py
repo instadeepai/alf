@@ -4,8 +4,8 @@ import pandas as pd
 import os
 import tempfile
 
-from core.dataclasses.predictions import Predictions
-from core.dataclasses.candidate import Candidate
+from alf.core.dataclasses.predictions import Predictions
+from alf.core.dataclasses.candidate import Candidate
 
 
 class TestPredictionsInitialization:
