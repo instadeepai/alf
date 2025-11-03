@@ -12,7 +12,7 @@ from core.dataclasses import Candidate, LabeledCandidates
 logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
 log = logging.getLogger("rich")
 
-DATAPATH = "testbed/datasets/data/"
+DATAPATH = "testbed/datasets/data/gfp/"
 FILENAME = "gfp_dataset.csv"
 URL = "https://raw.githubusercontent.com/dhbrookes/CbAS/master/data/gfp_data.csv"
 
@@ -36,9 +36,9 @@ class GFP(BaseDataset):
             if response.status_code == 200:
                 with open(os.path.join(DATAPATH, FILENAME), "wb") as file:
                     file.write(response.content)
-                print("GFP dataset downloaded successfully.")
+                log.info("GFP dataset downloaded successfully.")
             else:
-                print(
+                log.error(
                     f"Failed to download GFP dataset. Status code: {response.status_code}"
                 )
 

@@ -52,8 +52,8 @@ class LabeledCandidates:
     
     def append(
         self,
-        candidates: Union[List["Candidate"], "LabeledCandidates"],
-        labels: Optional[np.ndarray] = None,
+        candidates: Union[List["Candidate"], "LabeledCandidates", "Candidate"],
+        labels: Optional[np.ndarray | float | int] = None,
     ) -> None:
         """Append candidates and labels to this collection.
         
@@ -64,6 +64,13 @@ class LabeledCandidates:
         Raises:
             ValueError: If candidates and labels don't match in length
         """
+        # Convert candidates to list if it is a single Candidate
+        if isinstance(candidates, Candidate):
+            candidates = [candidates]
+        # Convert labels to numpy array if it is not a numpy array or list
+        if not isinstance(labels, np.ndarray) and not isinstance(labels, list):
+            labels = np.array([labels])
+
         if isinstance(candidates, LabeledCandidates):
             self.candidates.extend(candidates.candidates)
             self.labels = np.concatenate(

@@ -15,6 +15,6 @@
 import os
 
 PROTEIN_ALPHABET = "ARNDCQEGHILKMFPSTWYV"
-DATA_REPOSITORY_NAME = "InstaDeepAI/alf"
-DATA_REPOSITORY_URL = f"hf://datasets/{DATA_REPOSITORY_NAME}"
+HF_DATASETS_REPOSITORY_NAME = "InstaDeepAI/alfred"
+HF_DATASETS_REPOSITORY_URL = f"hf://datasets/{HF_DATASETS_REPOSITORY_NAME}"
 BASEDIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))

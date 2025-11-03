@@ -21,6 +21,7 @@ dependencies = [
     "s3fs>=2023.6.0",
     "requests>=2.25.0",
     "ipykernel>=6.25.0",
+    "huggingface_hub==0.27.0"
 ]
 
 [project.optional-dependencies]
