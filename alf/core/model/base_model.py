@@ -17,11 +17,6 @@ class BaseModel(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def cleanup(self) -> None:
-        """Delete any temporary files, checkpoints etc that aren't being persisted."""
-        pass
-
-    @abc.abstractmethod
     def train(self, train_data: LabeledCandidates, val_data: LabeledCandidates, logger: Optional[Logger] = None) -> None:
         """Train the model."""
         pass
@@ -36,7 +31,10 @@ class BaseModel(abc.ABC):
         """Sample candidate points from the model."""
         pass
 
-    @abc.abstractmethod
     def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Get the training summary metrics."""
+        return {}
+
+    def cleanup(self) -> None:
+        """Delete any temporary files, checkpoints etc that aren't being persisted."""
         pass
