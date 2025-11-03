@@ -7,7 +7,7 @@ from alf.core.dataset.base_dataset import BaseDataset
 from alf.core.optimizer.acquisition_function import AcquisitionFunction
 from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions
 from alf.core.utils.logger import Logger
-
+from alf.core.dataclasses import TaskState
 
 class DummyDataset(BaseDataset):
     """Dummy dataset that generates random data for testing."""
@@ -102,12 +102,11 @@ class DummyModel(BaseModel):
 class DummyAcquisitionFunction(AcquisitionFunction):
     """Dummy acquisition function that generates random acquisition values for testing."""
     
-    def __init__(self, name: str = "dummy_acquisition_function", seed: int = 42):
+    def __init__(self, seed: int = 42):
         """Initialize the dummy acquisition function."""
-        super().__init__(name)
         self.seed = seed
         self.rng = np.random.RandomState(seed)
     
-    def _get_acquisition_values(self, predictions: Predictions) -> np.ndarray:
+    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
         """Generate random acquisition values for the predictions."""
         return self.rng.randn(len(predictions))

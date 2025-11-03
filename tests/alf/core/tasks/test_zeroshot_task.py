@@ -6,7 +6,7 @@ import shutil
 
 from alf.core.tasks.zeroshot_task import ZeroShotTask
 from alf.core.utils.logger import TerminalLogger
-from tests.alf.core.tasks.conftest import dummy_dataset, dummy_surrogate
+
 
 @pytest.fixture
 def expected_metrics():
