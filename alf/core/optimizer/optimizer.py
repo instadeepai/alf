@@ -22,7 +22,7 @@ from alf.core.dataclasses import (
     TaskState,
 )
 from alf.core.utils.logger import Logger
-from alf.core.optimizer.acquisition import Acquisition
+from alf.core.optimizer.acquisition_function import AcquisitionFunction
 from alf.core.optimizer.search import BaseSearch
 
 
@@ -39,17 +39,17 @@ class Optimizer:
 
     def __init__(
         self,
-        acquisition: Acquisition,
-        search: BaseSearch,
+        acquisition_fn: AcquisitionFunction,
+        search_fn: BaseSearch,
     ) -> None:
         """Initialize the optimizer."""
-        self.acq_fn = acquisition
-        self.search_fn = search
+        self.acquisition_fn = acquisition_fn
+        self.search_fn = search_fn
 
     def ask(
         self,
         state: TaskState,
-    ) -> Tuple[List[Candidate], TaskState]:
+    ) -> Tuple[List[Candidate], TaskState]: 
         """Ask the optimizer to propose the next batch of candidates through the search and acquisition functions."""
 
         t0 = time.perf_counter()
@@ -60,8 +60,7 @@ class Optimizer:
             acquired_candidates = state.dataset.train_dataset.candidates
         else:
             search_candidates = self.search_fn(state)
-            best_f = state.dataset.train_dataset.labels.max()
-            acquisition_candidates = self.acq_fn(search_candidates, best_f=best_f)
+            acquisition_candidates = self.acquisition_fn(search_candidates, state)
             acquired_candidates = select_top_k(acquisition_candidates, state.acq_batch_size).candidates
 
         t1 = time.perf_counter()

@@ -13,12 +13,11 @@ from alf.tools.datasets.gfp import GFP
 from alf.tools.models.cnn import CNNModel
 from alf.core.surrogate.surrogate import Surrogate
 from alf.core.optimizer.optimizer import Optimizer
-from alf.core.optimizer.acquisition import Acquisition
 from alf.core.optimizer.search import DatasetSearch
 from alf.core.oracle.oracle import Oracle
 from alf.core.utils.logger import TerminalLogger
 from alf.core.tasks.design_task import DesignTask
-
+from alf.tools.optimizer.acquisition_functions.greedy import Greedy
 
 # Dataset configuration
 split_config = {
@@ -42,13 +41,13 @@ gfp_dataset = GFP(
 surrogate = Surrogate(model=CNNModel())
 
 # Initialize acquisition function
-acquisition = Acquisition(name="greedy", surrogate=surrogate)
+acquisition_fn = Greedy()
 
 # Initialize search strategy
-search = DatasetSearch()
+search_fn = DatasetSearch()
 
 # Initialize optimizer
-optimizer = Optimizer(acquisition=acquisition, search=search)
+optimizer = Optimizer(acquisition_fn=acquisition_fn, search_fn=search_fn)
 
 # Initialize oracle
 oracle = Oracle(module=gfp_dataset)

@@ -6,12 +6,12 @@ import shutil
 from alf.tools.datasets.gfp import GFP
 from alf.core.surrogate.surrogate import Surrogate
 from alf.core.optimizer.optimizer import Optimizer
-from alf.core.optimizer.acquisition import Acquisition
 from alf.core.optimizer.search import DatasetSearch
 from alf.core.oracle.oracle import Oracle
 from alf.core.utils.logger import TerminalLogger
 from alf.core.tasks.design_task import DesignTask
 from alf.tools.models.random import RandomModel
+from alf.tools.optimizer.acquisition_functions.greedy import Greedy
 
 
 @pytest.fixture
@@ -35,21 +35,21 @@ def surrogate_model():
 
 
 @pytest.fixture
-def acquisition(surrogate_model):
+def acquisition_fn():
     """Fixture to create acquisition function."""
-    return Acquisition(name="greedy", surrogate=surrogate_model)
+    return Greedy()
 
 
 @pytest.fixture
-def search():
+def search_fn():
     """Fixture to create search strategy."""
     return DatasetSearch()
 
 
 @pytest.fixture
-def optimizer(acquisition, search):
+def optimizer(acquisition_fn, search_fn):
     """Fixture to create optimizer."""
-    return Optimizer(acquisition=acquisition, search=search)
+    return Optimizer(acquisition_fn=acquisition_fn, search_fn=search_fn)
 
 
 @pytest.fixture
