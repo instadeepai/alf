@@ -17,7 +17,7 @@ from alf.core.optimizer.search import DatasetSearch
 from alf.core.oracle.oracle import Oracle
 from alf.core.utils.logger import TerminalLogger
 from alf.core.tasks.design_task import DesignTask
-from alf.tools.optimizer.acquisition.greedy import Greedy
+from alf.tools.optimizer.acquisition_functions.greedy import Greedy
 
 # Dataset configuration
 split_config = {

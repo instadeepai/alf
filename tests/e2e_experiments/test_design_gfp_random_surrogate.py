@@ -11,7 +11,7 @@ from alf.core.oracle.oracle import Oracle
 from alf.core.utils.logger import TerminalLogger
 from alf.core.tasks.design_task import DesignTask
 from alf.tools.models.random import RandomModel
-from alf.tools.optimizer.acquisition.greedy import Greedy
+from alf.tools.optimizer.acquisition_functions.greedy import Greedy
 
 
 @pytest.fixture
@@ -35,21 +35,21 @@ def surrogate_model():
 
 
 @pytest.fixture
-def acquisition():
+def acquisition_fn():
     """Fixture to create acquisition function."""
     return Greedy()
 
 
 @pytest.fixture
-def search():
+def search_fn():
     """Fixture to create search strategy."""
     return DatasetSearch()
 
 
 @pytest.fixture
-def optimizer(acquisition, search):
+def optimizer(acquisition_fn, search_fn):
     """Fixture to create optimizer."""
-    return Optimizer(acquisition_fn=acquisition, search_fn=search)
+    return Optimizer(acquisition_fn=acquisition_fn, search_fn=search_fn)
 
 
 @pytest.fixture
