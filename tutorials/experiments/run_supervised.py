@@ -8,12 +8,12 @@ This script demonstrates how to run a supervised task using:
 - Dataset-based search strategy
 """
 
-from testbed.datasets.gfp import GFPDataset
-from testbed.models.cnn import CNNModel
-from core.surrogate.surrogate import Surrogate
-from core.oracle.oracle import Oracle
-from core.utils.logger import TerminalLogger
-from core.tasks.supervised_task import SupervisedTask
+from alf.tools.datasets.gfp import GFP
+from alf.tools.models.cnn import CNNModel
+from alf.core.surrogate.surrogate import Surrogate
+from alf.core.oracle.oracle import Oracle
+from alf.core.utils.logger import TerminalLogger
+from alf.core.tasks.supervised_task import SupervisedTask
 
 
 # Dataset configuration
@@ -27,7 +27,7 @@ split_config = {
 }
 
 # Initialize dataset
-gfp_dataset = GFPDataset(
+gfp_dataset = GFP(
     name="gfp",
     modality="sequence",
     seed=51505,
