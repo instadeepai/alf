@@ -22,7 +22,7 @@ from alf.core.dataclasses import (
     TaskState,
 )
 from alf.core.utils.logger import Logger
-from alf.core.optimizer.acquisition import AcquisitionFunction
+from alf.core.optimizer.acquisition_function import AcquisitionFunction
 from alf.core.optimizer.search import BaseSearch
 
 
