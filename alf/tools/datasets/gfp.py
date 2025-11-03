@@ -12,7 +12,7 @@ from alf.core.dataclasses import Candidate, LabeledCandidates
 logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
 log = logging.getLogger("rich")
 
-DATAPATH = "testbed/datasets/data/"
+DATAPATH = "alf/tools/datasets/data/"
 FILENAME = "gfp_dataset.csv"
 URL = "https://raw.githubusercontent.com/dhbrookes/CbAS/master/data/gfp_data.csv"
 
