@@ -9,8 +9,8 @@ class AcquisitionFunction(abc.ABC):
     """Abstract base class for acquisition functions."""
 
     @abc.abstractmethod
-    def acquire(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Scores the candidates based on the surrogate model's predictions."""
+    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
+        """Get the acquisition values for the candidate points based on the surrogate model's predictions for them."""
         pass
 
     def __call__(
@@ -20,5 +20,5 @@ class AcquisitionFunction(abc.ABC):
     ) -> LabeledCandidates:
         """Returns the candidates with their acquisition values."""
         predictions: Predictions = state.surrogate.predict(search_candidates)
-        acquisition_values = self.acquire(predictions, state)
+        acquisition_values = self._get_acquisition_values(predictions, state)
         return LabeledCandidates(search_candidates, acquisition_values)
