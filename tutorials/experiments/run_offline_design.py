@@ -41,13 +41,13 @@ gfp_dataset = GFP(
 surrogate = Surrogate(model=CNNModel())
 
 # Initialize acquisition function
-acquisition = Greedy()
+acquisition_fn = Greedy()
 
 # Initialize search strategy
-search = DatasetSearch()
+search_fn = DatasetSearch()
 
 # Initialize optimizer
-optimizer = Optimizer(acquisition=acquisition, search=search)
+optimizer = Optimizer(acquisition_fn=acquisition_fn, search_fn=search_fn)
 
 # Initialize oracle
 oracle = Oracle(module=gfp_dataset)

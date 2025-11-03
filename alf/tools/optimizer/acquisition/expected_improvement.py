@@ -7,8 +7,8 @@ from scipy.stats import norm
 class ExpectedImprovement(AcquisitionFunction):
     """Expected improvement acquisition function."""
 
-    def acquire(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Scores the candidates based on the surrogate model's predictions."""
+    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
+        """Computes acquisition values for candidates based on surrogate predictions."""
         best_f = state.dataset.train_dataset.labels.max()
         if predictions.empirical_dist is not None:
             return np.mean(np.maximum(predictions.empirical_dist - best_f, 0), -1)

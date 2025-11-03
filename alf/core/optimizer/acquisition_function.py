@@ -10,7 +10,7 @@ class AcquisitionFunction(abc.ABC):
 
     @abc.abstractmethod
     def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Get the acquisition values for the candidate points based on the surrogate model's predictions for them."""
+        """Computes acquisition values for candidates based on surrogate predictions."""
         pass
 
     def __call__(

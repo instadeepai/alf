@@ -10,8 +10,8 @@ class UCB(AcquisitionFunction):
         """Initialize UCB with exploration parameter alpha."""
         self.alpha = alpha
 
-    def acquire(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Scores the candidates based on the surrogate model's predictions."""
+    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
+        """Computes acquisition values for candidates based on surrogate predictions."""
         if predictions.variances is not None:
             sigma = np.sqrt(predictions.variances)
             mu = predictions.means

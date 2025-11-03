@@ -6,6 +6,6 @@ import numpy as np
 class Greedy(AcquisitionFunction):
     """Greedy acquisition function."""
 
-    def acquire(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Scores the candidates based on the surrogate model's predictions."""
+    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
+        """Computes acquisition values for candidates based on surrogate predictions."""
         return predictions.means

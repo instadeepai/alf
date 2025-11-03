@@ -49,7 +49,7 @@ def search():
 @pytest.fixture
 def optimizer(acquisition, search):
     """Fixture to create optimizer."""
-    return Optimizer(acquisition=acquisition, search=search)
+    return Optimizer(acquisition_fn=acquisition, search_fn=search)
 
 
 @pytest.fixture
