@@ -9,15 +9,15 @@ This script demonstrates how to run an offline design task using:
 - Multiple acquisition rounds with batch sampling
 """
 
-from testbed.datasets.gfp import GFP
-from testbed.models.cnn import CNNModel
-from core.surrogate.surrogate import Surrogate
-from core.optimizer.optimizer import Optimizer
-from core.optimizer.acquisition import Acquisition
-from core.optimizer.search import DatasetSearch
-from core.oracle.oracle import Oracle
-from core.utils.logger import TerminalLogger
-from core.tasks.design_task import DesignTask
+from alf.tools.datasets.gfp import GFP
+from alf.tools.models.cnn import CNNModel
+from alf.core.surrogate.surrogate import Surrogate
+from alf.core.optimizer.optimizer import Optimizer
+from alf.core.optimizer.acquisition import Acquisition
+from alf.core.optimizer.search import DatasetSearch
+from alf.core.oracle.oracle import Oracle
+from alf.core.utils.logger import TerminalLogger
+from alf.core.tasks.design_task import DesignTask
 
 
 # Dataset configuration
