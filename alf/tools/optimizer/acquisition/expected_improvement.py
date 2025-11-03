@@ -1,6 +1,6 @@
-from core.optimizer.acquisition import AcquisitionFunction
-from core.dataclasses.task_state import TaskState
-from core.dataclasses.predictions import Predictions
+from alf.core.optimizer.acquisition import AcquisitionFunction
+from alf.core.dataclasses.task_state import TaskState
+from alf.core.dataclasses.predictions import Predictions
 import numpy as np
 from scipy.stats import norm
 
