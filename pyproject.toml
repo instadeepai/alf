@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "alf"
 version = "0.1.0"
-description = "A Python package for handling multi-modal data candidates"
+description = "A Python package for performing active learning experiments."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -23,7 +23,7 @@ dependencies = [
     "ipykernel>=6.25.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=6.2.0",
     "pytest-cov>=2.12.0",
@@ -33,12 +33,7 @@ dev = [
     "pre-commit>=4.1.0",
 ]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["."]
-
 [tool.uv.sources]
-# build cuda if on linux, else build cpu
 torch = [
   { index = "pytorch-cpu"},
 ]
@@ -47,3 +42,8 @@ torch = [
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
+
+[tool.uv]
+default-groups = [
+  "dev",
+]
