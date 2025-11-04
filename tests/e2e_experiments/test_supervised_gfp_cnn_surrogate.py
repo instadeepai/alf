@@ -105,7 +105,6 @@ class TestSupervised:
         task.run(
             state=state, 
             logger=TerminalLogger(), 
-            oracle=oracle, 
             save_path=str(save_path)
         )
         
