@@ -7,7 +7,7 @@ on:
 
 jobs:
   linters:
-    runs-on: instadeep-ci-4
+    runs-on: instadeep-ci-8-highmem
     container:
       image: python:3.12-slim-bullseye
 
