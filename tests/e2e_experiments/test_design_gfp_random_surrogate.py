@@ -3,21 +3,21 @@ import numpy as np
 import pandas as pd
 import shutil
 
-from testbed.datasets.gfp import GFPDataset
-from core.surrogate.surrogate import Surrogate
-from core.optimizer.optimizer import Optimizer
-from core.optimizer.acquisition import Acquisition
-from core.optimizer.search import DatasetSearch
-from core.oracle.oracle import Oracle
-from core.utils.logger import TerminalLogger
-from core.tasks.design_task import DesignTask
-from testbed.models.random import RandomModel
+from alf.tools.datasets.gfp import GFP
+from alf.core.surrogate.surrogate import Surrogate
+from alf.core.optimizer.optimizer import Optimizer
+from alf.core.optimizer.search import DatasetSearch
+from alf.core.oracle.oracle import Oracle
+from alf.core.utils.logger import TerminalLogger
+from alf.core.tasks.design_task import DesignTask
+from alf.tools.models.random import RandomModel
+from alf.tools.optimizer.acquisition_functions.greedy import Greedy
 
 
 @pytest.fixture
 def gfp_dataset():
     """Fixture to create a GFP dataset for testing."""
-    return GFPDataset(
+    return GFP(
         name="gfp", 
         modality="sequence", 
         seed=51505, 
@@ -35,21 +35,21 @@ def surrogate_model():
 
 
 @pytest.fixture
-def acquisition(surrogate_model):
+def acquisition_fn():
     """Fixture to create acquisition function."""
-    return Acquisition(name="greedy", surrogate=surrogate_model)
+    return Greedy()
 
 
 @pytest.fixture
-def search(gfp_dataset):
+def search_fn():
     """Fixture to create search strategy."""
-    return DatasetSearch(dataset=gfp_dataset)
+    return DatasetSearch()
 
 
 @pytest.fixture
-def optimizer(acquisition, search):
+def optimizer(acquisition_fn, search_fn):
     """Fixture to create optimizer."""
-    return Optimizer(acquisition=acquisition, search=search)
+    return Optimizer(acquisition_fn=acquisition_fn, search_fn=search_fn)
 
 
 @pytest.fixture

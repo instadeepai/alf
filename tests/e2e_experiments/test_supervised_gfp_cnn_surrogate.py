@@ -5,12 +5,12 @@ import pandas as pd
 import shutil
 from pathlib import Path
 
-from testbed.datasets.gfp import GFPDataset
-from testbed.models.cnn import CNNModel, CNNTrainConfig
-from core.utils.logger import TerminalLogger
-from core.tasks.supervised_task import SupervisedTask
-from core.oracle.oracle import Oracle
-from core.surrogate.surrogate import Surrogate
+from alf.tools.datasets.gfp import GFP
+from alf.tools.models.cnn import CNNModel, CNNTrainConfig
+from alf.core.utils.logger import TerminalLogger
+from alf.core.tasks.supervised_task import SupervisedTask
+from alf.core.oracle.oracle import Oracle
+from alf.core.surrogate.surrogate import Surrogate
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def set_seed():
 @pytest.fixture
 def gfp_dataset():
     """Fixture to create a GFP dataset for testing."""
-    return GFPDataset(
+    return GFP(
         name="gfp", 
         modality="sequence", 
         seed=51505, 

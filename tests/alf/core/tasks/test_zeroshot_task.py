@@ -1,38 +1,11 @@
+"""Tests for the zero-shot task."""
 import pytest
 import numpy as np
 import pandas as pd
 import shutil
 
-from alf.tools.datasets.gfp import GFP
-from alf.tools.models.random import RandomModel
-from alf.core.surrogate.surrogate import Surrogate
-from alf.core.utils.logger import TerminalLogger
 from alf.core.tasks.zeroshot_task import ZeroShotTask
-
-
-@pytest.fixture
-def gfp_dataset():
-    """Fixture to create a GFP dataset for testing."""
-    split_config = {
-        "split_ratio": {
-            "train": 0,
-            "validation": 0,
-            "test": 1.0
-        },
-        "split_type": "random"
-    }
-    return GFP(
-        name="gfp",
-        modality="sequence",
-        seed=51505,
-        split_config=split_config
-    )
-
-
-@pytest.fixture
-def surrogate_model():
-    """Fixture to create a random surrogate model for testing."""
-    return Surrogate(model=RandomModel())
+from alf.core.utils.logger import TerminalLogger
 
 
 @pytest.fixture
@@ -40,44 +13,47 @@ def expected_metrics():
     """Fixture containing expected metric values for assertions."""
     return {
         "surrogate": {
-            "test_mse": 11.54878,
-            "test_spearman": 0.01734,
-            "test_pearson": 0.03023,
-            "test_pairwise_xent": 0.43931
+            "test_mse": 35.37165,
+            "test_spearman": 0.06963,
+            "test_pearson": 0.08390,
+            "test_pairwise_xent": 0.41527
         },
         "dataset": {
-            "num_train": 0.0,
-            "num_validation": 0.0,
-            "num_test": 1000.0,
-            "test_mean": 3.13320,
-            "num_candidate_pool": 0.0
+            "num_train": 480.00000,
+            "train_mean": 5.04921,
+            "num_validation": 120.00000,
+            "validation_mean": 4.83871,
+            "num_test": 200.00000,
+            "test_mean": 5.13172,
+            "num_candidate_pool": 200.00000,
+            "candidate_pool_mean": 4.82509
         }
     }
 
 
-class TestZeroShotGFPRandomSurrogate:
-    """Tests a zero-shot experiment with a random surrogate model on the GFP dataset."""
+class TestZeroShotTask:
+    """Tests a zero-shot experiment with a dummy surrogate model on a dummy dataset."""
     
-    def test_zeroshot_gfp_random_surrogate_experiment(
+    def test_zeroshot_dummy_surrogate_experiment(
         self, 
-        gfp_dataset, 
-        surrogate_model, 
+        dummy_dataset, 
+        dummy_surrogate, 
         expected_metrics, 
         tmp_path
     ):
         """
-        Test the complete zero-shot GFP random surrogate experiment pipeline.
+        Test the complete zero-shot dummy surrogate experiment pipeline.
         
         This test verifies that the zero-shot pipeline works correctly
-        and produces expected metrics for the GFP dataset using a random surrogate model.
+        and produces expected metrics for the dummy dataset using a dummy surrogate model.
         """
         # Use pytest's tmp_path for temporary directory
-        save_path = tmp_path / "zeroshot_gfp_random_surrogate"
+        save_path = tmp_path / "zeroshot_dummy_surrogate"
         save_path.mkdir()
         
         # Create and run the zero-shot task
         task = ZeroShotTask()
-        state = task.setup(dataset=gfp_dataset, surrogate=surrogate_model)
+        state = task.setup(dataset=dummy_dataset, surrogate=dummy_surrogate)
         task.run(
             state=state,
             logger=TerminalLogger(),

@@ -9,16 +9,15 @@ This script demonstrates how to run an offline design task using:
 - Multiple acquisition rounds with batch sampling
 """
 
-from testbed.datasets.gfp import GFPDataset
-from testbed.models.cnn import CNNModel
-from core.surrogate.surrogate import Surrogate
-from core.optimizer.optimizer import Optimizer
-from core.optimizer.acquisition import Acquisition
-from core.optimizer.search import DatasetSearch
-from core.oracle.oracle import Oracle
-from core.utils.logger import TerminalLogger
-from core.tasks.design_task import DesignTask
-
+from alf.tools.datasets.gfp import GFP
+from alf.tools.models.cnn import CNNModel
+from alf.core.surrogate.surrogate import Surrogate
+from alf.core.optimizer.optimizer import Optimizer
+from alf.core.optimizer.search import DatasetSearch
+from alf.core.oracle.oracle import Oracle
+from alf.core.utils.logger import TerminalLogger
+from alf.core.tasks.design_task import DesignTask
+from alf.tools.optimizer.acquisition_functions.greedy import Greedy
 
 # Dataset configuration
 split_config = {
@@ -31,7 +30,7 @@ split_config = {
 }
 
 # Initialize dataset
-gfp_dataset = GFPDataset(
+gfp_dataset = GFP(
     name="gfp",
     modality="sequence",
     seed=51505,
@@ -42,13 +41,13 @@ gfp_dataset = GFPDataset(
 surrogate = Surrogate(model=CNNModel())
 
 # Initialize acquisition function
-acquisition = Acquisition(name="greedy", surrogate=surrogate)
+acquisition_fn = Greedy()
 
 # Initialize search strategy
-search = DatasetSearch(dataset=gfp_dataset)
+search_fn = DatasetSearch()
 
 # Initialize optimizer
-optimizer = Optimizer(acquisition=acquisition, search=search)
+optimizer = Optimizer(acquisition_fn=acquisition_fn, search_fn=search_fn)
 
 # Initialize oracle
 oracle = Oracle(module=gfp_dataset)
