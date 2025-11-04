@@ -32,12 +32,17 @@ dev = [
     "pre-commit>=4.1.0",
 ]
 cpu = [
-    { name = "torch", version = ">=1.9.0", source = { index = "pytorch-cpu" } },
+    "torch>=1.9.0",
 ]
 gpu = [
-   { name = "torch", version = ">=1.9.0", source = { index = "pytorch-cu121" } },
+   "torch>=1.9.0",
 ]
 
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu", torch_source = "cpu" },
+  { index = "pytorch-gpu", torch_source = "gpu" },
+]
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
@@ -45,11 +50,17 @@ url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [[tool.uv.index]]
-name = "pytorch-cu121"
+name = "pytorch-gpu"
 url = "https://download.pytorch.org/whl/cu121"
 explicit = true
 
 [tool.uv]
+conflicts = [
+  [
+    { torch_source = "cpu" },
+    { torch_source = "gpu" },
+  ],
+]
 default-groups = [
   "dev",
   "gpu",
