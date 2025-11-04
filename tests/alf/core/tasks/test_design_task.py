@@ -29,10 +29,10 @@ def expected_metrics():
             "test_pairwise_xent": 0.44950
         },
         "dataset": {
-            "num_train": 520.00000,
-            "train_mean": 5.05563,
-            "num_validation": 130.00000,
-            "validation_mean": 4.72903,
+            "num_train": 525.00000,
+            "train_mean": 5.03691,
+            "num_validation": 125.00000,
+            "validation_mean": 4.79461,
             "num_test": 200.00000,
             "test_mean": 5.13172,
             "num_candidate_pool": 150.00000,

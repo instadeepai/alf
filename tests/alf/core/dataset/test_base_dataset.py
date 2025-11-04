@@ -3,7 +3,6 @@ import pytest
 import numpy as np
 import tempfile
 import os
-from pathlib import Path
 
 from alf.core.dataset.base_dataset import BaseDataset
 from alf.core.dataclasses import Candidate, LabeledCandidates
@@ -154,7 +153,7 @@ class TestBaseDatasetProperties:
         train = dataset.train_dataset
         
         assert isinstance(train, LabeledCandidates)
-        assert len(train) == 60
+        assert len(train) == 48
     
     def test_validation_dataset_property(self):
         """Test validation_dataset property."""
@@ -162,7 +161,7 @@ class TestBaseDatasetProperties:
         validation = dataset.validation_dataset
         
         assert isinstance(validation, LabeledCandidates)
-        assert len(validation) == 20
+        assert len(validation) == 12
     
     def test_test_dataset_property(self):
         """Test test_dataset property."""

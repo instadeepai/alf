@@ -30,6 +30,7 @@ class LabeledCandidates:
         Returns:
             For integer index: new LabeledCandidates object with the candidate and label at the index
             For slice: new LabeledCandidates object with sliced data
+            For numpy array: new LabeledCandidates object with the candidates and labels at the indices
         """
         if isinstance(index, int):
             return LabeledCandidates(candidates=[self.candidates[index]], labels=np.array([self.labels[index]]))

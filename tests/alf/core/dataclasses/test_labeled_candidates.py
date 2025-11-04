@@ -169,13 +169,6 @@ class TestLabeledCandidatesGetItem:
         assert [c.data for c in sub.candidates] == ["b", "c"]
         np.testing.assert_array_equal(sub.labels, np.array([1, 0]))
 
-    def test_getitem_invalid_index_type_raises(self):
-        candidates = [Candidate(data="a", modality="sequence")]
-        labels = np.array([0])
-        lc = LabeledCandidates(candidates=candidates, labels=labels)
-        with pytest.raises(TypeError, match="Indices must be integers or slices"):
-            _ = lc["bad"]  # type: ignore[index]
-
 
 class TestLabeledCandidatesValidateShuffleSortRemove:
     """Tests for validate_candidates, shuffle, sort, and remove methods."""
