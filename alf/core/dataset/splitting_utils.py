@@ -1,17 +1,17 @@
 from alf.core.dataclasses.labeled_candidates import LabeledCandidates
 import numpy as np
 
-def split_dataset(split_type: str, dataset: LabeledCandidates, train_size: int, validation_size: int, test_size: int, seed: int) -> dict[str, LabeledCandidates]:
+def split_dataset(split_type: str, dataset: LabeledCandidates, train_size: int, validation_size: int, test_size: int, candidate_pool_size: int, seed: int) -> dict[str, LabeledCandidates]:
     """Split dataset into train, validation, test, and candidate pool."""
     if split_type == "random":
-        return split_random(dataset, train_size, validation_size, test_size, seed)
+        return split_random(dataset, train_size, validation_size, test_size, candidate_pool_size, seed)
     elif split_type == "low_vs_high":
-        return split_low_vs_high(dataset, train_size, validation_size, test_size, seed)
+        return split_low_vs_high(dataset, train_size, validation_size, test_size, candidate_pool_size, seed)
     else:
         raise ValueError(f"Invalid split type: {split_type}")
 
 
-def split_random(dataset: LabeledCandidates, train_size: int, validation_size: int, test_size: int, seed: int) -> dict[str, LabeledCandidates]:
+def split_random(dataset: LabeledCandidates, train_size: int, validation_size: int, test_size: int, candidate_pool_size: int, seed: int) -> dict[str, LabeledCandidates]:
     """Split dataset randomly into train, validation, test, and candidate pool."""
     shuffled_candidates = dataset.shuffle(seed=seed)
     
@@ -35,7 +35,7 @@ def split_random(dataset: LabeledCandidates, train_size: int, validation_size: i
     }
 
 
-def split_low_vs_high(dataset: LabeledCandidates, train_size: int, validation_size: int, test_size: int, seed: int) -> dict[str, LabeledCandidates]:
+def split_low_vs_high(dataset: LabeledCandidates, train_size: int, validation_size: int, test_size: int, candidate_pool_size: int, seed: int) -> dict[str, LabeledCandidates]:
     """Split dataset so train/validation contain low-scoring candidates, test/pool contain high-scoring."""
     # Sort indices by label (highest to lowest)
     sorted_indices = dataset.labels.argsort()[::-1]
@@ -53,5 +53,5 @@ def split_low_vs_high(dataset: LabeledCandidates, train_size: int, validation_si
         "train": shuffled_low[:train_size],
         "validation": shuffled_low[train_size:],
         "test": shuffled_high[:test_size],
-        "candidate_pool": shuffled_high[test_size:]
+        "candidate_pool": shuffled_high[test_size:test_size + candidate_pool_size]
     }
