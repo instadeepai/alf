@@ -31,6 +31,8 @@ dev = [
     "mypy>=0.910",
     "pre-commit>=4.1.0",
 ]
+
+[project.optional-dependencies]
 cpu = [
     "torch>=1.9.0",
 ]
@@ -63,5 +65,4 @@ conflicts = [
 ]
 default-groups = [
   "dev",
-  "gpu",
 ]
