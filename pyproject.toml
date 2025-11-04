@@ -30,6 +30,7 @@ dev = [
     "black>=21.0.0",
     "flake8>=3.9.0",
     "mypy>=0.910",
+    "pre-commit>=4.1.0",
 ]
 
 [tool.pytest.ini_options]
