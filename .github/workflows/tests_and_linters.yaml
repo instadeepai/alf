@@ -9,7 +9,7 @@ jobs:
   linters:
     runs-on: instadeep-ci
     container:
-      image: python:3.12-slim-bullseye
+      image: python:3.11-slim-bullseye
 
     steps:
       - name: Git setup
