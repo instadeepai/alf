@@ -61,9 +61,9 @@ jobs:
                             --junitxml=pytest.xml \
                             --cov=alf
 
-          - name: Pytest coverage comment 💬
-            id: coverageComment
-            uses: MishaKav/pytest-coverage-comment@main
-            with:
-              pytest-xml-coverage-path: ./coverage.xml
-              junitxml-path: ./pytest.xml
+        - name: Pytest coverage comment 💬
+          id: coverageComment
+          uses: MishaKav/pytest-coverage-comment@main
+          with:
+            pytest-xml-coverage-path: ./coverage.xml
+            junitxml-path: ./pytest.xml
