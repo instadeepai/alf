@@ -37,8 +37,8 @@ def split_random(dataset: LabeledCandidates, train_size: int, validation_size: i
 
 def split_low_vs_high(dataset: LabeledCandidates, train_size: int, validation_size: int, test_size: int, candidate_pool_size: int, seed: int) -> dict[str, LabeledCandidates]:
     """Split dataset so train/validation contain low-scoring candidates, test/pool contain high-scoring."""
-    # Sort indices by label (highest to lowest)
-    sorted_indices = dataset.labels.argsort()[::-1]
+    # Sort indices by label (lowest to highest)
+    sorted_indices = dataset.labels.argsort()
     
     # Low-scoring candidates go to train/validation, high-scoring to test/pool
     train_plus_validation_size = train_size + validation_size
