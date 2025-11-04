@@ -39,7 +39,7 @@ class Predictions:
 
     def __len__(self) -> int:
         return len(self.means)
-    
+
     def save(
         self,
         output_dir: str,

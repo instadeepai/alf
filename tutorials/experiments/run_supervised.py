@@ -37,5 +37,4 @@ state = task.setup(dataset=gfp_dataset, surrogate=surrogate)
 task.run(
     state,
     logger=TerminalLogger(),
-    oracle=oracle,
 )

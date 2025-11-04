@@ -99,8 +99,8 @@ class TestSupervised:
         task = SupervisedTask()
         state = task.setup(dataset=gfp_dataset, surrogate=surrogate_model)
         task.run(
-            state=state, 
-            logger=TerminalLogger(), 
+            state=state,
+            logger=TerminalLogger(),
             save_path=str(save_path)
 
         )
