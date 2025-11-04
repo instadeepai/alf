@@ -21,9 +21,9 @@ from scipy.stats import norm, pearsonr, spearmanr
 
 
 def check_inputs(means: np.ndarray, targets: np.ndarray) -> None:
-    assert (
-        means.shape == targets.shape
-    ), f"Means shape {means.shape} and targets shape {targets.shape} don't match"
+    assert means.shape == targets.shape, (
+        f"Means shape {means.shape} and targets shape {targets.shape} don't match"
+    )
     assert len(means) != 0, "Empty input arrays"
     assert not (np.any(np.isnan(means))), "Mean prediction array contains NaN values"
     assert not (np.any(np.isnan(targets))), "Target array contains NaN values"
@@ -31,9 +31,9 @@ def check_inputs(means: np.ndarray, targets: np.ndarray) -> None:
 
 def check_variance_validity(variances: np.ndarray, targets: np.ndarray) -> None:
     assert variances is not None, "This function requires variances but it is None"
-    assert np.all(
-        variances >= 0
-    ), "All uncertainty values must be non-negative (variances)."
+    assert np.all(variances >= 0), (
+        "All uncertainty values must be non-negative (variances)."
+    )
     assert len(variances) == len(targets), (
         f"Length of variances vector ({len(variances)})"
         f"should equal length of targets vector ({len(targets)})"
@@ -43,23 +43,31 @@ def check_variance_validity(variances: np.ndarray, targets: np.ndarray) -> None:
 
 class MetricRegistry:
     """Simple registry for metrics with variance requirements."""
-    
+
     def __init__(self):
         self.metrics: dict[str, Callable] = {}
         self.variance_required: dict[str, bool] = {}
-    
+
     def register(self, name: str, metric_fn: Callable, requires_variance: bool = False):
         """Register a metric function."""
         self.metrics[name] = metric_fn
         self.variance_required[name] = requires_variance
-    
+
     def get_metrics_requiring_variance(self) -> dict[str, Callable]:
         """Get metrics that require variance."""
-        return {name: fn for name, fn in self.metrics.items() if self.variance_required[name]}
-    
+        return {
+            name: fn
+            for name, fn in self.metrics.items()
+            if self.variance_required[name]
+        }
+
     def get_metrics_not_requiring_variance(self) -> dict[str, Callable]:
         """Get metrics that don't require variance."""
-        return {name: fn for name, fn in self.metrics.items() if not self.variance_required[name]}
+        return {
+            name: fn
+            for name, fn in self.metrics.items()
+            if not self.variance_required[name]
+        }
 
 
 # Create the global registry instance
@@ -67,10 +75,10 @@ metric_registry = MetricRegistry()
 
 
 def requires_variance(metric_fn: Callable) -> Callable:
-    """
-    Decorator to mark a metric as requiring variance.
+    """Decorator to mark a metric as requiring variance.
     This automatically registers the metric in the global registry and applies input validation.
     """
+
     @wraps(metric_fn)
     def wrapper(
         means: np.ndarray,
@@ -82,17 +90,17 @@ def requires_variance(metric_fn: Callable) -> Callable:
         check_inputs(means, targets)
         check_variance_validity(variances, targets)
         return metric_fn(means, variances, targets, *args, **kwargs)
-    
+
     # Register the metric with variance requirement
     metric_registry.register(metric_fn.__name__, wrapper, requires_variance=True)
     return wrapper
 
 
 def no_variance_required(metric_fn: Callable) -> Callable:
-    """
-    Decorator to mark a metric as not requiring variance.
+    """Decorator to mark a metric as not requiring variance.
     This automatically registers the metric in the global registry and applies input validation.
     """
+
     @wraps(metric_fn)
     def wrapper(
         means: np.ndarray,
@@ -103,7 +111,7 @@ def no_variance_required(metric_fn: Callable) -> Callable:
     ) -> Any:
         check_inputs(means, targets)
         return metric_fn(means, variances, targets, *args, **kwargs)
-    
+
     # Register the metric without variance requirement
     metric_registry.register(metric_fn.__name__, wrapper, requires_variance=False)
     return wrapper
@@ -114,8 +122,7 @@ def monte_carlo_ranking(
     variances: np.ndarray,
     num_samples: int = 10000,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Compute ranks, their means and variances (ranking uncertainty):
+    """Compute ranks, their means and variances (ranking uncertainty):
 
     For predicted means and variances, estimate n normally
     distributed means using Monte Carlo simulation.
@@ -128,7 +135,6 @@ def monte_carlo_ranking(
     Returns:
         Tuple: [mean_rank, rank_variances]
     """
-
     np.random.seed(42)
     n = len(means)
 
@@ -151,8 +157,7 @@ def monte_carlo_ranking(
 def mse(
     means: np.ndarray, _: np.ndarray | None, targets: np.ndarray
 ) -> dict[str, float]:
-    """
-    Compute the mean squared error.
+    """Compute the mean squared error.
 
     For each sample compute the squared euclidean distance between
     the true label and the mean prediction. Compute the mean over these distances.
@@ -172,8 +177,7 @@ def mse(
 def spearman(
     means: np.ndarray, _: np.ndarray | None, targets: np.ndarray
 ) -> dict[str, float]:
-    """
-    Compute the spearman correlation.
+    """Compute the spearman correlation.
 
     This is a non-parametric statistical test which measures
     the strength of the monotonic relationship between two variables.
@@ -196,8 +200,7 @@ def spearman(
 def pearson(
     means: np.ndarray, _: np.ndarray | None, targets: np.ndarray
 ) -> dict[str, float]:
-    """
-    Compute the pearson correlation.
+    """Compute the pearson correlation.
 
     This is a statistical test which measures the strength
     and direction of the linear relationship between variables.
@@ -219,8 +222,7 @@ def pearson(
 def pairwise_xent(
     means: np.ndarray, _: np.ndarray | None, targets: np.ndarray
 ) -> dict[str, float]:
-    """
-    Compute the ranking loss for a pairwise classification problem.
+    """Compute the ranking loss for a pairwise classification problem.
 
     For each pair of items in the batch, predict which item has the higher target value.
     Derive logits from pairs of predictions and treat them as logits of a binary classifier.
@@ -256,8 +258,7 @@ def expected_calibration_error(
     targets: np.ndarray,
     n_grid_points: int = 100,
 ) -> dict[str, float]:
-    """
-    Compute Expected Calibration Error (ECE):
+    """Compute Expected Calibration Error (ECE):
     -- requires uncertainty --
     For alpha in grid from 0 -> 1
     Find alpha% confidence intervals for all predictions
@@ -295,8 +296,7 @@ def rank_expected_calibration_error(
     variances: np.ndarray,
     targets: np.ndarray,
 ) -> dict[str, float]:
-    """
-    Compute Expected Calibration Error (ECE) in ranks:
+    """Compute Expected Calibration Error (ECE) in ranks:
     -- requires uncertainty --
     For alpha in grid from 0 -> 1
     Find alpha% confidence intervals for all predictions
@@ -331,8 +331,7 @@ def width(
     targets: np.ndarray,
     alpha: float = 0.95,
 ) -> dict[str, float]:
-    """
-    Compute width @ alpha%:
+    """Compute width @ alpha%:
     -- requires uncertainty --
     Find (alpha%) confidence intervals for all predictions
     Compute the average width of all the confidence intervals
@@ -374,8 +373,7 @@ def rank_width(
     targets: np.ndarray,
     alpha: float = 0.95,
 ) -> dict[str, float]:
-    """
-    Compute width @ alpha% based on ranks:
+    """Compute width @ alpha% based on ranks:
     -- requires uncertainty --
     Find (alpha%) confidence intervals for all predictions
     Compute the average width of all the confidence intervals
@@ -415,8 +413,7 @@ def coverage(
     targets: np.ndarray,
     alpha: float = 0.95,
 ) -> dict[str, float]:
-    """
-    Compute coverage @ alpha%:
+    """Compute coverage @ alpha%:
     -- requires uncertainty --
     Find (alpha%) confidence intervals for all predictions
     What % of targets fall within the approximate confidence intervals
@@ -450,8 +447,7 @@ def rank_coverage(
     targets: np.ndarray,
     alpha: float = 0.95,
 ) -> dict[str, float]:
-    """
-    Compute coverage @ alpha% based on ranks:
+    """Compute coverage @ alpha% based on ranks:
     -- requires uncertainty --
     Find (alpha%) confidence intervals for all predictions
     What % of targets fall within the approximate confidence intervals
@@ -484,8 +480,7 @@ def residual_spearman(
     variances: np.ndarray,
     targets: np.ndarray,
 ) -> dict[str, float]:
-    """
-    Compute spearman correlation between the residuals and the variances:
+    """Compute spearman correlation between the residuals and the variances:
     -- requires uncertainty --
     Compute the residuals: abs(targets - means)
     Compute the spearman between residuals and variances
@@ -512,8 +507,7 @@ def residual_pearson(
     variances: np.ndarray,
     targets: np.ndarray,
 ) -> dict[str, float]:
-    """
-    Compute pearson correlation between the residuals and the standard deviations
+    """Compute pearson correlation between the residuals and the standard deviations
     -- requires uncertainty --
     Compute the residuals: abs(targets - means)
     Compute the pearson between residuals and standard deviations
@@ -542,8 +536,7 @@ def regret_ucb_alpha(
     alpha: float = 0.1,
     num_acquisitions: int = 100,
 ) -> dict[str, float]:
-    """
-    Compute UCB regret
+    """Compute UCB regret
     --- requires uncertainty --
     Compute the Upper Confidence Bound (UCB) acquisition function
     on the test dataset.
@@ -601,8 +594,7 @@ def regret_ucb_alpha_sweep(
     alpha: Optional[Union[float, list[float]]] | None = None,
     num_acquisitions: int = 100,
 ) -> dict[str, float]:
-    """
-    Compute UCB regret on a list of alphas
+    """Compute UCB regret on a list of alphas
     --- requires uncertainty --
 
     Compute the `regret_ucb_alpha` metric on a list of alpha values
@@ -618,9 +610,9 @@ def regret_ucb_alpha_sweep(
         dict: Mapping from f"regret_ucb_{alpha}" to regret value for each alpha.
     """
     assert variances is not None, "UCB regret requires variances"
-    assert np.all(
-        variances >= 0
-    ), "All uncertainty values must be non-negative (variances)."
+    assert np.all(variances >= 0), (
+        "All uncertainty values must be non-negative (variances)."
+    )
 
     # Set the default list if alpha was not provided.
     # This is an ugly solution, but setting a mutable object (a list)

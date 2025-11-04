@@ -1,13 +1,17 @@
-from alf.core.optimizer.acquisition_function import AcquisitionFunction
-from alf.core.dataclasses.task_state import TaskState
-from alf.core.dataclasses.predictions import Predictions
 import numpy as np
 from scipy.stats import norm
+
+from alf.core.dataclasses.predictions import Predictions
+from alf.core.dataclasses.task_state import TaskState
+from alf.core.optimizer.acquisition_function import AcquisitionFunction
+
 
 class ExpectedImprovement(AcquisitionFunction):
     """Expected improvement acquisition function."""
 
-    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
+    def _get_acquisition_values(
+        self, predictions: Predictions, state: TaskState
+    ) -> np.ndarray:
         """Computes acquisition values for candidates based on surrogate predictions."""
         best_f = state.dataset.train_dataset.labels.max()
         if predictions.empirical_dist is not None:

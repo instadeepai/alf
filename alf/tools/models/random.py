@@ -1,8 +1,11 @@
-from typing import List, Union, Any, Optional
+from typing import Any, List, Optional, Union
+
 import numpy as np
+
 from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions
 from alf.core.model.base_model import BaseModel
 from alf.core.utils.logger import Logger
+
 
 class RandomModel(BaseModel):
     def __init__(self, name: str = "random_model", seed: int = 42):
@@ -16,7 +19,12 @@ class RandomModel(BaseModel):
     def cleanup(self) -> None:
         pass
 
-    def train(self, train_data: LabeledCandidates, val_data: LabeledCandidates, logger: Optional[Logger] = None) -> None:
+    def train(
+        self,
+        train_data: LabeledCandidates,
+        val_data: LabeledCandidates,
+        logger: Optional[Logger] = None,
+    ) -> None:
         pass
 
     def predict(self, candidate_points: List[Candidate]) -> Predictions:
@@ -24,7 +32,7 @@ class RandomModel(BaseModel):
         return Predictions(means=labels)
 
     def sample(self, *args: Any, **kwargs: Any) -> List[Candidate]:
-        pass
+        raise NotImplementedError("Sampling is not implemented for this model.")
 
     def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
         return {}

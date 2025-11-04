@@ -1,15 +1,19 @@
-from typing import List
-import numpy as np
-from alf.core.dataclasses import LabeledCandidates, Candidate, Predictions
-from alf.core.dataclasses.task_state import TaskState
 import abc
+from typing import List
+
+import numpy as np
+
+from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions
+from alf.core.dataclasses.task_state import TaskState
 
 
 class AcquisitionFunction(abc.ABC):
     """Abstract base class for acquisition functions."""
 
     @abc.abstractmethod
-    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
+    def _get_acquisition_values(
+        self, predictions: Predictions, state: TaskState
+    ) -> np.ndarray:
         """Computes acquisition values for candidates based on surrogate predictions."""
         pass
 

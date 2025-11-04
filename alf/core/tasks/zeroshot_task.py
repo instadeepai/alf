@@ -15,9 +15,9 @@
 import logging
 from typing import Any, Optional
 
-from alf.core.utils.logger import Logger
-from alf.core.tasks.base_task import BaseTask
 from alf.core.dataclasses.task_state import TaskState
+from alf.core.tasks.base_task import BaseTask
+from alf.core.utils.logger import Logger
 
 logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
 log = logging.getLogger("rich")
@@ -27,14 +27,13 @@ class ZeroShotTask(BaseTask):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(task_type="ZeroShot", **kwargs)
 
-    def run(
+    def run(  # type: ignore[override]
         self,
         state: TaskState,
         logger: Logger,
         save_path: Optional[str] = None,
     ) -> None:
         """This is the multi-round design task."""
-
         log.info(
             f"Zero-shot evaluation on test data with {len(state.dataset.test_dataset)} sequences"
         )

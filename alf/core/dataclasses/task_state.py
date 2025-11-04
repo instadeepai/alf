@@ -1,12 +1,14 @@
-from dataclasses import dataclass, field
-from typing import List, Any, TYPE_CHECKING
 import copy
-from alf.core.dataclasses import LabeledCandidates
 import logging
-import pandas as pd
 import os
-from alf.core.utils.io import input_handler
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, List
+
 import matplotlib.pyplot as plt
+import pandas as pd
+
+from alf.core.dataclasses import LabeledCandidates
+from alf.core.utils.io import input_handler
 
 logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
 log = logging.getLogger("rich")

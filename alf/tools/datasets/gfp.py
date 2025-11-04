@@ -1,13 +1,13 @@
 import logging
 import os
 from typing import Any
-import numpy as np
 
+import numpy as np
 import pandas as pd
 import requests
 
-from alf.core.dataset.base_dataset import BaseDataset
 from alf.core.dataclasses import Candidate, LabeledCandidates
+from alf.core.dataset.base_dataset import BaseDataset
 
 logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
 log = logging.getLogger("rich")
@@ -19,7 +19,7 @@ URL = "https://raw.githubusercontent.com/dhbrookes/CbAS/master/data/gfp_data.csv
 
 class GFP(BaseDataset):
     def __init__(
-        self,  name: str, modality: str, seed: int, split_config: dict[str, Any]
+        self, name: str, modality: str, seed: int, split_config: dict[str, Any]
     ):
         super().__init__(name, modality, seed, split_config)
         self.setup()
@@ -47,4 +47,7 @@ class GFP(BaseDataset):
         # otherwise the candidate pool is too large and becomes compute intensive
         data = list(gfp_dataset["nucSequence"])[:1000]
         labels = np.array(gfp_dataset["medianBrightness"].values)[:1000]
-        return LabeledCandidates(candidates=[Candidate(data=data, modality="sequence") for data in data], labels=labels)
+        return LabeledCandidates(
+            candidates=[Candidate(data=data, modality="sequence") for data in data],
+            labels=labels,
+        )

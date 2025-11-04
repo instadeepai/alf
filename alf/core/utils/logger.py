@@ -31,7 +31,9 @@ class Logger(abc.ABC):
     """Abstract base class for loggers that can write data and artifacts."""
 
     @abc.abstractmethod
-    def write(self, data: Dict[str, Any], label: str = "", timestep: Optional[int] = None) -> None:
+    def write(
+        self, data: Dict[str, Any], label: str = "", timestep: Optional[int] = None
+    ) -> None:
         """Write data to the logger destination."""
         pass
 
@@ -56,7 +58,7 @@ class Logger(abc.ABC):
 
 class NeptuneLogger(Logger):
     """Logger that writes to Neptune AI platform."""
-    
+
     metadata = None
 
     def __init__(
@@ -93,14 +95,14 @@ class NeptuneLogger(Logger):
     def _process_tags(self, config: DictConfig, neptune_tags: List[str]) -> List[str]:
         """Process and combine configuration tags with neptune tags."""
         config_tags = config["logging"]["tags"]
-        
+
         if isinstance(config_tags, listconfig.ListConfig):
             tags = list(config_tags)
         elif config_tags is None:
             tags = []
         else:
             raise ValueError("tags field must be None or list")
-            
+
         return tags + neptune_tags
 
     def write(
@@ -113,23 +115,22 @@ class NeptuneLogger(Logger):
         try:
             self._timestep = timestep if timestep is not None else self._timestep + 1
             prefix = f"{label}/" if label else ""
-            
+
             for key, value in data.items():
                 if isinstance(value, plt.Figure):
                     self._log_figure(key, value, prefix)
                 else:
                     self._log_metric(key, value, prefix)
-                    
+
         except Exception as e:
             log.error(f"Neptune Write Error: {e}")
 
     def _log_figure(self, key: str, figure: plt.Figure, prefix: str) -> None:
         """Log a matplotlib figure if conditions are met."""
-        should_save = (
-            ("test" in key and self.save_test_plots) or
-            ("training" in key and self.save_training_plots)
+        should_save = ("test" in key and self.save_test_plots) or (
+            "training" in key and self.save_training_plots
         )
-        
+
         if should_save:
             self.run[f"{prefix}{key}"].append(figure, step=self._timestep)
 
@@ -156,7 +157,7 @@ class NeptuneLogger(Logger):
             parts = file_path.split("/")
             if len(parts) != 2:
                 raise ValueError("File path must be in format 'run_id/checkpoint_name'")
-                
+
             run = neptune.init_run(project=self.config["project"], with_id=parts[0])
             destination = f"{parts[0]}_{parts[1]}"
             run[f"checkpoints/{parts[1]}"].download(destination=destination)
@@ -168,7 +169,7 @@ class NeptuneLogger(Logger):
 
 class TerminalLogger(Logger):
     """Simple logger that outputs to terminal/console."""
-    
+
     def __init__(self, **kwargs: Any):
         log.info(">>> Terminal Logger")
 
@@ -183,7 +184,7 @@ class TerminalLogger(Logger):
         for key, value in data.items():
             if not isinstance(value, plt.Figure) and not np.isnan(value):
                 metrics.append(f"{key}: {value:.5f}")
-        
+
         if metrics:
             message = "\n".join(metrics)
             if timestep is not None:
@@ -205,13 +206,13 @@ def logger_factory(
     elif logger_type == "terminal":
         return TerminalLogger(**kwargs)
     else:
-        raise ValueError(f"Unsupported logger type: {logger_type}. Expected 'neptune' or 'terminal'.")
+        raise ValueError(
+            f"Unsupported logger type: {logger_type}. Expected 'neptune' or 'terminal'."
+        )
 
 
 def get_logger_from_config(
-    config: DictConfig, 
-    file_system: Optional[S3FileSystem] = None, 
-    **kwargs: Any
+    config: DictConfig, file_system: Optional[S3FileSystem] = None, **kwargs: Any
 ) -> Logger:
     """Create a logger based on configuration settings."""
     return logger_factory(
