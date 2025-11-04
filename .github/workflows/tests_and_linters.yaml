@@ -1,6 +1,9 @@
 name: Tests and Linters 🧪
 
-on: [ push ]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
 
 jobs:
   linters:
@@ -48,22 +51,22 @@ jobs:
         - name: Add safe directory 🔒
           run: git config --system --add safe.directory $GITHUB_WORKSPACE
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        - name: Install uv
+          uses: astral-sh/setup-uv@v6
 
-      - name: Sync dependencies (CPU)
-        run: uv sync --no-default-groups --group gpu --group dev
+        - name: Sync dependencies (CPU)
+          run: uv sync --no-default-groups --group gpu --group dev
 
-      - name: Run tests 🧪
-        run: |
-          uv run pytest --verbose --cov-report xml:coverage.xml \
-                          --cov-report term-missing \
-                          --junitxml=pytest.xml \
-                          --cov=alf
+        - name: Run tests 🧪
+          run: |
+            uv run pytest --verbose --cov-report xml:coverage.xml \
+                            --cov-report term-missing \
+                            --junitxml=pytest.xml \
+                            --cov=alf
 
-        - name: Pytest coverage comment 💬
-          id: coverageComment
-          uses: MishaKav/pytest-coverage-comment@main
-          with:
-            pytest-xml-coverage-path: ./coverage.xml
-            junitxml-path: ./pytest.xml
+          - name: Pytest coverage comment 💬
+            id: coverageComment
+            uses: MishaKav/pytest-coverage-comment@main
+            with:
+              pytest-xml-coverage-path: ./coverage.xml
+              junitxml-path: ./pytest.xml
