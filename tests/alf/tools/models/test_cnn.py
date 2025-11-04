@@ -18,8 +18,8 @@ import torch
 
 from alf.core.dataclasses import Candidate, LabeledCandidates
 from alf.tools.models.cnn import (
-    CNNModelConfig,
     CNNModel,
+    CNNModelConfig,
     CNNTrainConfig,
 )
 
@@ -63,7 +63,9 @@ class TestCNNModel:
         assert "final_train_spearman" in metrics
 
         # Predictions should work
-        test_candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * 3
+        test_candidates = [
+            Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")
+        ] * 3
         predictions = cnn_model.predict(test_candidates)
         assert predictions.means.shape == (3,)
         assert np.all(np.isfinite(predictions.means))
@@ -71,7 +73,9 @@ class TestCNNModel:
     def test_train_with_validation(self, cnn_model, sample_data):
         """Test training with validation data."""
         val_sequences = ["ACDEFGHIKLMNPQRSTVWY"] * 3
-        val_candidates = [Candidate(data=seq, modality="sequence") for seq in val_sequences]
+        val_candidates = [
+            Candidate(data=seq, modality="sequence") for seq in val_sequences
+        ]
         val_data = LabeledCandidates(val_candidates, np.random.randn(3))
 
         cnn_model.train(sample_data, val_data=val_data)
@@ -112,7 +116,9 @@ class TestCNNModel:
     def test_different_sequence_lengths_fails(self, cnn_model):
         """Test that sequences of different lengths cause issues appropriately."""
         # First train with one length
-        data1 = LabeledCandidates([Candidate(data="A" * 10, modality="sequence")], np.array([1.0]))
+        data1 = LabeledCandidates(
+            [Candidate(data="A" * 10, modality="sequence")], np.array([1.0])
+        )
         cnn_model.train(data1)
 
         # Trying to predict with different length should fail in one-hot encoding

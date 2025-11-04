@@ -15,11 +15,11 @@
 import logging
 from typing import Any, Optional
 
-from alf.core.utils.logger import Logger
-from alf.core.tasks.base_task import BaseTask
 from alf.core.dataclasses.task_state import TaskState
 from alf.core.optimizer.optimizer import Optimizer
 from alf.core.oracle.oracle import Oracle
+from alf.core.tasks.base_task import BaseTask
+from alf.core.utils.logger import Logger
 
 logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
 log = logging.getLogger("rich")
@@ -29,7 +29,7 @@ class DesignTask(BaseTask):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(task_type="Design", **kwargs)
 
-    def run(
+    def run(  # type: ignore[override]
         self,
         state: TaskState,
         logger: Logger,
@@ -38,7 +38,6 @@ class DesignTask(BaseTask):
         save_path: Optional[str] = None,
     ) -> None:
         """This is the multi-round design task."""
-
         log.info(f"Multi-round Design Task: {state.num_acq_rounds} Rounds")
 
         if save_path:
@@ -46,7 +45,7 @@ class DesignTask(BaseTask):
 
         for round_i in range(state.num_acq_rounds + 1):
             state.round_metrics = {"round": round_i}
-            acquired_candidates, state =  optimizer.ask(state)
+            acquired_candidates, state = optimizer.ask(state)
             labeled_candidates, state = oracle.evaluate(acquired_candidates, state)
             state.update(labeled_candidates)
             state = optimizer.tell(state=state, logger=logger)
@@ -61,5 +60,5 @@ class DesignTask(BaseTask):
 
             if state.should_terminate():
                 break
-        
+
         return

@@ -25,7 +25,7 @@ from s3fs.core import S3FileSystem
 
 class FileHandler:
     """Unified file handler for local and S3 storage.
-    
+
     Provides a consistent interface for file operations whether using local filesystem
     or S3 storage. Automatically handles path resolution and file system abstraction.
     """
@@ -34,14 +34,14 @@ class FileHandler:
         self, s3_endpoint: Optional[str] = None, bucket: Optional[str] = "input"
     ) -> None:
         """Initialize FileHandler.
-        
+
         Args:
             s3_endpoint: S3 endpoint URL. If None, uses local filesystem
             bucket: Bucket type - "input" or "output". Only used with S3.
         """
         self.s3_endpoint = s3_endpoint
         self.bucket = bucket
-        
+
         if s3_endpoint:
             self.s3 = S3FileSystem(client_kwargs={"endpoint_url": s3_endpoint})
             if bucket == "input":
@@ -56,14 +56,14 @@ class FileHandler:
     def _get_full_path(self, path: str) -> str:
         """Get the full path for the given relative path."""
         return os.path.join(self.bucket_path, path)
-    
+
     def _ensure_local_dir(self, path: str) -> None:
         """Ensure local directory exists for the given path."""
         if not self.s3_endpoint:
             dir_path = os.path.dirname(path)
             if dir_path:
                 os.makedirs(dir_path, exist_ok=True)
-    
+
     def _open_file(self, path: str, mode: str = "r", **kwargs):
         """Open file with appropriate handler (S3 or local)."""
         full_path = self._get_full_path(path)
@@ -71,10 +71,10 @@ class FileHandler:
             return self.s3.open(full_path, mode, **kwargs)
         else:
             return open(full_path, mode, **kwargs)
-    
+
     def open(self, path: str, *args: Any, **kwargs: Any):
         """Open file with appropriate handler (S3 or local).
-        
+
         This is a public interface for the _open_file method.
         """
         return self._open_file(path, *args, **kwargs)
@@ -102,7 +102,7 @@ class FileHandler:
             array: Numpy array to save
         """
         self._ensure_local_dir(path)
-        
+
         if self.s3_endpoint:
             with self._open_file(path, "wb") as f:
                 f.write(pickle.dumps(array))
@@ -129,7 +129,7 @@ class FileHandler:
             lines: List of lines to write to the file
         """
         self._ensure_local_dir(path)
-        
+
         with self._open_file(path, "w") as f:
             for line in lines:
                 f.write(line)
@@ -154,7 +154,7 @@ class FileHandler:
             data: Dictionary to save as JSON
         """
         self._ensure_local_dir(path)
-        
+
         with self._open_file(path, "w") as f:
             json.dump(data, f, indent=4)
 
@@ -178,7 +178,7 @@ class FileHandler:
             data: Dictionary to save as YAML
         """
         self._ensure_local_dir(path)
-        
+
         with self._open_file(path, "w") as f:
             yaml.dump(data, f)
 
@@ -212,7 +212,7 @@ class FileHandler:
             assert "FSSPEC_S3_ENDPOINT_URL" in os.environ
         else:
             self._ensure_local_dir(path)
-            
+
         df.to_csv(self._get_full_path(path), index=index, header=header)
 
     def listdir(self, path: str) -> List[str]:
