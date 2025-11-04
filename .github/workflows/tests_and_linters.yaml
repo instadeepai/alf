@@ -25,6 +25,9 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
 
+      - name: Sync dependencies (CPU)
+        run: uv sync --no-default-groups --group cpu --group dev
+
       - name: Lint
         run: uv run pre-commit run --all-files --verbose
 
@@ -48,15 +51,18 @@ jobs:
         - name: Add safe directory 🔒
           run: git config --system --add safe.directory $GITHUB_WORKSPACE
 
-        - name: Install uv
-          uses: astral-sh/setup-uv@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
 
-        - name: Run tests 🧪
-          run: |
-            uv run pytest --verbose --cov-report xml:coverage.xml \
-                            --cov-report term-missing \
-                            --junitxml=pytest.xml \
-                            --cov=alf
+      - name: Sync dependencies (CPU)
+        run: uv sync --no-default-groups --group gpu --group dev
+
+      - name: Run tests 🧪
+        run: |
+          uv run pytest --verbose --cov-report xml:coverage.xml \
+                          --cov-report term-missing \
+                          --junitxml=pytest.xml \
+                          --cov=alf
 
         - name: Pytest coverage comment 💬
           id: coverageComment
