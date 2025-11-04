@@ -38,7 +38,6 @@ class TestSupervisedTask:
         self, 
         dummy_dataset, 
         dummy_surrogate,
-        oracle,
         expected_metrics, 
         tmp_path
     ):
@@ -58,7 +57,6 @@ class TestSupervisedTask:
         task.run(
             state=state,
             logger=TerminalLogger(),
-            oracle=oracle,
             save_path=str(save_path)
         )
         
