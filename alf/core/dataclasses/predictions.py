@@ -32,6 +32,9 @@ class Predictions:
         if self.empirical_dist is not None:
             assert len(self.empirical_dist) == len(self.means), "Empirical dist must have the same length as means"
 
+    def __len__(self) -> int:
+        return len(self.means)
+    
     def save(
         self,
         output_dir: str,
