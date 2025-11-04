@@ -39,20 +39,10 @@ pythonpath = ["."]
 [tool.uv.sources]
 # build cuda if on linux, else build cpu
 torch = [
-  { index = "pytorch-118", marker = "sys_platform == 'linux'" },
-  { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
-]
-torchvision = [
-  { index = "pytorch-118", marker = "sys_platform == 'linux'" },
-  { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
+  { index = "pytorch-cpu"},
 ]
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
-explicit = true
-
-[[tool.uv.index]]
-name = "pytorch-118"
-url = "https://download.pytorch.org/whl/cu118"
 explicit = true
