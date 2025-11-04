@@ -37,6 +37,9 @@ class Predictions:
                 "Empirical dist must have the same length as means"
             )
 
+    def __len__(self) -> int:
+        return len(self.means)
+    
     def save(
         self,
         output_dir: str,

@@ -19,7 +19,6 @@ class SupervisedTask(BaseTask):
         self,
         state: TaskState,
         logger: Logger,
-        oracle: Oracle,
         save_path: Optional[str] = None,
     ) -> None:
         """Run the supervised task."""

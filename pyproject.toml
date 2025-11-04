@@ -34,7 +34,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_paths = ["."]
+pythonpath = ["."]
 
 [tool.uv.sources]
 # build cuda if on linux, else build cpu

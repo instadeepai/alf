@@ -99,10 +99,10 @@ class TestSupervised:
         task = SupervisedTask()
         state = task.setup(dataset=gfp_dataset, surrogate=surrogate_model)
         task.run(
-            state=state,
-            logger=TerminalLogger(),
-            oracle=oracle,
-            save_path=str(save_path),
+            state=state, 
+            logger=TerminalLogger(), 
+            save_path=str(save_path)
+
         )
 
         # Load and verify results
