@@ -42,8 +42,8 @@ gpu = [
 
 [tool.uv.sources]
 torch = [
-  { index = "pytorch-cpu", torch_source = "cpu" },
-  { index = "pytorch-gpu", torch_source = "gpu" },
+  { index = "pytorch-cpu", extra = "cpu" },
+  { index = "pytorch-gpu", extra = "gpu" },
 ]
 
 [[tool.uv.index]]
@@ -59,8 +59,8 @@ explicit = true
 [tool.uv]
 conflicts = [
   [
-    { torch_source = "cpu" },
-    { torch_source = "gpu" },
+    { extra = "cpu" },
+    { extra = "gpu" },
   ],
 ]
 default-groups = [
