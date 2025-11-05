@@ -1,8 +1,8 @@
-import pytest
-import numpy as np
-import torch
 import networkx as nx
+import numpy as np
 import pandas as pd
+import pytest
+import torch
 
 from alf.core.dataclasses.candidate import Candidate
 
@@ -36,7 +36,9 @@ class TestCandidateInitialization:
         """Test Candidate string representation."""
         candidate = Candidate(data="test", modality="test", features={"key": "value"})
         repr_str = repr(candidate)
-        assert repr_str == "Candidate(data=test, modality=test, features={'key': 'value'})"
+        assert (
+            repr_str == "Candidate(data=test, modality=test, features={'key': 'value'})"
+        )
 
 
 class TestCandidateDataModalities:
@@ -138,7 +140,7 @@ class TestCandidateEdgeCases:
         nested_features = {
             "metadata": {"source": "database", "version": "1.0"},
             "stats": {"mean": 0.5, "std": 0.1},
-            "flags": [True, False, True]
+            "flags": [True, False, True],
         }
         candidate = Candidate(data="test", modality="test", features=nested_features)
         assert candidate.features == nested_features
@@ -151,11 +153,11 @@ class TestCandidateFeatures:
     def test_features_immutability_after_init(self):
         """Test that features can be modified after initialization."""
         candidate = Candidate(data="test", modality="test", features={"key1": "value1"})
-        
+
         # Modify features
         candidate.features["key2"] = "value2"
         candidate.features["key1"] = "updated_value"
-        
+
         assert candidate.features["key1"] == "updated_value"
         assert candidate.features["key2"] == "value2"
 
@@ -169,7 +171,7 @@ class TestCandidateFeatures:
             "list": [1, 2, 3],
             "dict": {"nested": "value"},
             "numpy_array": np.array([1, 2, 3]),
-            "torch_tensor": torch.tensor([1, 2, 3])
+            "torch_tensor": torch.tensor([1, 2, 3]),
         }
         candidate = Candidate(data="test", modality="test", features=features)
         assert candidate.features == features
@@ -187,30 +189,37 @@ class TestCandidateStringify:
         with pytest.raises(ValueError, match="Unsupported modality"):
             candidate.stringify()
 
-@pytest.mark.parametrize("modality,data_factory", [
-    ("sequence", lambda: "ATCGATCG"),
-    ("image", lambda: np.random.rand(32, 32, 3)),
-    ("graph", lambda: nx.path_graph(5)),
-    ("structure", lambda: np.random.rand(10, 3)),
-    ("tabular", lambda: {"feature1": 1, "feature2": 2}),
-    ("embedding", lambda: torch.randn(10, 5)),
-])
+
+@pytest.mark.parametrize(
+    "modality,data_factory",
+    [
+        ("sequence", lambda: "ATCGATCG"),
+        ("image", lambda: np.random.rand(32, 32, 3)),
+        ("graph", lambda: nx.path_graph(5)),
+        ("structure", lambda: np.random.rand(10, 3)),
+        ("tabular", lambda: {"feature1": 1, "feature2": 2}),
+        ("embedding", lambda: torch.randn(10, 5)),
+    ],
+)
 def test_candidate_modality_consistency(modality, data_factory):
     """Parametrized test for different modalities with consistent data types."""
     data = data_factory()
     candidate = Candidate(data=data, modality=modality)
-    
+
     assert candidate.data is not None
     assert candidate.modality == modality
     assert candidate.features == {}
 
 
-@pytest.mark.parametrize("features", [
-    {},
-    {"single": "value"},
-    {"multiple": "values", "with": "different", "types": 123},
-    {"nested": {"inner": "value"}},
-])
+@pytest.mark.parametrize(
+    "features",
+    [
+        {},
+        {"single": "value"},
+        {"multiple": "values", "with": "different", "types": 123},
+        {"nested": {"inner": "value"}},
+    ],
+)
 def test_candidate_features_parametrized(features):
     """Parametrized test for different feature configurations."""
     candidate = Candidate(data="test", modality="test", features=features)

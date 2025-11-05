@@ -11,18 +11,18 @@ from alf.core.dataclasses import TaskState
 
 class DummyDataset(BaseDataset):
     """Dummy dataset that generates random data for testing."""
-    
+
     def __init__(
         self,
         name: str = "dummy",
         modality: str = "sequence",
         seed: int = 42,
-        split_config: dict[str, Any] = None,
+        split_config: dict[str, Any] | None = None,
         num_samples: int = 1000,
     ):
         """
         Initialize a dummy dataset.
-        
+
         Args:
             name: Name of the dataset
             modality: Modality of the data (e.g., "sequence")
@@ -39,28 +39,28 @@ class DummyDataset(BaseDataset):
         super().__init__(name, modality, seed, split_config)
         self.num_samples = num_samples
         self.setup()
-    
+
     def load_dataset(self) -> LabeledCandidates:
         """
         Generate dummy dataset with random sequences and labels.
-        
+
         Returns:
             LabeledCandidates with dummy data
         """
         # Generate dummy sequences (e.g., random strings)
         candidates = []
         labels = []
-        
+
         for i in range(self.num_samples):
             # Generate a dummy sequence (e.g., random string of length 10)
             dummy_sequence = "".join(self.rng.choice(list("ACGT"), size=10))
-            
+
             # Generate a dummy label (random float between 0 and 10)
             dummy_label = float(self.rng.uniform(0, 10))
-            
+
             candidates.append(Candidate(data=dummy_sequence, modality=self.modality))
             labels.append(dummy_label)
-        
+
         return LabeledCandidates(
             candidates=candidates,
             labels=np.array(labels)
@@ -69,11 +69,11 @@ class DummyDataset(BaseDataset):
 
 class DummyModel(BaseModel):
     """Dummy model that generates random predictions for testing."""
-    
+
     def __init__(self, name: str = "dummy_model", seed: int = 42):
         """
         Initialize a dummy model.
-        
+
         Args:
             name: Name of the model
             seed: Random seed for reproducibility
@@ -94,19 +94,19 @@ class DummyModel(BaseModel):
     def train(self, train_data: LabeledCandidates, val_data: LabeledCandidates, logger: Optional[Logger] = None) -> None:
         """Dummy model does not perform any actual training but updates the random seed."""
         self.rng = np.random.RandomState(self.seed + 1)
-   
+
     def sample(self, *args: Any, **kwargs: Any) -> List[Candidate]:
         """Dummy model does not perform sampling."""
-        pass
+        raise NotImplementedError("Sampling is not implemented for this model.")
 
 class DummyAcquisitionFunction(AcquisitionFunction):
     """Dummy acquisition function that generates random acquisition values for testing."""
-    
+
     def __init__(self, seed: int = 42):
         """Initialize the dummy acquisition function."""
         self.seed = seed
         self.rng = np.random.RandomState(seed)
-    
+
     def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
         """Generate random acquisition values for the predictions."""
         return self.rng.randn(len(predictions))

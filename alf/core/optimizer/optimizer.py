@@ -13,20 +13,19 @@
 # limitations under the License.
 
 import time
-from typing import List, Optional, Tuple, Dict
-
+from typing import Dict, List, Optional, Tuple
 
 from alf.core.dataclasses import (
     Candidate,
     LabeledCandidates,
     TaskState,
 )
-from alf.core.utils.logger import Logger
 from alf.core.optimizer.acquisition_function import AcquisitionFunction
 from alf.core.optimizer.search import BaseSearch
+from alf.core.utils.logger import Logger
 
 
-def select_top_k(candidates: LabeledCandidates, k: int) -> List[Candidate]:
+def select_top_k(candidates: LabeledCandidates, k: int) -> LabeledCandidates:
     """Select the top k candidates from the list."""
     top_k_indices = candidates.labels.argsort()[::-1][:k]
     top_k_candidates = [candidates.candidates[i] for i in top_k_indices]
@@ -49,9 +48,8 @@ class Optimizer:
     def ask(
         self,
         state: TaskState,
-    ) -> Tuple[List[Candidate], TaskState]: 
+    ) -> Tuple[List[Candidate], TaskState]:
         """Ask the optimizer to propose the next batch of candidates through the search and acquisition functions."""
-
         t0 = time.perf_counter()
 
         # During the first round, we use the training dataset as the acquired candidates.
@@ -61,7 +59,9 @@ class Optimizer:
         else:
             search_candidates = self.search_fn(state)
             acquisition_candidates = self.acquisition_fn(search_candidates, state)
-            acquired_candidates = select_top_k(acquisition_candidates, state.acq_batch_size).candidates
+            acquired_candidates = select_top_k(
+                acquisition_candidates, state.acq_batch_size
+            ).candidates
 
         t1 = time.perf_counter()
         state.round_metrics.update({"ask_time": t1 - t0})
@@ -72,8 +72,7 @@ class Optimizer:
         state: TaskState,
         logger: Optional[Logger] = None,
     ) -> TaskState:
-        """
-        Train the surrogate model on the new train/val datasets.
+        """Train the surrogate model on the new train/val datasets.
 
         Args:
             state: the optimizer state
@@ -84,9 +83,9 @@ class Optimizer:
         t0 = time.perf_counter()
         if state.surrogate:
             state.surrogate.fit(
-                train_data=state.dataset.train_dataset, 
-                val_data=state.dataset.validation_dataset, 
-                logger=logger
+                train_data=state.dataset.train_dataset,
+                val_data=state.dataset.validation_dataset,
+                logger=logger,
             )
         t1 = time.perf_counter()
 
@@ -100,10 +99,9 @@ class Optimizer:
         state: TaskState,
     ) -> Dict[str, float]:
         """Update the state with the metrics from the acquired candidates, surrogate, search, and acquisition functions."""
-
         acquired_candidates = state.history[-1]
         metrics = {
-             # Metrics on the acquired candidates during the current round
+            # Metrics on the acquired candidates during the current round
             "acquired_candidates/round_mean": acquired_candidates.labels.mean(),
             "acquired_candidates/round_max": acquired_candidates.labels.max(),
             "acquired_candidates/round_min": acquired_candidates.labels.min(),

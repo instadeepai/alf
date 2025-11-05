@@ -1,11 +1,13 @@
-from alf.core.optimizer.acquisition_function import AcquisitionFunction
-from alf.core.dataclasses.task_state import TaskState
-from alf.core.dataclasses.predictions import Predictions
 import numpy as np
+
+from alf.core.dataclasses.predictions import Predictions
+from alf.core.dataclasses.task_state import TaskState
+from alf.core.optimizer.acquisition_function import AcquisitionFunction
+
 
 class ThompsonSampling(AcquisitionFunction):
     """Thompson Sampling acquisition function.
-    
+
     A generalisation of Thompson Sampling to the case where batch size > num posterior samples.
 
     For each point, we find its maximum rank under any ensemble member,
@@ -15,7 +17,9 @@ class ThompsonSampling(AcquisitionFunction):
     is better.
     """
 
-    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
+    def _get_acquisition_values(
+        self, predictions: Predictions, state: TaskState
+    ) -> np.ndarray:
         """Computes acquisition values for candidates based on surrogate predictions."""
         if predictions.empirical_dist is not None:
             samples = predictions.empirical_dist

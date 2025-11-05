@@ -1,8 +1,10 @@
-from typing import List, Union
+from typing import List, Optional, Union
+
+import numpy as np
+
 from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions
 from alf.core.model.base_model import BaseModel
 from alf.core.utils.logger import Logger
-import numpy as np
 
 
 class Surrogate:
@@ -13,11 +15,16 @@ class Surrogate:
     def __init__(self, model: BaseModel):
         """Initialize the surrogate model."""
         self.model: BaseModel = model
-    
-    def fit(self, train_data: LabeledCandidates, val_data: LabeledCandidates, logger: Logger) -> None:
+
+    def fit(
+        self,
+        train_data: LabeledCandidates,
+        val_data: LabeledCandidates,
+        logger: Optional[Logger] = None,
+    ) -> None:
         """Fit the surrogate model on the batch of candidates."""
         self.model.train(train_data, val_data, logger)
-    
+
     def predict(self, candidates: List[Candidate]) -> Predictions:
         """Predict the scores for the candidates."""
         return self.model.predict(candidates)

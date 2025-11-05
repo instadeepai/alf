@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, List, Mapping, Optional, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import torch
@@ -23,9 +23,9 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 
 from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions, Results
+from alf.core.model.base_model import BaseModel
 from alf.core.utils.constants import PROTEIN_ALPHABET
 from alf.core.utils.logger import Logger
-from alf.core.model.base_model import BaseModel
 
 logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
 log = logging.getLogger("rich")
@@ -53,8 +53,7 @@ class CNNTrainConfig:
 
 
 class SequenceCNN(nn.Module):
-    """
-    Simple 1D CNN for sequence regression.
+    """Simple 1D CNN for sequence regression.
 
     Architecture:
     - One-hot encoding → Conv1D layers → Fully connected → Scalar output
@@ -70,8 +69,7 @@ class SequenceCNN(nn.Module):
         fc_hidden_dim: int = 256,
         dropout: float = 0.3,
     ):
-        """
-        Initialize the SequenceCNN model.
+        """Initialize the SequenceCNN model.
 
         Args:
             seq_length: Length of input sequences.
@@ -90,16 +88,14 @@ class SequenceCNN(nn.Module):
         current_length = seq_length
 
         for _ in range(num_conv_layers):
-            conv_layers.extend(
-                [
-                    nn.Conv1d(
-                        in_channels, num_filters, kernel_size, padding=kernel_size // 2
-                    ),
-                    nn.ReLU(),
-                    nn.MaxPool1d(kernel_size=2),
-                    nn.Dropout(dropout),
-                ]
-            )
+            conv_layers.extend([
+                nn.Conv1d(
+                    in_channels, num_filters, kernel_size, padding=kernel_size // 2
+                ),
+                nn.ReLU(),
+                nn.MaxPool1d(kernel_size=2),
+                nn.Dropout(dropout),
+            ])
             in_channels = num_filters
             current_length = current_length // 2
 
@@ -118,8 +114,7 @@ class SequenceCNN(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass through the network.
+        """Forward pass through the network.
 
         Args:
             x: One-hot encoded sequences (batch_size, alphabet_size, seq_length).
@@ -134,8 +129,7 @@ class SequenceCNN(nn.Module):
 
 
 class CNNModel(BaseModel):
-    """
-    Minimal CNN model for sequence fitness prediction.
+    """Minimal CNN model for sequence fitness prediction.
 
     One-hot encodes sequences, trains a simple 1D CNN with MSE loss.
     """
@@ -148,8 +142,7 @@ class CNNModel(BaseModel):
         alphabet: str = PROTEIN_ALPHABET,
         device: Optional[str] = None,
     ):
-        """
-        Initialize the CNNModel.
+        """Initialize the CNNModel.
 
         Args:
             name: Name of the surrogate model.
@@ -158,7 +151,6 @@ class CNNModel(BaseModel):
             alphabet: Sequence alphabet to use.
             device: Device to use for training ('cuda', 'cpu', or None for auto-detect).
         """
-
         # Use defaults if configs not provided
         self.model_config = model_config or CNNModelConfig()
         self.train_config = train_config or CNNTrainConfig()
@@ -178,11 +170,10 @@ class CNNModel(BaseModel):
         self.seq_length: Optional[int] = None
 
         # Track metrics
-        self.training_metrics: dict = {}
+        self.training_metrics: dict[str, Union[float, int, np.number]] = {}
 
     def _one_hot_encode(self, sequences: List[str]) -> torch.Tensor:
-        """
-        One-hot encode sequences.
+        """One-hot encode sequences.
 
         Args:
             sequences: List of sequences as strings.
@@ -202,9 +193,10 @@ class CNNModel(BaseModel):
 
         return one_hot
 
-    def featurise(self, inputs: Union[LabeledCandidates, List[Candidate]]) -> torch.Tensor:
-        """
-        Convert inputs to one-hot encoded tensors.
+    def featurise(
+        self, inputs: Union[LabeledCandidates, List[Candidate]]
+    ) -> torch.Tensor:
+        """Convert inputs to one-hot encoded tensors.
 
         Args:
             inputs: Either LabeledCandidates or list of Candidates to featurise.
@@ -224,8 +216,7 @@ class CNNModel(BaseModel):
     def _prepare_data_loader(
         self, data: LabeledCandidates, shuffle: bool = False
     ) -> DataLoader:
-        """
-        Prepare a DataLoader from LabeledCandidates.
+        """Prepare a DataLoader from LabeledCandidates.
 
         Args:
             data: Data containing sequences and oracle values.
@@ -249,8 +240,7 @@ class CNNModel(BaseModel):
         optimizer: optim.Optimizer,
         criterion: nn.Module,
     ) -> tuple[float, dict]:
-        """
-        Train for one epoch.
+        """Train for one epoch.
 
         Args:
             train_loader: DataLoader for training data.
@@ -260,6 +250,7 @@ class CNNModel(BaseModel):
         Returns:
             Tuple of (average_loss, metrics_dict).
         """
+        assert self.model is not None, "Model must be initialized before training"
         self.model.train()
         train_losses = []
         train_predictions_all = []
@@ -283,7 +274,9 @@ class CNNModel(BaseModel):
         train_predictions_obj = Predictions(means=train_preds, variances=None)
         # Handle case where dataset is too small for correlation metrics
         if len(train_preds) >= 2:
-            train_metrics = Results(predictions=train_predictions_obj, targets=train_targets).metrics
+            train_metrics = Results(
+                predictions=train_predictions_obj, targets=train_targets
+            ).metrics
         else:
             # Only compute MSE for very small datasets
             mse = np.mean((train_preds - train_targets) ** 2)
@@ -294,8 +287,7 @@ class CNNModel(BaseModel):
     def _validate_epoch(
         self, val_loader: DataLoader, criterion: nn.Module
     ) -> tuple[float, dict]:
-        """
-        Validate for one epoch.
+        """Validate for one epoch.
 
         Args:
             val_loader: DataLoader for validation data.
@@ -304,6 +296,7 @@ class CNNModel(BaseModel):
         Returns:
             Tuple of (average_loss, metrics_dict).
         """
+        assert self.model is not None, "Model must be initialized before validation"
         self.model.eval()
         val_losses = []
         val_predictions_all = []
@@ -325,7 +318,9 @@ class CNNModel(BaseModel):
         val_predictions_obj = Predictions(means=val_preds, variances=None)
         # Handle case where dataset is too small for correlation metrics
         if len(val_preds) >= 2:
-            val_metrics = Results(predictions=val_predictions_obj, targets=val_targets).metrics
+            val_metrics = Results(
+                predictions=val_predictions_obj, targets=val_targets
+            ).metrics
         else:
             # Only compute MSE for very small datasets
             mse = np.mean((val_preds - val_targets) ** 2)
@@ -341,8 +336,7 @@ class CNNModel(BaseModel):
         avg_val_loss: Optional[float] = None,
         val_metrics: Optional[dict] = None,
     ) -> None:
-        """
-        Log epoch metrics.
+        """Log epoch metrics.
 
         Args:
             epoch: Current epoch.
@@ -353,7 +347,7 @@ class CNNModel(BaseModel):
         """
         if (epoch + 1) % self.train_config.log_frequency == 0:
             msg = (
-                f"Epoch {epoch+1}/{self.train_config.num_epochs} - "
+                f"Epoch {epoch + 1}/{self.train_config.num_epochs} - "
                 f"Train Loss: {avg_train_loss:.4f}, Train Spearman: {train_metrics['spearman']:.4f}"
             )
             if avg_val_loss is not None and val_metrics is not None:
@@ -369,8 +363,7 @@ class CNNModel(BaseModel):
         val_data: Optional[LabeledCandidates] = None,
         logger: Optional[Logger] = None,
     ) -> None:
-        """
-        Train the CNN model.
+        """Train the CNN model.
 
         Args:
             train_data: Training data containing sequences and oracle values.
@@ -450,20 +443,19 @@ class CNNModel(BaseModel):
             "final_train_loss": avg_train_loss,
         }
         # Add all final train metrics
-        self.training_metrics.update(
-            {f"final_train_{k}": v for k, v in train_metrics.items()}
-        )
+        self.training_metrics.update({
+            f"final_train_{k}": v for k, v in train_metrics.items()
+        })
 
         if val_loader is not None:
             self.training_metrics["final_val_loss"] = avg_val_loss
             # Add all final validation metrics
-            self.training_metrics.update(
-                {f"final_val_{k}": v for k, v in val_metrics.items()}
-            )
+            self.training_metrics.update({
+                f"final_val_{k}": v for k, v in val_metrics.items()
+            })
 
     def predict(self, candidate_points: List[Candidate]) -> Predictions:
-        """
-        Make predictions for candidates.
+        """Make predictions for candidates.
 
         Args:
             candidate_points: List of candidates to predict fitness for.
@@ -488,9 +480,8 @@ class CNNModel(BaseModel):
 
     def get_training_summary_metrics(
         self,
-    ) -> Mapping[str, Union[float, int, np.number]]:
-        """
-        Return training metrics.
+    ) -> dict[str, Union[float, int, np.number]]:
+        """Return training metrics.
 
         Returns:
             Dictionary of training metrics including losses and Spearman correlations.

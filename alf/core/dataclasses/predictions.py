@@ -1,9 +1,11 @@
-from dataclasses import dataclass
-import numpy as np
-from alf.core.dataclasses.candidate import Candidate
-from typing import List
-import pandas as pd
 import os
+from dataclasses import dataclass
+from typing import List
+
+import numpy as np
+import pandas as pd
+
+from alf.core.dataclasses.candidate import Candidate
 from alf.core.utils.io import input_handler
 
 
@@ -20,7 +22,6 @@ class Predictions:
             (num_candidates, num_ensemble_models).
     """
 
-
     means: np.ndarray
     variances: np.ndarray | None = None
     empirical_dist: np.ndarray | None = None
@@ -28,13 +29,17 @@ class Predictions:
     def __post_init__(self) -> None:
         assert len(self.means) > 0, "Means must have at least one prediction"
         if self.variances is not None:
-            assert len(self.variances) == len(self.means), "Variances must have the same length as means"
+            assert len(self.variances) == len(self.means), (
+                "Variances must have the same length as means"
+            )
         if self.empirical_dist is not None:
-            assert len(self.empirical_dist) == len(self.means), "Empirical dist must have the same length as means"
+            assert len(self.empirical_dist) == len(self.means), (
+                "Empirical dist must have the same length as means"
+            )
 
     def __len__(self) -> int:
         return len(self.means)
-    
+
     def save(
         self,
         output_dir: str,
@@ -42,8 +47,7 @@ class Predictions:
         targets: np.ndarray,
         filename: str,
     ) -> None:
-        """
-        Save the predictions to disk.
+        """Save the predictions to disk.
 
         First create a dataframe of {(sequence_i, mean_i target_i)} and then save to disk.
         Additionally, if they exist then save variances, and empirical dists.

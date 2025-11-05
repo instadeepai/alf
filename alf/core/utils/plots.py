@@ -26,23 +26,29 @@ DEFAULT_FIGURE_SIZE = (6, 6)
 
 class PlotRegistry:
     """Simple registry for plots with variance requirements."""
-    
+
     def __init__(self):
         self.plots: dict[str, Callable] = {}
         self.variance_required: dict[str, bool] = {}
-    
+
     def register(self, name: str, plot_fn: Callable, requires_variance: bool = False):
         """Register a plot function."""
         self.plots[name] = plot_fn
         self.variance_required[name] = requires_variance
-    
+
     def get_plots_requiring_variance(self) -> dict[str, Callable]:
         """Get plots that require variance."""
-        return {name: fn for name, fn in self.plots.items() if self.variance_required[name]}
-    
+        return {
+            name: fn for name, fn in self.plots.items() if self.variance_required[name]
+        }
+
     def get_plots_not_requiring_variance(self) -> dict[str, Callable]:
         """Get plots that don't require variance."""
-        return {name: fn for name, fn in self.plots.items() if not self.variance_required[name]}
+        return {
+            name: fn
+            for name, fn in self.plots.items()
+            if not self.variance_required[name]
+        }
 
 
 # Create the global registry instance
@@ -50,10 +56,10 @@ plot_registry = PlotRegistry()
 
 
 def requires_variance(plot_fn: Callable) -> Callable:
-    """
-    Decorator to mark a plot as requiring variance.
+    """Decorator to mark a plot as requiring variance.
     This automatically registers the plot in the global registry and applies input validation.
     """
+
     @wraps(plot_fn)
     def wrapper(
         means: np.ndarray,
@@ -65,17 +71,17 @@ def requires_variance(plot_fn: Callable) -> Callable:
         check_inputs(means, targets)
         check_variance_validity(variances, targets)
         return plot_fn(means, variances, targets, *args, **kwargs)
-    
+
     # Register the plot with variance requirement
     plot_registry.register(plot_fn.__name__, wrapper, requires_variance=True)
     return wrapper
 
 
 def no_variance_required(plot_fn: Callable) -> Callable:
-    """
-    Decorator to mark a plot as not requiring variance.
+    """Decorator to mark a plot as not requiring variance.
     This automatically registers the plot in the global registry and applies input validation.
     """
+
     @wraps(plot_fn)
     def wrapper(
         means: np.ndarray,
@@ -86,7 +92,7 @@ def no_variance_required(plot_fn: Callable) -> Callable:
     ) -> Any:
         check_inputs(means, targets)
         return plot_fn(means, variances, targets, *args, **kwargs)
-    
+
     # Register the plot without variance requirement
     plot_registry.register(plot_fn.__name__, wrapper, requires_variance=False)
     return wrapper
@@ -99,8 +105,7 @@ def create_ece_plot(
     targets: np.ndarray,
     n_grid_points: int = 100,
 ) -> dict[str, plt.Figure]:
-    """
-    Create ECE plot
+    """Create ECE plot
     -- requires uncertainty --
     For alpha in grid from 0 -> 1
     Find alpha% confidence intervals for all predictions
@@ -119,7 +124,6 @@ def create_ece_plot(
     Returns:
         matplotlib.figure.Figure: The generated figure
     """
-
     grid = np.linspace(0, 1, n_grid_points)
     perc = np.zeros(n_grid_points)
     for i, cdf_cutoff in enumerate(grid):
@@ -161,8 +165,7 @@ def create_predictions_plot(
     targets: np.ndarray,
     confidence_level: float = 0.95,
 ) -> dict[str, plt.Figure]:
-    """
-    Create predictions plot
+    """Create predictions plot
     -- optionally uses uncertainty --
     Creates a simple scatter plot of predictions against targets
     (Optional: if one has variances then also add confidence_level% confidence intervals)
@@ -212,7 +215,7 @@ def create_predictions_plot(
             alpha=0.7,
             ecolor="C0",
             capsize=2,
-            label=f"{int(confidence_level*100)}% CI",
+            label=f"{int(confidence_level * 100)}% CI",
         )
     else:
         ax.scatter(means, targets, alpha=0.7, color="C0", label="Predictions")
@@ -249,8 +252,7 @@ def create_ranks_plot(
     _: np.ndarray | None,
     targets: np.ndarray,
 ) -> dict[str, plt.Figure]:
-    """
-    Create predicted ranks plot
+    """Create predicted ranks plot
     Creates a simple scatter plot of predicted rank against true rank
 
     Args:
@@ -261,7 +263,6 @@ def create_ranks_plot(
     Returns:
         matplotlib.figure.Figure: The generated figure
     """
-
     # compute mse
     mse_val = np.mean((means - targets) ** 2)
     spearman_val = spearmanr(means, targets)[0]
@@ -310,8 +311,7 @@ def create_variance_histogram(
     variances: np.ndarray,
     targets: np.ndarray,
 ) -> dict[str, plt.Figure]:
-    """
-    Create a histogram of predicted variances.
+    """Create a histogram of predicted variances.
 
     Args:
         _: unused
@@ -321,7 +321,6 @@ def create_variance_histogram(
     Returns:
         matplotlib.figure.Figure: The generated figure
     """
-
     # create figure
     fig, ax = plt.subplots(figsize=DEFAULT_FIGURE_SIZE)
     ax.hist(variances, bins=30, color="C0", density=True, alpha=0.7)

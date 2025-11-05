@@ -33,66 +33,64 @@ def expected_metrics():
 
 class TestSupervisedTask:
     """Tests a supervised experiment with a dummy surrogate model on a dummy dataset."""
-    
+
     def test_supervised_dummy_surrogate_experiment(
-        self, 
-        dummy_dataset, 
+        self,
+        dummy_dataset,
         dummy_surrogate,
-        oracle,
-        expected_metrics, 
+        expected_metrics,
         tmp_path
     ):
         """
         Test the complete supervised dummy surrogate experiment pipeline.
-        
+
         This test verifies that the supervised learning pipeline works correctly
         and produces expected metrics for the dummy dataset using a dummy surrogate model.
         """
         # Use pytest's tmp_path for temporary directory
         save_path = tmp_path / "supervised_dummy_surrogate"
         save_path.mkdir()
-        
+
         # Create and run the supervised task
         task = SupervisedTask()
         state = task.setup(dataset=dummy_dataset, surrogate=dummy_surrogate)
         task.run(
             state=state,
             logger=TerminalLogger(),
-            oracle=oracle,
             save_path=str(save_path)
         )
-        
+
         # Load and verify results
         metrics_file = save_path / "metrics.csv"
         assert metrics_file.exists(), "Metrics file should be created"
-        
+
         metrics = pd.read_csv(metrics_file)
-        
+
         # Test surrogate performance metrics
         self._assert_surrogate_metrics(metrics, expected_metrics["surrogate"])
-        
+
         # Test dataset metrics
         self._assert_dataset_metrics(metrics, expected_metrics["dataset"])
-        
+
         # Clean up: remove the results folder after assertions
         shutil.rmtree(save_path)
-    
+
     def _assert_surrogate_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert surrogate model performance metrics."""
         for metric_name, expected_value in expected.items():
             actual_value = metrics[f"surrogate/{metric_name}"].iloc[0]
             assert np.isclose(
-                actual_value, 
-                expected_value, 
+                actual_value,
+                expected_value,
                 atol=1e-5
             ), f"Surrogate metric {metric_name} mismatch: expected {expected_value}, got {actual_value}"
-    
+
     def _assert_dataset_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert dataset metrics."""
         for metric_name, expected_value in expected.items():
             actual_value = metrics[f"dataset/{metric_name}"].iloc[0]
             assert np.isclose(
-                actual_value, 
-                expected_value, 
+                actual_value,
+                expected_value,
                 atol=1e-5
             ), f"Dataset metric {metric_name} mismatch: expected {expected_value}, got {actual_value}"

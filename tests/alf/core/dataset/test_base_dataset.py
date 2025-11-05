@@ -11,7 +11,7 @@ from tests.alf.core.tasks.dummy_components import DummyDataset
 
 class TestBaseDatasetInitialization:
     """Tests for BaseDataset initialization and configuration."""
-    
+
     def test_initialization_with_valid_config(self):
         """Test initialization with valid split configuration, without candidate pool."""
         split_config = {
@@ -19,13 +19,13 @@ class TestBaseDatasetInitialization:
             "split_type": "random"
         }
         dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
-        
+
         assert dataset.name == "dummy"
         assert dataset.modality == "sequence"
         assert dataset.seed == 42
         assert dataset.split_ratio == split_config["split_ratio"]
         assert dataset.split_type == "random"
-    
+
     def test_initialization_with_candidate_pool(self):
         """Test initialization with candidate pool in split config."""
         split_config = {
@@ -33,20 +33,20 @@ class TestBaseDatasetInitialization:
             "split_type": "random"
         }
         dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
-        
+
         assert "candidate_pool" in dataset.split_ratio
         assert dataset.split_ratio["candidate_pool"] == 0.2
 
 
 class TestBaseDatasetValidation:
     """Tests for BaseDataset configuration validation."""
-    
+
     def test_validate_split_config_missing_split_ratio(self):
         """Test that missing split_ratio raises an assertion error."""
         with pytest.raises(AssertionError, match="Split ratio must be set"):
             split_config = {"split_type": "random"}
             DummyDataset(seed=42, split_config=split_config, num_samples=100)
-    
+
     def test_validate_split_config_missing_split_type(self):
         """Test that missing split_type raises an assertion error."""
         with pytest.raises(AssertionError, match="Split type must be set"):
@@ -54,7 +54,7 @@ class TestBaseDatasetValidation:
                 "split_ratio": {"train": 0.8, "validation_frac": 0.25, "test": 0.2}
             }
             DummyDataset(seed=42, split_config=split_config, num_samples=100)
-    
+
     def test_validate_split_config_ratios_sum_exceeds_one(self):
         """Test that split ratios summing to more than 1 raises an error."""
         with pytest.raises(AssertionError, match="Split ratios must sum to less than or equal to 1"):
@@ -63,7 +63,7 @@ class TestBaseDatasetValidation:
                 "split_type": "random"
             }
             DummyDataset(seed=42, split_config=split_config, num_samples=100)
-    
+
     def test_validate_split_config_with_candidate_pool_exceeds_one(self):
         """Test that split ratios with candidate pool summing to more than 1 raises an error."""
         with pytest.raises(AssertionError, match="Split ratios must sum to less than or equal to 1"):
@@ -76,7 +76,7 @@ class TestBaseDatasetValidation:
 
 class TestBaseDatasetSplitting:
     """Tests for dataset splitting functionality."""
-    
+
     def test_split_dataset_random(self):
         """Test random splitting of dataset."""
         split_config = {
@@ -84,12 +84,12 @@ class TestBaseDatasetSplitting:
             "split_type": "random"
         }
         dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
-        
+
         # train+val = 60, of which 25% (15) goes to validation, 75% (45) to train
         assert len(dataset.train_dataset) == 45
         assert len(dataset.validation_dataset) == 15
         assert len(dataset.test_dataset) == 20
-    
+
     def test_split_dataset_with_candidate_pool(self):
         """Test splitting with explicit candidate pool."""
         split_config = {
@@ -97,13 +97,13 @@ class TestBaseDatasetSplitting:
             "split_type": "random"
         }
         dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
-        
+
         # train+val = 50, of which 20% (10) goes to validation, 80% (40) to train
         assert len(dataset.train_dataset) == 40
         assert len(dataset.validation_dataset) == 10
         assert len(dataset.test_dataset) == 25
         assert len(dataset.candidate_pool) == 25
-    
+
     def test_split_dataset_low_vs_high(self):
         """Test low vs high splitting of dataset."""
         split_config = {
@@ -111,20 +111,20 @@ class TestBaseDatasetSplitting:
             "split_type": "low_vs_high"
         }
         dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
-        
+
         # Check sizes: train+val = 50, of which 20% (10) goes to validation, 80% (40) to train
         assert len(dataset.train_dataset) == 40
         assert len(dataset.validation_dataset) == 10
         assert len(dataset.test_dataset) == 25
         assert len(dataset.candidate_pool) == 25
-        
+
         # Check that train/val have lower scores than test/pool on average
-        train_val_mean = (np.mean(dataset.train_dataset.labels) + 
+        train_val_mean = (np.mean(dataset.train_dataset.labels) +
                          np.mean(dataset.validation_dataset.labels)) / 2
-        test_pool_mean = (np.mean(dataset.test_dataset.labels) + 
+        test_pool_mean = (np.mean(dataset.test_dataset.labels) +
                          np.mean(dataset.candidate_pool.labels)) / 2
         assert test_pool_mean >= train_val_mean
-    
+
     def test_init_candidate_pool_is_deepcopy(self):
         """Test that init_candidate_pool is a deep copy of the original candidate pool."""
         split_config = {
@@ -132,15 +132,15 @@ class TestBaseDatasetSplitting:
             "split_type": "random"
         }
         dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
-        
+
         # Verify init_candidate_pool exists
         assert hasattr(dataset, 'init_candidate_pool')
         assert len(dataset.init_candidate_pool) == len(dataset.candidate_pool)
-        
+
         # Modify current pool
         original_pool_size = len(dataset.candidate_pool)
         dataset.splits["candidate_pool"].labels[0] = 999.0
-        
+
         # Check that init pool is unaffected
         assert dataset.init_candidate_pool.labels[0] != 999.0
         assert len(dataset.init_candidate_pool) == original_pool_size
@@ -148,31 +148,31 @@ class TestBaseDatasetSplitting:
 
 class TestBaseDatasetProperties:
     """Tests for BaseDataset properties."""
-    
+
     def test_train_dataset_property(self):
         """Test train_dataset property."""
         dataset = DummyDataset(seed=42, num_samples=100)
         train = dataset.train_dataset
-        
+
         assert isinstance(train, LabeledCandidates)
         assert len(train) == 48
-    
+
     def test_validation_dataset_property(self):
         """Test validation_dataset property."""
         dataset = DummyDataset(seed=42, num_samples=100)
         validation = dataset.validation_dataset
-        
+
         assert isinstance(validation, LabeledCandidates)
         assert len(validation) == 12
-    
+
     def test_test_dataset_property(self):
         """Test test_dataset property."""
         dataset = DummyDataset(seed=42, num_samples=100)
         test = dataset.test_dataset
-        
+
         assert isinstance(test, LabeledCandidates)
         assert len(test) == 20
-    
+
     def test_candidate_pool_property(self):
         """Test candidate_pool property."""
         split_config = {
@@ -181,12 +181,12 @@ class TestBaseDatasetProperties:
         }
         dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
         pool = dataset.candidate_pool
-        
+
         assert isinstance(pool, LabeledCandidates)
         # When no candidate_pool specified, it gets the remainder
         # train+val = 60 (45 train, 15 val), test = 20, pool = 100 - 60 - 20 = 20
         assert len(pool) == 20
-    
+
     def test_property_access_before_split_raises_error(self):
         """Test that accessing properties before splitting raises an assertion error."""
         # Create a custom dataset that doesn't auto-setup
@@ -196,20 +196,20 @@ class TestBaseDatasetProperties:
                     candidates=[Candidate(data=f"seq_{i}", modality="sequence") for i in range(100)],
                     labels=np.random.rand(100)
                 )
-        
+
         split_config = {
             "split_ratio": {"train": 0.6, "validation_frac": 0.25, "test": 0.2},
             "split_type": "random"
         }
         dataset = NoSetupDataset(name="test", modality="sequence", seed=42, split_config=split_config)
-        
+
         with pytest.raises(AssertionError, match="Dataset must be split before accessing"):
             _ = dataset.train_dataset
 
 
 class TestBaseDatasetUpdateSplits:
     """Tests for updating dataset splits with acquired candidates."""
-    
+
     def test_update_splits_with_acquired_candidates(self):
         """Test that update_splits correctly moves candidates from pool to train/val."""
         split_config = {
@@ -217,27 +217,27 @@ class TestBaseDatasetUpdateSplits:
             "split_type": "random"
         }
         dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
-        
+
         # Get initial sizes
         initial_train_size = len(dataset.train_dataset)
         initial_val_size = len(dataset.validation_dataset)
         initial_pool_size = len(dataset.candidate_pool)
-        
+
         # Acquire some candidates from the pool
         num_acquired = 5
         acquired_candidates = dataset.candidate_pool[:num_acquired]
-        
+
         # Update splits
         dataset.update_splits(acquired_candidates)
-        
+
         # Check that pool size decreased
         assert len(dataset.candidate_pool) == initial_pool_size - num_acquired
-        
+
         # Check that train + val size increased by num_acquired
         new_train_size = len(dataset.train_dataset)
         new_val_size = len(dataset.validation_dataset)
         assert (new_train_size + new_val_size) == (initial_train_size + initial_val_size + num_acquired)
-    
+
     def test_update_splits_respects_validation_ratio(self):
         """Test that update_splits maintains the validation ratio."""
         split_config = {
@@ -245,13 +245,13 @@ class TestBaseDatasetUpdateSplits:
             "split_type": "random"
         }
         dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
-        
+
         # Acquire 10 candidates
         acquired_candidates = dataset.candidate_pool[:10]
         initial_val_size = len(dataset.validation_dataset)
-        
+
         dataset.update_splits(acquired_candidates)
-        
+
         # With validation_frac of 0.2, expect 2 of the 10 to go to validation (10 * 0.2 = 2)
         expected_new_val = int(10 * dataset.split_ratio["validation_frac"])
         actual_new_val = len(dataset.validation_dataset) - initial_val_size
@@ -260,21 +260,21 @@ class TestBaseDatasetUpdateSplits:
 
 class TestBaseDatasetQuery:
     """Tests for querying labels for candidates."""
-    
+
     def test_query_returns_correct_labels(self):
         """Test that query returns the correct labels for given candidates."""
         dataset = DummyDataset(seed=42, num_samples=100)
-        
+
         # Get some candidates from train set
         candidates_to_query = dataset.train_dataset.candidates[:5]
-        
+
         # Query their labels
         result = dataset.query(candidates_to_query)
-        
+
         assert isinstance(result, LabeledCandidates)
         assert len(result) == 5
         assert np.array_equal(result.candidates, candidates_to_query)
-        
+
         # Verify labels match the original data
         for i, candidate in enumerate(candidates_to_query):
             expected_idx = dataset._raw_dataset.data.index(candidate.data)
@@ -284,40 +284,40 @@ class TestBaseDatasetQuery:
 
 class TestBaseDatasetSaveSplits:
     """Tests for saving dataset splits."""
-    
+
     def test_save_splits_creates_files(self):
         """Test that save_splits creates the expected CSV files."""
         dataset = DummyDataset(seed=42, num_samples=100)
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             dataset.save_splits(tmpdir, _verbose=False)
-            
+
             # Check that files were created
             assert os.path.exists(os.path.join(tmpdir, "train.csv"))
             assert os.path.exists(os.path.join(tmpdir, "validation.csv"))
             assert os.path.exists(os.path.join(tmpdir, "test.csv"))
-            
+
             # Candidate pool should not be saved
             assert not os.path.exists(os.path.join(tmpdir, "candidate_pool.csv"))
-    
+
     def test_save_splits_file_contents(self):
         """Test that saved files contain the correct data."""
         dataset = DummyDataset(seed=42, num_samples=100)
-        
+
         with tempfile.TemporaryDirectory() as tmpdir:
             dataset.save_splits(tmpdir, _verbose=False)
-            
+
             # Read back the train file and verify
             import pandas as pd
             train_df = pd.read_csv(os.path.join(tmpdir, "train.csv"))
-            
+
             # Check that number of rows matches
             assert len(train_df) == len(dataset.train_dataset)
 
 
 class TestBaseDatasetGetMetrics:
     """Tests for getting dataset metrics."""
-    
+
     def test_get_metrics_returns_correct_keys(self):
         """Test that get_metrics returns metrics for all splits."""
         split_config = {
@@ -325,9 +325,9 @@ class TestBaseDatasetGetMetrics:
             "split_type": "random"
         }
         dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
-        
+
         metrics = dataset.get_metrics()
-        
+
         # Check that all expected keys are present
         expected_keys = [
             "num_train", "train_mean",
@@ -337,18 +337,18 @@ class TestBaseDatasetGetMetrics:
         ]
         for key in expected_keys:
             assert key in metrics
-    
+
     def test_get_metrics_returns_correct_values(self):
         """Test that get_metrics returns correct metric values."""
         dataset = DummyDataset(seed=42, num_samples=100)
-        
+
         metrics = dataset.get_metrics()
-        
+
         # Check counts
         assert metrics["num_train"] == len(dataset.train_dataset)
         assert metrics["num_validation"] == len(dataset.validation_dataset)
         assert metrics["num_test"] == len(dataset.test_dataset)
-        
+
         # Check means
         assert np.isclose(metrics["train_mean"], np.mean(dataset.train_dataset.labels))
         assert np.isclose(metrics["validation_mean"], np.mean(dataset.validation_dataset.labels))
@@ -357,26 +357,25 @@ class TestBaseDatasetGetMetrics:
 
 class TestBaseDatasetReproducibility:
     """Tests for reproducibility with different seeds."""
-    
+
     def test_different_seeds_produce_different_splits(self):
         """Test that different seeds produce different random splits."""
         dataset1 = DummyDataset(seed=42, num_samples=100)
         dataset2 = DummyDataset(seed=123, num_samples=100)
-        
+
         # Check that train sets are different
         train1_labels = dataset1.train_dataset.labels
         train2_labels = dataset2.train_dataset.labels
-        
+
         assert not np.array_equal(train1_labels, train2_labels)
-    
+
     def test_same_seed_produces_same_splits(self):
         """Test that the same seed produces identical splits."""
         dataset1 = DummyDataset(seed=42, num_samples=100)
         dataset2 = DummyDataset(seed=42, num_samples=100)
-        
+
         # Check that train sets are identical
         train1_labels = dataset1.train_dataset.labels
         train2_labels = dataset2.train_dataset.labels
-        
-        assert np.array_equal(train1_labels, train2_labels)
 
+        assert np.array_equal(train1_labels, train2_labels)

@@ -1,13 +1,15 @@
-from typing import List, Optional, Any, Union
 import abc
+from typing import Any, List, Optional, Union
+
+import numpy as np
+
 from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions
 from alf.core.utils.logger import Logger
-import numpy as np
 
 
 class BaseModel(abc.ABC):
-    """Base class for all models. 
-    Several components of the framework can be treated as models, such as the surrogate, oracle, 
+    """Base class for all models.
+    Several components of the framework can be treated as models, such as the surrogate, oracle,
     and the generator defined as model based search.
     """
 
@@ -17,7 +19,12 @@ class BaseModel(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def train(self, train_data: LabeledCandidates, val_data: LabeledCandidates, logger: Optional[Logger] = None) -> None:
+    def train(
+        self,
+        train_data: LabeledCandidates,
+        val_data: LabeledCandidates,
+        logger: Optional[Logger] = None,
+    ) -> None:
         """Train the model."""
         pass
 
@@ -27,7 +34,7 @@ class BaseModel(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def sample(condition: Optional[Any] = None, model = None) -> List[Candidate]:
+    def sample(self, condition: Optional[Any] = None) -> List[Candidate]:
         """Sample candidate points from the model."""
         pass
 
