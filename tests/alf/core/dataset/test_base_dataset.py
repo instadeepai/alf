@@ -249,8 +249,11 @@ class TestBaseDatasetUpdateSplits:
         
         dataset.update_splits(acquired_candidates)
         
-        # With validation ratio of 0.2, expect 2 of the 10 to go to validation
-        expected_new_val = int(10 * dataset.split_ratio["validation"])
+        # With train ratio of 0.4 and validation ratio of 0.2, 
+        # validation_fraction = 0.2 / (0.4 + 0.2) = 0.333...
+        # So expect 3 of the 10 to go to validation
+        validation_fraction = dataset.split_ratio["validation"] / (dataset.split_ratio["train"] + dataset.split_ratio["validation"])
+        expected_new_val = int(10 * validation_fraction)
         actual_new_val = len(dataset.validation_dataset) - initial_val_size
         assert actual_new_val == expected_new_val
 
