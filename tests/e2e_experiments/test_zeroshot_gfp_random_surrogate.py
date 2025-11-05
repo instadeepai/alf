@@ -16,7 +16,7 @@ def gfp_dataset():
     split_config = {
         "split_ratio": {
             "train": 0,
-            "validation": 0,
+            "validation_frac": 0,
             "test": 1.0
         },
         "split_type": "random"

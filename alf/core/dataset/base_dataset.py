@@ -66,32 +66,31 @@ class BaseDataset(abc.ABC):
         """Validate the split config for the dataset."""
         assert "split_ratio" in split_config, "Split ratio must be set"
         assert "split_type" in split_config, "Split type must be set"
-        assert "train" and "test" and "validation" in split_config["split_ratio"], "Train, test, and validation splits ratio must be set"
+        assert "train" and "test" and "validation_frac" in split_config["split_ratio"], "Train, test, and validation_frac must be set"
         self.split_type = split_config["split_type"]
         self.split_ratio = split_config["split_ratio"]
 
-        train_split_ratio = self.split_ratio["train"]
-        validation_split_ratio = self.split_ratio["validation"]
-        test_split_ratio = self.split_ratio["test"]
         if "candidate_pool" in self.split_ratio:
-            candidate_pool_split_ratio = self.split_ratio["candidate_pool"]
-            assert train_split_ratio + validation_split_ratio + test_split_ratio + candidate_pool_split_ratio <= 1, "Split ratios must sum to less than or equal to 1"
+            assert self.split_ratio["train"] + self.split_ratio["test"] + self.split_ratio["candidate_pool"] <= 1, "Split ratios must sum to less than or equal to 1"
         else:
-            assert train_split_ratio + validation_split_ratio + test_split_ratio <= 1, "Split ratios must sum to less than or equal to 1"
+            assert self.split_ratio["train"] + self.split_ratio["test"] <= 1, "Split ratios must sum to less than or equal to 1"
+        
+        assert self.split_ratio["validation_frac"] < 1 and self.split_ratio["validation_frac"] >= 0, "Validation fraction must be between 0 and 1"
 
     def _split_dataset(self) -> Tuple[Dict[str, LabeledCandidates], LabeledCandidates]:
         """Split dataset into train, test, validation splits."""
         assert self._raw_dataset is not None, "Dataset must be loaded before splitting"
 
         # Calculate split sizes
-        train_size = int(len(self._raw_dataset) * self.split_ratio["train"])
-        validation_size = int(len(self._raw_dataset) * self.split_ratio["validation"])
+        train_plus_validation_size = int(len(self._raw_dataset) * self.split_ratio["train"])
+        validation_size = int(train_plus_validation_size * self.split_ratio["validation_frac"])
+        train_size = train_plus_validation_size - validation_size
         test_size = int(len(self._raw_dataset) * self.split_ratio["test"])
         if "candidate_pool" in self.split_ratio:
             candidate_pool_size = int(len(self._raw_dataset) * self.split_ratio["candidate_pool"])
         else:
             log.warning("Candidate pool ratio not set, using remaining dataset size")
-            candidate_pool_size = len(self._raw_dataset) - train_size - validation_size - test_size
+            candidate_pool_size = len(self._raw_dataset) - train_plus_validation_size - test_size
 
         # Perform split based on type
         datasets_dict = split_dataset(self.split_type, self._raw_dataset, train_size, validation_size, test_size, candidate_pool_size, self.seed)
@@ -110,8 +109,7 @@ class BaseDataset(abc.ABC):
         self.splits["candidate_pool"].remove(acquired_candidates.candidates)
         
         # Split the acquired candidates into train and validation splits based on the split ratio
-        validation_fraction = self.split_ratio["validation"] / (self.split_ratio["train"] + self.split_ratio["validation"])
-        num_val = int(len(acquired_candidates) * validation_fraction)
+        num_val = int(len(acquired_candidates) * self.split_ratio["validation_frac"])
         shuffled_acquired_candidates = acquired_candidates.shuffle(self.seed)
         self.splits["train"].append(shuffled_acquired_candidates[:-num_val])
         self.splits["validation"].append(shuffled_acquired_candidates[-num_val:])

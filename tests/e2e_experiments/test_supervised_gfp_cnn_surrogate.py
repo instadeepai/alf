@@ -34,7 +34,8 @@ def gfp_dataset():
         modality="sequence", 
         seed=51505, 
         split_config={
-            "split_ratio": {"train": 0.05, "validation": 0.05, "test": 0.2}, 
+            # old version             "split_ratio": {"train": 0.1, "test": 0.2, "validation": 0.5}, 
+            "split_ratio": {"train": 0.6, "test": 0.2, "validation_frac": 0.833}, 
             "split_type": "random"
         }
     )
@@ -126,6 +127,7 @@ class TestSupervised:
     
     def _assert_surrogate_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert surrogate model performance metrics."""
+        print(metrics.iloc[-1])
         for metric_name, expected_value in expected.items():
             actual_value = metrics[f"surrogate/{metric_name}"].iloc[0]
             assert np.isclose(
@@ -136,6 +138,7 @@ class TestSupervised:
     
     def _assert_dataset_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert dataset metrics."""
+        print(metrics.iloc[-1])
         for metric_name, expected_value in expected.items():
             actual_value = metrics[f"dataset/{metric_name}"].iloc[0]
             assert np.isclose(

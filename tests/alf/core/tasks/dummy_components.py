@@ -33,7 +33,7 @@ class DummyDataset(BaseDataset):
         # Default split config if none provided
         if split_config is None:
             split_config = {
-                "split_ratio": {"train": 0.48, "validation": 0.12, "test": 0.2, "candidate_pool": 0.2},
+                "split_ratio": {"train": 0.6, "validation_frac": 0.2, "test": 0.2},
                 "split_type": "random"
             }
         super().__init__(name, modality, seed, split_config)

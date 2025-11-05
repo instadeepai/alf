@@ -3,7 +3,6 @@ import numpy as np
 import pandas as pd
 import shutil
 
-from alf.core.dataclasses import candidate
 from alf.tools.datasets.gfp import GFP
 from alf.core.surrogate.surrogate import Surrogate
 from alf.core.optimizer.optimizer import Optimizer
@@ -23,7 +22,7 @@ def gfp_dataset():
         modality="sequence", 
         seed=51505, 
         split_config={
-            "split_ratio": {"train": 0.08, "validation": 0.02, "test": 0.2, "candidate_pool": 0.7}, 
+            "split_ratio": {"train": 0.1, "validation_frac": 0.2, "test": 0.2}, 
             "split_type": "random"
         }
     )
