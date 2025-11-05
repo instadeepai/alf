@@ -5,6 +5,8 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Coverage](https://img.shields.io/badge/coverage-check%20CI-orange)](https://github.com/iinstadeepai/alf/actions)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
+[![Tests and Linters 🧪](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml/badge.svg?branch=main)](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml)
+
 
 
 **ALF** is a Python package for performing active learning experiments, designed to facilitate iterative optimization of sequences (e.g., proteins, molecules) through intelligent candidate selection and evaluation.
