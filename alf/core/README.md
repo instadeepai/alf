@@ -2,6 +2,8 @@
 
 This document provides an overview of the core components in the ALF (Active Learning Framework) library, describes the different task types, and explains how components interact during execution.
 
+![ALF Components](../../docs/imgs/alf_components.svg)
+
 ## Core Components
 
 ### 1. Dataset (`BaseDataset`)
