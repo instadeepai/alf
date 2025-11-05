@@ -20,9 +20,7 @@ class BaseDataset(abc.ABC):
         self.modality = modality
         self.seed = seed
         self.rng = np.random.RandomState(seed)
-        self.validate_split_config(split_config)
-        self.split_ratio = split_config["split_ratio"]
-        self.split_type = split_config["split_type"]
+        self._validate_split_config(split_config)
         self.metadata: dict | None = None
         self._raw_dataset: LabeledCandidates | None = None
         self.splits: dict[str, LabeledCandidates] = {}
@@ -64,17 +62,19 @@ class BaseDataset(abc.ABC):
         """Return a string representation of the dataset."""
         return f"Dataset(name={self.name}, modality={self.modality}, seed={self.seed}, train_size={len(self.train_dataset)}, validation_size={len(self.validation_dataset)}, test_size={len(self.test_dataset)}, candidate_pool_size={len(self.candidate_pool)})"
     
-    def validate_split_config(self, split_config: dict[str, Any]) -> None:
+    def _validate_split_config(self, split_config: dict[str, Any]) -> None:
         """Validate the split config for the dataset."""
         assert "split_ratio" in split_config, "Split ratio must be set"
         assert "split_type" in split_config, "Split type must be set"
         assert "train" and "test" and "validation" in split_config["split_ratio"], "Train, test, and validation splits ratio must be set"
+        self.split_type = split_config["split_type"]
+        self.split_ratio = split_config["split_ratio"]
 
-        train_split_ratio = split_config["split_ratio"]["train"]
-        validation_split_ratio = split_config["split_ratio"]["validation"]
-        test_split_ratio = split_config["split_ratio"]["test"]
-        if "candidate_pool" in split_config["split_ratio"]:
-            candidate_pool_split_ratio = split_config["split_ratio"]["candidate_pool"]
+        train_split_ratio = self.split_ratio["train"]
+        validation_split_ratio = self.split_ratio["validation"]
+        test_split_ratio = self.split_ratio["test"]
+        if "candidate_pool" in self.split_ratio:
+            candidate_pool_split_ratio = self.split_ratio["candidate_pool"]
             assert train_split_ratio + validation_split_ratio + test_split_ratio + candidate_pool_split_ratio <= 1, "Split ratios must sum to less than or equal to 1"
         else:
             assert train_split_ratio + validation_split_ratio + test_split_ratio <= 1, "Split ratios must sum to less than or equal to 1"
