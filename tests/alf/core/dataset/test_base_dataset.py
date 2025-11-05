@@ -13,7 +13,7 @@ class TestBaseDatasetInitialization:
     """Tests for BaseDataset initialization and configuration."""
     
     def test_initialization_with_valid_config(self):
-        """Test initialization with valid split configuration."""
+        """Test initialization with valid split configuration, without candidate pool."""
         split_config = {
             "split_ratio": {"train": 0.6, "validation": 0.2, "test": 0.2},
             "split_type": "random"
