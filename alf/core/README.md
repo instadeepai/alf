@@ -1,10 +1,34 @@
-# ALF Core Components
+# ALF Core
 
 This document provides an overview of the core components in the ALF (Active Learning Framework) library, describes the different task types, and explains how components interact during execution.
 
 <div align="center">
   <img src="../../docs/imgs/alf_components.svg" alt="ALF Components" width="70%">
 </div>
+
+## Overview
+
+This README is organized into the following sections:
+
+### Core Components
+- **[1. Dataset (`BaseDataset`)](#1-dataset-basedataset)** - Data loading, splitting, and querying
+- **[2. Model (`BaseModel`)](#2-model-basemodel)** - Abstract base class for all models
+- **[3. Surrogate (`Surrogate`)](#3-surrogate-surrogate)** - Approximates expensive experimental evaluation
+- **[4. Oracle (`Oracle`)](#4-oracle-oracle)** - Provides ground-truth labels for candidates
+- **[5. Optimizer (`Optimizer`)](#5-optimizer-optimizer)** - Orchestrates the active learning loop
+- **[6. Acquisition Function (`AcquisitionFunction`)](#6-acquisition-function-acquisitionfunction)** - Scores candidates for acquisition
+- **[7. Search Strategy (`BaseSearch`)](#7-search-strategy-basesearch)** - Defines the candidate pool
+- **[8. Task State (`TaskState`)](#8-task-state-taskstate)** - Tracks the state of active learning tasks
+
+### Task Types
+- **[1. Design Task (`DesignTask`)](#1-design-task-designtask)** - Multi-round active learning loop
+- **[2. Supervised Task (`SupervisedTask`)](#2-supervised-task-supervisedtask)** - Train and evaluate on fixed data
+- **[3. Zero-Shot Task (`ZeroShotTask`)](#3-zero-shot-task-zeroshottask)** - Evaluate pre-trained models
+
+### Component Flow
+- **[Design Task Flow](#design-task-flow)**
+- **[Supervised Task Flow](#supervised-task-flow)**
+- **[Zero-Shot Task Flow](#zero-shot-task-flow)**
 
 ## Core Components
 
