@@ -102,7 +102,7 @@ The optimizer orchestrates the active learning loop through the ask-tell interfa
 
 **Components:**
 - **Acquisition Function**: Scores candidates based on surrogate predictions
-- **Search Strategy**: Defines the pool of candidates to acquire from 
+- **Search Strategy**: Defines the pool of candidates to acquire from
 
 **Key Methods:**
 - `ask()`: Returns the next acquired batch of candidates to evaluate
@@ -221,15 +221,15 @@ The zero-shot task evaluates a pre-trained or untrained model without training:
       ├─ Search(state) → search_candidates
       ├─ Surrogate.predict(search_candidates) → predictions
       └─ Acquisition(predictions) → top_k candidates
-   
+
    b. Oracle.evaluate(candidates, state) → labeled_candidates
-   
+
    c. State.update(labeled_candidates)
       └─ Dataset.update_splits(labeled_candidates)
-   
+
    d. Optimizer.tell(state, logger) → updated_state
       └─ Surrogate.fit(train_data, val_data)
-   
+
    e. Task.evaluate(state) → updated_state
       ├─ Surrogate.predict(test_data) → predictions
       ├─ Results(predictions, targets) → metrics
