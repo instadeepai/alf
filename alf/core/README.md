@@ -38,7 +38,7 @@ The `BaseDataset` class manages data loading, splitting, and querying. It handle
 
 - **Data Loading**: Loads raw labeled data through the abstract `load_dataset()` method
 - **Data Splitting**: Splits data into train, validation, test, and candidate_pool sets
-- **Split Updates**: Updates splits dynamically as new candidates are acquired during active learning
+- **Split Updates**: Distributes newly acquired data into existing data splits
 - **Querying**: Provides labels for candidates from the original dataset (used by the oracle in offline settings)
 
 **Key Methods:**
@@ -52,8 +52,8 @@ The `BaseDataset` class manages data loading, splitting, and querying. It handle
 The `BaseModel` is an abstract base class that defines the interface for all models in the framework. Models can serve multiple roles depending on the context:
 
 - **Surrogate Model**: Wrapped by `Surrogate` to approximate expensive experimental evaluations
-- **Oracle Model**: Used directly by `Oracle` for online evaluation (simulating real experiments)
-- **Generator Model**: Used by `GeneratorSearch` to sample candidate sequences from the model
+- **Oracle Model**: Wrapped by by `Oracle` for online evaluation (simulating real experiments)
+- **Generator Model**: Wrapped by `GeneratorSearch` to sample candidate sequences from the model
 
 **Key Abstract Methods:**
 - `featurise()`: Converts inputs (candidates or labeled data) into features suitable for the model
