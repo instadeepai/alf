@@ -18,7 +18,8 @@ def gfp_dataset():
         "split_ratio": {
             "train": 0,
             "validation_frac": 0,
-            "test": 1.0
+            "test": 1.0,
+            "candidate_pool": 0
         },
         "split_type": "random"
     }
