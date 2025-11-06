@@ -122,7 +122,6 @@ class TestSupervised:
 
     def _assert_surrogate_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert surrogate model performance metrics."""
-        print(metrics.iloc[-1])
         for metric_name, expected_value in expected.items():
             actual_value = metrics[f"surrogate/{metric_name}"].iloc[0]
             assert np.isclose(actual_value, expected_value, atol=1e-4), (
@@ -131,7 +130,6 @@ class TestSupervised:
 
     def _assert_dataset_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert dataset metrics."""
-        print(metrics.iloc[-1])
         for metric_name, expected_value in expected.items():
             actual_value = metrics[f"dataset/{metric_name}"].iloc[0]
             assert np.isclose(actual_value, expected_value, atol=1e-4), (
