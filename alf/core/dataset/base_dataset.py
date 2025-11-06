@@ -24,7 +24,7 @@ class BaseDataset(abc.ABC):
         self.modality = modality
         self.seed = seed
         self.rng = np.random.RandomState(seed)
-        self._validate_split_config(split_config)
+        self._validate_and_process_split_config(split_config)
         self.metadata: dict | None = None
         self._raw_dataset: LabeledCandidates | None = None
         self.splits: dict[str, LabeledCandidates] = {}
@@ -74,38 +74,74 @@ class BaseDataset(abc.ABC):
         """Return a string representation of the dataset."""
         return f"Dataset(name={self.name}, modality={self.modality}, seed={self.seed}, train_size={len(self.train_dataset)}, validation_size={len(self.validation_dataset)}, test_size={len(self.test_dataset)}, candidate_pool_size={len(self.candidate_pool)})"
 
-    def _validate_split_config(self, split_config: dict[str, Any]) -> None:
-        """Validate the split config for the dataset."""
-        assert "split_ratio" in split_config, "Split ratio must be set"
-        assert "split_type" in split_config, "Split type must be set"
-        assert "train" and "test" and "validation_frac" in split_config["split_ratio"], "Train, test, and validation_frac must be set"
+    def _validate_and_process_split_config(self, split_config: dict[str, Any]) -> None:
+        """Validate and process the split config for the dataset.
+        
+        This method validates the split configuration and sets default values
+        where appropriate (e.g., candidate_pool ratio).
+        """
+        # Check required top-level keys
+        assert "split_ratio" in split_config, "split_config must contain 'split_ratio'"
+        assert "split_type" in split_config, "split_config must contain 'split_type'"
+        
         self.split_type = split_config["split_type"]
         self.split_ratio = split_config["split_ratio"]
-
+        
+        # Check required split_ratio keys present and between 0 and 1
+        required_keys = ["train", "test", "validation_frac"]
+        for key in required_keys:
+            assert key in self.split_ratio, f"split_ratio must contain '{key}'"
+            assert 0 <= self.split_ratio[key] <= 1, f"{key} ratio must be between 0 and 1"
+        
+        # Handle candidate_pool ratio
         if "candidate_pool" in self.split_ratio:
-            assert self.split_ratio["train"] + self.split_ratio["test"] + self.split_ratio["candidate_pool"] <= 1, "Split ratios must sum to less than or equal to 1"
+            assert 0 <= self.split_ratio["candidate_pool"] <= 1, (
+                "candidate_pool ratio must be between 0 and 1"
+            )
+            # Validate sum of all ratios
+            total_ratio = (
+                self.split_ratio["train"] 
+                + self.split_ratio["test"] 
+                + self.split_ratio["candidate_pool"]
+            )
+            assert round(total_ratio, 4) <= 1, ( # Round to avoid floating point errors
+                f"Sum of train, test, and candidate_pool ratios must be <= 1, got {total_ratio}"
+            )
         else:
-            assert self.split_ratio["train"] + self.split_ratio["test"] <= 1, "Split ratios must sum to less than or equal to 1"
-
-        assert self.split_ratio["validation_frac"] < 1 and self.split_ratio["validation_frac"] >= 0, "Validation fraction must be between 0 and 1"
+            # Set candidate_pool to use remaining data
+            remaining = 1 - self.split_ratio["train"] - self.split_ratio["test"]
+            assert round(remaining, 4) >= 0, ( # Round to avoid floating point errors
+                f"train + test ratios exceed 1 (train={self.split_ratio['train']}, "
+                f"test={self.split_ratio['test']})"
+                f"remaining={remaining}"
+            )
+            self.split_ratio["candidate_pool"] = remaining
+            log.info(
+                f"candidate_pool ratio not specified, using remaining data: {remaining:.3f}"
+            )
 
     def _split_dataset(self) -> Dict[str, LabeledCandidates]:
-        """Split dataset into train, test, validation splits."""
+        """Split dataset into train, test, validation, and candidate pool splits."""
         assert self._raw_dataset is not None, "Dataset must be loaded before splitting"
-
-        # Calculate split sizes
-        train_plus_validation_size = int(len(self._raw_dataset) * self.split_ratio["train"])
+        
+        # Calculate split sizes 
+        dataset_size = len(self._raw_dataset)
+        train_plus_validation_size = int(dataset_size * self.split_ratio["train"])
         validation_size = int(train_plus_validation_size * self.split_ratio["validation_frac"])
         train_size = train_plus_validation_size - validation_size
-        test_size = int(len(self._raw_dataset) * self.split_ratio["test"])
-        if "candidate_pool" in self.split_ratio:
-            candidate_pool_size = int(len(self._raw_dataset) * self.split_ratio["candidate_pool"])
-        else:
-            log.warning("Candidate pool ratio not set, using remaining dataset size")
-            candidate_pool_size = len(self._raw_dataset) - train_plus_validation_size - test_size
-
+        test_size = int(dataset_size * self.split_ratio["test"])
+        candidate_pool_size = int(dataset_size * self.split_ratio["candidate_pool"])
+        
         # Perform split based on type
-        datasets_dict = split_dataset(self.split_type, self._raw_dataset, train_size, validation_size, test_size, candidate_pool_size, self.seed)
+        datasets_dict = split_dataset(
+            self.split_type, 
+            self._raw_dataset, 
+            train_size, 
+            validation_size, 
+            test_size, 
+            candidate_pool_size, 
+            self.seed
+        )
         self.init_candidate_pool = copy.deepcopy(datasets_dict["candidate_pool"])
         return datasets_dict
 

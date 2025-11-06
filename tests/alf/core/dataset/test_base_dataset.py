@@ -43,13 +43,13 @@ class TestBaseDatasetValidation:
 
     def test_validate_split_config_missing_split_ratio(self):
         """Test that missing split_ratio raises an assertion error."""
-        with pytest.raises(AssertionError, match="Split ratio must be set"):
+        with pytest.raises(AssertionError, match="split_config must contain 'split_ratio'"):
             split_config = {"split_type": "random"}
             DummyDataset(seed=42, split_config=split_config, num_samples=100)
 
     def test_validate_split_config_missing_split_type(self):
         """Test that missing split_type raises an assertion error."""
-        with pytest.raises(AssertionError, match="Split type must be set"):
+        with pytest.raises(AssertionError, match="split_config must contain 'split_type'"):
             split_config = {
                 "split_ratio": {"train": 0.8, "validation_frac": 0.25, "test": 0.2}
             }
@@ -57,7 +57,7 @@ class TestBaseDatasetValidation:
 
     def test_validate_split_config_ratios_sum_exceeds_one(self):
         """Test that split ratios summing to more than 1 raises an error."""
-        with pytest.raises(AssertionError, match="Split ratios must sum to less than or equal to 1"):
+        with pytest.raises(AssertionError, match="train \\+ test ratios exceed 1"):
             split_config = {
                 "split_ratio": {"train": 0.8, "validation_frac": 0.5, "test": 0.6},
                 "split_type": "random"
@@ -66,7 +66,7 @@ class TestBaseDatasetValidation:
 
     def test_validate_split_config_with_candidate_pool_exceeds_one(self):
         """Test that split ratios with candidate pool summing to more than 1 raises an error."""
-        with pytest.raises(AssertionError, match="Split ratios must sum to less than or equal to 1"):
+        with pytest.raises(AssertionError, match="Sum of train, test, and candidate_pool ratios must be <= 1"):
             split_config = {
                 "split_ratio": {"train": 0.5, "validation_frac": 0.3, "test": 0.3, "candidate_pool": 0.3},
                 "split_type": "random"
