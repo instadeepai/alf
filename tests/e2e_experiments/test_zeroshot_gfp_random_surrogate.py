@@ -15,8 +15,13 @@ from alf.tools.models.random import RandomModel
 def gfp_dataset():
     """Fixture to create a GFP dataset for testing."""
     split_config = {
-        "split_ratio": {"train": 0, "validation": 0, "test": 1.0},
-        "split_type": "random",
+        "split_ratio": {
+            "train": 0,
+            "validation_frac": 0,
+            "test": 1.0,
+            "candidate_pool": 0
+        },
+        "split_type": "random"
     }
     return GFP(name="gfp", modality="sequence", seed=51505, split_config=split_config)
 

@@ -23,7 +23,7 @@ class LabeledCandidates:
         """Return the number of candidates in the collection."""
         return len(self.candidates)
 
-    def __getitem__(self, index: Union[int, slice]) -> "LabeledCandidates":
+    def __getitem__(self, index: Union[int, slice, np.ndarray]) -> "LabeledCandidates":
         """Make LabeledCandidates subscriptable.
 
         Args:
@@ -32,6 +32,7 @@ class LabeledCandidates:
         Returns:
             For integer index: new LabeledCandidates object with the candidate and label at the index
             For slice: new LabeledCandidates object with sliced data
+            For numpy array: new LabeledCandidates object with the candidates and labels at the indices
         """
         if isinstance(index, int):
             return LabeledCandidates(
@@ -43,9 +44,11 @@ class LabeledCandidates:
                 candidates=self.candidates[index], labels=self.labels[index]
             )
         else:
-            raise TypeError(
-                f"Indices must be integers or slices, not {type(index).__name__}"
-            )
+            # Handle numpy array indexing
+            selected_candidates = [self.candidates[i] for i in index]
+            selected_labels = self.labels[index]
+            return LabeledCandidates(candidates=selected_candidates, labels=selected_labels)
+
 
     @property
     def data(self) -> List[Any]:

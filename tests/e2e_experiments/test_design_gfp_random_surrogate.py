@@ -23,9 +23,9 @@ def gfp_dataset():
         modality="sequence",
         seed=51505,
         split_config={
-            "split_ratio": {"train": 0.1, "validation": 0.2, "test": 0.2},
-            "split_type": "random",
-        },
+            "split_ratio": {"train": 0.1, "validation_frac": 0.2, "test": 0.2, "candidate_pool": 0.7},
+            "split_type": "random"
+        }
     )
 
 

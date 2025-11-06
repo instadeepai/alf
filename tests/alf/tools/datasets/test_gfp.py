@@ -12,9 +12,9 @@ def gfp_dataset():
         modality="sequence",
         seed=51505,
         split_config={
-            "split_ratio": {"train": 0.1, "test": 0.2, "validation": 0.5},
-            "split_type": "random",
-        },
+            "split_ratio": {"train": 0.1, "test": 0.2, "validation_frac": 0.5, "candidate_pool": 0.7},
+            "split_type": "random"
+        }
     )
 
 
