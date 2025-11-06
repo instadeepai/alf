@@ -76,23 +76,23 @@ class BaseDataset(abc.ABC):
 
     def _validate_and_process_split_config(self, split_config: dict[str, Any]) -> None:
         """Validate and process the split config for the dataset.
-        
+
         This method validates the split configuration and sets default values
         where appropriate (e.g., candidate_pool ratio).
         """
         # Check required top-level keys
         assert "split_ratio" in split_config, "split_config must contain 'split_ratio'"
         assert "split_type" in split_config, "split_config must contain 'split_type'"
-        
+
         self.split_type = split_config["split_type"]
         self.split_ratio = split_config["split_ratio"]
-        
+
         # Check required split_ratio keys present and between 0 and 1
         required_keys = ["train", "test", "validation_frac"]
         for key in required_keys:
             assert key in self.split_ratio, f"split_ratio must contain '{key}'"
             assert 0 <= self.split_ratio[key] <= 1, f"{key} ratio must be between 0 and 1"
-        
+
         # Handle candidate_pool ratio
         if "candidate_pool" in self.split_ratio:
             assert 0 <= self.split_ratio["candidate_pool"] <= 1, (
@@ -100,8 +100,8 @@ class BaseDataset(abc.ABC):
             )
             # Validate sum of all ratios
             total_ratio = (
-                self.split_ratio["train"] 
-                + self.split_ratio["test"] 
+                self.split_ratio["train"]
+                + self.split_ratio["test"]
                 + self.split_ratio["candidate_pool"]
             )
             assert round(total_ratio, 4) <= 1, ( # Round to avoid floating point errors
@@ -123,23 +123,23 @@ class BaseDataset(abc.ABC):
     def _split_dataset(self) -> Dict[str, LabeledCandidates]:
         """Split dataset into train, test, validation, and candidate pool splits."""
         assert self._raw_dataset is not None, "Dataset must be loaded before splitting"
-        
-        # Calculate split sizes 
+
+        # Calculate split sizes
         dataset_size = len(self._raw_dataset)
         train_plus_validation_size = int(dataset_size * self.split_ratio["train"])
         validation_size = int(train_plus_validation_size * self.split_ratio["validation_frac"])
         train_size = train_plus_validation_size - validation_size
         test_size = int(dataset_size * self.split_ratio["test"])
         candidate_pool_size = int(dataset_size * self.split_ratio["candidate_pool"])
-        
+
         # Perform split based on type
         datasets_dict = split_dataset(
-            self.split_type, 
-            self._raw_dataset, 
-            train_size, 
-            validation_size, 
-            test_size, 
-            candidate_pool_size, 
+            self.split_type,
+            self._raw_dataset,
+            train_size,
+            validation_size,
+            test_size,
+            candidate_pool_size,
             self.seed
         )
         self.init_candidate_pool = copy.deepcopy(datasets_dict["candidate_pool"])
