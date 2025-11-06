@@ -9,7 +9,7 @@
 
 
 
-**ALF** is a Python package for performing active learning experiments, designed to facilitate iterative optimization of sequences (e.g., proteins, molecules) through intelligent candidate selection and evaluation.
+**ALF** is a Python package for performing active learning experiments to facilitate iterative optimization of design targets (e.g., proteins, molecules, materials) through intelligent candidate selection and evaluation.
 
 ## ✨ Features
 
