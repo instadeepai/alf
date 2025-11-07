@@ -73,18 +73,12 @@ class LabeledCandidates:
         Raises:
             ValueError: If candidates and labels don't match in length
         """
-        # Convert candidates to list if it is a single Candidate
-        if isinstance(candidates, Candidate):
-            candidates = [candidates]
-        # Convert labels to numpy array if it is not a numpy array or list
-        if not isinstance(labels, np.ndarray) and not isinstance(labels, list):
-            labels = np.array([labels])
-
         if isinstance(candidates, LabeledCandidates):
             self.candidates.extend(candidates.candidates)
             self.labels = np.concatenate((self.labels, candidates.labels), axis=0)
         else:
-            assert labels is not None and len(candidates) == len(labels), (
+            assert labels is not None, "Labels must be provided when appending candidates"
+            assert len(candidates) == len(labels), (
                 "Candidates and labels must have the same length"
             )
             self.candidates.extend(candidates)

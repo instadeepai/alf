@@ -1,14 +1,18 @@
-from testbed.datasets.proteingym import ProteinGym
 import numpy as np
+import pytest
 
-def test_proteingym_dataset_singles():
-    """Test that the Proteingym dataset initializes correctly."""
-    dataset = ProteinGym(
+from alf.tools.datasets.proteingym import ProteinGym
+
+
+@pytest.fixture
+def proteingym_dataset_singles():
+    """Create a ProteinGym singles dataset fixture for testing."""
+    return ProteinGym(
         name="proteingym",
         modality="sequence",
         seed=51505,
         split_config={
-            "split_ratio": {"train": 0.6, "validation": 0.2, "test": 0.2},
+            "split_ratio": {"train": 0.6, "validation_frac": 0.2, "test": 0.2, "candidate_pool": 0.2},
             "split_type": "random"
         },
         dataset_config={
@@ -16,16 +20,17 @@ def test_proteingym_dataset_singles():
             "dms_type": "singles"
         }
     )
-    print(dataset)
 
-def test_proteingym_dataset_multiples():
-    """Test that the Proteingym dataset initializes correctly."""
-    dataset = ProteinGym(
+
+@pytest.fixture
+def proteingym_dataset_multiples():
+    """Create a ProteinGym multiples dataset fixture for testing."""
+    return ProteinGym(
         name="proteingym",
         modality="sequence",
         seed=51505,
         split_config={
-            "split_ratio": {"train": 0.6, "validation": 0.2, "test": 0.2},
+            "split_ratio": {"train": 0.6, "validation_frac": 0.2, "test": 0.2, "candidate_pool": 0.2},
             "split_type": "random"
         },
         dataset_config={
@@ -33,16 +38,17 @@ def test_proteingym_dataset_multiples():
             "dms_type": "multiples"
         }
     )
-    print(dataset)
 
-def test_proteingym_dataset_cross_validation_singles():
-    """Test that the Proteingym dataset initializes correctly."""
-    dataset = ProteinGym(
+
+@pytest.fixture
+def proteingym_dataset_cv_singles():
+    """Create a ProteinGym cross-validation singles dataset fixture for testing."""
+    return ProteinGym(
         name="proteingym",
         modality="sequence",
         seed=51505,
         split_config={
-            "split_ratio": {"train": 0.783, "validation": 0.0, "test": 0.218},
+            "split_ratio": {"train": 0.7827, "validation_frac": 0.0, "test": 0.2173, "candidate_pool": 0.0},
             "split_type": "random"
         },
         dataset_config={
@@ -53,22 +59,17 @@ def test_proteingym_dataset_cross_validation_singles():
             "cross_validation_fold": 0
         }
     )
-    assert len(dataset.train_dataset) == 1070
-    assert len(dataset.test_dataset) == 297
-    assert len(dataset.validation_dataset) == 0
-    assert len(dataset.candidate_pool) == 0
 
-    assert np.isclose(np.mean(dataset.train_dataset.labels), 0.790617)
-    assert np.isclose(np.mean(dataset.test_dataset.labels), 0.799398)
 
-def test_proteingym_dataset_cross_validation_multiples():
-    """Test that the Proteingym dataset initializes correctly."""
-    dataset = ProteinGym(
+@pytest.fixture
+def proteingym_dataset_cv_multiples():
+    """Create a ProteinGym cross-validation multiples dataset fixture for testing."""
+    return ProteinGym(
         name="proteingym",
         modality="sequence",
         seed=51505,
         split_config={
-            "split_ratio": {"train": 0.8, "validation": 0.0, "test": 0.21},
+            "split_ratio": {"train": 0.79968, "validation_frac": 0.0, "test": 0.20032, "candidate_pool": 0.0},
             "split_type": "random"
         },
         dataset_config={
@@ -79,15 +80,73 @@ def test_proteingym_dataset_cross_validation_multiples():
             "cross_validation_fold": 0
         }
     )
-    assert len(dataset.train_dataset) == 33849
-    assert len(dataset.test_dataset) == 8479, f"Test dataset size should be 8479, got {len(dataset.test_dataset)}"
-    assert len(dataset.validation_dataset) == 0
-    assert len(dataset.candidate_pool) == 0
 
-    assert np.isclose(np.mean(dataset.train_dataset.labels), -1.227048)
-    assert np.isclose(np.mean(dataset.test_dataset.labels), -1.221083)
 
-test_proteingym_dataset_singles()
-test_proteingym_dataset_multiples()
-test_proteingym_dataset_cross_validation_singles()
-test_proteingym_dataset_cross_validation_multiples()
+class TestProteinGymDataset:
+    """Test class for ProteinGym dataset functionality."""
+
+    def test_dataset_initialization_singles(self, proteingym_dataset_singles):
+        """Test that singles dataset initializes correctly."""
+        assert proteingym_dataset_singles.name == "proteingym"
+        assert proteingym_dataset_singles.modality == "sequence"
+        assert proteingym_dataset_singles.seed == 51505
+
+    def test_dataset_initialization_multiples(self, proteingym_dataset_multiples):
+        """Test that multiples dataset initializes correctly."""
+        assert proteingym_dataset_multiples.name == "proteingym"
+        assert proteingym_dataset_multiples.modality == "sequence"
+        assert proteingym_dataset_multiples.seed == 51505
+
+    def test_cross_validation_singles_split_sizes(self, proteingym_dataset_cv_singles):
+        """Test that cross-validation singles dataset splits have correct sizes."""
+        assert len(proteingym_dataset_cv_singles.train_dataset) == 1070, (
+            f"Train dataset should have 1070 samples, got {len(proteingym_dataset_cv_singles.train_dataset)}"
+        )
+        assert len(proteingym_dataset_cv_singles.test_dataset) == 297, (
+            f"Test dataset should have 297 samples, got {len(proteingym_dataset_cv_singles.test_dataset)}"
+        )
+        assert len(proteingym_dataset_cv_singles.validation_dataset) == 0, (
+            f"Validation dataset should have 0 samples, got {len(proteingym_dataset_cv_singles.validation_dataset)}"
+        )
+        assert len(proteingym_dataset_cv_singles.candidate_pool) == 0, (
+            f"Candidate pool should have 0 samples, got {len(proteingym_dataset_cv_singles.candidate_pool)}"
+        )
+
+    def test_cross_validation_singles_label_statistics(self, proteingym_dataset_cv_singles):
+        """Test that cross-validation singles dataset label statistics match expected values."""
+        train_mean = np.mean(proteingym_dataset_cv_singles.train_dataset.labels)
+        test_mean = np.mean(proteingym_dataset_cv_singles.test_dataset.labels)
+
+        assert np.isclose(train_mean, 0.790617), (
+            f"Train dataset mean should be ~0.790617, got {train_mean}"
+        )
+        assert np.isclose(test_mean, 0.799398), (
+            f"Test dataset mean should be ~0.799398, got {test_mean}"
+        )
+
+    def test_cross_validation_multiples_split_sizes(self, proteingym_dataset_cv_multiples):
+        """Test that cross-validation multiples dataset splits have correct sizes."""
+        assert len(proteingym_dataset_cv_multiples.train_dataset) == 33849, (
+            f"Train dataset should have 33849 samples, got {len(proteingym_dataset_cv_multiples.train_dataset)}"
+        )
+        assert len(proteingym_dataset_cv_multiples.test_dataset) == 8479, (
+            f"Test dataset should have 8479 samples, got {len(proteingym_dataset_cv_multiples.test_dataset)}"
+        )
+        assert len(proteingym_dataset_cv_multiples.validation_dataset) == 0, (
+            f"Validation dataset should have 0 samples, got {len(proteingym_dataset_cv_multiples.validation_dataset)}"
+        )
+        assert len(proteingym_dataset_cv_multiples.candidate_pool) == 0, (
+            f"Candidate pool should have 0 samples, got {len(proteingym_dataset_cv_multiples.candidate_pool)}"
+        )
+
+    def test_cross_validation_multiples_label_statistics(self, proteingym_dataset_cv_multiples):
+        """Test that cross-validation multiples dataset label statistics match expected values."""
+        train_mean = np.mean(proteingym_dataset_cv_multiples.train_dataset.labels)
+        test_mean = np.mean(proteingym_dataset_cv_multiples.test_dataset.labels)
+
+        assert np.isclose(train_mean, -1.227048), (
+            f"Train dataset mean should be ~-1.227048, got {train_mean}"
+        )
+        assert np.isclose(test_mean, -1.221083), (
+            f"Test dataset mean should be ~-1.221083, got {test_mean}"
+        )

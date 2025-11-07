@@ -126,11 +126,11 @@ class BaseDataset(abc.ABC):
 
         # Calculate split sizes
         dataset_size = len(self._raw_dataset)
-        train_plus_validation_size = int(dataset_size * self.split_ratio["train"])
-        validation_size = int(train_plus_validation_size * self.split_ratio["validation_frac"])
-        train_size = train_plus_validation_size - validation_size
-        test_size = int(dataset_size * self.split_ratio["test"])
-        candidate_pool_size = int(dataset_size * self.split_ratio["candidate_pool"])
+        train_plus_validation_size = dataset_size * self.split_ratio["train"]
+        validation_size = round(train_plus_validation_size * self.split_ratio["validation_frac"])
+        train_size = round(train_plus_validation_size - validation_size)
+        test_size = round(dataset_size * self.split_ratio["test"])
+        candidate_pool_size = round(dataset_size * self.split_ratio["candidate_pool"])
 
         # Perform split based on type
         datasets_dict = split_dataset(

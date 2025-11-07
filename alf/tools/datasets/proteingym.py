@@ -1,8 +1,8 @@
-from core.dataset.base_dataset import BaseDataset
-from core.dataclasses import Candidate, LabeledCandidates
+from alf.core.dataset.base_dataset import BaseDataset
+from alf.core.dataclasses import Candidate, LabeledCandidates
 from typing import Any
 from typing import Tuple, Dict
-from core.utils.constants import HF_DATASETS_REPOSITORY_NAME
+from alf.core.utils.constants import HF_DATASETS_REPOSITORY_NAME
 from huggingface_hub import hf_hub_download
 import logging
 import os
@@ -20,6 +20,10 @@ class ProteinGym(BaseDataset):
         super().__init__(name, modality, seed, split_config)
         self.dataset_config = dataset_config
         self.setup()
+
+    def __repr__(self) -> str:
+        """Return a string representation of the dataset."""
+        return f"ProteinGym(name={self.name}, modality={self.modality}, seed={self.seed}, split_ratio={self.split_ratio}, dataset_config={self.dataset_config})"
 
     def load_dataset(self) -> LabeledCandidates:
         """Load ProteinGym dataset from local file or download from HF if not present.
@@ -62,8 +66,7 @@ class ProteinGym(BaseDataset):
                 features.update({
                     "random_fold_id": row["fold_rand_multiples"],
                 })
-            
-            dataset.append(Candidate(data=data, modality="sequence", features=features), label)
+            dataset.append([Candidate(data=data, modality="sequence", features=features)], np.array([label]))
 
         return dataset
 
@@ -81,10 +84,12 @@ class ProteinGym(BaseDataset):
     def _split_cross_validation(self) -> Tuple[Dict[str, LabeledCandidates], LabeledCandidates]:
         """Split dataset into cross-validation folds."""
         # Calculate split sizes
-        train_plus_validation_size = int(len(self._raw_dataset) * self.split_ratio["train"])
-        validation_size = int(train_plus_validation_size * self.split_ratio["validation"])
+        dataset_size = len(self._raw_dataset)
+        train_plus_validation_size = round(dataset_size * self.split_ratio["train"])
+        validation_size = round(train_plus_validation_size * self.split_ratio["validation_frac"])
         train_size = train_plus_validation_size - validation_size
-        test_size = int(len(self._raw_dataset) * self.split_ratio["test"])
+        test_size = round(dataset_size * self.split_ratio["test"])
+        candidate_pool_size = round(dataset_size * self.split_ratio["candidate_pool"])
 
         # Shuffle dataset
         shuffled_dataset = self._raw_dataset.shuffle(self.seed)
