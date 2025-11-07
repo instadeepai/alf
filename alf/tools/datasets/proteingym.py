@@ -49,7 +49,7 @@ class ProteinGym(BaseDataset):
                 local_dir=DATAPATH,
             )
             log.info("ProteinGym dataset downloaded successfully.")
-       
+
         df = pd.read_csv(f"{DATAPATH}/{filename}")
         dataset = LabeledCandidates(candidates=[], labels=np.array([]))
         for _, row in df.iterrows():
@@ -70,7 +70,7 @@ class ProteinGym(BaseDataset):
 
         return dataset
 
-    def _split_dataset(self) -> Tuple[Dict[str, LabeledCandidates], LabeledCandidates]:
+    def _split_dataset(self) -> Dict[str, LabeledCandidates]:
         """Split dataset into train, validation, test and candidate pool splits."""
         if self.dataset_config.get("cross_validation", False):
             assert self.dataset_config.get("cross_validation_type", None) is not None, "Cross-validation type must be set"
@@ -81,8 +81,9 @@ class ProteinGym(BaseDataset):
         else:
             return super()._split_dataset()
 
-    def _split_cross_validation(self) -> Tuple[Dict[str, LabeledCandidates], LabeledCandidates]:
+    def _split_cross_validation(self) -> Dict[str, LabeledCandidates]:
         """Split dataset into cross-validation folds."""
+        assert self._raw_dataset is not None, "Dataset must be loaded before splitting"
         # Calculate split sizes
         dataset_size = len(self._raw_dataset)
         train_plus_validation_size = round(dataset_size * self.split_ratio["train"])
@@ -95,21 +96,22 @@ class ProteinGym(BaseDataset):
         shuffled_dataset = self._raw_dataset.shuffle(self.seed)
         train_and_validation_dataset = LabeledCandidates(candidates=[], labels=[])
         test_and_candidate_pool_dataset = LabeledCandidates(candidates=[], labels=[])
-        
+
         # Split dataset into train/test sets depending on cross-validation fold
-        for i in range(len(shuffled_dataset)):
-            fold_id = shuffled_dataset[i].candidates[0].features["random_fold_id"]
-            if fold_id == self.dataset_config["cross_validation_fold"]:
-                test_and_candidate_pool_dataset.append(shuffled_dataset[i])
+        cv_type = f"{self.dataset_config["cross_validation_type"]}_fold_id"
+        cv_fold = self.dataset_config["cross_validation_fold"]
+        for candidate, label in shuffled_dataset:
+            if cv_fold == candidate.features[cv_type]:
+                test_and_candidate_pool_dataset.append([candidate], [label])
             else:
-                train_and_validation_dataset.append(shuffled_dataset[i])
-        
+                train_and_validation_dataset.append([candidate], [label])
+
         # Split train/validation and test/candidate pool sets
         train_dataset = train_and_validation_dataset[:train_size]
         validation_dataset = train_and_validation_dataset[train_size:]
         test_dataset = test_and_candidate_pool_dataset[:test_size]
-        candidate_pool_dataset = test_and_candidate_pool_dataset[test_size:]
-        
+        candidate_pool_dataset = test_and_candidate_pool_dataset[test_size:test_size + candidate_pool_size]
+
         return {
             "train": train_dataset,
             "validation": validation_dataset,

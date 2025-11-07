@@ -61,8 +61,8 @@ class LabeledCandidates:
 
     def append(
         self,
-        candidates: Union[List["Candidate"], "LabeledCandidates", "Candidate"],
-        labels: Optional[np.ndarray | float | int] = None,
+        candidates: Union[List["Candidate"], "LabeledCandidates"],
+        labels: Optional[np.ndarray] = None,
     ) -> None:
         """Append candidates and labels to this collection.
 
@@ -126,3 +126,12 @@ class LabeledCandidates:
             rows.append(d)
 
         return pd.DataFrame.from_records(rows)
+
+    def __iter__(self):
+        """Iterate over candidates and labels, yielding (candidate, label) tuples.
+
+        Yields:
+            Tuple of (Candidate, float): A candidate and its corresponding label
+        """
+        for candidate, label in zip(self.candidates, self.labels):
+            yield candidate, label
