@@ -3,8 +3,7 @@ from typing import List
 
 import numpy as np
 
-from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions
-from alf.core.dataclasses.task_state import TaskState
+from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions, TaskState
 
 
 class AcquisitionFunction(abc.ABC):

@@ -2,12 +2,12 @@
 from typing import Union, List, Any, Optional
 import numpy as np
 
+from alf.core.optimizer.acquisition_function import AcquisitionFunction
+from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions, TaskState
 from alf.core.model.base_model import BaseModel
 from alf.core.dataset.base_dataset import BaseDataset
-from alf.core.optimizer.acquisition_function import AcquisitionFunction
-from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions
 from alf.core.utils.logger import Logger
-from alf.core.dataclasses import TaskState
+
 
 class DummyDataset(BaseDataset):
     """Dummy dataset that generates random data for testing."""

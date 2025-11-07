@@ -2,8 +2,7 @@ import abc
 import logging
 from typing import Any, Optional
 
-from alf.core.dataclasses import Results
-from alf.core.dataclasses.task_state import TaskState
+from alf.core.dataclasses import Results, TaskState
 from alf.core.dataset.base_dataset import BaseDataset
 from alf.core.surrogate.surrogate import Surrogate
 

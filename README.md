@@ -56,12 +56,7 @@ uv sync --extra gpu
 ### Design Task (Active Learning)
 
 ```python
-from alf.core.optimizer.optimizer import Optimizer
-from alf.core.optimizer.search import DatasetSearch
-from alf.core.oracle.oracle import Oracle
-from alf.core.surrogate.surrogate import Surrogate
-from alf.core.tasks.design_task import DesignTask
-from alf.core.utils.logger import TerminalLogger
+from alf.core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask, TerminalLogger
 from alf.tools.datasets.gfp import GFP
 from alf.tools.models.cnn import CNNModel
 from alf.tools.optimizer.acquisition_functions.greedy import Greedy
@@ -83,9 +78,7 @@ task.run(state=state, logger=TerminalLogger(), optimizer=optimizer, oracle=oracl
 ### Supervised Task
 
 ```python
-from alf.core.surrogate.surrogate import Surrogate
-from alf.core.tasks.supervised_task import SupervisedTask
-from alf.core.utils.logger import TerminalLogger
+from alf.core import Surrogate, SupervisedTask, TerminalLogger
 from alf.tools.datasets.gfp import GFP
 from alf.tools.models.cnn import CNNModel
 
@@ -102,9 +95,7 @@ task.run(state=state, logger=TerminalLogger())
 ### Zero-Shot Task
 
 ```python
-from alf.core.surrogate.surrogate import Surrogate
-from alf.core.tasks.zeroshot_task import ZeroShotTask
-from alf.core.utils.logger import TerminalLogger
+from alf.core import Surrogate, ZeroShotTask, TerminalLogger
 from alf.tools.datasets.gfp import GFP
 from alf.tools.models.random import RandomModel
 
@@ -129,7 +120,7 @@ alf/
 │   │   ├── model/         # Model base classes
 │   │   ├── optimizer/     # Optimizer, acquisition functions, search strategies
 │   │   ├── oracle/        # Oracle for candidate evaluation
-│   │   ├── surrogate/    # Surrogate model wrapper
+│   │   ├── surrogate/     # Surrogate model wrapper
 │   │   ├── tasks/         # Task implementations (Design, Supervised, ZeroShot)
 │   │   └── utils/         # Utilities (metrics, logging, I/O)
 │   └── tools/             # Example implementations and tools

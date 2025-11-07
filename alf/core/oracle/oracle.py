@@ -3,10 +3,9 @@ from typing import List, Tuple, Union
 
 import numpy as np
 
-from alf.core.dataclasses import Candidate, LabeledCandidates
-from alf.core.dataclasses.task_state import TaskState
-from alf.core.dataset.base_dataset import BaseDataset
+from alf.core.dataclasses import Candidate, LabeledCandidates, TaskState
 from alf.core.model.base_model import BaseModel
+from alf.core.dataset.base_dataset import BaseDataset
 
 
 class Oracle:

@@ -2,8 +2,7 @@ import logging
 import time
 from typing import Any, Optional
 
-from alf.core.dataclasses.task_state import TaskState
-from alf.core.oracle.oracle import Oracle
+from alf.core.dataclasses import TaskState
 from alf.core.tasks.base_task import BaseTask
 from alf.core.utils.logger import Logger
 
