@@ -14,10 +14,12 @@ class Results:
     """Computes metrics and figures based on the predictions and targets.
 
     Attributes:
-        predictions: A Predictions object containing model predictions.
-        means: A numpy array of mean predictions.
+        targets: A numpy array of ground truth target values.
+        predictions: A Predictions object containing model predictions (optional).
+        means: A numpy array of mean predictions (optional).
         variances: A numpy array of prediction variances (optional).
-        targets: A numpy array of targets.
+        metrics: A dictionary of computed metrics (computed in __post_init__).
+        figures: A dictionary of matplotlib figures (computed in __post_init__).
 
     Two instantiation options:
     1. Results(predictions=my_predictions, targets=my_targets)

@@ -4,7 +4,13 @@ from typing import Any, Optional
 
 @dataclass
 class Candidate:
-    """A candidate is a data point with a modality and features."""
+    """A candidate is a data point with a modality and features.
+
+    Attributes:
+        data: The raw data of the candidate (e.g., sequence string, graph, image).
+        modality: The type/modality of the data (e.g., "sequence", "graph", "image").
+        features: Optional dictionary of precomputed features for the candidate.
+    """
 
     data: Any
     modality: str

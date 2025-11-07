@@ -20,7 +20,18 @@ if TYPE_CHECKING:
 
 @dataclass
 class TaskState:
-    """Tracks the state of an active learning / optimization task."""
+    """Tracks the state of an active learning / optimization task.
+
+    Attributes:
+        dataset: The dataset containing train/validation/test splits and candidate pool.
+        surrogate: The surrogate model used for predictions.
+        round: Current round number in the active learning loop.
+        acq_batch_size: Number of candidates to acquire per round.
+        num_acq_rounds: Total number of acquisition rounds to run.
+        save_round_predictions: Whether to save predictions at each round.
+        history: List of LabeledCandidates acquired in each round.
+        round_metrics: Dictionary of metrics computed for the current round.
+    """
 
     dataset: "BaseDataset"
     surrogate: "Surrogate"

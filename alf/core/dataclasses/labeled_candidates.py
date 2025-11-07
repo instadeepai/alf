@@ -9,7 +9,12 @@ from alf.core.dataclasses.candidate import Candidate
 
 @dataclass
 class LabeledCandidates:
-    """A collection of candidates paired with their labels."""
+    """A collection of candidates paired with their labels.
+
+    Attributes:
+        candidates: A list of Candidate objects.
+        labels: A numpy array of labels corresponding to each candidate.
+    """
 
     candidates: List["Candidate"]
     labels: np.ndarray
