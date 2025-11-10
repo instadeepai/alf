@@ -50,8 +50,8 @@ class Results:
             "Either predictions OR (means, variances) must be set, not both"
         )
 
-        # If means/variances were provided, create predictions object
-        if has_means:
+        # If predictions are not set, create predictions object
+        if not has_predictions:
             self.predictions = Predictions(means=self.means, variances=self.variances)
 
         self.metrics = self.compute_metrics()
@@ -66,9 +66,11 @@ class Results:
                 are available.
 
         Raises:
-            AssertionError: If predictions is not set.
+            ValueError: If predictions is not set.
         """
-        assert self.predictions is not None, "Predictions must be set"
+        if self.predictions is None:
+            raise ValueError("Predictions must be set")
+
         metrics: Dict[str, Union[float, int, np.number]] = {}
         metrics_dict = (
             metric_registry.get_metrics_not_requiring_variance()
@@ -92,9 +94,11 @@ class Results:
                 Figure objects. The figures depend on whether variances are available.
 
         Raises:
-            AssertionError: If predictions is not set.
+            ValueError: If predictions is not set.
         """
-        assert self.predictions is not None, "Predictions must be set"
+        if self.predictions is None:
+            raise ValueError("Predictions must be set")
+
         plots: Dict[str, plt.Figure] = {}
         plots_dict = (
             plot_registry.get_plots_not_requiring_variance()
