@@ -14,7 +14,7 @@
 
 import warnings
 from functools import wraps
-from typing import Any, Callable, Tuple, Union
+from typing import Any, Callable, Union
 
 import numpy as np
 from scipy.stats import norm, pearsonr, spearmanr
@@ -161,7 +161,7 @@ def monte_carlo_ranking(
     means: np.ndarray,
     variances: np.ndarray,
     num_samples: int = 10000,
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Compute ranks, their means and variances using Monte Carlo simulation.
 
     For predicted means and variances, estimates normally distributed means
@@ -174,7 +174,7 @@ def monte_carlo_ranking(
             Defaults to 10000.
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]: A tuple containing:
+        tuple[np.ndarray, np.ndarray]: A tuple containing:
             - mean_rank: Mean rank for each candidate
             - rank_variances: Variance of ranks for each candidate
     """

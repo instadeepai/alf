@@ -17,7 +17,7 @@ import abc
 import copy
 import logging
 import os
-from typing import Any, Dict, Union
+from typing import Any, Union
 
 import numpy as np
 
@@ -40,7 +40,7 @@ class BaseDataset(abc.ABC):
             modality: Data modality (e.g., "sequence", "graph", "image").
             seed: Random seed for reproducibility.
             split_config: Dictionary containing:
-                - "split_ratio": Dict with "train", "validation", "test", and
+                - "split_ratio": dict with "train", "validation", "test", and
                   (optionally) "candidate_pool" ratios
                 - "split_type": Type of split ("random" or "low_vs_high")
         """
@@ -161,11 +161,11 @@ class BaseDataset(abc.ABC):
             "Train, test, and validation splits ratio must be set"
         )
 
-    def _split_dataset(self) -> Dict[str, LabeledCandidates]:
+    def _split_dataset(self) -> dict[str, LabeledCandidates]:
         """Split the raw dataset into train, validation, test, and candidate pool.
 
         Returns:
-            Dict[str, LabeledCandidates]: Dictionary with keys "train", "validation",
+            dict[str, LabeledCandidates]: Dictionary with keys "train", "validation",
                 "test", and "candidate_pool", each containing a LabeledCandidates object.
 
         Raises:

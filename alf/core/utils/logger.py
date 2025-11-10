@@ -14,7 +14,7 @@
 
 import abc
 import logging
-from typing import Any, Dict, Literal, Union
+from typing import Any, Literal, Union
 
 import matplotlib.pyplot as plt
 import neptune
@@ -31,7 +31,7 @@ class Logger(abc.ABC):
     """Abstract base class for loggers that can write data and artifacts."""
 
     @abc.abstractmethod
-    def write(self, data: Dict[str, Any], label: str = "", timestep: int | None = None) -> None:
+    def write(self, data: dict[str, Any], label: str = "", timestep: int | None = None) -> None:
         """Write data to the logger destination.
 
         Args:
@@ -154,7 +154,7 @@ class NeptuneLogger(Logger):
 
     def write(
         self,
-        data: Dict[str, Union[float, plt.Figure]],
+        data: dict[str, Union[float, plt.Figure]],
         label: str = "",
         timestep: int | None = None,
     ) -> None:
@@ -259,7 +259,7 @@ class TerminalLogger(Logger):
 
     def write(
         self,
-        data: Dict[str, Union[float, plt.Figure]],
+        data: dict[str, Union[float, plt.Figure]],
         label: str = "",
         timestep: int | None = None,
     ) -> None:

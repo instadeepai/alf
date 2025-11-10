@@ -15,7 +15,7 @@
 import json
 import os
 import pickle
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -163,7 +163,7 @@ class FileHandler:
             for line in lines:
                 f.write(line)
 
-    def read_json(self, path: str) -> Dict:
+    def read_json(self, path: str) -> dict:
         """Load JSON file.
 
         Args:
@@ -175,7 +175,7 @@ class FileHandler:
         with self._open_file(path, "r") as f:
             return json.load(f)
 
-    def save_json(self, path: str, data: Dict) -> None:
+    def save_json(self, path: str, data: dict) -> None:
         """Save dictionary to JSON file.
 
         Args:
@@ -187,7 +187,7 @@ class FileHandler:
         with self._open_file(path, "w") as f:
             json.dump(data, f, indent=4)
 
-    def read_yaml(self, path: str) -> Dict:
+    def read_yaml(self, path: str) -> dict:
         """Load YAML file safely.
 
         Args:
@@ -199,7 +199,7 @@ class FileHandler:
         with self._open_file(path, "r") as f:
             return yaml.load(f, Loader=yaml.SafeLoader)
 
-    def save_yaml(self, path: str, data: Dict) -> None:
+    def save_yaml(self, path: str, data: dict) -> None:
         """Save dictionary to YAML file.
 
         Args:

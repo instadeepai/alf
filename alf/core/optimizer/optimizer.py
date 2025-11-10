@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import time
-from typing import Dict, Tuple
 
 from alf.core.dataclasses import Candidate, LabeledCandidates, TaskState
 from alf.core.optimizer.acquisition_function import AcquisitionFunction
@@ -62,7 +61,7 @@ class Optimizer:
     def ask(
         self,
         state: TaskState,
-    ) -> Tuple[list[Candidate], TaskState]:
+    ) -> tuple[list[Candidate], TaskState]:
         """Propose the next batch of candidates to evaluate.
 
         Uses the search function to generate a candidate pool, then the acquisition
@@ -73,7 +72,7 @@ class Optimizer:
             state: Current task state.
 
         Returns:
-            Tuple[list[Candidate], TaskState]: A tuple containing:
+            tuple[list[Candidate], TaskState]: A tuple containing:
                 - list[Candidate]: The proposed candidates to evaluate
                 - TaskState: Updated state with ask_time metric
         """
@@ -129,14 +128,14 @@ class Optimizer:
     def get_metrics(
         self,
         state: TaskState,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Collect metrics from acquired candidates, surrogate, and search functions.
 
         Args:
             state: Current task state.
 
         Returns:
-            Dict[str, float]: Dictionary of metric names to values, including:
+            dict[str, float]: Dictionary of metric names to values, including:
                 - Metrics on acquired candidates (mean, max, min)
                 - Surrogate training metrics (if available)
                 - Search function metrics

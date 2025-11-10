@@ -13,8 +13,6 @@
 # limitations under the License.
 
 
-from typing import Dict
-
 from alf.core.dataclasses import LabeledCandidates
 
 
@@ -23,7 +21,7 @@ def compute_recall(
     acquired_candidates: LabeledCandidates,
     top_percentile: float = 0.1,
     top_n: int = 100,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Compute recall metrics for acquired candidates.
 
     Measures how many of the acquired candidates are in the top performers of
@@ -36,7 +34,7 @@ def compute_recall(
         top_n: Number of top candidates to consider. Defaults to 100.
 
     Returns:
-        Dict[str, float]: Dictionary containing:
+        dict[str, float]: Dictionary containing:
             - "optimizer/top_percentile_recall": Recall at top_percentile threshold
             - "optimizer/top_n_recall": Recall at top_n threshold
     """
@@ -66,7 +64,7 @@ def compute_recall(
 
 def compute_regret(
     init_candidate_pool: LabeledCandidates, acquired_candidates: LabeledCandidates
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Compute regret of acquired candidates relative to the best possible candidate.
 
     Regret is the difference between the best possible label in the initial pool
@@ -77,7 +75,7 @@ def compute_regret(
         acquired_candidates: Candidates that were acquired during optimization.
 
     Returns:
-        Dict[str, float]: Dictionary containing:
+        dict[str, float]: Dictionary containing:
             - "optimizer/regret": The regret value (lower is better).
     """
     best_possible_candidate_label = init_candidate_pool.labels.max()

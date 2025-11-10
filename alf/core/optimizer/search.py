@@ -14,7 +14,6 @@
 
 
 import abc
-from typing import Dict
 
 import numpy as np
 
@@ -41,14 +40,14 @@ class BaseSearch(abc.ABC):
         """
         pass
 
-    def get_metrics(self, task_state: TaskState) -> Dict[str, float]:
+    def get_metrics(self, task_state: TaskState) -> dict[str, float]:
         """Get metrics for the search function.
 
         Args:
             task_state: Current task state.
 
         Returns:
-            Dict[str, float]: Dictionary of metric names to values.
+            dict[str, float]: Dictionary of metric names to values.
                 Returns empty dict by default; subclasses should override.
         """
         return {}
@@ -110,14 +109,14 @@ class DatasetSearch(BaseSearch):
         candidate_pool = task_state.dataset.candidate_pool
         return candidate_pool.candidates
 
-    def get_metrics(self, task_state: TaskState) -> Dict[str, float]:
+    def get_metrics(self, task_state: TaskState) -> dict[str, float]:
         """Return recall and regret metrics for the dataset search method.
 
         Args:
             task_state: Current task state.
 
         Returns:
-            Dict[str, float]: Dictionary containing recall and regret metrics
+            dict[str, float]: Dictionary containing recall and regret metrics
                 comparing initial candidate pool to acquired candidates.
         """
         init_candidate_pool = task_state.dataset.init_candidate_pool

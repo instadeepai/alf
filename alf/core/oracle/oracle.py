@@ -14,7 +14,7 @@
 
 
 import time
-from typing import Tuple, Union
+from typing import Union
 
 import numpy as np
 
@@ -40,7 +40,7 @@ class Oracle:
 
     def evaluate(
         self, candidates: list[Candidate], state: TaskState
-    ) -> Tuple[LabeledCandidates, TaskState]:
+    ) -> tuple[LabeledCandidates, TaskState]:
         """Evaluate candidates and return their labels.
 
         Args:
@@ -48,7 +48,7 @@ class Oracle:
             state: Current task state (updated with evaluation time).
 
         Returns:
-            Tuple[LabeledCandidates, TaskState]: A tuple containing:
+            tuple[LabeledCandidates, TaskState]: A tuple containing:
                 - LabeledCandidates: Candidates paired with their evaluated labels
                 - TaskState: Updated state with oracle_time metric
         """

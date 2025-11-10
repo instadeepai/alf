@@ -14,7 +14,7 @@
 
 
 from dataclasses import dataclass
-from typing import Dict, Union
+from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -72,11 +72,11 @@ class Results:
         self.metrics = self.compute_metrics()
         self.figures = self.compute_figures()
 
-    def compute_metrics(self) -> Dict[str, Union[float, int, np.number]]:
+    def compute_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Compute evaluation metrics based on predictions and targets.
 
         Returns:
-            Dict[str, Union[float, int, np.number]]: A dictionary of metric names
+            dict[str, Union[float, int, np.number]]: A dictionary of metric names
                 to their computed values. The metrics depend on whether variances
                 are available.
 
@@ -86,7 +86,7 @@ class Results:
         if self.predictions is None:
             raise ValueError("Predictions must be set")
 
-        metrics: Dict[str, Union[float, int, np.number]] = {}
+        metrics: dict[str, Union[float, int, np.number]] = {}
         metrics_dict = (
             metric_registry.get_metrics_not_requiring_variance()
             if self.variances is None
@@ -99,11 +99,11 @@ class Results:
 
         return metrics
 
-    def compute_figures(self) -> Dict[str, plt.Figure]:
+    def compute_figures(self) -> dict[str, plt.Figure]:
         """Compute visualization figures based on predictions and targets.
 
         Returns:
-            Dict[str, plt.Figure]: A dictionary of figure names to matplotlib
+            dict[str, plt.Figure]: A dictionary of figure names to matplotlib
                 Figure objects. The figures depend on whether variances are available.
 
         Raises:
@@ -112,7 +112,7 @@ class Results:
         if self.predictions is None:
             raise ValueError("Predictions must be set")
 
-        plots: Dict[str, plt.Figure] = {}
+        plots: dict[str, plt.Figure] = {}
         plots_dict = (
             plot_registry.get_plots_not_requiring_variance()
             if self.variances is None
