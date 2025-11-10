@@ -28,7 +28,7 @@ jobs:
       - name: Lint
         run: |
           uv sync --extra cpu
-          uv run pre-commit run --all-files --verbose
+          uv run --no-sync pre-commit run --all-files --verbose
 
   tests:
       runs-on: instadeep-ci-4
@@ -56,7 +56,7 @@ jobs:
         - name: Run tests 🧪
           run: |
             uv sync --extra cpu
-            uv run pytest --verbose --cov-report xml:coverage.xml \
+            uv run --no-sync pytest --verbose --cov-report xml:coverage.xml \
                             --cov-report term-missing \
                             --junitxml=pytest.xml \
                             --cov=alf
