@@ -1,8 +1,10 @@
 """Tests for the supervised task."""
-import pytest
+
+import shutil
+
 import numpy as np
 import pandas as pd
-import shutil
+import pytest
 
 from alf.core.tasks.supervised_task import SupervisedTask
 from alf.core.utils.logger import TerminalLogger
@@ -16,7 +18,7 @@ def expected_metrics():
             "test_mse": 35.11162,
             "test_spearman": -0.00425,
             "test_pearson": 0.00483,
-            "test_pairwise_xent": 0.44950
+            "test_pairwise_xent": 0.44950,
         },
         "dataset": {
             "num_train": 480.00000,
@@ -26,8 +28,8 @@ def expected_metrics():
             "num_test": 200.00000,
             "test_mean": 5.13172,
             "num_candidate_pool": 200.00000,
-            "candidate_pool_mean": 4.82509
-        }
+            "candidate_pool_mean": 4.82509,
+        },
     }
 
 
@@ -35,14 +37,9 @@ class TestSupervisedTask:
     """Tests a supervised experiment with a dummy surrogate model on a dummy dataset."""
 
     def test_supervised_dummy_surrogate_experiment(
-        self,
-        dummy_dataset,
-        dummy_surrogate,
-        expected_metrics,
-        tmp_path
+        self, dummy_dataset, dummy_surrogate, expected_metrics, tmp_path
     ):
-        """
-        Test the complete supervised dummy surrogate experiment pipeline.
+        """Test the complete supervised dummy surrogate experiment pipeline.
 
         This test verifies that the supervised learning pipeline works correctly
         and produces expected metrics for the dummy dataset using a dummy surrogate model.
@@ -54,11 +51,7 @@ class TestSupervisedTask:
         # Create and run the supervised task
         task = SupervisedTask()
         state = task.setup(dataset=dummy_dataset, surrogate=dummy_surrogate)
-        task.run(
-            state=state,
-            logger=TerminalLogger(),
-            save_path=str(save_path)
-        )
+        task.run(state=state, logger=TerminalLogger(), save_path=str(save_path))
 
         # Load and verify results
         metrics_file = save_path / "metrics.csv"
@@ -79,18 +72,14 @@ class TestSupervisedTask:
         """Assert surrogate model performance metrics."""
         for metric_name, expected_value in expected.items():
             actual_value = metrics[f"surrogate/{metric_name}"].iloc[0]
-            assert np.isclose(
-                actual_value,
-                expected_value,
-                atol=1e-5
-            ), f"Surrogate metric {metric_name} mismatch: expected {expected_value}, got {actual_value}"
+            assert np.isclose(actual_value, expected_value, atol=1e-5), (
+                f"Surrogate metric {metric_name} mismatch: expected {expected_value}, got {actual_value}"
+            )
 
     def _assert_dataset_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert dataset metrics."""
         for metric_name, expected_value in expected.items():
             actual_value = metrics[f"dataset/{metric_name}"].iloc[0]
-            assert np.isclose(
-                actual_value,
-                expected_value,
-                atol=1e-5
-            ), f"Dataset metric {metric_name} mismatch: expected {expected_value}, got {actual_value}"
+            assert np.isclose(actual_value, expected_value, atol=1e-5), (
+                f"Dataset metric {metric_name} mismatch: expected {expected_value}, got {actual_value}"
+            )

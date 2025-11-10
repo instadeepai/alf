@@ -15,11 +15,7 @@
 import time
 from typing import Dict, Tuple
 
-from alf.core.dataclasses import (
-    Candidate,
-    LabeledCandidates,
-    TaskState,
-)
+from alf.core.dataclasses import Candidate, LabeledCandidates, TaskState
 from alf.core.optimizer.acquisition_function import AcquisitionFunction
 from alf.core.optimizer.search import BaseSearch
 from alf.core.utils.logger import Logger

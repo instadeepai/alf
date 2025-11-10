@@ -4,8 +4,8 @@ from typing import Tuple, Union
 import numpy as np
 
 from alf.core.dataclasses import Candidate, LabeledCandidates, TaskState
-from alf.core.model.base_model import BaseModel
 from alf.core.dataset.base_dataset import BaseDataset
+from alf.core.model.base_model import BaseModel
 
 
 class Oracle:

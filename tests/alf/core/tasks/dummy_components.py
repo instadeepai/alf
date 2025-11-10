@@ -1,11 +1,13 @@
 """Dummy components for testing purposes, including a dummy dataset, model, and acquisition function."""
-from typing import Union, List, Any, Optional
+
+from typing import Any, List, Optional, Union
+
 import numpy as np
 
-from alf.core.optimizer.acquisition_function import AcquisitionFunction
 from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions, TaskState
-from alf.core.model.base_model import BaseModel
 from alf.core.dataset.base_dataset import BaseDataset
+from alf.core.model.base_model import BaseModel
+from alf.core.optimizer.acquisition_function import AcquisitionFunction
 from alf.core.utils.logger import Logger
 
 
@@ -20,8 +22,7 @@ class DummyDataset(BaseDataset):
         split_config: dict[str, Any] | None = None,
         num_samples: int = 1000,
     ):
-        """
-        Initialize a dummy dataset.
+        """Initialize a dummy dataset.
 
         Args:
             name: Name of the dataset
@@ -34,15 +35,14 @@ class DummyDataset(BaseDataset):
         if split_config is None:
             split_config = {
                 "split_ratio": {"train": 0.6, "validation": 0.2, "test": 0.2},
-                "split_type": "random"
+                "split_type": "random",
             }
         super().__init__(name, modality, seed, split_config)
         self.num_samples = num_samples
         self.setup()
 
     def load_dataset(self) -> LabeledCandidates:
-        """
-        Generate dummy dataset with random sequences and labels.
+        """Generate dummy dataset with random sequences and labels.
 
         Returns:
             LabeledCandidates with dummy data
@@ -61,18 +61,14 @@ class DummyDataset(BaseDataset):
             candidates.append(Candidate(data=dummy_sequence, modality=self.modality))
             labels.append(dummy_label)
 
-        return LabeledCandidates(
-            candidates=candidates,
-            labels=np.array(labels)
-        )
+        return LabeledCandidates(candidates=candidates, labels=np.array(labels))
 
 
 class DummyModel(BaseModel):
     """Dummy model that generates random predictions for testing."""
 
     def __init__(self, name: str = "dummy_model", seed: int = 42):
-        """
-        Initialize a dummy model.
+        """Initialize a dummy model.
 
         Args:
             name: Name of the model
@@ -91,13 +87,19 @@ class DummyModel(BaseModel):
         """Dummy model does not perform featurisation."""
         pass
 
-    def train(self, train_data: LabeledCandidates, val_data: LabeledCandidates, logger: Optional[Logger] = None) -> None:
+    def train(
+        self,
+        train_data: LabeledCandidates,
+        val_data: LabeledCandidates,
+        logger: Optional[Logger] = None,
+    ) -> None:
         """Dummy model does not perform any actual training but updates the random seed."""
         self.rng = np.random.RandomState(self.seed + 1)
 
     def sample(self, *args: Any, **kwargs: Any) -> List[Candidate]:
         """Dummy model does not perform sampling."""
         raise NotImplementedError("Sampling is not implemented for this model.")
+
 
 class DummyAcquisitionFunction(AcquisitionFunction):
     """Dummy acquisition function that generates random acquisition values for testing."""
@@ -107,6 +109,8 @@ class DummyAcquisitionFunction(AcquisitionFunction):
         self.seed = seed
         self.rng = np.random.RandomState(seed)
 
-    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
+    def _get_acquisition_values(
+        self, predictions: Predictions, state: TaskState
+    ) -> np.ndarray:
         """Generate random acquisition values for the predictions."""
         return self.rng.randn(len(predictions))

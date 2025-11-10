@@ -14,7 +14,7 @@
 
 import warnings
 from functools import wraps
-from typing import Any, Callable, Optional, Tuple, Union
+from typing import Any, Callable, Tuple, Union
 
 import numpy as np
 from scipy.stats import norm, pearsonr, spearmanr
@@ -68,7 +68,9 @@ class MetricRegistry:
         self.metrics: dict[str, Callable] = {}
         self.variance_required: dict[str, bool] = {}
 
-    def register(self, name: str, metric_fn: Callable, requires_variance: bool = False) -> None:
+    def register(
+        self, name: str, metric_fn: Callable, requires_variance: bool = False
+    ) -> None:
         """Register a metric function in the registry.
 
         Args:

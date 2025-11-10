@@ -16,9 +16,9 @@ import logging
 from typing import Any
 
 from alf.core.dataclasses import TaskState
-from alf.core.tasks.base_task import BaseTask
 from alf.core.optimizer.optimizer import Optimizer
 from alf.core.oracle.oracle import Oracle
+from alf.core.tasks.base_task import BaseTask
 from alf.core.utils.logger import Logger
 
 logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")

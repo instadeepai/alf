@@ -32,7 +32,9 @@ class PlotRegistry:
         self.plots: dict[str, Callable] = {}
         self.variance_required: dict[str, bool] = {}
 
-    def register(self, name: str, plot_fn: Callable, requires_variance: bool = False) -> None:
+    def register(
+        self, name: str, plot_fn: Callable, requires_variance: bool = False
+    ) -> None:
         """Register a plot function in the registry.
 
         Args:
