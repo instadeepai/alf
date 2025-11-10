@@ -16,16 +16,28 @@ class Candidate:
     modality: str
     features: dict | None = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Initialize features to empty dict if None."""
         if self.features is None:
             self.features = {}
 
     def __repr__(self) -> str:
-        """Return a string representation of the candidate."""
+        """Return a string representation of the candidate.
+
+        Returns:
+            str: A string representation showing the candidate's data, modality, and features.
+        """
         return f"Candidate(data={self.data}, modality={self.modality}, features={self.features})"
 
     def stringify(self) -> str:
-        """Convert the candidate data to a string."""
+        """Convert the candidate data to a string representation.
+
+        Returns:
+            str: The string representation of the candidate's data.
+
+        Raises:
+            ValueError: If the modality is not "sequence" (other modalities not yet supported).
+        """
         if self.modality == "sequence":
             return self.data
         else:

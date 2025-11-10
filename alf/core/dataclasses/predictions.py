@@ -26,6 +26,12 @@ class Predictions:
     empirical_dist: np.ndarray | None = None
 
     def __post_init__(self) -> None:
+        """Validate that predictions arrays have consistent lengths.
+
+        Raises:
+            AssertionError: If means is empty, or if variances or empirical_dist
+                don't match the length of means.
+        """
         assert len(self.means) > 0, "Means must have at least one prediction"
         if self.variances is not None:
             assert len(self.variances) == len(self.means), (
@@ -37,6 +43,11 @@ class Predictions:
             )
 
     def __len__(self) -> int:
+        """Return the number of predictions.
+
+        Returns:
+            int: The number of predictions (length of the means array).
+        """
         return len(self.means)
 
     def save(
@@ -46,10 +57,16 @@ class Predictions:
         targets: np.ndarray,
         filename: str,
     ) -> None:
-        """Save the predictions to disk.
+        """Save the predictions to disk as a CSV file.
 
-        First create a dataframe of {(sequence_i, mean_i target_i)} and then save to disk.
-        Additionally, if they exist then save variances, and empirical dists.
+        Creates a DataFrame with predictions, targets, and optionally variances
+        and ensemble predictions, then saves it to the specified directory.
+
+        Args:
+            output_dir: Directory path where the CSV file will be saved.
+            candidates: List of Candidate objects corresponding to the predictions.
+            targets: Ground truth target values corresponding to each candidate.
+            filename: Name of the CSV file to save (e.g., "predictions.csv").
         """
         predictions_list = []
         for i in range(len(self.means)):

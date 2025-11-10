@@ -11,7 +11,11 @@ log = logging.getLogger("rich")
 
 
 class BaseTask(abc.ABC):
-    """Base class for all tasks."""
+    """Base class for all tasks.
+
+    Provides common functionality for different types of experiments/tasks,
+    including setup, evaluation, and saving predictions.
+    """
 
     def __init__(
         self,
@@ -20,13 +24,30 @@ class BaseTask(abc.ABC):
         num_acq_rounds: int = 0,
         save_round_predictions: bool = False,
     ) -> None:
+        """Initialize the base task.
+
+        Args:
+            task_type: Type identifier for the task ("Design", "Supervised", "ZeroShot").
+            acq_batch_size: Number of candidates to acquire per round. Defaults to 0.
+            num_acq_rounds: Total number of acquisition rounds. Defaults to 0.
+            save_round_predictions: Whether to save predictions at each round.
+                Defaults to False.
+        """
         self.task_type = task_type
         self.acq_batch_size = acq_batch_size
         self.num_acq_rounds = num_acq_rounds
         self.save_round_predictions = save_round_predictions
 
     def setup(self, dataset: BaseDataset, surrogate: Surrogate) -> TaskState:
-        """Setup the task."""
+        """Setup the task with dataset and surrogate model.
+
+        Args:
+            dataset: The dataset containing train/validation/test splits.
+            surrogate: The surrogate model to use for predictions.
+
+        Returns:
+            TaskState: Initialized task state with the provided dataset and surrogate.
+        """
         return TaskState(
             dataset=dataset,
             surrogate=surrogate,
@@ -37,7 +58,14 @@ class BaseTask(abc.ABC):
 
     @abc.abstractmethod
     def run(self, **kwargs: Any) -> None:
-        """Run the task."""
+        """Run the task.
+
+        This method must be implemented by subclasses to define the specific
+        task execution logic.
+
+        Args:
+            **kwargs: Task-specific keyword arguments.
+        """
         pass
 
     def evaluate(
@@ -47,7 +75,24 @@ class BaseTask(abc.ABC):
         save_path: str | None,
         filename: str,
     ) -> TaskState:
-        """Evaluate the surrogate model on the test dataset and return the updated state."""
+        """Evaluate the surrogate model on the test dataset and return the updated state.
+
+        Computes predictions, metrics, and figures on the test set. Optionally saves
+        predictions if configured. Updates the task state with computed metrics.
+
+        Args:
+            state: Current task state containing dataset and surrogate.
+            round_name: Name or number identifying the current round.
+            save_path: Directory path to save predictions. If None, predictions
+                are not saved.
+            filename: Name of the CSV file to save predictions (e.g., "predictions.csv").
+
+        Returns:
+            TaskState: Updated task state with evaluation metrics and figures.
+
+        Raises:
+            AssertionError: If save_round_predictions is True but filename is empty.
+        """
         if len(state.dataset.test_dataset) > 0 and state.surrogate:
             predictions = state.surrogate.predict(state.dataset.test_dataset.candidates)
             results = Results(

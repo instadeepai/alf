@@ -21,6 +21,15 @@ from scipy.stats import norm, pearsonr, spearmanr
 
 
 def check_inputs(means: np.ndarray, targets: np.ndarray) -> None:
+    """Validate that means and targets arrays are compatible and valid.
+
+    Args:
+        means: Array of predicted means.
+        targets: Array of target values.
+
+    Raises:
+        AssertionError: If shapes don't match, arrays are empty, or contain NaN values.
+    """
     assert means.shape == targets.shape, (
         f"Means shape {means.shape} and targets shape {targets.shape} don't match"
     )
@@ -30,6 +39,16 @@ def check_inputs(means: np.ndarray, targets: np.ndarray) -> None:
 
 
 def check_variance_validity(variances: np.ndarray, targets: np.ndarray) -> None:
+    """Validate that variance array is valid and compatible with targets.
+
+    Args:
+        variances: Array of predicted variances.
+        targets: Array of target values.
+
+    Raises:
+        AssertionError: If variances is None, contains negative values, length
+            doesn't match targets, or contains NaN values.
+    """
     assert variances is not None, "This function requires variances but it is None"
     assert np.all(variances >= 0), (
         "All uncertainty values must be non-negative (variances)."
@@ -44,17 +63,28 @@ def check_variance_validity(variances: np.ndarray, targets: np.ndarray) -> None:
 class MetricRegistry:
     """Simple registry for metrics with variance requirements."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize an empty metric registry."""
         self.metrics: dict[str, Callable] = {}
         self.variance_required: dict[str, bool] = {}
 
-    def register(self, name: str, metric_fn: Callable, requires_variance: bool = False):
-        """Register a metric function."""
+    def register(self, name: str, metric_fn: Callable, requires_variance: bool = False) -> None:
+        """Register a metric function in the registry.
+
+        Args:
+            name: Name identifier for the metric.
+            metric_fn: Callable function that computes the metric.
+            requires_variance: Whether this metric requires variance information.
+        """
         self.metrics[name] = metric_fn
         self.variance_required[name] = requires_variance
 
     def get_metrics_requiring_variance(self) -> dict[str, Callable]:
-        """Get metrics that require variance."""
+        """Get all registered metrics that require variance.
+
+        Returns:
+            dict[str, Callable]: Dictionary mapping metric names to their functions.
+        """
         return {
             name: fn
             for name, fn in self.metrics.items()
@@ -62,7 +92,11 @@ class MetricRegistry:
         }
 
     def get_metrics_not_requiring_variance(self) -> dict[str, Callable]:
-        """Get metrics that don't require variance."""
+        """Get all registered metrics that don't require variance.
+
+        Returns:
+            dict[str, Callable]: Dictionary mapping metric names to their functions.
+        """
         return {
             name: fn
             for name, fn in self.metrics.items()
@@ -76,7 +110,15 @@ metric_registry = MetricRegistry()
 
 def requires_variance(metric_fn: Callable) -> Callable:
     """Decorator to mark a metric as requiring variance.
-    This automatically registers the metric in the global registry and applies input validation.
+
+    Automatically registers the metric in the global registry and applies input validation.
+    The decorated function will receive validated inputs with variance checks.
+
+    Args:
+        metric_fn: The metric function to decorate.
+
+    Returns:
+        Callable: Wrapped metric function with validation and registration.
     """
 
     @wraps(metric_fn)
@@ -98,7 +140,15 @@ def requires_variance(metric_fn: Callable) -> Callable:
 
 def no_variance_required(metric_fn: Callable) -> Callable:
     """Decorator to mark a metric as not requiring variance.
-    This automatically registers the metric in the global registry and applies input validation.
+
+    Automatically registers the metric in the global registry and applies input validation.
+    The decorated function will receive validated inputs without variance checks.
+
+    Args:
+        metric_fn: The metric function to decorate.
+
+    Returns:
+        Callable: Wrapped metric function with validation and registration.
     """
 
     @wraps(metric_fn)
@@ -122,18 +172,21 @@ def monte_carlo_ranking(
     variances: np.ndarray,
     num_samples: int = 10000,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Compute ranks, their means and variances (ranking uncertainty):
+    """Compute ranks, their means and variances using Monte Carlo simulation.
 
-    For predicted means and variances, estimate n normally
-    distributed means using Monte Carlo simulation.
+    For predicted means and variances, estimates normally distributed means
+    using Monte Carlo simulation and computes ranking statistics.
 
     Args:
-        means: Array of shape (b,). Mean predictions
-        variances: Array of shape (b,) or None. Predicted variances
-        num_samples: Integer. Number of random samples to draw for the simulation.
+        means: Array of shape (b,). Mean predictions.
+        variances: Array of shape (b,). Predicted variances.
+        num_samples: Number of random samples to draw for the simulation.
+            Defaults to 10000.
 
     Returns:
-        Tuple: [mean_rank, rank_variances]
+        Tuple[np.ndarray, np.ndarray]: A tuple containing:
+            - mean_rank: Mean rank for each candidate
+            - rank_variances: Variance of ranks for each candidate
     """
     np.random.seed(42)
     n = len(means)
@@ -258,23 +311,24 @@ def expected_calibration_error(
     targets: np.ndarray,
     n_grid_points: int = 100,
 ) -> dict[str, float]:
-    """Compute Expected Calibration Error (ECE):
-    -- requires uncertainty --
-    For alpha in grid from 0 -> 1
-    Find alpha% confidence intervals for all predictions
-    Count % of targets which fall within the confidence intervals
-    Compute area between x=y and the curve
+    """Compute Expected Calibration Error (ECE).
 
-    We want to minimize this metric
+    For each confidence level alpha in a grid from 0 to 1:
+    - Find alpha% confidence intervals for all predictions
+    - Count percentage of targets that fall within the confidence intervals
+    - ECE = area between x=y line and the observed coverage curve
+
+    Lower ECE values indicate better calibration.
 
     Args:
-        means: Array of shape (b,). Mean predictions
-        _: Array of shape (b,) or None. Predicted variances
-        targets: Array of shape (b,). True labels
-        n_grid_points: Integer for the coarseness of the grid
+        means: Array of shape (b,). Mean predictions.
+        variances: Array of shape (b,). Predicted variances.
+        targets: Array of shape (b,). True labels.
+        n_grid_points: Number of grid points for confidence level discretization.
+            Defaults to 100.
 
     Returns:
-        dict: {"ece": ECE float}
+        dict[str, float]: Dictionary with key "ece" mapping to the ECE value.
     """
     check_variance_validity(variances, targets)
 
@@ -296,23 +350,20 @@ def rank_expected_calibration_error(
     variances: np.ndarray,
     targets: np.ndarray,
 ) -> dict[str, float]:
-    """Compute Expected Calibration Error (ECE) in ranks:
-    -- requires uncertainty --
-    For alpha in grid from 0 -> 1
-    Find alpha% confidence intervals for all predictions
-    Count % of targets which fall within the confidence intervals
-    Compute area between x=y and the curve
+    """Compute Expected Calibration Error (ECE) in rank space.
 
-    We want to minimize this metric
+    Computes ECE using Monte Carlo ranking to estimate rank distributions,
+    then applies the standard ECE computation in rank space.
+
+    Lower ECE values indicate better calibration.
 
     Args:
-        means: Array of shape (b,). Mean predictions
-        _: Array of shape (b,) or None. Predicted variances
-        targets: Array of shape (b,). True labels
-        n_grid_points: Integer for the coarseness of the grid
+        means: Array of shape (b,). Mean predictions.
+        variances: Array of shape (b,). Predicted variances.
+        targets: Array of shape (b,). True labels.
 
     Returns:
-        dict: {"ece": ECE float}
+        dict[str, float]: Dictionary with key "rank_ece" mapping to the ECE value.
     """
     check_variance_validity(variances, targets)
 
@@ -331,25 +382,24 @@ def width(
     targets: np.ndarray,
     alpha: float = 0.95,
 ) -> dict[str, float]:
-    """Compute width @ alpha%:
-    -- requires uncertainty --
-    Find (alpha%) confidence intervals for all predictions
-    Compute the average width of all the confidence intervals
-    Find the max distance between any two targets
-    Compute the ratio:
-    avg_ci / max_width
+    """Compute average confidence interval width normalized by dataset range.
 
-    We want this to be as small as possible whilst still retaining
-    good calibration (i.e. ECE, coverage)
+    Computes alpha% confidence intervals for all predictions, then calculates
+    the average width normalized by the maximum distance between any two targets.
+    Lower values are better while maintaining good calibration.
 
     Args:
-        means: Array of shape (b,). Mean predictions
-        _: Array of shape (b,) or None. Predicted variances
-        targets: Array of shape (b,). True labels
-        n_grid_points: Integer for the coarseness of the grid
+        _: Array of shape (b,). Unused parameter (for API consistency).
+        variances: Array of shape (b,). Predicted variances.
+        targets: Array of shape (b,). True labels.
+        alpha: Confidence level (e.g., 0.95 for 95% CI). Defaults to 0.95.
 
     Returns:
-        dict: {"width_{alpha}": Width @ alpha% float}
+        dict[str, float]: Dictionary with key "width_{alpha:.2f}" mapping to
+            the normalized average width value.
+
+    Raises:
+        AssertionError: If alpha is not in [0, 1].
     """
     check_variance_validity(variances, targets)
     assert (alpha >= 0) and (alpha <= 1), "alpha should be in [0,1]"
@@ -373,25 +423,23 @@ def rank_width(
     targets: np.ndarray,
     alpha: float = 0.95,
 ) -> dict[str, float]:
-    """Compute width @ alpha% based on ranks:
-    -- requires uncertainty --
-    Find (alpha%) confidence intervals for all predictions
-    Compute the average width of all the confidence intervals
-    Find the max distance between any two targets
-    Compute the ratio:
-    avg_ci / max_width
+    """Compute average confidence interval width in rank space.
 
-    We want this to be as small as possible whilst still retaining
-    good calibration (i.e. ECE, coverage)
+    Computes width metric using Monte Carlo ranking to estimate rank distributions,
+    then applies the standard width computation in rank space.
 
     Args:
-        means: Array of shape (b,). Mean predictions
-        _: Array of shape (b,) or None. Predicted variances
-        targets: Array of shape (b,). True labels
-        n_grid_points: Integer for the coarseness of the grid
+        means: Array of shape (b,). Mean predictions.
+        variances: Array of shape (b,). Predicted variances.
+        targets: Array of shape (b,). True labels.
+        alpha: Confidence level (e.g., 0.95 for 95% CI). Defaults to 0.95.
 
     Returns:
-        dict: {"width_{alpha}": Width @ alpha% float}
+        dict[str, float]: Dictionary with key "rank_width_{alpha:.2f}" mapping to
+            the normalized average width value in rank space.
+
+    Raises:
+        AssertionError: If alpha is not in [0, 1].
     """
     check_variance_validity(variances, targets)
     assert (alpha >= 0) and (alpha <= 1), "alpha should be in [0,1]"
@@ -413,20 +461,24 @@ def coverage(
     targets: np.ndarray,
     alpha: float = 0.95,
 ) -> dict[str, float]:
-    """Compute coverage @ alpha%:
-    -- requires uncertainty --
-    Find (alpha%) confidence intervals for all predictions
-    What % of targets fall within the approximate confidence intervals
-    We want this to be as close to alpha as possible
+    """Compute coverage at alpha% confidence level.
+
+    Computes alpha% confidence intervals for all predictions and measures
+    what percentage of targets fall within these intervals. Ideal coverage
+    should be close to alpha.
 
     Args:
-        means: Array of shape (b,). Mean predictions
-        _: Array of shape (b,) or None. Predicted variances
-        targets: Array of shape (b,). True labels
-        alpha: float. Confidence level
+        means: Array of shape (b,). Mean predictions.
+        variances: Array of shape (b,). Predicted variances.
+        targets: Array of shape (b,). True labels.
+        alpha: Confidence level (e.g., 0.95 for 95% CI). Defaults to 0.95.
 
     Returns:
-        dict: {"coverage_{alpha}": Coverage @ alpha% float}
+        dict[str, float]: Dictionary with key "coverage_{alpha:.2f}" mapping to
+            the coverage percentage.
+
+    Raises:
+        AssertionError: If alpha is not in [0, 1].
     """
     check_variance_validity(variances, targets)
     assert (alpha >= 0) and (alpha <= 1), "alpha should be in [0,1]"
@@ -447,20 +499,23 @@ def rank_coverage(
     targets: np.ndarray,
     alpha: float = 0.95,
 ) -> dict[str, float]:
-    """Compute coverage @ alpha% based on ranks:
-    -- requires uncertainty --
-    Find (alpha%) confidence intervals for all predictions
-    What % of targets fall within the approximate confidence intervals
-    We want this to be as close to alpha as possible
+    """Compute coverage at alpha% confidence level in rank space.
+
+    Computes coverage metric using Monte Carlo ranking to estimate rank distributions,
+    then applies the standard coverage computation in rank space.
 
     Args:
-        means: Array of shape (b,). Mean predictions
-        _: Array of shape (b,) or None. Predicted variances
-        targets: Array of shape (b,). True labels
-        alpha: float. Confidence level
+        means: Array of shape (b,). Mean predictions.
+        variances: Array of shape (b,). Predicted variances.
+        targets: Array of shape (b,). True labels.
+        alpha: Confidence level (e.g., 0.95 for 95% CI). Defaults to 0.95.
 
     Returns:
-        dict: {"coverage_{alpha}": Coverage @ alpha% float}
+        dict[str, float]: Dictionary with key "rank_coverage_{alpha:.2f}" mapping to
+            the coverage percentage in rank space.
+
+    Raises:
+        AssertionError: If alpha is not in [0, 1].
     """
     check_variance_validity(variances, targets)
     assert (alpha >= 0) and (alpha <= 1), "alpha should be in [0,1]"
@@ -480,20 +535,20 @@ def residual_spearman(
     variances: np.ndarray,
     targets: np.ndarray,
 ) -> dict[str, float]:
-    """Compute spearman correlation between the residuals and the variances:
-    -- requires uncertainty --
-    Compute the residuals: abs(targets - means)
-    Compute the spearman between residuals and variances
+    """Compute Spearman correlation between residuals and variances.
 
-    We expect these two things to be correlated
+    Computes absolute residuals (|targets - means|) and measures their Spearman
+    correlation with predicted variances. Higher correlation indicates better
+    uncertainty estimation.
 
     Args:
-        means: Array of shape (b,). Mean predictions
-        _: Array of shape (b,) or None. Predicted variances
-        targets: Array of shape (b,). True labels
+        means: Array of shape (b,). Mean predictions.
+        variances: Array of shape (b,). Predicted variances.
+        targets: Array of shape (b,). True labels.
 
     Returns:
-        dict: {"residual_spearman": Residual Spearman}
+        dict[str, float]: Dictionary with key "residual_spearman" mapping to
+            the correlation coefficient.
     """
     check_variance_validity(variances, targets)
 
@@ -507,20 +562,20 @@ def residual_pearson(
     variances: np.ndarray,
     targets: np.ndarray,
 ) -> dict[str, float]:
-    """Compute pearson correlation between the residuals and the standard deviations
-    -- requires uncertainty --
-    Compute the residuals: abs(targets - means)
-    Compute the pearson between residuals and standard deviations
+    """Compute Pearson correlation between residuals and standard deviations.
 
-    We expect these two things to be correlated
+    Computes absolute residuals (|targets - means|) and measures their Pearson
+    correlation with predicted standard deviations (sqrt(variances)). Higher
+    correlation indicates better uncertainty estimation.
 
     Args:
-        means: Array of shape (b,). Mean predictions
-        _: Array of shape (b,) or None. Predicted variances
-        targets: Array of shape (b,). True labels
+        means: Array of shape (b,). Mean predictions.
+        variances: Array of shape (b,). Predicted variances.
+        targets: Array of shape (b,). True labels.
 
     Returns:
-        dict: {"residual_pearson": Residual Pearson float}
+        dict[str, float]: Dictionary with key "residual_pearson" mapping to
+            the correlation coefficient.
     """
     check_variance_validity(variances, targets)
 
@@ -536,26 +591,25 @@ def regret_ucb_alpha(
     alpha: float = 0.1,
     num_acquisitions: int = 100,
 ) -> dict[str, float]:
-    """Compute UCB regret
-    --- requires uncertainty --
-    Compute the Upper Confidence Bound (UCB) acquisition function
-    on the test dataset.
-    ucb_i = means_i + alpha * variances_i
-    Compare the best possible num_acquisitions labels
-    versus the labels of the sequences we would acquire according to the
-    acquisition function
+    """Compute UCB (Upper Confidence Bound) acquisition regret.
 
-    We want to minimise this metric
+    Computes UCB values (means + alpha * sqrt(variances)) and compares the sum
+    of labels from the top num_acquisitions candidates selected by UCB versus
+    the best possible sum. Lower regret indicates better acquisition performance.
 
     Args:
-        means: Array of shape (b,). Mean predictions
-        _: Array of shape (b,) or None. Predicted variances
-        targets: Array of shape (b,). True labels
-        alpha: float. The parameter of the UCB acquisition function
-        num_acquisitions: int. The number of acquisitions
+        means: Array of shape (b,). Mean predictions.
+        variances: Array of shape (b,). Predicted variances.
+        targets: Array of shape (b,). True labels.
+        alpha: UCB exploration parameter. Defaults to 0.1.
+        num_acquisitions: Number of candidates to acquire. Defaults to 100.
 
     Returns:
-        dict: {f"regret_ucb_{alpha}": Regret float}
+        dict[str, float]: Dictionary with key "regret_ucb_{alpha:.2f}" mapping to
+            the cumulative regret value.
+
+    Raises:
+        AssertionError: If num_acquisitions is not a positive integer.
     """
     check_variance_validity(variances, targets)
     assert isinstance(num_acquisitions, int), "num_acquisitions should be an integer."
@@ -594,20 +648,27 @@ def regret_ucb_alpha_sweep(
     alpha: Union[float, list[float]] | None = None,
     num_acquisitions: int = 100,
 ) -> dict[str, float]:
-    """Compute UCB regret on a list of alphas
-    --- requires uncertainty --
+    """Compute UCB regret for multiple alpha values.
 
-    Compute the `regret_ucb_alpha` metric on a list of alpha values
+    Computes UCB regret for each alpha value in the provided list (or default range).
+    Useful for evaluating acquisition function performance across different
+    exploration-exploitation trade-offs.
 
     Args:
-        means: Array of shape (b,). Mean predictions
-        _: Array of shape (b,) or None. Predicted variances
-        targets: Array of shape (b,). True labels
-        alpha: float | list[float]. The parameter(s) of the UCB acquisition function
-        num_acquisitions: int. The number of acquisitions
+        means: Array of shape (b,). Mean predictions.
+        variances: Array of shape (b,). Predicted variances.
+        targets: Array of shape (b,). True labels.
+        alpha: Single float, list of floats, or None. UCB exploration parameter(s).
+            If None, uses default list [0.1, 0.3, 0.5, 1.0]. Defaults to None.
+        num_acquisitions: Number of candidates to acquire. Defaults to 100.
 
     Returns:
-        dict: Mapping from f"regret_ucb_{alpha}" to regret value for each alpha.
+        dict[str, float]: Dictionary mapping "regret_ucb_{alpha:.2f}" to regret value
+            for each alpha value.
+
+    Raises:
+        ValueError: If alpha is an empty list.
+        TypeError: If alpha is not a float or list of floats.
     """
     assert variances is not None, "UCB regret requires variances"
     assert np.all(variances >= 0), (

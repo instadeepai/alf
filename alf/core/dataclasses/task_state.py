@@ -43,14 +43,27 @@ class TaskState:
     round_metrics: dict[str, Any] = field(default_factory=dict)
 
     def update(self, acquired_candidates: LabeledCandidates) -> None:
-        """Update the task state, including the dataset, with the acquired candidates."""
+        """Update the task state with newly acquired candidates.
+
+        Adds the acquired candidates to history and updates the dataset splits.
+        Also increments the round counter.
+
+        Args:
+            acquired_candidates: The newly acquired candidates with their labels.
+        """
         self.history.append(copy.copy(acquired_candidates))
         if self.round != 0:
             self.dataset.update_splits(acquired_candidates)
         self.round += 1
 
     def print_metrics(self, round_name: int | str) -> None:
-        """Stringify the metrics."""
+        """Print the current round's metrics to the logger.
+
+        Formats and logs all numeric metrics (excluding figures) for the current round.
+
+        Args:
+            round_name: Name or number identifying the current round.
+        """
         metrics_list: list = []
         for key, value in self.round_metrics.items():
             # Skip the "round" key explicitly; only accept float and int types
@@ -63,7 +76,14 @@ class TaskState:
         self,
         output_dir: str,
     ) -> None:
-        """Save the multiround metrics to the output directory"""
+        """Save the current round's metrics to a CSV file.
+
+        Appends the metrics to metrics.csv in the output directory. If the file
+        already exists, the new metrics are appended to it.
+
+        Args:
+            output_dir: Directory path where the metrics CSV file will be saved.
+        """
         numeric_metrics = {
             k: v for k, v in self.round_metrics.items() if not isinstance(v, plt.Figure)
         }
@@ -76,7 +96,14 @@ class TaskState:
         input_handler.save_csv(os.path.join(output_dir, "metrics.csv"), metrics_df)
 
     def save_history(self, output_dir: str) -> None:
-        """Save the multiround history of acquisitions to the output directory"""
+        """Save the acquisition history to CSV files.
+
+        Saves each round's acquired candidates to a separate CSV file named
+        acq_round_{round_number}.csv.
+
+        Args:
+            output_dir: Directory path where the history CSV files will be saved.
+        """
         for acq_round, acq_points in enumerate(self.history):
             input_handler.save_csv(
                 os.path.join(output_dir, f"acq_round_{acq_round}.csv"),
@@ -84,7 +111,12 @@ class TaskState:
             )
 
     def save(self, save_path: str | None, _verbose: bool = False) -> None:
-        """Save the metrics and history to the output directory"""
+        """Save both metrics and acquisition history to the output directory.
+
+        Args:
+            save_path: Directory path where files will be saved. If None, nothing is saved.
+            _verbose: If True, log a message when saving.
+        """
         if _verbose:
             log.info(f"Saving metrics and history to {save_path}")
 
@@ -93,7 +125,14 @@ class TaskState:
             self.save_history(save_path)
 
     def should_terminate(self) -> bool:
-        """Check if the task should be terminated."""
+        """Check if the task should be terminated early.
+
+        Termination occurs when the remaining candidate pool is smaller than
+        the acquisition batch size.
+
+        Returns:
+            bool: True if the task should be terminated, False otherwise.
+        """
         if len(self.dataset.candidate_pool) < self.acq_batch_size:
             log.info(
                 "Optimizer is signalling that optimization is complete, i.e. batch size "

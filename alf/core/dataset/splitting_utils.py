@@ -11,7 +11,23 @@ def split_dataset(
     test_size: int,
     seed: int,
 ) -> dict[str, LabeledCandidates]:
-    """Split dataset into train, validation, test, and candidate pool."""
+    """Split dataset into train, validation, test, and candidate pool.
+
+    Args:
+        split_type: Type of split to perform ("random" or "low_vs_high").
+        dataset: Dataset to split.
+        train_size: Number of samples for training set.
+        validation_size: Number of samples for validation set.
+        test_size: Number of samples for test set.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        dict[str, LabeledCandidates]: Dictionary with keys "train", "validation",
+            "test", and "candidate_pool".
+
+    Raises:
+        ValueError: If split_type is not "random" or "low_vs_high".
+    """
     if split_type == "random":
         return split_random(dataset, train_size, validation_size, test_size, seed)
     elif split_type == "low_vs_high":
@@ -27,7 +43,22 @@ def split_random(
     test_size: int,
     seed: int,
 ) -> dict[str, LabeledCandidates]:
-    """Split dataset randomly into train, validation, test, and candidate pool."""
+    """Split dataset randomly into train, validation, test, and candidate pool.
+
+    Shuffles the dataset and splits it sequentially into the specified sizes.
+    Remaining samples go to the candidate pool.
+
+    Args:
+        dataset: Dataset to split.
+        train_size: Number of samples for training set.
+        validation_size: Number of samples for validation set.
+        test_size: Number of samples for test set.
+        seed: Random seed for shuffling.
+
+    Returns:
+        dict[str, LabeledCandidates]: Dictionary with keys "train", "validation",
+            "test", and "candidate_pool".
+    """
     shuffled_candidates = dataset.shuffle(seed=seed)
 
     start_idx = 0
@@ -57,7 +88,23 @@ def split_low_vs_high(
     test_size: int,
     seed: int,
 ) -> dict[str, LabeledCandidates]:
-    """Split dataset so train/validation contain low-scoring candidates, test/pool contain high-scoring."""
+    """Split dataset with low-scoring candidates in train/val, high-scoring in test/pool.
+
+    Sorts candidates by label value, assigns low-scoring candidates to train/validation
+    and high-scoring candidates to test/candidate_pool. Within each group, candidates
+    are randomly shuffled.
+
+    Args:
+        dataset: Dataset to split.
+        train_size: Number of samples for training set (from low-scoring group).
+        validation_size: Number of samples for validation set (from low-scoring group).
+        test_size: Number of samples for test set (from high-scoring group).
+        seed: Random seed for shuffling within groups.
+
+    Returns:
+        dict[str, LabeledCandidates]: Dictionary with keys "train", "validation",
+            "test", and "candidate_pool".
+    """
     # Sort indices by label (highest to lowest)
     sorted_indices = dataset.labels.argsort()[::-1]
 

@@ -26,7 +26,20 @@ log = logging.getLogger("rich")
 
 
 class DesignTask(BaseTask):
+    """Multi-round active learning task for iterative design optimization.
+
+    Performs multiple rounds of candidate acquisition, evaluation, and model training
+    to iteratively improve the surrogate model and discover high-performing candidates
+    or candidates with high uncertainty.
+    """
+
     def __init__(self, **kwargs: Any) -> None:
+        """Initialize the design task.
+
+        Args:
+            **kwargs: Additional arguments passed to BaseTask (acq_batch_size,
+                num_acq_rounds, save_round_predictions).
+        """
         super().__init__(task_type="Design", **kwargs)
 
     def run(  # type: ignore[override]
@@ -37,7 +50,24 @@ class DesignTask(BaseTask):
         oracle: Oracle,
         save_path: str | None = None,
     ) -> None:
-        """This is the multi-round design task."""
+        """Run the multi-round design task.
+
+        Executes multiple rounds of active learning:
+        1. Optimizer proposes candidates (ask)
+        2. Oracle evaluates candidates
+        3. Surrogate model is updated with new data (tell)
+        4. Model is evaluated on test set
+        5. Metrics are logged
+
+        The loop continues for num_acq_rounds or until termination conditions are met.
+
+        Args:
+            state: Initial task state with dataset and surrogate.
+            logger: Logger for recording metrics and artifacts.
+            optimizer: Optimizer for candidate acquisition.
+            oracle: Oracle for evaluating candidate labels.
+            save_path: Optional directory path to save dataset splits and predictions.
+        """
         log.info(f"Multi-round Design Task: {state.num_acq_rounds} Rounds")
 
         if save_path:

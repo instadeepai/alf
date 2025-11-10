@@ -12,7 +12,15 @@ class AcquisitionFunction(abc.ABC):
     def _get_acquisition_values(
         self, predictions: Predictions, state: TaskState
     ) -> np.ndarray:
-        """Computes acquisition values for candidates based on surrogate predictions."""
+        """Compute acquisition values for candidates based on surrogate predictions.
+
+        Args:
+            predictions: Predictions from the surrogate model.
+            state: Current task state.
+
+        Returns:
+            np.ndarray: Array of acquisition values, one per candidate.
+        """
         pass
 
     def __call__(
@@ -20,7 +28,15 @@ class AcquisitionFunction(abc.ABC):
         search_candidates: list[Candidate],
         state: TaskState,
     ) -> LabeledCandidates:
-        """Returns the candidates with their acquisition values."""
+        """Compute acquisition values for candidates and return them as LabeledCandidates.
+
+        Args:
+            search_candidates: List of Candidate objects to score.
+            state: Current task state containing the dataset and surrogate model.
+
+        Returns:
+            LabeledCandidates: Candidates paired with their acquisition values.
+        """
         predictions: Predictions = state.surrogate.predict(search_candidates)
         acquisition_values = self._get_acquisition_values(predictions, state)
         return LabeledCandidates(search_candidates, acquisition_values)

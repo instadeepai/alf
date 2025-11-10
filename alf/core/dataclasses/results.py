@@ -34,7 +34,15 @@ class Results:
     variances: np.ndarray | None = None
 
     def __post_init__(self) -> None:
-        """Post init is used to check the means and predictions, and compute the metrics and figures."""
+        """Validate inputs and compute metrics and figures.
+
+        Ensures exactly one of the two instantiation options is used, then
+        computes metrics and figures based on the predictions and targets.
+
+        Raises:
+            AssertionError: If both predictions and (means, variances) are set,
+                or if neither is set.
+        """
         # Ensure exactly one of the two instantiation options is used
         has_predictions = self.predictions is not None
         has_means = self.means is not None
@@ -50,7 +58,16 @@ class Results:
         self.figures = self.compute_figures()
 
     def compute_metrics(self) -> Dict[str, Union[float, int, np.number]]:
-        """Compute the metrics."""
+        """Compute evaluation metrics based on predictions and targets.
+
+        Returns:
+            Dict[str, Union[float, int, np.number]]: A dictionary of metric names
+                to their computed values. The metrics depend on whether variances
+                are available.
+
+        Raises:
+            AssertionError: If predictions is not set.
+        """
         assert self.predictions is not None, "Predictions must be set"
         metrics: Dict[str, Union[float, int, np.number]] = {}
         metrics_dict = (
@@ -68,7 +85,15 @@ class Results:
         return metrics
 
     def compute_figures(self) -> Dict[str, plt.Figure]:
-        """Compute the figures."""
+        """Compute visualization figures based on predictions and targets.
+
+        Returns:
+            Dict[str, plt.Figure]: A dictionary of figure names to matplotlib
+                Figure objects. The figures depend on whether variances are available.
+
+        Raises:
+            AssertionError: If predictions is not set.
+        """
         assert self.predictions is not None, "Predictions must be set"
         plots: Dict[str, plt.Figure] = {}
         plots_dict = (

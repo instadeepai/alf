@@ -26,7 +26,16 @@ from alf.core.utils.logger import Logger
 
 
 def select_top_k(candidates: LabeledCandidates, k: int) -> LabeledCandidates:
-    """Select the top k candidates from the list."""
+    """Select the top k candidates based on their label values.
+
+    Args:
+        candidates: LabeledCandidates to select from.
+        k: Number of top candidates to select.
+
+    Returns:
+        LabeledCandidates: New LabeledCandidates object containing the top k candidates
+            sorted by label values (highest first).
+    """
     top_k_indices = candidates.labels.argsort()[::-1][:k]
     top_k_candidates = [candidates.candidates[i] for i in top_k_indices]
     top_k_labels = candidates.labels[top_k_indices]
@@ -34,14 +43,23 @@ def select_top_k(candidates: LabeledCandidates, k: int) -> LabeledCandidates:
 
 
 class Optimizer:
-    """High level ask/tell routine"""
+    """Implements the ask/tell interface for active learning.
+
+    Coordinates search and acquisition functions to propose candidates and update
+    the surrogate model iteratively.
+    """
 
     def __init__(
         self,
         acquisition_fn: AcquisitionFunction,
         search_fn: BaseSearch,
     ) -> None:
-        """Initialize the optimizer."""
+        """Initialize the optimizer.
+
+        Args:
+            acquisition_fn: Acquisition function for scoring candidates.
+            search_fn: Search function for generating candidate pools.
+        """
         self.acquisition_fn = acquisition_fn
         self.search_fn = search_fn
 
@@ -49,7 +67,20 @@ class Optimizer:
         self,
         state: TaskState,
     ) -> Tuple[list[Candidate], TaskState]:
-        """Ask the optimizer to propose the next batch of candidates through the search and acquisition functions."""
+        """Propose the next batch of candidates to evaluate.
+
+        Uses the search function to generate a candidate pool, then the acquisition
+        function to score and select the top candidates. In the first round, uses
+        the training dataset if available.
+
+        Args:
+            state: Current task state.
+
+        Returns:
+            Tuple[list[Candidate], TaskState]: A tuple containing:
+                - list[Candidate]: The proposed candidates to evaluate
+                - TaskState: Updated state with ask_time metric
+        """
         t0 = time.perf_counter()
 
         # During the first round, we use the training dataset as the acquired candidates.
@@ -72,13 +103,17 @@ class Optimizer:
         state: TaskState,
         logger: Logger | None = None,
     ) -> TaskState:
-        """Train the surrogate model on the new train/val datasets.
+        """Update the surrogate model with newly acquired data.
+
+        Trains the surrogate model on the updated training and validation datasets,
+        then computes and updates metrics.
 
         Args:
-            state: the optimizer state
-            dataset: the dataset
-            surrogate: the surrogate model
-            logger: the logger
+            state: Current task state with updated dataset.
+            logger: Optional logger for recording training metrics.
+
+        Returns:
+            TaskState: Updated state with tell_time and optimizer metrics.
         """
         t0 = time.perf_counter()
         if state.surrogate:
@@ -98,7 +133,17 @@ class Optimizer:
         self,
         state: TaskState,
     ) -> Dict[str, float]:
-        """Update the state with the metrics from the acquired candidates, surrogate, search, and acquisition functions."""
+        """Collect metrics from acquired candidates, surrogate, and search functions.
+
+        Args:
+            state: Current task state.
+
+        Returns:
+            Dict[str, float]: Dictionary of metric names to values, including:
+                - Metrics on acquired candidates (mean, max, min)
+                - Surrogate training metrics (if available)
+                - Search function metrics
+        """
         acquired_candidates = state.history[-1]
         metrics = {
             # Metrics on the acquired candidates during the current round

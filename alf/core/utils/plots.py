@@ -27,23 +27,38 @@ DEFAULT_FIGURE_SIZE = (6, 6)
 class PlotRegistry:
     """Simple registry for plots with variance requirements."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize an empty plot registry."""
         self.plots: dict[str, Callable] = {}
         self.variance_required: dict[str, bool] = {}
 
-    def register(self, name: str, plot_fn: Callable, requires_variance: bool = False):
-        """Register a plot function."""
+    def register(self, name: str, plot_fn: Callable, requires_variance: bool = False) -> None:
+        """Register a plot function in the registry.
+
+        Args:
+            name: Name identifier for the plot.
+            plot_fn: Callable function that generates the plot.
+            requires_variance: Whether this plot requires variance.
+        """
         self.plots[name] = plot_fn
         self.variance_required[name] = requires_variance
 
     def get_plots_requiring_variance(self) -> dict[str, Callable]:
-        """Get plots that require variance."""
+        """Get all registered plots that require variance.
+
+        Returns:
+            dict[str, Callable]: Dictionary mapping plot names to their functions.
+        """
         return {
             name: fn for name, fn in self.plots.items() if self.variance_required[name]
         }
 
     def get_plots_not_requiring_variance(self) -> dict[str, Callable]:
-        """Get plots that don't require variance."""
+        """Get all registered plots that don't require variance.
+
+        Returns:
+            dict[str, Callable]: Dictionary mapping plot names to their functions.
+        """
         return {
             name: fn
             for name, fn in self.plots.items()
@@ -57,7 +72,15 @@ plot_registry = PlotRegistry()
 
 def requires_variance(plot_fn: Callable) -> Callable:
     """Decorator to mark a plot as requiring variance.
-    This automatically registers the plot in the global registry and applies input validation.
+
+    Automatically registers the plot in the global registry and applies input validation.
+    The decorated function will receive validated inputs with variance checks.
+
+    Args:
+        plot_fn: The plot function to decorate.
+
+    Returns:
+        Callable: Wrapped plot function with validation and registration.
     """
 
     @wraps(plot_fn)
@@ -79,7 +102,15 @@ def requires_variance(plot_fn: Callable) -> Callable:
 
 def no_variance_required(plot_fn: Callable) -> Callable:
     """Decorator to mark a plot as not requiring variance.
-    This automatically registers the plot in the global registry and applies input validation.
+
+    Automatically registers the plot in the global registry and applies input validation.
+    The decorated function will receive validated inputs without variance checks.
+
+    Args:
+        plot_fn: The plot function to decorate.
+
+    Returns:
+        Callable: Wrapped plot function with validation and registration.
     """
 
     @wraps(plot_fn)
@@ -105,24 +136,24 @@ def create_ece_plot(
     targets: np.ndarray,
     n_grid_points: int = 100,
 ) -> dict[str, plt.Figure]:
-    """Create ECE plot
-    -- requires uncertainty --
-    For alpha in grid from 0 -> 1
-    Find alpha% confidence intervals for all predictions
-    Count % of targets which fall within the confidence intervals
-    ECE = Compute area between x=y and the curve
-    (We want to minimize this metric)
-    Plot the counts for different values of alpha
-    with comparison to perfect calibration x=y
+    """Create Expected Calibration Error (ECE) plot.
+
+    For each confidence level alpha in a grid from 0 to 1:
+    - Find alpha% confidence intervals for all predictions
+    - Count percentage of targets that fall within the confidence intervals
+    - ECE = area between x=y line and the observed coverage curve (minimize this)
+
+    Plots observed coverage vs confidence level with comparison to perfect calibration.
 
     Args:
-        means: Array of shape (b,). Predicted means
-        variances: Array of shape (b,). Predicted variances
-        targets: Array of shape (b,). True labels
-        n_grid_points: Integer for the coarseness of the grid
+        means: Array of shape (b,). Predicted means.
+        variances: Array of shape (b,). Predicted variances.
+        targets: Array of shape (b,). True labels.
+        n_grid_points: Number of grid points for confidence level discretization.
+            Defaults to 100.
 
     Returns:
-        matplotlib.figure.Figure: The generated figure
+        dict[str, plt.Figure]: Dictionary with key "ece" mapping to the generated figure.
     """
     grid = np.linspace(0, 1, n_grid_points)
     perc = np.zeros(n_grid_points)
@@ -165,20 +196,21 @@ def create_predictions_plot(
     targets: np.ndarray,
     confidence_level: float = 0.95,
 ) -> dict[str, plt.Figure]:
-    """Create predictions plot
-    -- optionally uses uncertainty --
-    Creates a simple scatter plot of predictions against targets
-    (Optional: if one has variances then also add confidence_level% confidence intervals)
+    """Create scatter plot of predictions against targets.
 
+    Creates a scatter plot with optional confidence intervals if variances are provided.
+    Includes MSE, Pearson, and Spearman correlation metrics in the title.
 
     Args:
-        means: Array of shape (b,). Predicted means
-        variances: Array of shape (b,). Predicted variances, optionally None
-        targets: Array of shape (b,). True labels
-        confidence_level: float.
+        means: Array of shape (b,). Predicted means.
+        variances: Array of shape (b,). Predicted variances, optionally None.
+        targets: Array of shape (b,). True labels.
+        confidence_level: Confidence level for error bars (if variances provided).
+            Defaults to 0.95.
 
     Returns:
-        matplotlib.figure.Figure: The generated figure
+        dict[str, plt.Figure]: Dictionary with key "predictions_scatter" mapping to
+            the generated figure.
     """
     if variances is not None:
         has_variance = True
@@ -252,16 +284,19 @@ def create_ranks_plot(
     _: np.ndarray | None,
     targets: np.ndarray,
 ) -> dict[str, plt.Figure]:
-    """Create predicted ranks plot
-    Creates a simple scatter plot of predicted rank against true rank
+    """Create scatter plot of predicted ranks against true ranks.
+
+    Computes ranks for both predictions and targets, then plots them against each other.
+    Includes MSE, Pearson, and Spearman correlation metrics in the title.
 
     Args:
-        means: Array of shape (b,). Predicted means
-        _: Array of shape (b,), optionally None. Unused.
-        targets: Array of shape (b,). True labels
+        means: Array of shape (b,). Predicted means.
+        _: Array of shape (b,), optionally None. Unused parameter (for API consistency).
+        targets: Array of shape (b,). True labels.
 
     Returns:
-        matplotlib.figure.Figure: The generated figure
+        dict[str, plt.Figure]: Dictionary with key "ranks_scatter" mapping to
+            the generated figure.
     """
     # compute mse
     mse_val = np.mean((means - targets) ** 2)
@@ -314,12 +349,13 @@ def create_variance_histogram(
     """Create a histogram of predicted variances.
 
     Args:
-        _: unused
-        variances: Array of shape (b,). Predicted variances
-        targets: Array of shape (b,). True labels
+        _: Array of shape (b,). Unused parameter (for API consistency).
+        variances: Array of shape (b,). Predicted variances.
+        targets: Array of shape (b,). True labels (unused, for API consistency).
 
     Returns:
-        matplotlib.figure.Figure: The generated figure
+        dict[str, plt.Figure]: Dictionary with key "variance_histogram" mapping to
+            the generated figure.
     """
     # create figure
     fig, ax = plt.subplots(figsize=DEFAULT_FIGURE_SIZE)

@@ -19,7 +19,17 @@ class BaseDataset(abc.ABC):
 
     def __init__(
         self, name: str, modality: str, seed: int, split_config: dict[str, Any]
-    ):
+    ) -> None:
+        """Initialize the base dataset.
+
+        Args:
+            name: Name identifier for the dataset.
+            modality: Data modality (e.g., "sequence", "graph", "image").
+            seed: Random seed for reproducibility.
+            split_config: Dictionary containing:
+                - "split_ratio": Dict with "train", "validation", "test", and (optionally) "candidate_pool" ratios
+                - "split_type": Type of split ("random" or "low_vs_high")
+        """
         self.name = name
         self.modality = modality
         self.seed = seed
@@ -33,16 +43,34 @@ class BaseDataset(abc.ABC):
 
     @abc.abstractmethod
     def load_dataset(self) -> LabeledCandidates:
-        """Load the dataset into HF datasets format."""
+        """Load the raw dataset.
+
+        This method must be implemented by subclasses to load data from their
+        specific source.
+
+        Returns:
+            LabeledCandidates: The loaded dataset with candidates and labels.
+        """
         pass
 
     def set_metadata(self) -> None:
-        """Set the metadata for the dataset."""
+        """Set metadata for the dataset.
+
+        Subclasses can override this method to compute and store dataset-specific
+        metadata. Called automatically during setup().
+        """
         pass
 
     @property
     def train_dataset(self) -> LabeledCandidates:
-        """Get the train dataset."""
+        """Get the training dataset split.
+
+        Returns:
+            LabeledCandidates: Training dataset.
+
+        Raises:
+            AssertionError: If dataset hasn't been split yet.
+        """
         assert "train" in self.splits, (
             "Dataset must be split before accessing train dataset"
         )
@@ -50,7 +78,14 @@ class BaseDataset(abc.ABC):
 
     @property
     def test_dataset(self) -> LabeledCandidates:
-        """Get the test dataset."""
+        """Get the test dataset split.
+
+        Returns:
+            LabeledCandidates: Test dataset.
+
+        Raises:
+            AssertionError: If dataset hasn't been split yet.
+        """
         assert "test" in self.splits, (
             "Dataset must be split before accessing test dataset"
         )
@@ -58,7 +93,14 @@ class BaseDataset(abc.ABC):
 
     @property
     def validation_dataset(self) -> LabeledCandidates:
-        """Get the validation dataset."""
+        """Get the validation dataset split.
+
+        Returns:
+            LabeledCandidates: Validation dataset.
+
+        Raises:
+            AssertionError: If dataset hasn't been split yet.
+        """
         assert "validation" in self.splits, (
             "Dataset must be split before accessing validation dataset"
         )
@@ -66,18 +108,37 @@ class BaseDataset(abc.ABC):
 
     @property
     def candidate_pool(self) -> LabeledCandidates:
-        """Get the candidate pool."""
+        """Get the candidate pool split.
+
+        Returns:
+            LabeledCandidates: Candidate pool available for acquisition.
+
+        Raises:
+            AssertionError: If dataset hasn't been split yet.
+        """
         assert "candidate_pool" in self.splits, (
             "Dataset must be split before accessing candidate pool"
         )
         return self.splits["candidate_pool"]
 
     def __repr__(self) -> str:
-        """Return a string representation of the dataset."""
+        """Return a string representation of the dataset.
+
+        Returns:
+            str: String showing dataset name, modality, seed, and split sizes.
+        """
         return f"Dataset(name={self.name}, modality={self.modality}, seed={self.seed}, train_size={len(self.train_dataset)}, validation_size={len(self.validation_dataset)}, test_size={len(self.test_dataset)}, candidate_pool_size={len(self.candidate_pool)})"
 
     def validate_split_config(self, split_config: dict[str, Any]) -> None:
-        """Validate the split config for the dataset."""
+        """Validate the split config for the dataset.
+
+        Args:
+            split_config: Split config of type dict to validate.
+
+        Raises:
+            AssertionError: If split_ratio or split_type are missing, or if
+                required split ratios are not present.
+        """
         assert "split_ratio" in split_config, "Split ratio must be set"
         assert "split_type" in split_config, "Split type must be set"
         assert "train" and "test" and "validation" in split_config["split_ratio"], (
@@ -85,7 +146,15 @@ class BaseDataset(abc.ABC):
         )
 
     def _split_dataset(self) -> Dict[str, LabeledCandidates]:
-        """Split dataset into train, test, validation splits."""
+        """Split the raw dataset into train, validation, test, and candidate pool.
+
+        Returns:
+            Dict[str, LabeledCandidates]: Dictionary with keys "train", "validation",
+                "test", and "candidate_pool", each containing a LabeledCandidates object.
+
+        Raises:
+            AssertionError: If dataset hasn't been loaded yet.
+        """
         assert self._raw_dataset is not None, "Dataset must be loaded before splitting"
 
         # Calculate split sizes
@@ -111,13 +180,24 @@ class BaseDataset(abc.ABC):
         return datasets_dict
 
     def setup(self) -> None:
-        """Setup the dataset."""
+        """Setup the dataset by loading and splitting it.
+
+        Loads the raw dataset, splits it according to the split configuration,
+        and sets metadata. This must be called before accessing dataset splits.
+        """
         self._raw_dataset = self.load_dataset()
         self.splits = self._split_dataset()
         self.set_metadata()
 
     def update_splits(self, acquired_candidates: LabeledCandidates) -> None:
-        """Update the splits with the acquired candidates."""
+        """Update dataset splits with newly acquired candidates.
+
+        Removes acquired candidates from the candidate pool and distributes them
+        between train and validation splits according to the split ratio.
+
+        Args:
+            acquired_candidates: Newly acquired candidates with labels.
+        """
         # Remove acquired candidates from candidate pool if they are in it
         self.splits["candidate_pool"].remove(acquired_candidates.candidates)
 
@@ -128,7 +208,15 @@ class BaseDataset(abc.ABC):
         self.splits["validation"].append(shuffled_acquired_candidates[-num_val:])
 
     def save_splits(self, output_dir: str, _verbose: bool = False) -> None:
-        """Save the datasplits to the output directory."""
+        """Save dataset splits to CSV files in the output directory.
+
+        Saves train, validation, and test splits (but not candidate_pool) as
+        separate CSV files.
+
+        Args:
+            output_dir: Directory path where CSV files will be saved.
+            _verbose: If True, log messages when saving each split.
+        """
         for key, split in self.splits.items():
             if key not in ["train", "validation", "test"]:
                 continue
@@ -140,14 +228,31 @@ class BaseDataset(abc.ABC):
             )
 
     def query(self, candidates: list[Candidate]) -> LabeledCandidates:
-        """Return the labels for the candidates."""
+        """Query labels for the given candidates from the raw dataset.
+
+        Args:
+            candidates: List of Candidate objects to query.
+
+        Returns:
+            LabeledCandidates: Candidates paired with their labels from the dataset.
+
+        Raises:
+            AssertionError: If dataset hasn't been loaded yet.
+            ValueError: If any candidate's data is not found in the dataset.
+        """
         assert self._raw_dataset is not None, "Dataset must be loaded before querying"
         indices = [self._raw_dataset.data.index(cand.data) for cand in candidates]
         labels = self._raw_dataset.labels[indices]
         return LabeledCandidates(candidates=candidates, labels=labels)
 
     def get_metrics(self) -> dict[str, Union[float, int, np.number]]:
-        """Get the metrics for the dataset."""
+        """Get summary metrics for all dataset splits.
+
+        Returns:
+            dict[str, Union[float, int, np.number]]: Dictionary containing:
+                - "num_{split}": Number of samples in each split
+                - "{split}_mean": Mean label value for each split
+        """
         metrics: dict[str, Union[float, int, np.number]] = {}
         for key, split in self.splits.items():
             metrics[f"num_{key}"] = len(split)

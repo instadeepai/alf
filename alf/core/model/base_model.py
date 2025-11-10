@@ -15,7 +15,14 @@ class BaseModel(abc.ABC):
 
     @abc.abstractmethod
     def featurise(self, inputs: Union[LabeledCandidates, list[Candidate]]) -> Any:
-        """Featurise the inputs."""
+        """Convert inputs into feature representations.
+
+        Args:
+            inputs: Either LabeledCandidates or a list of Candidate objects to featurize.
+
+        Returns:
+            Any: Feature representation of the inputs (format depends on implementation).
+        """
         pass
 
     @abc.abstractmethod
@@ -25,23 +32,53 @@ class BaseModel(abc.ABC):
         val_data: LabeledCandidates,
         logger: Logger | None = None,
     ) -> None:
-        """Train the model."""
+        """Train the model on the provided training and validation data.
+
+        Args:
+            train_data: Labeled candidates for training.
+            val_data: Labeled candidates for validation.
+            logger: Optional logger for recording training metrics.
+        """
         pass
 
     @abc.abstractmethod
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
-        """Predict the scores for the candidate points."""
+        """Predict scores for the given candidate points.
+
+        Args:
+            candidate_points: List of Candidate objects to make predictions for.
+
+        Returns:
+            Predictions: Predictions object containing means and optionally variances
+                and empirical distributions.
+        """
         pass
 
     @abc.abstractmethod
     def sample(self, condition: Any | None = None) -> list[Candidate]:
-        """Sample candidate points from the model."""
+        """Sample candidate points from the model.
+
+        Args:
+            condition: Optional conditioning information for sampling.
+
+        Returns:
+            list[Candidate]: List of sampled candidate points.
+        """
         pass
 
     def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
-        """Get the training summary metrics."""
+        """Get summary metrics from the most recent training run.
+
+        Returns:
+            dict[str, Union[float, int, np.number]]: Dictionary of metric names to values.
+                Returns empty dict by default; subclasses should override to provide metrics.
+        """
         return {}
 
     def cleanup(self) -> None:
-        """Delete any temporary files, checkpoints etc that aren't being persisted."""
+        """Clean up temporary files and resources.
+
+        Deletes any temporary files, checkpoints, or other resources that aren't
+        being persisted. Subclasses should override to implement cleanup logic.
+        """
         pass

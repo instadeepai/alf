@@ -20,23 +20,36 @@ class LabeledCandidates:
     labels: np.ndarray
 
     def __post_init__(self) -> None:
+        """Validate that candidates and labels have the same length.
+
+        Raises:
+            AssertionError: If the length of candidates and labels don't match.
+        """
         assert len(self.candidates) == len(self.labels), (
             "Candidates and labels must have the same length"
         )
 
     def __len__(self) -> int:
-        """Return the number of candidates in the collection."""
+        """Return the number of candidates in the collection.
+
+        Returns:
+            The number of candidates (and labels) in the collection.
+        """
         return len(self.candidates)
 
     def __getitem__(self, index: Union[int, slice]) -> "LabeledCandidates":
         """Make LabeledCandidates subscriptable.
 
         Args:
-            index: Integer index or slice
+            index: Integer index or slice to select candidates and labels.
 
         Returns:
-            For integer index: new LabeledCandidates object with the candidate and label at the index
-            For slice: new LabeledCandidates object with sliced data
+            LabeledCandidates: A new LabeledCandidates object containing:
+                - For integer index: the single candidate and label at that index
+                - For slice: the candidates and labels in the specified range
+
+        Raises:
+            TypeError: If index is not an integer or slice.
         """
         if isinstance(index, int):
             return LabeledCandidates(
@@ -54,11 +67,23 @@ class LabeledCandidates:
 
     @property
     def data(self) -> list[Any]:
-        """Return the raw data (sequence, graph, image, etc.) of each candidate."""
+        """Return the raw data of each candidate.
+
+        Returns:
+            list[Any]: A list containing the raw data (sequence, graph, image, etc.)
+                of each candidate in the collection.
+        """
         return [cand.data for cand in self.candidates]
 
     def validate_candidates(self, candidates: list[Candidate]) -> bool:
-        """Validate candidates from this collection."""
+        """Check if all given candidates are present in this collection.
+
+        Args:
+            candidates: A list of Candidate objects to validate.
+
+        Returns:
+            bool: True if all candidates are in this collection, False otherwise.
+        """
         return all(candidate in self.candidates for candidate in candidates)
 
     def append(
@@ -70,10 +95,13 @@ class LabeledCandidates:
 
         Args:
             candidates: Either a list of Candidate objects or another LabeledCandidates
-            labels: Optional labels array (required if candidates is a list)
+                object. If a list is provided, labels must also be provided.
+            labels: Optional numpy array of labels. Required if candidates is a list,
+                ignored if candidates is a LabeledCandidates object.
 
         Raises:
-            ValueError: If candidates and labels don't match in length
+            AssertionError: If candidates is a list and labels is None, or if the
+                length of candidates and labels don't match.
         """
         if isinstance(candidates, LabeledCandidates):
             self.candidates.extend(candidates.candidates)
@@ -86,7 +114,15 @@ class LabeledCandidates:
             self.labels = np.concatenate((self.labels, labels), axis=0)
 
     def shuffle(self, seed: int) -> "LabeledCandidates":
-        """Create a new LabeledCandidates object with shuffled candidates and labels."""
+        """Create a new LabeledCandidates object with shuffled candidates and labels.
+
+        Args:
+            seed: Random seed for reproducibility of the shuffle.
+
+        Returns:
+            LabeledCandidates: A new LabeledCandidates object with the same candidates
+                and labels, but in a randomly shuffled order.
+        """
         shuffled_indices = np.random.RandomState(seed).permutation(len(self.candidates))
         return LabeledCandidates(
             candidates=[self.candidates[i] for i in shuffled_indices],
@@ -94,7 +130,17 @@ class LabeledCandidates:
         )
 
     def sort(self, ascending: bool = True) -> "LabeledCandidates":
-        """Sort the candidates and labels by the labels."""
+        """Sort the candidates and labels by label values.
+
+        Args:
+            ascending: If True, sort in ascending order (lowest to highest).
+                If False, sort in descending order (highest to lowest).
+                Defaults to True.
+
+        Returns:
+            LabeledCandidates: A new LabeledCandidates object with candidates and
+                labels sorted by label values.
+        """
         sorted_indices = np.argsort(self.labels)
         if not ascending:
             sorted_indices = sorted_indices[::-1]
@@ -104,7 +150,16 @@ class LabeledCandidates:
         )
 
     def remove(self, candidates: Union[list[Candidate], "LabeledCandidates"]) -> None:
-        """Remove candidates from this collection."""
+        """Remove specified candidates and their corresponding labels from this collection.
+
+        Args:
+            candidates: Either a list of Candidate objects or a LabeledCandidates
+                object containing the candidates to remove.
+
+        Raises:
+            AssertionError: If any of the candidates to remove are not present
+                in this collection.
+        """
         if isinstance(candidates, LabeledCandidates):
             candidates = candidates.candidates
 
@@ -117,7 +172,14 @@ class LabeledCandidates:
         self.candidates = [cand for cand in self.candidates if cand not in candidates]
 
     def to_dataframe(self) -> pd.DataFrame:
-        """Convert the labeled candidates to a pandas dataframe."""
+        """Convert the labeled candidates to a pandas DataFrame.
+
+        Returns:
+            pd.DataFrame: A DataFrame with columns:
+                - "data": The stringified data of each candidate
+                - "label": The label value for each candidate
+                - Additional columns for any features present in the candidates
+        """
         rows = []
         for cand, label in zip(self.candidates, self.labels):
             d = {"data": cand.stringify(), "label": label}
