@@ -183,23 +183,10 @@ uv sync --extra cpu --group dev
 uv run pytest
 
 # Run with coverage
-uv run pytest --cov=alf --cov-report=html
+uv run pytest --cov=alf --cov-report term-missing
 
 # Run specific test file
 uv run pytest tests/alf/core/tasks/test_design_task.py
-```
-
-### Code Formatting
-
-```bash
-# Format code with black
-uv run black alf/ tests/
-
-# Check code style
-uv run flake8 alf/ tests/
-
-# Type checking
-uv run mypy alf/
 ```
 
 ### Pre-commit Hooks
