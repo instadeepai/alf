@@ -36,9 +36,7 @@ class TestPredictionsInitialization:
         means = np.array([1.0, 2.0, 3.0])
         variances = np.array([0.1, 0.2, 0.3])
         empirical_dist = np.array([[1.1, 1.2], [2.1, 2.2], [3.1, 3.2]])
-        predictions = Predictions(
-            means=means, variances=variances, empirical_dist=empirical_dist
-        )
+        predictions = Predictions(means=means, variances=variances, empirical_dist=empirical_dist)
 
         np.testing.assert_array_equal(predictions.means, means)
         np.testing.assert_array_equal(predictions.variances, variances)
@@ -57,9 +55,7 @@ class TestPredictionsInitialization:
         variances = np.random.rand(n_predictions)
         empirical_dist = np.random.randn(n_predictions, 5)  # 5 ensemble models
 
-        predictions = Predictions(
-            means=means, variances=variances, empirical_dist=empirical_dist
-        )
+        predictions = Predictions(means=means, variances=variances, empirical_dist=empirical_dist)
 
         np.testing.assert_array_equal(predictions.means, means)
         np.testing.assert_array_equal(predictions.variances, variances)
@@ -83,7 +79,9 @@ class TestPredictionsValidation:
             Predictions(means=means, variances=variances)
 
     def test_predictions_with_mismatched_empirical_dist_array_lengths(self):
-        """Test Predictions with mismatched array lengths between means and empirical distribution."""
+        """Test Predictions with mismatched array lengths between means and
+        empirical distribution.
+        """
         means = np.array([1.0, 2.0, 3.0])
         variances = np.array([0.1, 0.2, 0.3])
         empirical_dist = np.array([[1.1, 1.2], [2.1, 2.2]])
@@ -126,9 +124,7 @@ class TestPredictionsSavePredictions:
             assert "targets" in df.columns
 
             # Check values
-            np.testing.assert_array_equal(
-                df["sequence"].values, ["seq1", "seq2", "seq3"]
-            )
+            np.testing.assert_array_equal(df["sequence"].values, ["seq1", "seq2", "seq3"])
             np.testing.assert_array_almost_equal(df["mean"].values, [1.0, 2.0, 3.0])
             np.testing.assert_array_almost_equal(df["variance"].values, [0.1, 0.2, 0.3])
             np.testing.assert_array_almost_equal(df["targets"].values, [1.1, 2.1, 3.1])
@@ -163,15 +159,9 @@ class TestPredictionsSavePredictions:
             assert "ensemble_pred_2" in df.columns
 
             # Check values
-            np.testing.assert_array_almost_equal(
-                df["ensemble_pred_0"].values, [1.1, 2.1]
-            )
-            np.testing.assert_array_almost_equal(
-                df["ensemble_pred_1"].values, [1.2, 2.2]
-            )
-            np.testing.assert_array_almost_equal(
-                df["ensemble_pred_2"].values, [1.3, 2.3]
-            )
+            np.testing.assert_array_almost_equal(df["ensemble_pred_0"].values, [1.1, 2.1])
+            np.testing.assert_array_almost_equal(df["ensemble_pred_1"].values, [1.2, 2.2])
+            np.testing.assert_array_almost_equal(df["ensemble_pred_2"].values, [1.3, 2.3])
 
     def test_save_predictions_without_variances(self):
         """Test save_predictions without variances."""
@@ -203,9 +193,7 @@ class TestPredictionsSavePredictions:
             # Setup test data
             means = np.array([1.0, 2.0])
             variances = np.array([0.1, 0.2])
-            predictions = Predictions(
-                means=means, variances=variances
-            )  # No empirical_dist
+            predictions = Predictions(means=means, variances=variances)  # No empirical_dist
 
             candidates = [
                 Candidate(data="seq1", modality="sequence"),
@@ -221,7 +209,5 @@ class TestPredictionsSavePredictions:
             df = pd.read_csv(file_path)
 
             # Check that no ensemble columns exist
-            ensemble_cols = [
-                col for col in df.columns if col.startswith("ensemble_pred_")
-            ]
+            ensemble_cols = [col for col in df.columns if col.startswith("ensemble_pred_")]
             assert len(ensemble_cols) == 0

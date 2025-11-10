@@ -36,9 +36,7 @@ class TestCandidateInitialization:
         """Test Candidate string representation."""
         candidate = Candidate(data="test", modality="test", features={"key": "value"})
         repr_str = repr(candidate)
-        assert (
-            repr_str == "Candidate(data=test, modality=test, features={'key': 'value'})"
-        )
+        assert repr_str == "Candidate(data=test, modality=test, features={'key': 'value'})"
 
 
 class TestCandidateDataModalities:
@@ -109,7 +107,7 @@ class TestCandidateEdgeCases:
     def test_empty_string_data(self):
         """Test Candidate with empty string data."""
         candidate = Candidate(data="", modality="sequence")
-        assert candidate.data == ""
+        assert candidate.data == ""  # noqa: PLC1901
         assert candidate.modality == "sequence"
 
     def test_none_data(self):
@@ -181,10 +179,12 @@ class TestCandidateStringify:
     """Tests for Candidate.stringify method."""
 
     def test_stringify_sequence(self):
+        """Test stringify method with sequence modality."""
         candidate = Candidate(data="ACDEFG", modality="sequence")
         assert candidate.stringify() == "ACDEFG"
 
     def test_stringify_unsupported_modality_raises(self):
+        """Test that stringify raises ValueError for unsupported modality."""
         candidate = Candidate(data=123, modality="numeric")
         with pytest.raises(ValueError, match="Unsupported modality"):
             candidate.stringify()

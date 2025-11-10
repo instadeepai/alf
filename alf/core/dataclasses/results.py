@@ -94,9 +94,7 @@ class Results:
         )
         for _, metric_fn in metrics_dict.items():
             metrics.update(
-                metric_fn(
-                    self.predictions.means, self.predictions.variances, self.targets
-                )
+                metric_fn(self.predictions.means, self.predictions.variances, self.targets)
             )
 
         return metrics
@@ -121,10 +119,6 @@ class Results:
             else plot_registry.get_plots_requiring_variance()
         )
         for _, plot_fn in plots_dict.items():
-            plots.update(
-                plot_fn(
-                    self.predictions.means, self.predictions.variances, self.targets
-                )
-            )
+            plots.update(plot_fn(self.predictions.means, self.predictions.variances, self.targets))
 
         return plots

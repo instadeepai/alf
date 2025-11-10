@@ -73,7 +73,8 @@ class TestZeroShotTask:
         for metric_name, expected_value in expected.items():
             actual_value = metrics[f"surrogate/{metric_name}"].iloc[0]
             assert np.isclose(actual_value, expected_value, atol=1e-5), (
-                f"Surrogate metric {metric_name} mismatch: expected {expected_value}, got {actual_value}"
+                f"Surrogate metric {metric_name} mismatch: "
+                f"expected {expected_value}, got {actual_value}"
             )
 
     def _assert_dataset_metrics(self, metrics: pd.DataFrame, expected: dict):
@@ -81,5 +82,6 @@ class TestZeroShotTask:
         for metric_name, expected_value in expected.items():
             actual_value = metrics[f"dataset/{metric_name}"].iloc[0]
             assert np.isclose(actual_value, expected_value, atol=1e-5), (
-                f"Dataset metric {metric_name} mismatch: expected {expected_value}, got {actual_value}"
+                f"Dataset metric {metric_name} mismatch: "
+                f"expected {expected_value}, got {actual_value}"
             )

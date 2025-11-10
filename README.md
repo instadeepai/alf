@@ -10,14 +10,21 @@
 
 
 **ALF** is a Python package for performing active learning experiments to facilitate iterative optimization of design targets (e.g., proteins, molecules, materials) through intelligent candidate selection and evaluation.
+intelligent candidate selection and evaluation.
 
 ## ✨ Features
 
-- **Modular Architecture**: Flexible, extensible components that can be easily swapped and customized
-- **Multiple experiment setups**: Support for multi-round active learning, supervised learning, and zero-shot evaluation
 - **Diverse Acquisition Strategies**: Built-in acquisition functions (Greedy, UCB, Expected Improvement, Thompson Sampling)
 - **Flexible Search Methods**: Support for dataset-based, generator-based, and protocol-based search strategies
 - **Offline and Online Evaluation**: Support for both offline (dataset-based) and online (model-based) optimization scenarios
+- **Multiple experiment setups**: Support for multi-round active learning, supervised
+  learning, and zero-shot evaluation
+- **Diverse Acquisition Strategies**: Built-in acquisition functions (Greedy, UCB,
+  Expected Improvement, Thompson Sampling)
+- **Flexible Search Methods**: Support for dataset-based, generator-based, and
+  protocol-based search strategies
+- **Offline and Online Evaluation**: Support for both offline (dataset-based) and
+  online (model-based) optimization scenarios
 - **Comprehensive Testing**: Full test coverage with end-to-end experiments
 
 ## 📦 Installation
@@ -135,13 +142,15 @@ alf/
 ## 📖 Documentation
 
 For detailed documentation on core components, see:
-- **[Core Components Documentation](alf/core/README.md)** - Comprehensive guide to all core components and their interactions
+- **[Core Components Documentation](alf/core/README.md)** - Comprehensive guide to all
+  core components and their interactions
 
 ## 🎓 Tutorials
 
 Explore the tutorials to learn how to use ALF:
 
-- **[Offline Design Tutorial](tutorials/offline_design_tutorial.ipynb)** - Complete guide to running offline design experiments
+- **[Offline Design Tutorial](tutorials/offline_design_tutorial.ipynb)** - Complete guide
+  to running offline design experiments
 - **[Example Scripts](tutorials/experiments/)** - Ready-to-run examples for all task types
 
 ## 🧩 Core Components

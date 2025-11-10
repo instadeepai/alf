@@ -72,13 +72,9 @@ class LabeledCandidates:
                 labels=np.array([self.labels[index]]),
             )
         elif isinstance(index, slice):
-            return LabeledCandidates(
-                candidates=self.candidates[index], labels=self.labels[index]
-            )
+            return LabeledCandidates(candidates=self.candidates[index], labels=self.labels[index])
         else:
-            raise TypeError(
-                f"Indices must be integers or slices, not {type(index).__name__}"
-            )
+            raise TypeError(f"Indices must be integers or slices, not {type(index).__name__}")
 
     @property
     def data(self) -> list[Any]:
@@ -178,12 +174,8 @@ class LabeledCandidates:
         if isinstance(candidates, LabeledCandidates):
             candidates = candidates.candidates
 
-        assert self.validate_candidates(candidates), (
-            "Candidates must be in this collection"
-        )
-        self.labels = np.delete(
-            self.labels, [self.candidates.index(cand) for cand in candidates]
-        )
+        assert self.validate_candidates(candidates), "Candidates must be in this collection"
+        self.labels = np.delete(self.labels, [self.candidates.index(cand) for cand in candidates])
         self.candidates = [cand for cand in self.candidates if cand not in candidates]
 
     def to_dataframe(self) -> pd.DataFrame:

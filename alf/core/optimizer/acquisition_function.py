@@ -24,9 +24,7 @@ class AcquisitionFunction(abc.ABC):
     """Abstract base class for acquisition functions."""
 
     @abc.abstractmethod
-    def _get_acquisition_values(
-        self, predictions: Predictions, state: TaskState
-    ) -> np.ndarray:
+    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
         """Compute acquisition values for candidates based on surrogate predictions.
 
         Args:

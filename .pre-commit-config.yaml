@@ -21,8 +21,10 @@ repos:
     hooks:
       - id: debug-statements # Check for debugger imports
       - id: check-ast # Simply check whether the files parse as valid python
-      - id: check-case-conflict # Check for files that would conflict in case-insensitive filesystems
-      - id: check-builtin-literals # Require literal syntax when initializing empty or zero Python builtin types
+      - id: check-case-conflict
+        # Check for files that would conflict in case-insensitive filesystems
+      - id: check-builtin-literals
+        # Require literal syntax when initializing empty or zero Python builtin types
       - id: check-merge-conflict # Check for files that contain merge conflict strings
       - id: check-yaml # Check yaml files
       - id: end-of-file-fixer # Ensure that a file is either empty, or ends with one newline

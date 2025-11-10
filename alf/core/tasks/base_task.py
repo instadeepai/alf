@@ -110,9 +110,7 @@ class BaseTask(abc.ABC):
         """
         if len(state.dataset.test_dataset) > 0 and state.surrogate:
             predictions = state.surrogate.predict(state.dataset.test_dataset.candidates)
-            results = Results(
-                predictions=predictions, targets=state.dataset.test_dataset.labels
-            )
+            results = Results(predictions=predictions, targets=state.dataset.test_dataset.labels)
 
             if self.save_round_predictions and save_path:
                 assert filename, "Filename must be provided to save predictions"
@@ -131,9 +129,7 @@ class BaseTask(abc.ABC):
             })
 
         dataset_metrics = state.dataset.get_metrics()
-        state.round_metrics.update({
-            f"dataset/{k}": v for k, v in dataset_metrics.items()
-        })
+        state.round_metrics.update({f"dataset/{k}": v for k, v in dataset_metrics.items()})
 
         state.print_metrics(round_name)
         state.save(save_path, _verbose=True)

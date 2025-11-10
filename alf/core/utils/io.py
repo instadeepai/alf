@@ -30,14 +30,15 @@ class FileHandler:
     or S3 storage. Automatically handles path resolution and file system abstraction.
     """
 
-    def __init__(
-        self, s3_endpoint: str | None = None, bucket: str | None = "input"
-    ) -> None:
+    def __init__(self, s3_endpoint: str | None = None, bucket: str | None = "input") -> None:
         """Initialize FileHandler.
 
         Args:
             s3_endpoint: S3 endpoint URL. If None, uses local filesystem
             bucket: Bucket type - "input" or "output". Only used with S3.
+
+        Raises:
+            ValueError: If bucket is not 'input' or 'output'
         """
         self.s3_endpoint = s3_endpoint
         self.bucket = bucket
@@ -54,18 +55,38 @@ class FileHandler:
             self.bucket_path = "./"
 
     def _get_full_path(self, path: str) -> str:
-        """Get the full path for the given relative path."""
+        """Get the full path for the given relative path.
+
+        Args:
+            path: Relative path to the file
+
+        Returns:
+            Full path to the file
+        """
         return os.path.join(self.bucket_path, path)
 
     def _ensure_local_dir(self, path: str) -> None:
-        """Ensure local directory exists for the given path."""
+        """Ensure local directory exists for the given path.
+
+        Args:
+            path: Path to the directory
+        """
         if not self.s3_endpoint:
             dir_path = os.path.dirname(path)
             if dir_path:
                 os.makedirs(dir_path, exist_ok=True)
 
     def _open_file(self, path: str, mode: str = "r", **kwargs):
-        """Open file with appropriate handler (S3 or local)."""
+        """Open file with appropriate handler (S3 or local).
+
+        Args:
+            path: Path to the file
+            mode: Mode to open the file in
+            **kwargs: Additional arguments for the open function
+
+        Returns:
+            File handle (S3 file handle or standard file handle)
+        """
         full_path = self._get_full_path(path)
         if self.s3_endpoint:
             return self.s3.open(full_path, mode, **kwargs)
@@ -76,6 +97,14 @@ class FileHandler:
         """Open file with appropriate handler (S3 or local).
 
         This is a public interface for the _open_file method.
+
+        Args:
+            path: Path to the file
+            *args: Additional positional arguments for the open function
+            **kwargs: Additional keyword arguments for the open function
+
+        Returns:
+            File handle (S3 file handle or standard file handle)
         """
         return self._open_file(path, *args, **kwargs)
 
@@ -191,6 +220,10 @@ class FileHandler:
 
         Returns:
             Pandas DataFrame from the CSV file
+
+        Raises:
+            AssertionError: If S3 endpoint is set but FSSPEC_S3_ENDPOINT_URL is not in
+                environment variables
         """
         if self.s3_endpoint:
             assert "FSSPEC_S3_ENDPOINT_URL" in os.environ
@@ -207,6 +240,10 @@ class FileHandler:
             df: DataFrame to save
             header: Whether to include headers. Defaults to True
             index: Whether to include index. Defaults to False
+
+        Raises:
+            AssertionError: If S3 endpoint is set but FSSPEC_S3_ENDPOINT_URL is not in
+                environment variables
         """
         if self.s3_endpoint:
             assert "FSSPEC_S3_ENDPOINT_URL" in os.environ
@@ -266,6 +303,9 @@ class FileHandler:
             local_path: Local path to download to
             recursive: Whether to download recursively
             **kwargs: Additional arguments for S3 download
+
+        Raises:
+            ValueError: If S3 endpoint is not set
         """
         if not self.s3_endpoint:
             raise ValueError("download() only works with S3 endpoint")
@@ -283,12 +323,13 @@ class FileHandler:
             remote_path: S3 path to upload to
             recursive: Whether to upload recursively
             **kwargs: Additional arguments for S3 upload
+
+        Raises:
+            ValueError: If S3 endpoint is not set
         """
         if not self.s3_endpoint:
             raise ValueError("upload() only works with S3 endpoint")
-        self.s3.put(
-            local_path, self._get_full_path(remote_path), recursive=recursive, **kwargs
-        )
+        self.s3.put(local_path, self._get_full_path(remote_path), recursive=recursive, **kwargs)
 
 
 # Global file handler instance for convenience

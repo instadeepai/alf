@@ -82,9 +82,7 @@ class TestDesignTask:
         metrics = pd.read_csv(metrics_file)
 
         # Test acquired candidates metrics (last round)
-        self._assert_acquired_candidates_metrics(
-            metrics, expected_metrics["acquired_candidates"]
-        )
+        self._assert_acquired_candidates_metrics(metrics, expected_metrics["acquired_candidates"])
 
         # Test optimizer metrics (last round)
         self._assert_optimizer_metrics(metrics, expected_metrics["optimizer"])
@@ -98,15 +96,14 @@ class TestDesignTask:
         # Clean up: remove the results folder after assertions
         shutil.rmtree(save_path)
 
-    def _assert_acquired_candidates_metrics(
-        self, metrics: pd.DataFrame, expected: dict
-    ):
+    def _assert_acquired_candidates_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert acquired candidates metrics."""
         for metric_name, expected_value in expected.items():
             # Get the last round value (design tasks have multiple rounds)
             actual_value = metrics[f"acquired_candidates/{metric_name}"].iloc[-1]
             assert np.isclose(actual_value, expected_value, atol=1e-5), (
-                f"Acquired candidates metric {metric_name} mismatch: expected {expected_value}, got {actual_value}"
+                f"Acquired candidates metric {metric_name} mismatch: "
+                f"expected {expected_value}, got {actual_value}"
             )
 
     def _assert_optimizer_metrics(self, metrics: pd.DataFrame, expected: dict):
@@ -115,7 +112,8 @@ class TestDesignTask:
             # Get the last round value
             actual_value = metrics[f"optimizer/{metric_name}"].iloc[-1]
             assert np.isclose(actual_value, expected_value, atol=1e-5), (
-                f"Optimizer metric {metric_name} mismatch: expected {expected_value}, got {actual_value}"
+                f"Optimizer metric {metric_name} mismatch: "
+                f"expected {expected_value}, got {actual_value}"
             )
 
     def _assert_surrogate_metrics(self, metrics: pd.DataFrame, expected: dict):
@@ -124,7 +122,8 @@ class TestDesignTask:
             # Get the last round value
             actual_value = metrics[f"surrogate/{metric_name}"].iloc[-1]
             assert np.isclose(actual_value, expected_value, atol=1e-5), (
-                f"Surrogate metric {metric_name} mismatch: expected {expected_value}, got {actual_value}"
+                f"Surrogate metric {metric_name} mismatch: "
+                f"expected {expected_value}, got {actual_value}"
             )
 
     def _assert_dataset_metrics(self, metrics: pd.DataFrame, expected: dict):
@@ -133,5 +132,6 @@ class TestDesignTask:
             # Get the last round value
             actual_value = metrics[f"dataset/{metric_name}"].iloc[-1]
             assert np.isclose(actual_value, expected_value, atol=1e-5), (
-                f"Dataset metric {metric_name} mismatch: expected {expected_value}, got {actual_value}"
+                f"Dataset metric {metric_name} mismatch: "
+                f"expected {expected_value}, got {actual_value}"
             )

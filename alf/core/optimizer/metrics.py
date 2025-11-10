@@ -46,14 +46,15 @@ def compute_recall(
     ].labels[0]
     top_n_threshold = init_candidate_pool[top_n - 1].labels[0]
 
-    top_percentile_recall = sum(
-        acquired_candidates.labels >= top_percentile_threshold
-    ) / int(len(init_candidate_pool) * top_percentile)
+    top_percentile_recall = sum(acquired_candidates.labels >= top_percentile_threshold) / int(
+        len(init_candidate_pool) * top_percentile
+    )
     top_n_recall = sum(acquired_candidates.labels >= top_n_threshold) / top_n
 
     # If there are candidates with the same label, e.g., the threshold label is Y and
-    # there are more than top_percentile and/or top_n candidates with label equal to or greater than Y,
-    # then the recall will be greater than 1 and thus needs to be clipped at 1.
+    # there are more than top_percentile and/or top_n candidates with label equal to
+    # or greater than Y, then the recall will be greater than 1 and thus needs to be
+    # clipped at 1.
     top_percentile_recall = min(top_percentile_recall, 1)
     top_n_recall = min(top_n_recall, 1)
 

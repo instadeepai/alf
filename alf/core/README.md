@@ -1,6 +1,8 @@
 # ALF Core
 
-This document provides an overview of the core components in the ALF (Active Learning Framework) library, describes the different task types, and explains how components interact during execution.
+This document provides an overview of the core components in the ALF (Active Learning
+Framework) library, describes the different task types, and explains how components
+interact during execution.
 
 <div align="center">
   <img src="../../docs/imgs/alf_components.svg" alt="ALF Components" width="70%">
@@ -13,17 +15,23 @@ This README is organized into the following sections:
 ### Core Components
 - **[1. Dataset (`BaseDataset`)](#1-dataset-basedataset)** - Data loading, splitting, and querying
 - **[2. Model (`BaseModel`)](#2-model-basemodel)** - Abstract base class for all models
-- **[3. Surrogate (`Surrogate`)](#3-surrogate-surrogate)** - Approximates expensive experimental evaluation
+- **[3. Surrogate (`Surrogate`)](#3-surrogate-surrogate)** - Approximates expensive
+  experimental evaluation
 - **[4. Oracle (`Oracle`)](#4-oracle-oracle)** - Provides ground-truth labels for candidates
 - **[5. Optimizer (`Optimizer`)](#5-optimizer-optimizer)** - Orchestrates the active learning loop
-- **[6. Acquisition Function (`AcquisitionFunction`)](#6-acquisition-function-acquisitionfunction)** - Scores candidates for acquisition
-- **[7. Search Strategy (`BaseSearch`)](#7-search-strategy-basesearch)** - Defines the candidate pool
-- **[8. Task State (`TaskState`)](#8-task-state-taskstate)** - Tracks the state of active learning tasks
+- **[6. Acquisition Function (`AcquisitionFunction`)](#6-acquisition-function-acquisitionfunction)**
+  - Scores candidates for acquisition
+- **[7. Search Strategy (`BaseSearch`)](#7-search-strategy-basesearch)** - Defines the
+  candidate pool
+- **[8. Task State (`TaskState`)](#8-task-state-taskstate)** - Tracks the state of active
+  learning tasks
 
 ### Task Types
 - **[1. Design Task (`DesignTask`)](#1-design-task-designtask)** - Multi-round active learning loop
-- **[2. Supervised Task (`SupervisedTask`)](#2-supervised-task-supervisedtask)** - Train and evaluate on fixed data
-- **[3. Zero-Shot Task (`ZeroShotTask`)](#3-zero-shot-task-zeroshottask)** - Evaluate pre-trained models
+- **[2. Supervised Task (`SupervisedTask`)](#2-supervised-task-supervisedtask)** - Train and
+  evaluate on fixed data
+- **[3. Zero-Shot Task (`ZeroShotTask`)](#3-zero-shot-task-zeroshottask)** - Evaluate
+  pre-trained models
 
 ### Component Flow
 - **[Design Task Flow](#design-task-flow)**
@@ -39,17 +47,22 @@ The `BaseDataset` class manages data loading, splitting, and querying. It handle
 - **Data Loading**: Loads raw labeled data through the abstract `load_dataset()` method
 - **Data Splitting**: Splits data into train, validation, test, and candidate_pool sets
 - **Split Updates**: Distributes newly acquired data into existing data splits
-- **Querying**: Provides labels for candidates from the original dataset (used by the oracle in offline settings)
+- **Querying**: Provides labels for candidates from the original dataset (used by the
+  oracle in offline settings)
 
 **Key Methods:**
-- `load_dataset()`: Every child class needs to implement how to load the dataset and return it as `LabeledCamdidates`
-- `_split_dataset()`: Splits the dataset based on the split config, which specifies the ratio of data points in train/val/test/candidate_pool sets and the splitting method (random or low_vs_high)
+- `load_dataset()`: Every child class needs to implement how to load the dataset and
+  return it as `LabeledCamdidates`
+- `_split_dataset()`: Splits the dataset based on the split config, which specifies the
+  ratio of data points in train/val/test/candidate_pool sets and the splitting method
+  (random or low_vs_high)
 - `update_splits()`: Updates train/validation splits with newly acquired candidates
 - `query()`: Returns labels for given candidates (for offline evaluation)
 
 ### 2. Model (`BaseModel`)
 
-The `BaseModel` is an abstract base class that defines the interface for all models in the framework. Models can serve multiple roles depending on the context:
+The `BaseModel` is an abstract base class that defines the interface for all models in
+the framework. Models can serve multiple roles depending on the context:
 
 - **Surrogate Model**: Wrapped by `Surrogate` to approximate expensive experimental evaluations
 - **Oracle Model**: Wrapped by by `Oracle` for online evaluation (simulating real experiments)
@@ -62,17 +75,23 @@ The `BaseModel` is an abstract base class that defines the interface for all mod
 - `sample()`: Samples new candidate sequences from the model (used for generative search strategies)
 
 **Optional Methods:**
-- `get_training_summary_metrics()`: Returns training metrics (e.g., loss, accuracy) - defaults to empty dict
+- `get_training_summary_metrics()`: Returns training metrics (e.g., loss, accuracy) -
+  defaults to empty dict
 - `cleanup()`: Cleans up temporary files, checkpoints, or other resources - defaults to no-op
 
 **Implementation Notes:**
-- All concrete model implementations must inherit from `BaseModel` and implement all abstract methods, in case a particular method cannot be implemented (e.g., train for an oracle model) it should raise a NotImplementedError describing the reason
-- The `predict()` method should return a `Predictions` object containing both mean predictions and uncertainty estimates
-- The `sample()` method is particularly important for generative search strategies, where the model generates the candidate pool
+- All concrete model implementations must inherit from `BaseModel` and implement all
+  abstract methods, in case a particular method cannot be implemented (e.g., train for
+  an oracle model) it should raise a NotImplementedError describing the reason
+- The `predict()` method should return a `Predictions` object containing both mean
+  predictions and uncertainty estimates
+- The `sample()` method is particularly important for generative search strategies,
+  where the model generates the candidate pool
 
 ### 3. Surrogate (`Surrogate`)
 
-The surrogate approximates the expensive experimental evaluation. It wraps a `BaseModel` and provides:
+The surrogate approximates the expensive experimental evaluation. It wraps a `BaseModel`
+and provides:
 
 - **Training**: Fits the model on labeled training data
 - **Prediction**: Makes predictions on candidate sequences
@@ -110,7 +129,8 @@ The optimizer orchestrates the active learning loop through the ask-tell interfa
 
 ### 6. Acquisition Function (`AcquisitionFunction`)
 
-Acquisition functions determine which candidates are most promising to evaluate. They score candidates based on:
+Acquisition functions determine which candidates are most promising to evaluate. They
+score candidates based on:
 
 - Surrogate model predictions (means and uncertainties)
 - Current task state (training data, round number, etc.)
@@ -165,7 +185,8 @@ The design task implements a multi-round active learning loop for optimizing seq
    - **Evaluate**: Assess surrogate performance on test set
    - **Log**: Record metrics and save results
 
-**Use Case**: Iteratively improve sequences by actively selecting and evaluating promising candidates.
+**Use Case**: Iteratively improve sequences by actively selecting and evaluating
+promising candidates.
 
 **Components Required:**
 - Dataset

@@ -32,9 +32,7 @@ class PlotRegistry:
         self.plots: dict[str, Callable] = {}
         self.variance_required: dict[str, bool] = {}
 
-    def register(
-        self, name: str, plot_fn: Callable, requires_variance: bool = False
-    ) -> None:
+    def register(self, name: str, plot_fn: Callable, requires_variance: bool = False) -> None:
         """Register a plot function in the registry.
 
         Args:
@@ -51,9 +49,7 @@ class PlotRegistry:
         Returns:
             dict[str, Callable]: Dictionary mapping plot names to their functions.
         """
-        return {
-            name: fn for name, fn in self.plots.items() if self.variance_required[name]
-        }
+        return {name: fn for name, fn in self.plots.items() if self.variance_required[name]}
 
     def get_plots_not_requiring_variance(self) -> dict[str, Callable]:
         """Get all registered plots that don't require variance.
@@ -61,11 +57,7 @@ class PlotRegistry:
         Returns:
             dict[str, Callable]: Dictionary mapping plot names to their functions.
         """
-        return {
-            name: fn
-            for name, fn in self.plots.items()
-            if not self.variance_required[name]
-        }
+        return {name: fn for name, fn in self.plots.items() if not self.variance_required[name]}
 
 
 # Create the global registry instance

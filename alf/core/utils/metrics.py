@@ -50,9 +50,7 @@ def check_variance_validity(variances: np.ndarray, targets: np.ndarray) -> None:
             doesn't match targets, or contains NaN values.
     """
     assert variances is not None, "This function requires variances but it is None"
-    assert np.all(variances >= 0), (
-        "All uncertainty values must be non-negative (variances)."
-    )
+    assert np.all(variances >= 0), "All uncertainty values must be non-negative (variances)."
     assert len(variances) == len(targets), (
         f"Length of variances vector ({len(variances)})"
         f"should equal length of targets vector ({len(targets)})"
@@ -68,9 +66,7 @@ class MetricRegistry:
         self.metrics: dict[str, Callable] = {}
         self.variance_required: dict[str, bool] = {}
 
-    def register(
-        self, name: str, metric_fn: Callable, requires_variance: bool = False
-    ) -> None:
+    def register(self, name: str, metric_fn: Callable, requires_variance: bool = False) -> None:
         """Register a metric function in the registry.
 
         Args:
@@ -87,11 +83,7 @@ class MetricRegistry:
         Returns:
             dict[str, Callable]: Dictionary mapping metric names to their functions.
         """
-        return {
-            name: fn
-            for name, fn in self.metrics.items()
-            if self.variance_required[name]
-        }
+        return {name: fn for name, fn in self.metrics.items() if self.variance_required[name]}
 
     def get_metrics_not_requiring_variance(self) -> dict[str, Callable]:
         """Get all registered metrics that don't require variance.
@@ -99,11 +91,7 @@ class MetricRegistry:
         Returns:
             dict[str, Callable]: Dictionary mapping metric names to their functions.
         """
-        return {
-            name: fn
-            for name, fn in self.metrics.items()
-            if not self.variance_required[name]
-        }
+        return {name: fn for name, fn in self.metrics.items() if not self.variance_required[name]}
 
 
 # Create the global registry instance
@@ -194,9 +182,7 @@ def monte_carlo_ranking(
     n = len(means)
 
     # Simulate Gaussian scores
-    mean_samples = np.random.normal(
-        loc=means, scale=np.sqrt(variances), size=(num_samples, n)
-    )
+    mean_samples = np.random.normal(loc=means, scale=np.sqrt(variances), size=(num_samples, n))
 
     # Compute hard ranks for each sample
     rank_samples = np.argsort(np.argsort(-mean_samples, axis=1), axis=1) + 1
@@ -209,9 +195,7 @@ def monte_carlo_ranking(
 
 
 @no_variance_required
-def mse(
-    means: np.ndarray, _: np.ndarray | None, targets: np.ndarray
-) -> dict[str, float]:
+def mse(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dict[str, float]:
     """Compute the mean squared error.
 
     For each sample compute the squared euclidean distance between
@@ -229,9 +213,7 @@ def mse(
 
 
 @no_variance_required
-def spearman(
-    means: np.ndarray, _: np.ndarray | None, targets: np.ndarray
-) -> dict[str, float]:
+def spearman(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dict[str, float]:
     """Compute the spearman correlation.
 
     This is a non-parametric statistical test which measures
@@ -252,9 +234,7 @@ def spearman(
 
 
 @no_variance_required
-def pearson(
-    means: np.ndarray, _: np.ndarray | None, targets: np.ndarray
-) -> dict[str, float]:
+def pearson(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dict[str, float]:
     """Compute the pearson correlation.
 
     This is a statistical test which measures the strength
@@ -274,9 +254,7 @@ def pearson(
 
 
 @no_variance_required
-def pairwise_xent(
-    means: np.ndarray, _: np.ndarray | None, targets: np.ndarray
-) -> dict[str, float]:
+def pairwise_xent(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dict[str, float]:
     """Compute the ranking loss for a pairwise classification problem.
 
     For each pair of items in the batch, predict which item has the higher target value.
@@ -449,9 +427,7 @@ def rank_width(
     mean_rank, rank_variances = monte_carlo_ranking(means, variances)
     target_ranks = (-targets).argsort().argsort() + 1
 
-    avg_width_ratio = width(mean_rank, rank_variances, target_ranks, alpha)[
-        f"width_{alpha:.2f}"
-    ]
+    avg_width_ratio = width(mean_rank, rank_variances, target_ranks, alpha)[f"width_{alpha:.2f}"]
 
     return {f"rank_width_{alpha:.2f}": avg_width_ratio}
 
@@ -673,9 +649,7 @@ def regret_ucb_alpha_sweep(
         TypeError: If alpha is not a float or list of floats.
     """
     assert variances is not None, "UCB regret requires variances"
-    assert np.all(variances >= 0), (
-        "All uncertainty values must be non-negative (variances)."
-    )
+    assert np.all(variances >= 0), "All uncertainty values must be non-negative (variances)."
 
     # Set the default list if alpha was not provided.
     # This is an ugly solution, but setting a mutable object (a list)

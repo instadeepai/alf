@@ -130,9 +130,7 @@ def split_low_vs_high(
 
     # Randomly shuffle within each group
     shuffled_low = dataset[np.random.RandomState(seed).permutation(low_scoring_indices)]
-    shuffled_high = dataset[
-        np.random.RandomState(seed).permutation(high_scoring_indices)
-    ]
+    shuffled_high = dataset[np.random.RandomState(seed).permutation(high_scoring_indices)]
 
     return {
         "train": shuffled_low[:train_size],

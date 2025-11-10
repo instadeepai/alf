@@ -32,9 +32,7 @@ log = logging.getLogger("rich")
 class BaseDataset(abc.ABC):
     """Base class for all datasets."""
 
-    def __init__(
-        self, name: str, modality: str, seed: int, split_config: dict[str, Any]
-    ) -> None:
+    def __init__(self, name: str, modality: str, seed: int, split_config: dict[str, Any]) -> None:
         """Initialize the base dataset.
 
         Args:
@@ -42,7 +40,8 @@ class BaseDataset(abc.ABC):
             modality: Data modality (e.g., "sequence", "graph", "image").
             seed: Random seed for reproducibility.
             split_config: Dictionary containing:
-                - "split_ratio": Dict with "train", "validation", "test", and (optionally) "candidate_pool" ratios
+                - "split_ratio": Dict with "train", "validation", "test", and
+                  (optionally) "candidate_pool" ratios
                 - "split_type": Type of split ("random" or "low_vs_high")
         """
         self.name = name
@@ -86,9 +85,7 @@ class BaseDataset(abc.ABC):
         Raises:
             AssertionError: If dataset hasn't been split yet.
         """
-        assert "train" in self.splits, (
-            "Dataset must be split before accessing train dataset"
-        )
+        assert "train" in self.splits, "Dataset must be split before accessing train dataset"
         return self.splits["train"]
 
     @property
@@ -101,9 +98,7 @@ class BaseDataset(abc.ABC):
         Raises:
             AssertionError: If dataset hasn't been split yet.
         """
-        assert "test" in self.splits, (
-            "Dataset must be split before accessing test dataset"
-        )
+        assert "test" in self.splits, "Dataset must be split before accessing test dataset"
         return self.splits["test"]
 
     @property
@@ -142,7 +137,13 @@ class BaseDataset(abc.ABC):
         Returns:
             str: String showing dataset name, modality, seed, and split sizes.
         """
-        return f"Dataset(name={self.name}, modality={self.modality}, seed={self.seed}, train_size={len(self.train_dataset)}, validation_size={len(self.validation_dataset)}, test_size={len(self.test_dataset)}, candidate_pool_size={len(self.candidate_pool)})"
+        return (
+            f"Dataset(name={self.name}, modality={self.modality}, seed={self.seed}, "
+            f"train_size={len(self.train_dataset)}, "
+            f"validation_size={len(self.validation_dataset)}, "
+            f"test_size={len(self.test_dataset)}, "
+            f"candidate_pool_size={len(self.candidate_pool)})"
+        )
 
     def validate_split_config(self, split_config: dict[str, Any]) -> None:
         """Validate the split config for the dataset.
@@ -173,12 +174,8 @@ class BaseDataset(abc.ABC):
         assert self._raw_dataset is not None, "Dataset must be loaded before splitting"
 
         # Calculate split sizes
-        train_plus_validation_size = int(
-            len(self._raw_dataset) * self.split_ratio["train"]
-        )
-        validation_size = int(
-            train_plus_validation_size * self.split_ratio["validation"]
-        )
+        train_plus_validation_size = int(len(self._raw_dataset) * self.split_ratio["train"])
+        validation_size = int(train_plus_validation_size * self.split_ratio["validation"])
         train_size = train_plus_validation_size - validation_size
         test_size = int(len(self._raw_dataset) * self.split_ratio["test"])
 

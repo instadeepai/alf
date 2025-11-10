@@ -50,9 +50,7 @@ class TestLabeledCandidatesInitialization:
     def test_large_number_of_candidates(self):
         """Test LabeledCandidates with a large number of candidates."""
         n_candidates = 1000
-        candidates = [
-            Candidate(data=f"test{i}", modality="test") for i in range(n_candidates)
-        ]
+        candidates = [Candidate(data=f"test{i}", modality="test") for i in range(n_candidates)]
         labels = np.random.randint(0, 2, size=n_candidates)
 
         labeled_candidates = LabeledCandidates(candidates=candidates, labels=labels)
@@ -71,25 +69,23 @@ class TestLabeledCandidatesInitialization:
         labeled_candidates = LabeledCandidates(candidates=candidates, labels=labels)
 
         assert labeled_candidates.labels.shape == (2, 2)
-        np.testing.assert_array_equal(
-            labeled_candidates.labels, np.array([[1, 0], [0, 1]])
-        )
+        np.testing.assert_array_equal(labeled_candidates.labels, np.array([[1, 0], [0, 1]]))
 
 
 class TestLabeledCandidatesValidation:
     """Test cases for LabeledCandidates validation and error handling."""
 
     def test_initialization_with_mismatched_lengths_raises_assertion(self):
-        """Test that initialization with mismatched candidates and labels lengths raises AssertionError."""
+        """Test that initialization with mismatched candidates and labels lengths
+        raises AssertionError.
+        """
         candidates = [
             Candidate(data="test1", modality="test"),
             Candidate(data="test2", modality="test"),
         ]
         labels = np.array([1])  # Only one label for two candidates
 
-        with pytest.raises(
-            AssertionError, match="Candidates and labels must have the same length"
-        ):
+        with pytest.raises(AssertionError, match="Candidates and labels must have the same length"):
             LabeledCandidates(candidates=candidates, labels=labels)
 
     def test_initialization_with_empty_candidates_non_empty_labels(self):
@@ -97,9 +93,7 @@ class TestLabeledCandidatesValidation:
         candidates = []
         labels = np.array([1, 2, 3])
 
-        with pytest.raises(
-            AssertionError, match="Candidates and labels must have the same length"
-        ):
+        with pytest.raises(AssertionError, match="Candidates and labels must have the same length"):
             LabeledCandidates(candidates=candidates, labels=labels)
 
     def test_initialization_with_non_empty_candidates_empty_labels(self):
@@ -110,9 +104,7 @@ class TestLabeledCandidatesValidation:
         ]
         labels = np.array([])
 
-        with pytest.raises(
-            AssertionError, match="Candidates and labels must have the same length"
-        ):
+        with pytest.raises(AssertionError, match="Candidates and labels must have the same length"):
             LabeledCandidates(candidates=candidates, labels=labels)
 
 
@@ -151,6 +143,7 @@ class TestLabeledCandidatesGetItem:
     """Tests for __getitem__ behavior."""
 
     def test_getitem_int_returns_singleton_collection(self):
+        """Test that indexing with integer returns a singleton LabeledCandidates."""
         candidates = [
             Candidate(data="a", modality="sequence"),
             Candidate(data="b", modality="sequence"),
@@ -165,6 +158,7 @@ class TestLabeledCandidatesGetItem:
         np.testing.assert_array_equal(item.labels, np.array([1]))
 
     def test_getitem_slice_returns_subcollection(self):
+        """Test that slicing returns a subcollection of LabeledCandidates."""
         candidates = [
             Candidate(data="a", modality="sequence"),
             Candidate(data="b", modality="sequence"),
@@ -179,6 +173,7 @@ class TestLabeledCandidatesGetItem:
         np.testing.assert_array_equal(sub.labels, np.array([1, 0]))
 
     def test_getitem_invalid_index_type_raises(self):
+        """Test that indexing with invalid type raises TypeError."""
         candidates = [Candidate(data="a", modality="sequence")]
         labels = np.array([0])
         lc = LabeledCandidates(candidates=candidates, labels=labels)
@@ -190,6 +185,7 @@ class TestLabeledCandidatesValidateShuffleSortRemove:
     """Tests for validate_candidates, shuffle, sort, and remove methods."""
 
     def test_validate_candidates(self):
+        """Test validate_candidates method returns True for existing candidates."""
         c1 = Candidate(data="a", modality="sequence")
         c2 = Candidate(data="b", modality="sequence")
         lc = LabeledCandidates(candidates=[c1], labels=np.array([1]))
@@ -197,21 +193,21 @@ class TestLabeledCandidatesValidateShuffleSortRemove:
         assert lc.validate_candidates([c2]) is False
 
     def test_shuffle_deterministic(self):
+        """Test that shuffle with same seed produces deterministic results."""
         candidates = [Candidate(data=str(i), modality="sequence") for i in range(5)]
         labels = np.array([0, 1, 2, 3, 4])
         lc = LabeledCandidates(candidates=candidates, labels=labels)
 
         shuffled1 = lc.shuffle(seed=42)
         shuffled2 = lc.shuffle(seed=42)
-        assert [c.data for c in shuffled1.candidates] == [
-            c.data for c in shuffled2.candidates
-        ]
+        assert [c.data for c in shuffled1.candidates] == [c.data for c in shuffled2.candidates]
         np.testing.assert_array_equal(shuffled1.labels, shuffled2.labels)
         # Ensure original is unchanged length-wise and content-wise
         assert [c.data for c in lc.candidates] == [str(i) for i in range(5)]
         np.testing.assert_array_equal(lc.labels, labels)
 
     def test_sort_ascending_and_descending(self):
+        """Test sort method with ascending and descending order."""
         candidates = [
             Candidate(data="x", modality="sequence"),
             Candidate(data="y", modality="sequence"),
@@ -226,12 +222,11 @@ class TestLabeledCandidatesValidateShuffleSortRemove:
         np.testing.assert_array_equal([c.data for c in asc.candidates], ["y", "x", "z"])
         np.testing.assert_array_equal(asc.labels, np.array([1.0, 2.0, 3.0]))
 
-        np.testing.assert_array_equal(
-            [c.data for c in desc.candidates], ["z", "x", "y"]
-        )
+        np.testing.assert_array_equal([c.data for c in desc.candidates], ["z", "x", "y"])
         np.testing.assert_array_equal(desc.labels, np.array([3.0, 2.0, 1.0]))
 
     def test_remove_with_list_and_with_collection(self):
+        """Test remove method with both list and LabeledCandidates input."""
         c1 = Candidate(data="a", modality="sequence")
         c2 = Candidate(data="b", modality="sequence")
         c3 = Candidate(data="c", modality="sequence")
@@ -249,12 +244,11 @@ class TestLabeledCandidatesValidateShuffleSortRemove:
         np.testing.assert_array_equal(lc.labels, np.array([3]))
 
     def test_remove_raises_when_candidate_not_present(self):
+        """Test that remove raises AssertionError when candidate is not in collection."""
         c1 = Candidate(data="a", modality="sequence")
         c2 = Candidate(data="b", modality="sequence")
         lc = LabeledCandidates(candidates=[c1], labels=np.array([1]))
-        with pytest.raises(
-            AssertionError, match="Candidates must be in this collection"
-        ):
+        with pytest.raises(AssertionError, match="Candidates must be in this collection"):
             lc.remove([c2])
 
 
@@ -262,6 +256,7 @@ class TestLabeledCandidatesToDataFrame:
     """Tests for to_dataframe ensuring features and stringify are used."""
 
     def test_to_dataframe_with_features(self):
+        """Test to_dataframe method includes candidate features as columns."""
         c1 = Candidate(data="SEQ1", modality="sequence", features={"a": 1, "b": "x"})
         c2 = Candidate(data="SEQ2", modality="sequence", features={"a": 2})
         lc = LabeledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
@@ -338,9 +333,7 @@ class TestLabeledCandidatesAppend:
         ]
         new_labels = np.array([0])  # Only one label for two candidates
 
-        with pytest.raises(
-            AssertionError, match="Candidates and labels must have the same length"
-        ):
+        with pytest.raises(AssertionError, match="Candidates and labels must have the same length"):
             labeled_candidates.append(new_candidates, new_labels)
 
     def test_append_with_none_labels_raises_assertion(self):
@@ -351,9 +344,7 @@ class TestLabeledCandidatesAppend:
 
         new_candidates = [Candidate(data="test2", modality="test")]
 
-        with pytest.raises(
-            AssertionError, match="Candidates and labels must have the same length"
-        ):
+        with pytest.raises(AssertionError, match="Candidates and labels must have the same length"):
             labeled_candidates.append(new_candidates, None)
 
     def test_multiple_append_operations(self):
@@ -386,9 +377,7 @@ class TestLabeledCandidatesAppend:
 @pytest.mark.parametrize("n_candidates", [0, 1, 5, 10, 100])
 def test_labeled_candidates_length_consistency(n_candidates):
     """Parametrized test for length consistency with different numbers of candidates."""
-    candidates = [
-        Candidate(data=f"test{i}", modality="test") for i in range(n_candidates)
-    ]
+    candidates = [Candidate(data=f"test{i}", modality="test") for i in range(n_candidates)]
     labels = np.random.randint(0, 2, size=n_candidates)
 
     labeled_candidates = LabeledCandidates(candidates=candidates, labels=labels)

@@ -79,8 +79,9 @@ class Optimizer:
         """
         t0 = time.perf_counter()
 
-        # During the first round, we use the training dataset as the acquired candidates.
-        # During the subsequent rounds, we use the search and acquisition functions to acquire candidates.
+        # During the first round, we use the training dataset as the acquired
+        # candidates. During the subsequent rounds, we use the search and acquisition
+        # functions to acquire candidates.
         if state.round == 0 and len(state.dataset.train_dataset) > 0:
             acquired_candidates = state.dataset.train_dataset.candidates
         else:
