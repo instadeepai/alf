@@ -1,5 +1,5 @@
 import time
-from typing import List, Tuple, Union
+from typing import Tuple, Union
 
 import numpy as np
 
@@ -18,7 +18,7 @@ class Oracle:
         self.module: BaseModel | BaseDataset = module
 
     def evaluate(
-        self, candidates: List[Candidate], state: TaskState
+        self, candidates: list[Candidate], state: TaskState
     ) -> Tuple[LabeledCandidates, TaskState]:
         """Evaluate the candidates."""
         t0 = time.perf_counter()

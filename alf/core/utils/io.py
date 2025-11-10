@@ -15,7 +15,7 @@
 import json
 import os
 import pickle
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
@@ -31,7 +31,7 @@ class FileHandler:
     """
 
     def __init__(
-        self, s3_endpoint: Optional[str] = None, bucket: Optional[str] = "input"
+        self, s3_endpoint: str | None = None, bucket: str | None = "input"
     ) -> None:
         """Initialize FileHandler.
 
@@ -109,7 +109,7 @@ class FileHandler:
         else:
             np.save(path, array)
 
-    def read_text(self, path: str) -> List[str]:
+    def read_text(self, path: str) -> list[str]:
         """Read text file and return lines.
 
         Args:
@@ -121,7 +121,7 @@ class FileHandler:
         with self._open_file(path, "r") as f:
             return f.readlines()
 
-    def save_text(self, path: str, lines: List[str]) -> None:
+    def save_text(self, path: str, lines: list[str]) -> None:
         """Save lines to text file.
 
         Args:
@@ -215,7 +215,7 @@ class FileHandler:
 
         df.to_csv(self._get_full_path(path), index=index, header=header)
 
-    def listdir(self, path: str) -> List[str]:
+    def listdir(self, path: str) -> list[str]:
         """List files in directory.
 
         Args:

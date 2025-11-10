@@ -1,5 +1,5 @@
 import abc
-from typing import Dict, List
+from typing import Dict
 
 import numpy as np
 
@@ -14,7 +14,7 @@ class BaseSearch(abc.ABC):
     """Base class for all types of search methods."""
 
     @abc.abstractmethod
-    def __call__(self, task_state: TaskState, **kwargs) -> List[Candidate]:
+    def __call__(self, task_state: TaskState, **kwargs) -> list[Candidate]:
         """Returns the search candidates."""
         pass
 
@@ -27,7 +27,7 @@ class SearchProtocol:
     """Search protocol is used to define the search process."""
 
     @abc.abstractmethod
-    def __call__(self, task_state: TaskState) -> List[Candidate]:
+    def __call__(self, task_state: TaskState) -> list[Candidate]:
         """Apply the search protocol to return a pool of candidates."""
         pass
 
@@ -38,7 +38,7 @@ class GeneratorSearch(BaseSearch):
     def __init__(self, model: BaseModel):
         self.model: BaseModel = model
 
-    def __call__(self, task_state: TaskState, **kwargs) -> List[Candidate]:
+    def __call__(self, task_state: TaskState, **kwargs) -> list[Candidate]:
         """Sample candidates from the model to define the search pool."""
         return self.model.sample()
 
@@ -46,7 +46,7 @@ class GeneratorSearch(BaseSearch):
 class DatasetSearch(BaseSearch):
     """Offline search method based on a dataset defining the search pool."""
 
-    def __call__(self, task_state: TaskState, **kwargs) -> List[Candidate]:
+    def __call__(self, task_state: TaskState, **kwargs) -> list[Candidate]:
         """Get the candidate pool from the dataset."""
         candidate_pool = task_state.dataset.candidate_pool
         return candidate_pool.candidates
@@ -66,7 +66,7 @@ class ProtocolSearch(BaseSearch):
     def __init__(self, protocol: SearchProtocol):
         self.protocol: SearchProtocol = protocol
 
-    def __call__(self, task_state: TaskState, **kwargs) -> List[Candidate]:
+    def __call__(self, task_state: TaskState, **kwargs) -> list[Candidate]:
         """Apply the search protocol to return a pool of candidates."""
         return self.protocol(task_state, **kwargs)
 
@@ -79,6 +79,6 @@ class ModelProtocolSearch(BaseSearch):
         self.protocol: SearchProtocol = protocol
 
     @abc.abstractmethod
-    def __call__(self, task_state: TaskState, **kwargs) -> List[Candidate]:
+    def __call__(self, task_state: TaskState, **kwargs) -> list[Candidate]:
         """Apply the model and the search protocol to return a pool of candidates."""
         pass

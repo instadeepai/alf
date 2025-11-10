@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Any, Optional
+from typing import Any
 
 from alf.core.dataclasses import TaskState
 from alf.core.tasks.base_task import BaseTask
@@ -18,7 +18,7 @@ class SupervisedTask(BaseTask):
         self,
         state: TaskState,
         logger: Logger,
-        save_path: Optional[str] = None,
+        save_path: str | None = None,
     ) -> None:
         """Run the supervised task."""
         log.info("Running supervised task ...")

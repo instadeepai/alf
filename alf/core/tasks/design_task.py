@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from alf.core.dataclasses import TaskState
 from alf.core.tasks.base_task import BaseTask
@@ -35,7 +35,7 @@ class DesignTask(BaseTask):
         logger: Logger,
         optimizer: Optimizer,
         oracle: Oracle,
-        save_path: Optional[str] = None,
+        save_path: str | None = None,
     ) -> None:
         """This is the multi-round design task."""
         log.info(f"Multi-round Design Task: {state.num_acq_rounds} Rounds")

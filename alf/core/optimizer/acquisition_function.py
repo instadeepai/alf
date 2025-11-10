@@ -1,5 +1,4 @@
 import abc
-from typing import List
 
 import numpy as np
 
@@ -18,7 +17,7 @@ class AcquisitionFunction(abc.ABC):
 
     def __call__(
         self,
-        search_candidates: List[Candidate],
+        search_candidates: list[Candidate],
         state: TaskState,
     ) -> LabeledCandidates:
         """Returns the candidates with their acquisition values."""

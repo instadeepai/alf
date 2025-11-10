@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, List, Optional, Union
+from typing import Any, Union
 
 import numpy as np
 import pandas as pd
@@ -16,7 +16,7 @@ class LabeledCandidates:
         labels: A numpy array of labels corresponding to each candidate.
     """
 
-    candidates: List["Candidate"]
+    candidates: list["Candidate"]
     labels: np.ndarray
 
     def __post_init__(self) -> None:
@@ -53,18 +53,18 @@ class LabeledCandidates:
             )
 
     @property
-    def data(self) -> List[Any]:
+    def data(self) -> list[Any]:
         """Return the raw data (sequence, graph, image, etc.) of each candidate."""
         return [cand.data for cand in self.candidates]
 
-    def validate_candidates(self, candidates: List["Candidate"]) -> bool:
+    def validate_candidates(self, candidates: list["Candidate"]) -> bool:
         """Validate candidates from this collection."""
         return all(candidate in self.candidates for candidate in candidates)
 
     def append(
         self,
-        candidates: Union[List["Candidate"], "LabeledCandidates"],
-        labels: Optional[np.ndarray] = None,
+        candidates: Union[list["Candidate"], "LabeledCandidates"],
+        labels: np.ndarray | None = None,
     ) -> None:
         """Append candidates and labels to this collection.
 
@@ -103,7 +103,7 @@ class LabeledCandidates:
             labels=self.labels[sorted_indices],
         )
 
-    def remove(self, candidates: Union[List["Candidate"], "LabeledCandidates"]) -> None:
+    def remove(self, candidates: Union[list["Candidate"], "LabeledCandidates"]) -> None:
         """Remove candidates from this collection."""
         if isinstance(candidates, LabeledCandidates):
             candidates = candidates.candidates

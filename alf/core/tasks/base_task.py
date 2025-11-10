@@ -1,6 +1,6 @@
 import abc
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from alf.core.dataclasses import Results, TaskState
 from alf.core.dataset.base_dataset import BaseDataset
@@ -44,7 +44,7 @@ class BaseTask(abc.ABC):
         self,
         state: TaskState,
         round_name: int | str,
-        save_path: Optional[str],
+        save_path: str | None,
         filename: str,
     ) -> TaskState:
         """Evaluate the surrogate model on the test dataset and return the updated state."""

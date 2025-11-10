@@ -2,7 +2,7 @@ import copy
 import logging
 import os
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, List
+from typing import TYPE_CHECKING, Any
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -39,7 +39,7 @@ class TaskState:
     acq_batch_size: int = 0
     num_acq_rounds: int = 0
     save_round_predictions: bool = False
-    history: List = field(default_factory=list)
+    history: list = field(default_factory=list)
     round_metrics: dict[str, Any] = field(default_factory=dict)
 
     def update(self, acquired_candidates: LabeledCandidates) -> None:

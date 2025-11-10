@@ -1,6 +1,5 @@
 import os
 from dataclasses import dataclass
-from typing import List
 
 import numpy as np
 import pandas as pd
@@ -43,7 +42,7 @@ class Predictions:
     def save(
         self,
         output_dir: str,
-        candidates: List[Candidate],
+        candidates: list[Candidate],
         targets: np.ndarray,
         filename: str,
     ) -> None:

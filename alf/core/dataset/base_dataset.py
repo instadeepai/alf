@@ -2,7 +2,7 @@ import abc
 import copy
 import logging
 import os
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, Union
 
 import numpy as np
 
@@ -139,7 +139,7 @@ class BaseDataset(abc.ABC):
                 split.to_dataframe(),
             )
 
-    def query(self, candidates: List[Candidate]) -> LabeledCandidates:
+    def query(self, candidates: list[Candidate]) -> LabeledCandidates:
         """Return the labels for the candidates."""
         assert self._raw_dataset is not None, "Dataset must be loaded before querying"
         indices = [self._raw_dataset.data.index(cand.data) for cand in candidates]

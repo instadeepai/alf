@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass
@@ -14,7 +14,7 @@ class Candidate:
 
     data: Any
     modality: str
-    features: Optional[dict] = None
+    features: dict | None = None
 
     def __post_init__(self):
         if self.features is None:

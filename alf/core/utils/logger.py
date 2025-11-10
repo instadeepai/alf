@@ -14,7 +14,7 @@
 
 import abc
 import logging
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, Literal, Union
 
 import matplotlib.pyplot as plt
 import neptune
@@ -32,7 +32,7 @@ class Logger(abc.ABC):
 
     @abc.abstractmethod
     def write(
-        self, data: Dict[str, Any], label: str = "", timestep: Optional[int] = None
+        self, data: Dict[str, Any], label: str = "", timestep: int | None = None
     ) -> None:
         """Write data to the logger destination."""
         pass
@@ -45,7 +45,7 @@ class Logger(abc.ABC):
         """Close the logger and clean up resources."""
         pass
 
-    def get_checkpoint(self, file_path: str) -> Optional[str]:
+    def get_checkpoint(self, file_path: str) -> str | None:
         """Download checkpoint from a run (optional implementation)."""
         return None
 
@@ -65,8 +65,8 @@ class NeptuneLogger(Logger):
         self,
         config: DictConfig,
         mode: Literal["async", "sync", "offline", "read-only", "debug"] = "async",
-        file_system: Optional[S3FileSystem] = None,
-        neptune_tags: Optional[List[str]] = None,
+        file_system: S3FileSystem | None = None,
+        neptune_tags: list[str] | None = None,
         **kwargs: Any,
     ):
         self.config = config
@@ -92,7 +92,7 @@ class NeptuneLogger(Logger):
             self.run_id = self.run["sys/id"].fetch()
             NeptuneLogger.metadata = self.run_id
 
-    def _process_tags(self, config: DictConfig, neptune_tags: List[str]) -> List[str]:
+    def _process_tags(self, config: DictConfig, neptune_tags: list[str]) -> list[str]:
         """Process and combine configuration tags with neptune tags."""
         config_tags = config["logging"]["tags"]
 
@@ -109,7 +109,7 @@ class NeptuneLogger(Logger):
         self,
         data: Dict[str, Union[float, plt.Figure]],
         label: str = "",
-        timestep: Optional[int] = None,
+        timestep: int | None = None,
     ) -> None:
         """Write data to Neptune, handling both metrics and figures."""
         try:
@@ -151,7 +151,7 @@ class NeptuneLogger(Logger):
         """Stop the Neptune run."""
         self.run.stop()
 
-    def get_checkpoint(self, file_path: str) -> Optional[str]:
+    def get_checkpoint(self, file_path: str) -> str | None:
         """Download a checkpoint from Neptune and return the local path."""
         try:
             parts = file_path.split("/")
@@ -177,7 +177,7 @@ class TerminalLogger(Logger):
         self,
         data: Dict[str, Union[float, plt.Figure]],
         label: str = "",
-        timestep: Optional[int] = None,
+        timestep: int | None = None,
     ) -> None:
         """Write metrics to terminal, ignoring figures."""
         metrics = []
@@ -197,7 +197,7 @@ def logger_factory(
     logger_type: str,
     config_dict: DictConfig,
     mode: Literal["async", "sync", "offline", "read-only", "debug"] = "async",
-    file_system: Optional[S3FileSystem] = None,
+    file_system: S3FileSystem | None = None,
     **kwargs: Any,
 ) -> Logger:
     """Factory function to create logger instances."""
@@ -212,7 +212,7 @@ def logger_factory(
 
 
 def get_logger_from_config(
-    config: DictConfig, file_system: Optional[S3FileSystem] = None, **kwargs: Any
+    config: DictConfig, file_system: S3FileSystem | None = None, **kwargs: Any
 ) -> Logger:
     """Create a logger based on configuration settings."""
     return logger_factory(

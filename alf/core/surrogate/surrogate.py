@@ -1,4 +1,4 @@
-from typing import List, Optional, Union
+from typing import Union
 
 import numpy as np
 
@@ -20,12 +20,12 @@ class Surrogate:
         self,
         train_data: LabeledCandidates,
         val_data: LabeledCandidates,
-        logger: Optional[Logger] = None,
+        logger: Logger | None = None,
     ) -> None:
         """Fit the surrogate model on the batch of candidates."""
         self.model.train(train_data, val_data, logger)
 
-    def predict(self, candidates: List[Candidate]) -> Predictions:
+    def predict(self, candidates: list[Candidate]) -> Predictions:
         """Predict the scores for the candidates."""
         return self.model.predict(candidates)
 

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import time
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Tuple
 
 from alf.core.dataclasses import (
     Candidate,
@@ -48,7 +48,7 @@ class Optimizer:
     def ask(
         self,
         state: TaskState,
-    ) -> Tuple[List[Candidate], TaskState]:
+    ) -> Tuple[list[Candidate], TaskState]:
         """Ask the optimizer to propose the next batch of candidates through the search and acquisition functions."""
         t0 = time.perf_counter()
 
@@ -70,7 +70,7 @@ class Optimizer:
     def tell(
         self,
         state: TaskState,
-        logger: Optional[Logger] = None,
+        logger: Logger | None = None,
     ) -> TaskState:
         """Train the surrogate model on the new train/val datasets.
 

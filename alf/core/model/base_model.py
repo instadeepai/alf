@@ -1,5 +1,5 @@
 import abc
-from typing import Any, List, Optional, Union
+from typing import Any, Union
 
 import numpy as np
 
@@ -14,7 +14,7 @@ class BaseModel(abc.ABC):
     """
 
     @abc.abstractmethod
-    def featurise(self, inputs: Union[LabeledCandidates, List[Candidate]]) -> Any:
+    def featurise(self, inputs: Union[LabeledCandidates, list[Candidate]]) -> Any:
         """Featurise the inputs."""
         pass
 
@@ -23,18 +23,18 @@ class BaseModel(abc.ABC):
         self,
         train_data: LabeledCandidates,
         val_data: LabeledCandidates,
-        logger: Optional[Logger] = None,
+        logger: Logger | None = None,
     ) -> None:
         """Train the model."""
         pass
 
     @abc.abstractmethod
-    def predict(self, candidate_points: List[Candidate]) -> Predictions:
+    def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Predict the scores for the candidate points."""
         pass
 
     @abc.abstractmethod
-    def sample(self, condition: Optional[Any] = None) -> List[Candidate]:
+    def sample(self, condition: Any | None = None) -> list[Candidate]:
         """Sample candidate points from the model."""
         pass
 

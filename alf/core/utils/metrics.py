@@ -591,7 +591,7 @@ def regret_ucb_alpha_sweep(
     means: np.ndarray,
     variances: np.ndarray,
     targets: np.ndarray,
-    alpha: Optional[Union[float, list[float]]] | None = None,
+    alpha: Union[float, list[float]] | None = None,
     num_acquisitions: int = 100,
 ) -> dict[str, float]:
     """Compute UCB regret on a list of alphas
