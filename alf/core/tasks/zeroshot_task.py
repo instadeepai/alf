@@ -72,5 +72,3 @@ class ZeroShotTask(BaseTask):
         )
 
         logger.write(state.round_metrics, timestep=0)
-
-        return
