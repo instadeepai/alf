@@ -8,15 +8,14 @@
 [![Tests and Linters 🧪](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml/badge.svg?branch=main)](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml)
 
 
-
-**ALF** is a Python package for performing active learning experiments to facilitate iterative optimization of design targets (e.g., proteins, molecules, materials) through intelligent candidate selection and evaluation.
+**ALF** is a Python package for performing active learning experiments to facilitate
+iterative optimization of design targets (e.g., proteins, molecules, materials) through
 intelligent candidate selection and evaluation.
 
 ## ✨ Features
 
-- **Diverse Acquisition Strategies**: Built-in acquisition functions (Greedy, UCB, Expected Improvement, Thompson Sampling)
-- **Flexible Search Methods**: Support for dataset-based, generator-based, and protocol-based search strategies
-- **Offline and Online Evaluation**: Support for both offline (dataset-based) and online (model-based) optimization scenarios
+- **Modular Architecture**: Flexible, extensible components that can be easily swapped
+  and customized
 - **Multiple experiment setups**: Support for multi-round active learning, supervised
   learning, and zero-shot evaluation
 - **Diverse Acquisition Strategies**: Built-in acquisition functions (Greedy, UCB,
