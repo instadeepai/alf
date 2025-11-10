@@ -1,4 +1,5 @@
 import numpy as np
+
 from alf.core.dataclasses import Predictions, TaskState
 from alf.core.optimizer.acquisition_function import AcquisitionFunction
 

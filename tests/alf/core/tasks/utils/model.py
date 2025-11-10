@@ -1,6 +1,7 @@
 from typing import Any, List, Optional, Union
 
 import numpy as np
+
 from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions
 from alf.core.model.base_model import BaseModel
 from alf.core.utils.logger import Logger
