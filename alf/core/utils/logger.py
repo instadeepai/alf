@@ -125,6 +125,9 @@ def get_logger_from_config(config: DictConfig, **kwargs: Any) -> Logger:
 
     Returns:
         Logger instance configured according to the config settings
+
+    Raises:
+        ValueError: If the logger type is not supported
     """
     logger_type = config.logging.type
     if logger_type == "terminal":
