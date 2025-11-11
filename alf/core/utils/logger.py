@@ -18,7 +18,6 @@ from typing import Any, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
-from omegaconf import DictConfig
 
 log = logging.getLogger("alf-core")
 
@@ -114,23 +113,3 @@ class TerminalLogger(Logger):
                 log.info(f"Step {timestep:.2e}:\n{message}")
             else:
                 log.info(message)
-
-
-def get_logger_from_config(config: DictConfig, **kwargs: Any) -> Logger:
-    """Create a logger based on configuration settings.
-
-    Args:
-        config: Configuration dictionary containing logging settings
-        **kwargs: Additional keyword arguments passed to logger initialization
-
-    Returns:
-        Logger instance configured according to the config settings
-
-    Raises:
-        ValueError: If the logger type is not supported
-    """
-    logger_type = config.logging.type
-    if logger_type == "terminal":
-        return TerminalLogger(**kwargs)
-    else:
-        raise ValueError(f"Unsupported logger type: {logger_type}. Expected 'terminal'.")
