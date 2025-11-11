@@ -676,8 +676,3 @@ def regret_ucb_alpha_sweep(
 
         regret_alpha_list.update(regret_alpha)
     return regret_alpha_list
-
-
-# Backward compatibility
-METRICS_REQ_VAR = metric_registry.get_metrics_requiring_variance()
-METRICS_NOT_REQ_VAR = metric_registry.get_metrics_not_requiring_variance()
