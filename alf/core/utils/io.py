@@ -14,45 +14,26 @@
 
 import json
 import os
-import pickle
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import yaml
-from s3fs.core import S3FileSystem
 
 
 class FileHandler:
-    """Unified file handler for local and S3 storage.
+    """File handler for local storage.
 
-    Provides a consistent interface for file operations whether using local filesystem
-    or S3 storage. Automatically handles path resolution and file system abstraction.
+    Provides a consistent interface for local file operations.
     """
 
-    def __init__(self, s3_endpoint: str | None = None, bucket: str | None = "input") -> None:
+    def __init__(self, base_path: str = "./") -> None:
         """Initialize FileHandler.
 
         Args:
-            s3_endpoint: S3 endpoint URL. If None, uses local filesystem
-            bucket: Bucket type - "input" or "output". Only used with S3.
-
-        Raises:
-            ValueError: If bucket is not 'input' or 'output'
+            base_path: Base directory path for file operations. Defaults to "./"
         """
-        self.s3_endpoint = s3_endpoint
-        self.bucket = bucket
-
-        if s3_endpoint:
-            self.s3 = S3FileSystem(client_kwargs={"endpoint_url": s3_endpoint})
-            if bucket == "input":
-                self.bucket_path = os.environ["AICHOR_INPUT_PATH"]
-            elif bucket == "output":
-                self.bucket_path = os.environ["AICHOR_OUTPUT_PATH"]
-            else:
-                raise ValueError("bucket must be 'input' or 'output'")
-        else:
-            self.bucket_path = "./"
+        self.base_path = base_path
 
     def _get_full_path(self, path: str) -> str:
         """Get the full path for the given relative path.
@@ -63,7 +44,7 @@ class FileHandler:
         Returns:
             Full path to the file
         """
-        return os.path.join(self.bucket_path, path)
+        return os.path.join(self.base_path, path)
 
     def _ensure_local_dir(self, path: str) -> None:
         """Ensure local directory exists for the given path.
@@ -71,13 +52,12 @@ class FileHandler:
         Args:
             path: Path to the directory
         """
-        if not self.s3_endpoint:
-            dir_path = os.path.dirname(path)
-            if dir_path:
-                os.makedirs(dir_path, exist_ok=True)
+        dir_path = os.path.dirname(path)
+        if dir_path:
+            os.makedirs(dir_path, exist_ok=True)
 
     def _open_file(self, path: str, mode: str = "r", **kwargs):
-        """Open file with appropriate handler (S3 or local).
+        """Open file with local filesystem.
 
         Args:
             path: Path to the file
@@ -85,16 +65,13 @@ class FileHandler:
             **kwargs: Additional arguments for the open function
 
         Returns:
-            File handle (S3 file handle or standard file handle)
+            File handle
         """
         full_path = self._get_full_path(path)
-        if self.s3_endpoint:
-            return self.s3.open(full_path, mode, **kwargs)
-        else:
-            return open(full_path, mode, **kwargs)
+        return open(full_path, mode, **kwargs)
 
     def open(self, path: str, *args: Any, **kwargs: Any):
-        """Open file with appropriate handler (S3 or local).
+        """Open file with local filesystem.
 
         This is a public interface for the _open_file method.
 
@@ -104,7 +81,7 @@ class FileHandler:
             **kwargs: Additional keyword arguments for the open function
 
         Returns:
-            File handle (S3 file handle or standard file handle)
+            File handle
         """
         return self._open_file(path, *args, **kwargs)
 
@@ -117,11 +94,8 @@ class FileHandler:
         Returns:
             Loaded numpy array
         """
-        if self.s3_endpoint:
-            with self._open_file(path, "rb") as f:
-                return np.load(f, allow_pickle=True)
-        else:
-            return np.load(path, allow_pickle=True)
+        full_path = self._get_full_path(path)
+        return np.load(full_path, allow_pickle=True)
 
     def save_numpy(self, path: str, array: np.ndarray) -> None:
         """Save numpy array to file.
@@ -130,13 +104,9 @@ class FileHandler:
             path: Path where the array should be saved
             array: Numpy array to save
         """
-        self._ensure_local_dir(path)
-
-        if self.s3_endpoint:
-            with self._open_file(path, "wb") as f:
-                f.write(pickle.dumps(array))
-        else:
-            np.save(path, array)
+        full_path = self._get_full_path(path)
+        self._ensure_local_dir(full_path)
+        np.save(full_path, array)
 
     def read_text(self, path: str) -> list[str]:
         """Read text file and return lines.
@@ -157,7 +127,8 @@ class FileHandler:
             path: Path where the text should be saved
             lines: List of lines to write to the file
         """
-        self._ensure_local_dir(path)
+        full_path = self._get_full_path(path)
+        self._ensure_local_dir(full_path)
 
         with self._open_file(path, "w") as f:
             for line in lines:
@@ -182,7 +153,8 @@ class FileHandler:
             path: Path where the JSON should be saved
             data: Dictionary to save as JSON
         """
-        self._ensure_local_dir(path)
+        full_path = self._get_full_path(path)
+        self._ensure_local_dir(full_path)
 
         with self._open_file(path, "w") as f:
             json.dump(data, f, indent=4)
@@ -206,7 +178,8 @@ class FileHandler:
             path: Path where the YAML should be saved
             data: Dictionary to save as YAML
         """
-        self._ensure_local_dir(path)
+        full_path = self._get_full_path(path)
+        self._ensure_local_dir(full_path)
 
         with self._open_file(path, "w") as f:
             yaml.dump(data, f)
@@ -220,15 +193,9 @@ class FileHandler:
 
         Returns:
             Pandas DataFrame from the CSV file
-
-        Raises:
-            AssertionError: If S3 endpoint is set but FSSPEC_S3_ENDPOINT_URL is not in
-                environment variables
         """
-        if self.s3_endpoint:
-            assert "FSSPEC_S3_ENDPOINT_URL" in os.environ
-
-        return pd.read_csv(self._get_full_path(path), header=header)
+        full_path = self._get_full_path(path)
+        return pd.read_csv(full_path, header=header)
 
     def save_csv(
         self, path: str, df: pd.DataFrame, header: bool = True, index: bool = False
@@ -240,17 +207,10 @@ class FileHandler:
             df: DataFrame to save
             header: Whether to include headers. Defaults to True
             index: Whether to include index. Defaults to False
-
-        Raises:
-            AssertionError: If S3 endpoint is set but FSSPEC_S3_ENDPOINT_URL is not in
-                environment variables
         """
-        if self.s3_endpoint:
-            assert "FSSPEC_S3_ENDPOINT_URL" in os.environ
-        else:
-            self._ensure_local_dir(path)
-
-        df.to_csv(self._get_full_path(path), index=index, header=header)
+        full_path = self._get_full_path(path)
+        self._ensure_local_dir(full_path)
+        df.to_csv(full_path, index=index, header=header)
 
     def listdir(self, path: str) -> list[str]:
         """List files in directory.
@@ -261,13 +221,8 @@ class FileHandler:
         Returns:
             List of filenames in the directory
         """
-        if self.s3_endpoint:
-            full_path = self._get_full_path(path)
-            files = list(self.s3.ls(full_path))
-            # Extract just the filenames from full paths
-            return [os.path.basename(file) for file in files]
-        else:
-            return os.listdir(path)
+        full_path = self._get_full_path(path)
+        return os.listdir(full_path)
 
     def isfile(self, path: str) -> bool:
         """Check if path is a file.
@@ -278,10 +233,8 @@ class FileHandler:
         Returns:
             True if path is a file, False otherwise
         """
-        if self.s3_endpoint:
-            return self.s3.isfile(self._get_full_path(path))
-        else:
-            return os.path.isfile(path)
+        full_path = self._get_full_path(path)
+        return os.path.isfile(full_path)
 
     def makedirs(self, path: str, exist_ok: bool = True) -> None:
         """Create directories.
@@ -290,47 +243,9 @@ class FileHandler:
             path: Directory path to create
             exist_ok: If True, don't raise error if directory exists
         """
-        if not self.s3_endpoint:
-            os.makedirs(path, exist_ok=exist_ok)
-
-    def download(
-        self, remote_path: str, local_path: str, recursive: bool = False, **kwargs: Any
-    ) -> None:
-        """Download file from S3 to local.
-
-        Args:
-            remote_path: S3 path to download from
-            local_path: Local path to download to
-            recursive: Whether to download recursively
-            **kwargs: Additional arguments for S3 download
-
-        Raises:
-            ValueError: If S3 endpoint is not set
-        """
-        if not self.s3_endpoint:
-            raise ValueError("download() only works with S3 endpoint")
-        self.s3.download(
-            self._get_full_path(remote_path), local_path, recursive=recursive, **kwargs
-        )
-
-    def upload(
-        self, local_path: str, remote_path: str, recursive: bool = False, **kwargs: Any
-    ) -> None:
-        """Upload file from local to S3.
-
-        Args:
-            local_path: Local path to upload from
-            remote_path: S3 path to upload to
-            recursive: Whether to upload recursively
-            **kwargs: Additional arguments for S3 upload
-
-        Raises:
-            ValueError: If S3 endpoint is not set
-        """
-        if not self.s3_endpoint:
-            raise ValueError("upload() only works with S3 endpoint")
-        self.s3.put(local_path, self._get_full_path(remote_path), recursive=recursive, **kwargs)
+        full_path = self._get_full_path(path)
+        os.makedirs(full_path, exist_ok=exist_ok)
 
 
 # Global file handler instance for convenience
-input_handler = FileHandler(os.environ.get("S3_ENDPOINT"), bucket="input")
+input_handler = FileHandler()
