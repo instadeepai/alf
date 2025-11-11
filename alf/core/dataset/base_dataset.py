@@ -25,8 +25,7 @@ from alf.core.dataclasses.labeled_candidates import Candidate, LabeledCandidates
 from alf.core.dataset.splitting_utils import split_dataset
 from alf.core.utils.io import input_handler
 
-logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
-log = logging.getLogger("rich")
+log = logging.getLogger("alf-core")
 
 
 class BaseDataset(abc.ABC):

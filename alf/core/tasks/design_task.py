@@ -21,8 +21,7 @@ from alf.core.oracle.oracle import Oracle
 from alf.core.tasks.base_task import BaseTask
 from alf.core.utils.logger import Logger
 
-logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
-log = logging.getLogger("rich")
+log = logging.getLogger("alf-core")
 
 
 class DesignTask(BaseTask):

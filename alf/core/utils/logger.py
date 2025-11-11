@@ -23,8 +23,7 @@ from neptune.utils import stringify_unsupported
 from omegaconf import DictConfig, listconfig
 from s3fs import S3FileSystem
 
-logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
-log = logging.getLogger("rich")
+log = logging.getLogger("alf-core")
 
 
 class Logger(abc.ABC):

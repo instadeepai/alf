@@ -25,8 +25,7 @@ import pandas as pd
 from alf.core.dataclasses import LabeledCandidates
 from alf.core.utils.io import input_handler
 
-logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
-log = logging.getLogger("rich")
+log = logging.getLogger("alf-core")
 
 if TYPE_CHECKING:
     from alf.core.dataset.base_dataset import BaseDataset
