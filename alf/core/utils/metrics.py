@@ -310,8 +310,6 @@ def expected_calibration_error(
     Returns:
         dict[str, float]: Dictionary with key "ece" mapping to the ECE value.
     """
-    check_variance_validity(variances, targets)
-
     grid = np.linspace(0, 1, n_grid_points)
     perc = np.zeros(n_grid_points)
     for i, cdf_cutoff in enumerate(grid):
@@ -345,8 +343,6 @@ def rank_expected_calibration_error(
     Returns:
         dict[str, float]: Dictionary with key "rank_ece" mapping to the ECE value.
     """
-    check_variance_validity(variances, targets)
-
     mean_rank, rank_variances = monte_carlo_ranking(means, variances)
     target_ranks = (-targets).argsort().argsort() + 1
 
@@ -381,7 +377,6 @@ def width(
     Raises:
         AssertionError: If alpha is not in [0, 1].
     """
-    check_variance_validity(variances, targets)
     assert (alpha >= 0) and (alpha <= 1), "alpha should be in [0,1]"
 
     max_width_dataset = targets.max() - targets.min()
@@ -421,7 +416,6 @@ def rank_width(
     Raises:
         AssertionError: If alpha is not in [0, 1].
     """
-    check_variance_validity(variances, targets)
     assert (alpha >= 0) and (alpha <= 1), "alpha should be in [0,1]"
 
     mean_rank, rank_variances = monte_carlo_ranking(means, variances)
@@ -458,7 +452,6 @@ def coverage(
     Raises:
         AssertionError: If alpha is not in [0, 1].
     """
-    check_variance_validity(variances, targets)
     assert (alpha >= 0) and (alpha <= 1), "alpha should be in [0,1]"
 
     num_stds = norm.ppf(1 - ((1 - alpha) / 2))
@@ -495,7 +488,6 @@ def rank_coverage(
     Raises:
         AssertionError: If alpha is not in [0, 1].
     """
-    check_variance_validity(variances, targets)
     assert (alpha >= 0) and (alpha <= 1), "alpha should be in [0,1]"
 
     mean_rank, rank_variances = monte_carlo_ranking(means, variances)
@@ -528,8 +520,6 @@ def residual_spearman(
         dict[str, float]: Dictionary with key "residual_spearman" mapping to
             the correlation coefficient.
     """
-    check_variance_validity(variances, targets)
-
     residuals = np.abs(targets - means)
     return {"residual_spearman": spearmanr(residuals, variances)[0]}
 
@@ -555,8 +545,6 @@ def residual_pearson(
         dict[str, float]: Dictionary with key "residual_pearson" mapping to
             the correlation coefficient.
     """
-    check_variance_validity(variances, targets)
-
     residuals = np.abs(targets - means)
     return {"residual_pearson": pearsonr(residuals, np.sqrt(variances))[0]}
 
@@ -589,7 +577,6 @@ def regret_ucb_alpha(
     Raises:
         AssertionError: If num_acquisitions is not a positive integer.
     """
-    check_variance_validity(variances, targets)
     assert isinstance(num_acquisitions, int), "num_acquisitions should be an integer."
     assert num_acquisitions > 0, "num_acquisitions should be positive"
     # Handle case where num_acquisitions > available items
