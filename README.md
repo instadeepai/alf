@@ -42,20 +42,23 @@ cd alf
 
 # Install with uv (recommended)
 uv sync --extra cpu  # or --extra gpu for GPU support
-
-# Or install with pip
-pip install -e .
 ```
 
-### Install with optional dependencies
+Alternatively, this library can be installed with pip from this private GitHub repository, like this:
 
-```bash
-# For CPU support (PyTorch CPU version)
-uv sync --extra cpu
-
-# For GPU support (PyTorch GPU version)
-uv sync --extra gpu
 ```
+pip install git+https://github.com/instadeepai/alf
+```
+
+To authenticate, we recommend to set up a `.netrc` file in your home directory with a GitHub personal access token:
+
+```
+machine github.com login <USERNAME> password <TOKEN>
+```
+
+The tool `pip` will automatically make use of these credentials for authentication. For more information on creating personal access tokens, see [this](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
+
+
 
 ## 🚀 Quick Start
 
