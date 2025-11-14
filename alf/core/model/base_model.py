@@ -29,11 +29,11 @@ class BaseModel(abc.ABC):
     """
 
     @abc.abstractmethod
-    def featurise(self, inputs: Union[LabeledCandidates, list[Candidate]]) -> Any:
+    def featurise(self, inputs: list[Candidate]) -> Any:
         """Convert inputs into feature representations.
 
         Args:
-            inputs: Either LabeledCandidates or a list of Candidate objects to featurize.
+            inputs: List of Candidate objects to featurize.
 
         Returns:
             Any: Feature representation of the inputs (format depends on implementation).
