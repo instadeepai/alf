@@ -15,13 +15,9 @@
 
 import abc
 
-import numpy as np
-
 from alf.core.dataclasses import Candidate, TaskState
 from alf.core.model.base_model import BaseModel
 from alf.core.optimizer.metrics import compute_recall, compute_regret
-
-EMPTY_ARRAY: np.ndarray = np.array([])
 
 
 class BaseSearch(abc.ABC):
