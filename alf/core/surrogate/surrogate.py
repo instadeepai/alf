@@ -27,7 +27,13 @@ class Surrogate:
     Any BaseModel child class can be used as a surrogate model.
     """
 
-    model: BaseModel
+    def __init__(self, model: BaseModel):
+        """Initialize the Surrogate with a model.
+
+        Args:
+            model: The BaseModel instance to use as the surrogate model.
+        """
+        self.model = model
 
     def fit(
         self,
