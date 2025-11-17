@@ -14,27 +14,10 @@
 
 import time
 
-from alf.core.dataclasses import Candidate, LabeledCandidates, TaskState
+from alf.core.dataclasses import Candidate, TaskState
 from alf.core.optimizer.acquisition_function import AcquisitionFunction
 from alf.core.optimizer.search import BaseSearch
 from alf.core.utils.logger import Logger
-
-
-def select_top_k(candidates: LabeledCandidates, k: int) -> LabeledCandidates:
-    """Select the top k candidates based on their label values.
-
-    Args:
-        candidates: LabeledCandidates to select from.
-        k: Number of top candidates to select.
-
-    Returns:
-        LabeledCandidates: New LabeledCandidates object containing the top k candidates
-            sorted by label values (highest first).
-    """
-    top_k_indices = candidates.labels.argsort()[::-1][:k]
-    top_k_candidates = [candidates.candidates[i] for i in top_k_indices]
-    top_k_labels = candidates.labels[top_k_indices]
-    return LabeledCandidates(top_k_candidates, top_k_labels)
 
 
 class Optimizer:
@@ -86,9 +69,7 @@ class Optimizer:
         else:
             search_candidates = self.search_fn(state)
             acquisition_candidates = self.acquisition_fn(search_candidates, state)
-            acquired_candidates = select_top_k(
-                acquisition_candidates, state.acq_batch_size
-            ).candidates
+            acquired_candidates = acquisition_candidates.get_top_k(state.acq_batch_size).candidates
 
         t1 = time.perf_counter()
         state.round_metrics.update({"ask_time": t1 - t0})

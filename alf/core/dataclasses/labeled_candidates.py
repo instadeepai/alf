@@ -196,3 +196,18 @@ class LabeledCandidates:
             rows.append(d)
 
         return pd.DataFrame.from_records(rows)
+
+    def get_top_k(self, k: int) -> "LabeledCandidates":
+        """Return the top k candidates based on their label values.
+
+        Args:
+            k: Number of top candidates to select.
+
+        Returns:
+            LabeledCandidates: New LabeledCandidates object containing the top k candidates
+                sorted by label values (highest first).
+        """
+        top_k_indices = self.labels.argsort()[::-1][:k]
+        top_k_candidates = [self.candidates[i] for i in top_k_indices]
+        top_k_labels = self.labels[top_k_indices]
+        return LabeledCandidates(candidates=top_k_candidates, labels=top_k_labels)
