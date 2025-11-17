@@ -29,14 +29,14 @@ class Oracle:
     For online optimization tasks, the oracle is a model.
     """
 
-    def __init__(self, module: BaseModel | BaseDataset) -> None:
+    def __init__(self, scorer: BaseModel | BaseDataset) -> None:
         """Initialize the oracle with a model or dataset.
 
         Args:
-            module: Either a BaseModel (for online evaluation) or BaseDataset
+            scorer: Either a BaseModel (for online evaluation) or BaseDataset
                 (for offline evaluation from a dataset).
         """
-        self.module: BaseModel | BaseDataset = module
+        self.scorer: BaseModel | BaseDataset = scorer
 
     def evaluate(
         self, candidates: list[Candidate], state: TaskState
@@ -53,11 +53,11 @@ class Oracle:
                 - TaskState: Updated state with oracle_time metric
         """
         t0 = time.perf_counter()
-        if isinstance(self.module, BaseDataset):
-            evaluated_candidates = self.module.query(candidates)
+        if isinstance(self.scorer, BaseDataset):
+            evaluated_candidates = self.scorer.query(candidates)
         else:
             evaluated_candidates = LabeledCandidates(
-                candidates=candidates, labels=self.module.predict(candidates).means
+                candidates=candidates, labels=self.scorer.predict(candidates).means
             )
         t1 = time.perf_counter()
         state.round_metrics.update({"oracle_time": t1 - t0})
@@ -70,6 +70,6 @@ class Oracle:
             dict[str, Union[float, int, np.number]]: Dictionary of metric names to values.
                 Returns empty dict if the module doesn't provide metrics.
         """
-        if hasattr(self.module, "get_metrics"):
-            return self.module.get_metrics()
+        if hasattr(self.scorer, "get_metrics"):
+            return self.scorer.get_metrics()
         return {}

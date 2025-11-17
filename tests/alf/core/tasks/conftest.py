@@ -28,7 +28,7 @@ def dummy_dataset():
 @pytest.fixture
 def oracle(dummy_dataset):
     """Fixture to create an oracle for testing."""
-    return Oracle(module=dummy_dataset)
+    return Oracle(scorer=dummy_dataset)
 
 
 @pytest.fixture
