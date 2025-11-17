@@ -104,7 +104,7 @@ class BaseTask(abc.ABC):
         Raises:
             AssertionError: If save_round_predictions is True but filename is empty.
         """
-        if len(state.dataset.test_dataset) > 0 and state.surrogate:
+        if len(state.dataset.test_dataset) > 0:
             predictions = state.surrogate.predict(state.dataset.test_dataset.candidates)
             results = Results(predictions=predictions, targets=state.dataset.test_dataset.labels)
 

@@ -93,12 +93,11 @@ class Optimizer:
             TaskState: Updated state with tell_time and optimizer metrics.
         """
         t0 = time.perf_counter()
-        if state.surrogate:
-            state.surrogate.fit(
-                train_data=state.dataset.train_dataset,
-                val_data=state.dataset.validation_dataset,
-                logger=logger,
-            )
+        state.surrogate.fit(
+            train_data=state.dataset.train_dataset,
+            val_data=state.dataset.validation_dataset,
+            logger=logger,
+        )
         t1 = time.perf_counter()
 
         state.round_metrics.update({"tell_time": t1 - t0})
