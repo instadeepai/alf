@@ -25,11 +25,8 @@ log = logging.getLogger("alf-core")
 
 
 class DesignTask(BaseTask):
-    """Multi-round active learning task for iterative design optimization.
-
-    Performs multiple rounds of candidate acquisition, evaluation, and model training
-    to iteratively improve the surrogate model and discover high-performing candidates
-    or candidates with high uncertainty.
+    """Multi-round design task for iteratively optimising the surrogate model.
+    Performs multiple rounds of candidate acquisition, evaluation, and model training.
     """
 
     def __init__(self, **kwargs: Any) -> None:
