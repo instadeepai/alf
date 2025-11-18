@@ -16,10 +16,10 @@
 import abc
 import copy
 import logging
+import math
 import os
 from typing import Any, Union
 
-import math
 import numpy as np
 
 from alf.core.dataclasses.labeled_candidates import Candidate, LabeledCandidates
