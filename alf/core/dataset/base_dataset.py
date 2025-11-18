@@ -215,8 +215,10 @@ class BaseDataset(abc.ABC):
         # Split the acquired candidates into train and validation splits based on the split ratio
         num_val = int(len(acquired_candidates) * self.split_ratio["validation"])
         shuffled_acquired_candidates = acquired_candidates.shuffle(self.seed)
-        self.splits["train"].append(shuffled_acquired_candidates[:-num_val])
-        self.splits["validation"].append(shuffled_acquired_candidates[-num_val:])
+        self.splits["train"].append(LabeledCandidates(*shuffled_acquired_candidates[:-num_val]))
+        self.splits["validation"].append(
+            LabeledCandidates(*shuffled_acquired_candidates[-num_val:])
+        )
 
     def save_splits(self, output_dir: str, _verbose: bool = False) -> None:
         """Save dataset splits to CSV files in the output directory.

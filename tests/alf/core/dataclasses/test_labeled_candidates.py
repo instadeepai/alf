@@ -152,10 +152,10 @@ class TestLabeledCandidatesGetItem:
         lc = LabeledCandidates(candidates=candidates, labels=labels)
 
         item = lc[1]
-        assert isinstance(item, LabeledCandidates)
-        assert len(item) == 1
-        assert item.candidates[0].data == "b"
-        np.testing.assert_array_equal(item.labels, np.array([1]))
+        assert isinstance(item, tuple)
+        candidates, labels = item
+        assert candidates[0].data == "b"
+        np.testing.assert_array_equal(labels, np.array([1]))
 
     def test_getitem_slice_returns_subcollection(self):
         """Test that slicing returns a subcollection of LabeledCandidates."""
@@ -168,17 +168,11 @@ class TestLabeledCandidatesGetItem:
         lc = LabeledCandidates(candidates=candidates, labels=labels)
 
         sub = lc[1:3]
-        assert len(sub) == 2
-        assert [c.data for c in sub.candidates] == ["b", "c"]
-        np.testing.assert_array_equal(sub.labels, np.array([1, 0]))
-
-    def test_getitem_invalid_index_type_raises(self):
-        """Test that indexing with invalid type raises TypeError."""
-        candidates = [Candidate(data="a", modality="sequence")]
-        labels = np.array([0])
-        lc = LabeledCandidates(candidates=candidates, labels=labels)
-        with pytest.raises(TypeError, match="Indices must be integers or slices"):
-            _ = lc["bad"]  # type: ignore[index]
+        candidates, labels = sub
+        assert len(candidates) == 2
+        assert len(labels) == 2
+        assert [c.data for c in candidates] == ["b", "c"]
+        np.testing.assert_array_equal(labels, np.array([1, 0]))
 
 
 class TestLabeledCandidatesValidateShuffleSortRemove:

@@ -52,29 +52,19 @@ class LabeledCandidates:
         """
         return len(self.candidates)
 
-    def __getitem__(self, index: Union[int, slice]) -> "LabeledCandidates":
+    def __getitem__(self, index: Union[int, slice]) -> tuple[list[Candidate], np.ndarray]:
         """Make LabeledCandidates subscriptable.
 
         Args:
             index: Integer index or slice to select candidates and labels.
 
         Returns:
-            LabeledCandidates: A new LabeledCandidates object containing:
-                - For integer index: the single candidate and label at that index
-                - For slice: the candidates and labels in the specified range
-
-        Raises:
-            TypeError: If index is not an integer or slice.
+            tuple[list[Candidate], np.ndarray]: The candidates and labels at the specified index or slice.
         """
         if isinstance(index, int):
-            return LabeledCandidates(
-                candidates=[self.candidates[index]],
-                labels=np.array([self.labels[index]]),
-            )
-        elif isinstance(index, slice):
-            return LabeledCandidates(candidates=self.candidates[index], labels=self.labels[index])
-        else:
-            raise TypeError(f"Indices must be integers or slices, not {type(index).__name__}")
+            return ([self.candidates[index]], [self.labels[index]])
+
+        return (self.candidates[index], self.labels[index])
 
     @property
     def data(self) -> list[Any]:

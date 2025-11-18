@@ -77,16 +77,16 @@ def split_random(
     shuffled_candidates = dataset.shuffle(seed=seed)
 
     start_idx = 0
-    train = shuffled_candidates[start_idx : start_idx + train_size]
+    train = LabeledCandidates(*shuffled_candidates[start_idx : start_idx + train_size])
     start_idx += train_size
 
-    validation = shuffled_candidates[start_idx : start_idx + validation_size]
+    validation = LabeledCandidates(*shuffled_candidates[start_idx : start_idx + validation_size])
     start_idx += validation_size
 
-    test = shuffled_candidates[start_idx : start_idx + test_size]
+    test = LabeledCandidates(*shuffled_candidates[start_idx : start_idx + test_size])
     start_idx += test_size
 
-    candidate_pool = shuffled_candidates[start_idx:]
+    candidate_pool = LabeledCandidates(*shuffled_candidates[start_idx:])
 
     return {
         "train": train,
@@ -129,12 +129,16 @@ def split_low_vs_high(
     high_scoring_indices = sorted_indices[train_plus_validation_size:]
 
     # Randomly shuffle within each group
-    shuffled_low = dataset[np.random.RandomState(seed).permutation(low_scoring_indices)]
-    shuffled_high = dataset[np.random.RandomState(seed).permutation(high_scoring_indices)]
+    shuffled_low = LabeledCandidates(
+        *dataset[np.random.RandomState(seed).permutation(low_scoring_indices)]
+    )
+    shuffled_high = LabeledCandidates(
+        *dataset[np.random.RandomState(seed).permutation(high_scoring_indices)]
+    )
 
     return {
-        "train": shuffled_low[:train_size],
-        "validation": shuffled_low[train_size:],
-        "test": shuffled_high[:test_size],
-        "candidate_pool": shuffled_high[test_size:],
+        "train": LabeledCandidates(*shuffled_low[:train_size]),
+        "validation": LabeledCandidates(*shuffled_low[train_size:]),
+        "test": LabeledCandidates(*shuffled_high[:test_size]),
+        "candidate_pool": LabeledCandidates(*shuffled_high[test_size:]),
     }
