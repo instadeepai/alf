@@ -20,8 +20,8 @@ def expected_metrics():
             "round_min": 0.66444,
         },
         "optimizer": {
-            "top_percentile_recall": 1.00000,
-            "top_n_recall": 1.00000,
+            "top_10pc_recall": 1.00000,
+            "top_100_recall": 1.00000,
             "regret": -0.01515,
         },
         "surrogate": {

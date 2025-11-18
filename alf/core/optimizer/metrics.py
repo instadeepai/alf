@@ -57,8 +57,8 @@ def compute_recall(
     top_n_recall = min(top_n_recall, 1)
 
     return {
-        "optimizer/top_percentile_recall": top_percentile_recall,
-        "optimizer/top_n_recall": top_n_recall,
+        f"optimizer/top_{top_percentile * 100:.0f}pc_recall": top_percentile_recall,
+        f"optimizer/top_{top_n}_recall": top_n_recall,
     }
 
 
