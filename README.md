@@ -10,20 +10,20 @@
 
 **ALF** is a Python package for performing active learning experiments to facilitate
 iterative optimization of design targets (e.g., proteins, molecules, materials) through
-intelligent candidate selection and evaluation.
+intelligent candidate selection (data acquisition), model adaptation, and evaluation.
 
 ## ✨ Features
 
 - **Modular Architecture**: Flexible, extensible components that can be easily swapped
   and customized
-- **Multiple experiment setups**: Support for multi-round active learning, supervised
+- **Multiple experiment setups**: Support for multi-round optimisation, supervised
   learning, and zero-shot evaluation
 - **Diverse Acquisition Strategies**: Built-in acquisition functions (Greedy, UCB,
   Expected Improvement, Thompson Sampling)
-- **Flexible Search Methods**: Support for dataset-based, generator-based, and
-  protocol-based search strategies
+- **Flexible Search Methods**: Support for local (dataset-based and protocol-based
+  e.g. mutagenesis) and global (generative-based) search stratgies
 - **Offline and Online Evaluation**: Support for both offline (dataset-based) and
-  online (model-based) optimization scenarios
+  online (model-based or an external objective function) optimization scenariosd
 - **Comprehensive Testing**: Full test coverage with end-to-end experiments
 
 ## 📦 Installation
@@ -62,7 +62,7 @@ The tool `pip` will automatically make use of these credentials for authenticati
 
 ## 🚀 Quick Start
 
-### Design Task (Active Learning)
+### Design Task
 
 ```python
 from alf.core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask, TerminalLogger
