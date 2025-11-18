@@ -21,7 +21,12 @@ from alf.core.optimizer.metrics import compute_recall, compute_regret
 
 
 class BaseSearch(abc.ABC):
-    """Base class for all types of search methods."""
+    """Base class for all types of search methods.
+
+    Search methods provide a way of searching the design space in order to propose new candidates
+    not yet observed in the training dataset. This can be achieved in multiple ways depending on
+    the search protocol, or availability of ground truth labels.
+    """
 
     @abc.abstractmethod
     def __call__(self, task_state: TaskState, **kwargs) -> list[Candidate]:
