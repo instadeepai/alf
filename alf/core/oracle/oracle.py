@@ -24,7 +24,7 @@ from alf.core.model.base_model import BaseModel
 
 
 class Oracle:
-    """Oracle model is used to evaluate the candidates.
+    """Oracle model is used to evaluate new candidates proposed by the search/optimiser process.
     For offline optimization tasks, the oracle is the dataset.
     For online optimization tasks, the oracle is a model.
     """
