@@ -157,7 +157,7 @@ class BaseDataset(abc.ABC):
         assert "split_ratio" in split_config, "Split ratio must be set"
         assert "split_type" in split_config, "Split type must be set"
         assert "train" and "test" and "validation" in split_config["split_ratio"], (
-            "Train, test, and validation splits ratio must be set"
+            "Train, test, and validation splits ratio must be set and their sum must not exceed 1"
         )
 
     def _split_dataset(self) -> dict[str, LabeledCandidates]:
