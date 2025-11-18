@@ -59,7 +59,8 @@ class LabeledCandidates:
             index: Integer index or slice to select candidates and labels.
 
         Returns:
-            tuple[list[Candidate], np.ndarray]: The candidates and labels at the specified index or slice.
+            tuple[list[Candidate], np.ndarray]: The candidates and labels at the specified
+                index or slice.
         """
         if isinstance(index, int):
             return ([self.candidates[index]], [self.labels[index]])
