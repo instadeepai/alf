@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class TaskState:
-    """Tracks the state of an active learning / optimization task.
+    """Tracks the state of a task.
 
     Attributes:
         dataset: The dataset containing train/validation/test splits and candidate pool.
