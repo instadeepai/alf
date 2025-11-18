@@ -19,6 +19,7 @@ import logging
 import os
 from typing import Any, Union
 
+import math
 import numpy as np
 
 from alf.core.dataclasses.labeled_candidates import Candidate, LabeledCandidates
@@ -173,10 +174,10 @@ class BaseDataset(abc.ABC):
         assert self._raw_dataset is not None, "Dataset must be loaded before splitting"
 
         # Calculate split sizes
-        train_plus_validation_size = int(len(self._raw_dataset) * self.split_ratio["train"])
-        validation_size = int(train_plus_validation_size * self.split_ratio["validation"])
+        train_plus_validation_size = math.floor(len(self._raw_dataset) * self.split_ratio["train"])
+        validation_size = math.floor(train_plus_validation_size * self.split_ratio["validation"])
         train_size = train_plus_validation_size - validation_size
-        test_size = int(len(self._raw_dataset) * self.split_ratio["test"])
+        test_size = math.floor(len(self._raw_dataset) * self.split_ratio["test"])
 
         # Perform split based on type
         datasets_dict = split_dataset(
@@ -215,6 +216,7 @@ class BaseDataset(abc.ABC):
         # Split the acquired candidates into train and validation splits based on the split ratio
         num_val = int(len(acquired_candidates) * self.split_ratio["validation"])
         shuffled_acquired_candidates = acquired_candidates.shuffle(self.seed)
+        # Add num_val candidates to validation split and the rest to train split
         self.splits["train"].append(LabeledCandidates(*shuffled_acquired_candidates[:-num_val]))
         self.splits["validation"].append(
             LabeledCandidates(*shuffled_acquired_candidates[-num_val:])
