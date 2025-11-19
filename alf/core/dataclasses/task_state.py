@@ -41,8 +41,6 @@ class TaskState:
         surrogate: The surrogate model used for predictions.
         round: Current round number in the active learning loop.
         acq_batch_size: Number of candidates to acquire per round.
-        num_acq_rounds: Total number of acquisition rounds to run.
-        save_round_predictions: Whether to save predictions at each round.
         history: List of LabeledCandidates acquired in each round.
         round_metrics: Dictionary of metrics computed for the current round.
     """
@@ -51,8 +49,6 @@ class TaskState:
     surrogate: "Surrogate"
     round: int = 0
     acq_batch_size: int = 0
-    num_acq_rounds: int = 0
-    save_round_predictions: bool = False
     history: list = field(default_factory=list)
     round_metrics: dict[str, Any] = field(default_factory=dict)
 

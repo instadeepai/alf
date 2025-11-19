@@ -93,7 +93,7 @@ class DesignTask(BaseTask):
             oracle: Oracle for evaluating candidate labels.
             save_path: Optional directory path to save dataset splits and predictions.
         """
-        log.info(f"Multi-round Design Task: {state.num_acq_rounds} Rounds")
+        log.info(f"Multi-round Design Task: {self.num_acq_rounds} Rounds")
 
         if save_path:
             state.dataset.save_splits(save_path, _verbose=True)
@@ -103,7 +103,7 @@ class DesignTask(BaseTask):
         if len(state.dataset.train_dataset) > 0:
             state = self.run_initial_train_round(state, logger, save_path)
 
-        for round_i in range(1, state.num_acq_rounds + 1):
+        for round_i in range(1, self.num_acq_rounds + 1):
             state.round_metrics = {"round": round_i}
             acquired_candidates, state = optimizer.ask(state)
             labeled_candidates, state = oracle.evaluate(acquired_candidates, state)

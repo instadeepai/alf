@@ -63,8 +63,6 @@ class BaseTask(abc.ABC):
             dataset=dataset,
             surrogate=surrogate,
             acq_batch_size=self.acq_batch_size,
-            num_acq_rounds=self.num_acq_rounds,
-            save_round_predictions=self.save_round_predictions,
         )
 
     @abc.abstractmethod
