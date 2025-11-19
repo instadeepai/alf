@@ -22,6 +22,7 @@ from typing import Any, Union
 
 import numpy as np
 
+from alf.core.dataclasses.candidate import Modality
 from alf.core.dataclasses.labeled_candidates import Candidate, LabeledCandidates
 from alf.core.dataset.splitting_utils import split_dataset
 from alf.core.utils.io import input_handler
@@ -45,7 +46,12 @@ class BaseDataset(abc.ABC):
                 - "split_type": Type of split ("random" or "low_vs_high")
         """
         self.name = name
-        self.modality = modality
+        # Validate and convert modality string to Modality enum
+        valid_modalities = [m.value for m in Modality]
+        assert modality in valid_modalities, (
+            f"Invalid modality: {modality}. Must be one of {valid_modalities}"
+        )
+        self.modality = Modality(modality)
         self.seed = seed
         self.rng = np.random.RandomState(seed)
         self.validate_split_config(split_config)

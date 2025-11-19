@@ -14,7 +14,14 @@
 
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any
+
+
+class Modality(Enum):
+    """Enum for different data modalities."""
+
+    SEQUENCE = "sequence"
 
 
 @dataclass
@@ -28,7 +35,7 @@ class Candidate:
     """
 
     data: Any
-    modality: str
+    modality: Modality
     features: dict | None = None
 
     def __post_init__(self) -> None:
@@ -53,7 +60,7 @@ class Candidate:
         Raises:
             ValueError: If the modality is not "sequence" (other modalities not yet supported).
         """
-        if self.modality == "sequence":
+        if self.modality == Modality.SEQUENCE:
             return self.data
         else:
             # TODO: Implement stringification for other modalities
