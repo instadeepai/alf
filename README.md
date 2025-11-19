@@ -23,7 +23,9 @@ intelligent candidate selection (data acquisition), model adaptation, and evalua
 - **Flexible Search Methods**: Support for local (dataset-based and protocol-based
   e.g. mutagenesis) and global (generative-based) search stratgies
 - **Offline and Online Evaluation**: Support for both offline (dataset-based) and
-  online (model-based or an external objective function) optimization scenariosd
+  online (model-based or an external objective function) optimization scenarios
+- **Evaluation Metrics and Plots**: Comprehensive metrics and visualizations for
+  assessing prediction accuracy and uncertainty calibration of surrogate models
 - **Comprehensive Testing**: Full test coverage with end-to-end experiments
 
 ## 📦 Installation

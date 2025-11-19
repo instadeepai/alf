@@ -27,7 +27,7 @@ This README is organized into the following sections:
   learning tasks
 
 ### Task Types
-- **[1. Design Task (`DesignTask`)](#1-design-task-designtask)** - Multi-round active learning loop
+- **[1. Design Task (`DesignTask`)](#1-design-task-designtask)** - Multi-round optimisation loop
 - **[2. Supervised Task (`SupervisedTask`)](#2-supervised-task-supervisedtask)** - Train and
   evaluate on fixed data
 - **[3. Zero-Shot Task (`ZeroShotTask`)](#3-zero-shot-task-zeroshottask)** - Evaluate
@@ -37,6 +37,9 @@ This README is organized into the following sections:
 - **[Design Task Flow](#design-task-flow)**
 - **[Supervised Task Flow](#supervised-task-flow)**
 - **[Zero-Shot Task Flow](#zero-shot-task-flow)**
+
+### Evaluation Utilities
+- **[Evaluation Metrics and Plots](#evaluation-metrics-and-plots)** - Metrics and visualizations for predictions of the surrogate model
 
 ## Core Components
 
@@ -289,3 +292,48 @@ The zero-shot task evaluates a pre-trained or untrained model without training:
    ├─ Results(predictions, targets) → metrics
    └─ State.save(metrics)
    ```
+
+## Evaluation Metrics and Plots
+
+ALF provides comprehensive utilities for evaluating surrogate model predictions through metrics and visualizations (see `utils/metrics.py` and `utils/plots.py`).
+
+### Metrics
+
+Metrics are automatically registered and categorized by their variance requirements:
+
+**Accuracy Metrics** (no variance required):
+- **MSE**: Mean Squared Error between predictions and targets
+- **Pearson**: Pearson correlation coefficient measuring linear relationship
+- **Spearman**: Spearman correlation coefficient measuring monotonic relationship
+- **Pairwise XEnt**: Ranking loss for pairwise classification
+
+**Calibration Metrics** (variance required):
+- **ECE** (Expected Calibration Error): Area between observed coverage and ideal calibration curve
+- **Rank ECE**: ECE computed in rank space using Monte Carlo ranking
+- **Coverage**: Percentage of targets falling within confidence intervals at a given alpha level
+- **Rank Coverage**: Coverage computed in rank space
+- **Width**: Average confidence interval width normalized by dataset range
+- **Rank Width**: Width computed in rank space
+
+**Uncertainty Quality Metrics** (variance required):
+- **Residual Spearman**: Spearman correlation between absolute residuals and predicted variances
+- **Residual Pearson**: Pearson correlation between absolute residuals and standard deviations
+
+**Acquisition Performance Metrics** (variance required):
+- **Regret UCB Alpha**: UCB acquisition regret comparing selected vs optimal candidates
+- **Regret UCB Alpha Sweep**: UCB regret computed across multiple alpha exploration parameters
+
+All metrics accept predictions (means, variances, targets) and return a dictionary of computed values. Metrics requiring variance will validate that uncertainty estimates are provided.
+
+### Plots
+
+Plots are similarly registered and categorized by variance requirements:
+
+**Basic Visualization** (no variance required):
+- **Predictions Scatter**: Scatter plot of predictions vs targets with performance metrics
+- **Ranks Scatter**: Scatter plot of predicted ranks vs true ranks
+
+**Uncertainty Visualization** (variance required):
+- **ECE Plot**: Observed coverage vs confidence level with calibration curve
+- **Predictions Scatter with CI**: Predictions vs targets with confidence interval error bars
+- **Variance Histogram**: Distribution of predicted variances
