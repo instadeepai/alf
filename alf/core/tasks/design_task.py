@@ -41,7 +41,16 @@ class DesignTask(BaseTask):
     def run_initial_train_round(
         self, state: TaskState, logger: Logger, save_path: str | None = None
     ) -> TaskState:
-        """Run the initial train round."""
+        """Run the initial train round on the train and validation sets.
+
+        Args:
+            state: Task state with dataset and surrogate.
+            logger: Logger for recording metrics.
+            save_path: Optional directory path to save predictions.
+
+        Returns:
+            TaskState: Updated state with surrogate fine-tuned on the train and validation sets.
+        """
         log.info("Running initial round of surrogate model fine-tuning on the train dataset ...")
         state.surrogate.fit(
             train_data=state.dataset.train_dataset,
