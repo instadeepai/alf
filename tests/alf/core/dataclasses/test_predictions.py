@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alf.core.dataclasses.candidate import Candidate
+from alf.core.dataclasses.candidate import Candidate, Modality
 from alf.core.dataclasses.predictions import Predictions
 
 
@@ -102,9 +102,9 @@ class TestPredictionsSavePredictions:
             predictions = Predictions(means=means, variances=variances)
 
             candidates = [
-                Candidate(data="seq1", modality="sequence"),
-                Candidate(data="seq2", modality="sequence"),
-                Candidate(data="seq3", modality="sequence"),
+                Candidate(data="seq1", modality=Modality.SEQUENCE),
+                Candidate(data="seq2", modality=Modality.SEQUENCE),
+                Candidate(data="seq3", modality=Modality.SEQUENCE),
             ]
             targets = np.array([1.1, 2.1, 3.1])
 
@@ -141,8 +141,8 @@ class TestPredictionsSavePredictions:
             )
 
             candidates = [
-                Candidate(data="seq1", modality="sequence"),
-                Candidate(data="seq2", modality="sequence"),
+                Candidate(data="seq1", modality=Modality.SEQUENCE),
+                Candidate(data="seq2", modality=Modality.SEQUENCE),
             ]
             targets = np.array([1.1, 2.1])
 
@@ -171,9 +171,9 @@ class TestPredictionsSavePredictions:
             predictions = Predictions(means=means)  # No variances
 
             candidates = [
-                Candidate(data="seq1", modality="sequence"),
-                Candidate(data="seq2", modality="sequence"),
-                Candidate(data="seq3", modality="sequence"),
+                Candidate(data="seq1", modality=Modality.SEQUENCE),
+                Candidate(data="seq2", modality=Modality.SEQUENCE),
+                Candidate(data="seq3", modality=Modality.SEQUENCE),
             ]
             targets = np.array([1.1, 2.1, 3.1])
 
@@ -196,8 +196,8 @@ class TestPredictionsSavePredictions:
             predictions = Predictions(means=means, variances=variances)  # No empirical_dist
 
             candidates = [
-                Candidate(data="seq1", modality="sequence"),
-                Candidate(data="seq2", modality="sequence"),
+                Candidate(data="seq1", modality=Modality.SEQUENCE),
+                Candidate(data="seq2", modality=Modality.SEQUENCE),
             ]
             targets = np.array([1.1, 2.1])
 

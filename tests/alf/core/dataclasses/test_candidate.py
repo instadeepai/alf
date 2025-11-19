@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 import torch
 
-from alf.core.dataclasses.candidate import Candidate
+from alf.core.dataclasses.candidate import Candidate, Modality
 
 
 class TestCandidateInitialization:
@@ -12,31 +12,34 @@ class TestCandidateInitialization:
 
     def test_candidate_with_no_features(self):
         """Test Candidate initialization with no features."""
-        candidate = Candidate(data="test", modality="test")
+        candidate = Candidate(data="test", modality=Modality.SEQUENCE)
         assert candidate.data == "test"
-        assert candidate.modality == "test"
+        assert candidate.modality == Modality.SEQUENCE
         assert candidate.features == {}
 
     def test_candidate_with_features(self):
         """Test Candidate initialization with features."""
         features = {"feature1": "value1", "feature2": 42}
-        candidate = Candidate(data="test", modality="test", features=features)
+        candidate = Candidate(data="test", modality=Modality.SEQUENCE, features=features)
         assert candidate.data == "test"
-        assert candidate.modality == "test"
+        assert candidate.modality == Modality.SEQUENCE
         assert candidate.features == features
 
     def test_candidate_with_none_features(self):
         """Test Candidate initialization with None features (should default to empty dict)."""
-        candidate = Candidate(data="test", modality="test", features=None)
+        candidate = Candidate(data="test", modality=Modality.SEQUENCE, features=None)
         assert candidate.data == "test"
-        assert candidate.modality == "test"
+        assert candidate.modality == Modality.SEQUENCE
         assert candidate.features == {}
 
     def test_candidate_repr(self):
         """Test Candidate string representation."""
-        candidate = Candidate(data="test", modality="test", features={"key": "value"})
+        candidate = Candidate(data="test", modality=Modality.SEQUENCE, features={"key": "value"})
         repr_str = repr(candidate)
-        assert repr_str == "Candidate(data=test, modality=test, features={'key': 'value'})"
+        assert (
+            repr_str
+            == "Candidate(data=test, modality=Modality.SEQUENCE, features={'key': 'value'})"
+        )
 
 
 class TestCandidateDataModalities:
@@ -45,15 +48,15 @@ class TestCandidateDataModalities:
     def test_sequence_modality(self):
         """Test Candidate with sequence data (string)."""
         seq_data = "MKTFFVAGLVLLLTICSASG"  # protein sequence
-        candidate = Candidate(data=seq_data, modality="sequence")
+        candidate = Candidate(data=seq_data, modality=Modality.SEQUENCE)
         assert isinstance(candidate.data, str)
-        assert candidate.modality == "sequence"
+        assert candidate.modality == Modality.SEQUENCE
         assert len(candidate.data) == 20
 
     def test_image_modality_numpy(self):
         """Test Candidate with image data (NumPy array)."""
         img_data = np.random.rand(3, 64, 64).astype(np.float32)  # RGB image
-        candidate = Candidate(data=img_data, modality="image")
+        candidate = Candidate(data=img_data, modality=Modality.IMAGE)
         assert isinstance(candidate.data, np.ndarray)
         assert candidate.data.shape == (3, 64, 64)
         assert candidate.data.dtype == np.float32
@@ -61,42 +64,42 @@ class TestCandidateDataModalities:
     def test_image_modality_torch(self):
         """Test Candidate with image data (PyTorch tensor)."""
         img_data = torch.randn(3, 64, 64, dtype=torch.float32)
-        candidate = Candidate(data=img_data, modality="image")
+        candidate = Candidate(data=img_data, modality=Modality.IMAGE)
         assert isinstance(candidate.data, torch.Tensor)
         assert candidate.data.shape == (3, 64, 64)
 
     def test_graph_modality(self):
         """Test Candidate with graph data (NetworkX graph)."""
         G = nx.erdos_renyi_graph(n=10, p=0.3)
-        candidate = Candidate(data=G, modality="graph")
+        candidate = Candidate(data=G, modality=Modality.GRAPH)
         assert isinstance(candidate.data, nx.Graph)
         assert candidate.data.number_of_nodes() == 10
 
     def test_structure_modality(self):
         """Test Candidate with 3D structure data."""
         coords = np.random.rand(50, 3)  # 50 atoms, (x,y,z)
-        candidate = Candidate(data=coords, modality="structure")
+        candidate = Candidate(data=coords, modality=Modality.STRUCTURE)
         assert isinstance(candidate.data, np.ndarray)
         assert candidate.data.shape == (50, 3)
 
     def test_tabular_modality_pandas(self):
         """Test Candidate with tabular data (pandas Series)."""
         row = pd.Series({"age": 32, "height": 178, "weight": 70})
-        candidate = Candidate(data=row, modality="tabular")
+        candidate = Candidate(data=row, modality=Modality.TABULAR)
         assert isinstance(candidate.data, pd.Series)
         assert candidate.data["age"] == 32
 
     def test_tabular_modality_dict(self):
         """Test Candidate with tabular data (dictionary)."""
         row = {"age": 32, "height": 178, "weight": 70}
-        candidate = Candidate(data=row, modality="tabular")
+        candidate = Candidate(data=row, modality=Modality.TABULAR)
         assert isinstance(candidate.data, dict)
         assert candidate.data["age"] == 32
 
     def test_embedding_modality(self):
         """Test Candidate with embedding data (PyTorch tensor)."""
         tensor_data = torch.randn(16, 128)  # sequence embeddings
-        candidate = Candidate(data=tensor_data, modality="embedding")
+        candidate = Candidate(data=tensor_data, modality=Modality.EMBEDDING)
         assert isinstance(candidate.data, torch.Tensor)
         assert candidate.data.shape == (16, 128)
 
@@ -106,31 +109,25 @@ class TestCandidateEdgeCases:
 
     def test_empty_string_data(self):
         """Test Candidate with empty string data."""
-        candidate = Candidate(data="", modality="sequence")
+        candidate = Candidate(data="", modality=Modality.SEQUENCE)
         assert candidate.data == ""  # noqa: PLC1901
-        assert candidate.modality == "sequence"
+        assert candidate.modality == Modality.SEQUENCE
 
     def test_none_data(self):
         """Test Candidate with None data."""
-        candidate = Candidate(data=None, modality="test")
+        candidate = Candidate(data=None, modality=Modality.SEQUENCE)
         assert candidate.data is None
-        assert candidate.modality == "test"
+        assert candidate.modality == Modality.SEQUENCE
 
     def test_empty_list_data(self):
         """Test Candidate with empty list data."""
-        candidate = Candidate(data=[], modality="test")
+        candidate = Candidate(data=[], modality=Modality.SEQUENCE)
         assert candidate.data == []
-        assert candidate.modality == "test"
-
-    def test_empty_dict_data(self):
-        """Test Candidate with empty dictionary data."""
-        candidate = Candidate(data={}, modality="test")
-        assert candidate.data == {}
-        assert candidate.modality == "test"
+        assert candidate.modality == Modality.SEQUENCE
 
     def test_empty_features_dict(self):
         """Test Candidate with empty features dictionary."""
-        candidate = Candidate(data="test", modality="test", features={})
+        candidate = Candidate(data="test", modality=Modality.SEQUENCE, features={})
         assert candidate.features == {}
 
     def test_nested_features(self):
@@ -140,7 +137,7 @@ class TestCandidateEdgeCases:
             "stats": {"mean": 0.5, "std": 0.1},
             "flags": [True, False, True],
         }
-        candidate = Candidate(data="test", modality="test", features=nested_features)
+        candidate = Candidate(data="test", modality=Modality.SEQUENCE, features=nested_features)
         assert candidate.features == nested_features
         assert candidate.features["metadata"]["source"] == "database"
 
@@ -150,7 +147,7 @@ class TestCandidateFeatures:
 
     def test_features_immutability_after_init(self):
         """Test that features can be modified after initialization."""
-        candidate = Candidate(data="test", modality="test", features={"key1": "value1"})
+        candidate = Candidate(data="test", modality=Modality.SEQUENCE, features={"key1": "value1"})
 
         # Modify features
         candidate.features["key2"] = "value2"
@@ -171,7 +168,7 @@ class TestCandidateFeatures:
             "numpy_array": np.array([1, 2, 3]),
             "torch_tensor": torch.tensor([1, 2, 3]),
         }
-        candidate = Candidate(data="test", modality="test", features=features)
+        candidate = Candidate(data="test", modality=Modality.SEQUENCE, features=features)
         assert candidate.features == features
 
 
@@ -180,12 +177,12 @@ class TestCandidateStringify:
 
     def test_stringify_sequence(self):
         """Test stringify method with sequence modality."""
-        candidate = Candidate(data="ACDEFG", modality="sequence")
+        candidate = Candidate(data="ACDEFG", modality=Modality.SEQUENCE)
         assert candidate.stringify() == "ACDEFG"
 
     def test_stringify_unsupported_modality_raises(self):
         """Test that stringify raises ValueError for unsupported modality."""
-        candidate = Candidate(data=123, modality="numeric")
+        candidate = Candidate(data=np.random.rand(32, 32, 3), modality=Modality.IMAGE)
         with pytest.raises(ValueError, match="Unsupported modality"):
             candidate.stringify()
 
@@ -193,12 +190,12 @@ class TestCandidateStringify:
 @pytest.mark.parametrize(
     "modality,data_factory",
     [
-        ("sequence", lambda: "ATCGATCG"),
-        ("image", lambda: np.random.rand(32, 32, 3)),
-        ("graph", lambda: nx.path_graph(5)),
-        ("structure", lambda: np.random.rand(10, 3)),
-        ("tabular", lambda: {"feature1": 1, "feature2": 2}),
-        ("embedding", lambda: torch.randn(10, 5)),
+        (Modality.SEQUENCE, lambda: "ATCGATCG"),
+        (Modality.IMAGE, lambda: np.random.rand(32, 32, 3)),
+        (Modality.GRAPH, lambda: nx.path_graph(5)),
+        (Modality.STRUCTURE, lambda: np.random.rand(10, 3)),
+        (Modality.TABULAR, lambda: {"feature1": 1, "feature2": 2}),
+        (Modality.EMBEDDING, lambda: torch.randn(10, 5)),
     ],
 )
 def test_candidate_modality_consistency(modality, data_factory):
@@ -222,5 +219,5 @@ def test_candidate_modality_consistency(modality, data_factory):
 )
 def test_candidate_features_parametrized(features):
     """Parametrized test for different feature configurations."""
-    candidate = Candidate(data="test", modality="test", features=features)
+    candidate = Candidate(data="test", modality=Modality.SEQUENCE, features=features)
     assert candidate.features == features

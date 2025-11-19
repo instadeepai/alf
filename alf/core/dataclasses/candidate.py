@@ -22,6 +22,11 @@ class Modality(Enum):
     """Enum for different data modalities."""
 
     SEQUENCE = "sequence"
+    IMAGE = "image"
+    GRAPH = "graph"
+    STRUCTURE = "structure"
+    TABULAR = "tabular"
+    EMBEDDING = "embedding"
 
 
 @dataclass
