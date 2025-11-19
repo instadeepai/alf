@@ -60,17 +60,9 @@ class Optimizer:
                 - TaskState: Updated state with ask_time metric
         """
         t0 = time.perf_counter()
-
-        # During the first round, we use the training dataset as the acquired
-        # candidates. During the subsequent rounds, we use the search and acquisition
-        # functions to acquire candidates.
-        if state.round == 0 and len(state.dataset.train_dataset) > 0:
-            acquired_candidates = state.dataset.train_dataset.candidates
-        else:
-            search_candidates = self.search_fn(state)
-            acquisition_candidates = self.acquisition_fn(search_candidates, state)
-            acquired_candidates = acquisition_candidates.get_top_k(state.acq_batch_size).candidates
-
+        search_candidates = self.search_fn(state)
+        acquisition_candidates = self.acquisition_fn(search_candidates, state)
+        acquired_candidates = acquisition_candidates.get_top_k(state.acq_batch_size).candidates
         t1 = time.perf_counter()
         state.round_metrics.update({"ask_time": t1 - t0})
         return acquired_candidates, state

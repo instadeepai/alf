@@ -38,6 +38,26 @@ class DesignTask(BaseTask):
         """
         super().__init__(task_type="Design", **kwargs)
 
+    def run_initial_train_round(
+        self, state: TaskState, logger: Logger, save_path: str | None = None
+    ) -> TaskState:
+        """Run the initial train round."""
+        log.info("Running initial round of surrogate model fine-tuning on the train dataset ...")
+        state.surrogate.fit(
+            train_data=state.dataset.train_dataset,
+            val_data=state.dataset.validation_dataset,
+            logger=logger,
+        )
+        state.round_metrics = {"round": 0}
+        self.evaluate(
+            state=state,
+            round_name="initial_train_round",
+            save_path=save_path,
+            filename="initial_train_predictions.csv",
+        )
+        logger.write(state.round_metrics, timestep=0)
+        return state
+
     def run(  # type: ignore[override]
         self,
         state: TaskState,
@@ -69,7 +89,12 @@ class DesignTask(BaseTask):
         if save_path:
             state.dataset.save_splits(save_path, _verbose=True)
 
-        for round_i in range(state.num_acq_rounds + 1):
+        # If the train data is provided, run an initial round of fine-tuning the surrogate
+        # model on the training dataset.
+        if len(state.dataset.train_dataset) > 0:
+            state = self.run_initial_train_round(state, logger, save_path)
+
+        for round_i in range(1, state.num_acq_rounds + 1):
             state.round_metrics = {"round": round_i}
             acquired_candidates, state = optimizer.ask(state)
             labeled_candidates, state = oracle.evaluate(acquired_candidates, state)

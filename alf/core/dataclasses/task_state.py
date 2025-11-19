@@ -66,8 +66,7 @@ class TaskState:
             acquired_candidates: The newly acquired candidates with their labels.
         """
         self.history.append(copy.copy(acquired_candidates))
-        if self.round != 0:
-            self.dataset.update_splits(acquired_candidates)
+        self.dataset.update_splits(acquired_candidates)
         self.round += 1
 
     def print_metrics(self, round_name: int | str) -> None:
