@@ -86,7 +86,7 @@ class BaseTask(abc.ABC):
     ) -> TaskState:
         """Evaluate the surrogate model on the test dataset and return the updated state.
 
-        Computes predictions, metrics, and figures on the test set. Optionally saves
+        Computes predictions, metrics on the test set. Optionally saves
         predictions if configured. Updates the task state with computed metrics.
 
         Args:
@@ -97,7 +97,7 @@ class BaseTask(abc.ABC):
             filename: Name of the CSV file to save predictions (e.g., "predictions.csv").
 
         Returns:
-            TaskState: Updated task state with evaluation metrics and figures.
+            TaskState: Updated task state with evaluation metrics.
 
         Raises:
             AssertionError: If save_round_predictions is True but filename is empty.
@@ -115,9 +115,6 @@ class BaseTask(abc.ABC):
                     filename=filename,
                 )
 
-            state.round_metrics.update({
-                f"plots/test/{key}": value for key, value in results.figures.items()
-            })
             state.round_metrics.update({
                 f"surrogate/test_{key}": value for key, value in results.metrics.items()
             })

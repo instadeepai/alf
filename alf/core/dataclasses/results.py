@@ -16,17 +16,15 @@
 from dataclasses import dataclass
 from typing import Union
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from alf.core.dataclasses.predictions import Predictions
 from alf.core.utils.metrics import metric_registry
-from alf.core.utils.plots import plot_registry
 
 
 @dataclass
 class Results:
-    """Computes metrics and figures based on the predictions and targets.
+    """Computes metrics based on the predictions and targets.
 
     Attributes:
         targets: A numpy array of ground truth target values.
@@ -37,12 +35,11 @@ class Results:
     predictions: Predictions
 
     def __post_init__(self) -> None:
-        """Validate inputs and compute metrics and figures."""
+        """Validate inputs and compute metrics."""
         assert len(self.targets) == len(self.predictions.means), (
             "Targets and predictions must have the same length"
         )
         self.metrics = self.compute_metrics()
-        self.figures = self.compute_figures()
 
     def compute_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Compute evaluation metrics based on predictions and targets.
@@ -64,21 +61,3 @@ class Results:
             )
 
         return metrics
-
-    def compute_figures(self) -> dict[str, plt.Figure]:
-        """Compute visualization figures based on predictions and targets.
-
-        Returns:
-            dict[str, plt.Figure]: A dictionary of figure names to matplotlib
-                Figure objects. The figures depend on whether variances are available.
-        """
-        plots: dict[str, plt.Figure] = {}
-        plots_dict = (
-            plot_registry.get_plots_not_requiring_variance()
-            if self.predictions.variances is None
-            else plot_registry.get_plots_requiring_variance()
-        )
-        for _, plot_fn in plots_dict.items():
-            plots.update(plot_fn(self.predictions.means, self.predictions.variances, self.targets))
-
-        return plots

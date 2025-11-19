@@ -39,7 +39,7 @@ This README is organized into the following sections:
 - **[Zero-Shot Task Flow](#zero-shot-task-flow)**
 
 ### Evaluation Utilities
-- **[Evaluation Metrics and Plots](#evaluation-metrics-and-plots)** - Metrics and visualizations for predictions of the surrogate model
+- **[Evaluation Metrics](#evaluation-metrics)** - Metrics for predictions of the surrogate model
 
 ## Core Components
 
@@ -293,13 +293,9 @@ The zero-shot task evaluates a pre-trained or untrained model without training:
    └─ State.save(metrics)
    ```
 
-## Evaluation Metrics and Plots
+## Evaluation Metrics
 
-ALF provides comprehensive utilities for evaluating surrogate model predictions through metrics and visualizations (see `utils/metrics.py` and `utils/plots.py`).
-
-### Metrics
-
-Metrics are automatically registered and categorized by their variance requirements:
+ALF provides comprehensive utilities for evaluating surrogate model predictions through metrics (see `utils/metrics.py`). Metrics are automatically registered and categorized by their variance requirements:
 
 **Accuracy Metrics** (no variance required):
 - **MSE**: Mean Squared Error between predictions and targets
@@ -324,16 +320,3 @@ Metrics are automatically registered and categorized by their variance requireme
 - **Regret UCB Alpha Sweep**: UCB regret computed across multiple alpha exploration parameters
 
 All metrics accept predictions (means, variances, targets) and return a dictionary of computed values. Metrics requiring variance will validate that uncertainty estimates are provided.
-
-### Plots
-
-Plots are similarly registered and categorized by variance requirements:
-
-**Basic Visualization** (no variance required):
-- **Predictions Scatter**: Scatter plot of predictions vs targets with performance metrics
-- **Ranks Scatter**: Scatter plot of predicted ranks vs true ranks
-
-**Uncertainty Visualization** (variance required):
-- **ECE Plot**: Observed coverage vs confidence level with calibration curve
-- **Predictions Scatter with CI**: Predictions vs targets with confidence interval error bars
-- **Variance Histogram**: Distribution of predicted variances

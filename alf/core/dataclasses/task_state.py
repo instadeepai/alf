@@ -19,7 +19,6 @@ import os
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from alf.core.dataclasses import LabeledCandidates
@@ -68,15 +67,15 @@ class TaskState:
     def print_metrics(self, round_name: int | str) -> None:
         """Print the current round's metrics to the logger.
 
-        Formats and logs all numeric metrics (excluding figures) for the current round.
+        Formats and logs all metrics for the current round.
 
         Args:
             round_name: Name or number identifying the current round.
         """
         metrics_list: list = []
         for key, value in self.round_metrics.items():
-            # Skip the "round" key explicitly; only accept float and int types
-            if (key != "round") and isinstance(value, (float, int)):
+            # Skip the "round" key explicitly
+            if key != "round":
                 metrics_list.append(f"{key}: {value:.3f}")
         metrics_str = "\t".join(metrics_list)
         log.info(f"Round {round_name}:\t{metrics_str}")  # noqa: E231
@@ -93,10 +92,7 @@ class TaskState:
         Args:
             output_dir: Directory path where the metrics CSV file will be saved.
         """
-        numeric_metrics = {
-            k: v for k, v in self.round_metrics.items() if not isinstance(v, plt.Figure)
-        }
-        metrics_df = pd.DataFrame.from_records([numeric_metrics])
+        metrics_df = pd.DataFrame.from_records([self.round_metrics])
 
         if input_handler.isfile(os.path.join(output_dir, "metrics.csv")):
             saved_df = input_handler.read_csv(os.path.join(output_dir, "metrics.csv"))

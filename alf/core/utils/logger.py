@@ -14,10 +14,7 @@
 
 import abc
 import logging
-from typing import Any, Union
-
-import matplotlib.pyplot as plt
-import numpy as np
+from typing import Any
 
 log = logging.getLogger("alf-core")
 
@@ -30,7 +27,7 @@ class Logger(abc.ABC):
         """Write data to the logger destination.
 
         Args:
-            data: Dictionary of data to write (metrics or figures)
+            data: Dictionary of data to write
             label: Optional label prefix for the data
             timestep: Optional timestep for the data. If None, uses internal counter
         """
@@ -91,21 +88,18 @@ class TerminalLogger(Logger):
 
     def write(
         self,
-        data: dict[str, Union[float, plt.Figure]],
+        data: dict[str, float],
         label: str = "",
         timestep: int | None = None,
     ) -> None:
-        """Write metrics to terminal, ignoring figures.
+        """Write metrics to terminal.
 
         Args:
-            data: Dictionary of metrics (float) or figures (plt.Figure) to log
+            data: Dictionary of metrics to log
             label: Optional label prefix (currently unused)
             timestep: Optional timestep to display with the metrics
         """
-        metrics = []
-        for key, value in data.items():
-            if not isinstance(value, plt.Figure) and not np.isnan(value):
-                metrics.append(f"{key}: {value:.5f}")
+        metrics = [f"{key}: {value:.5f}" for key, value in data.items()]
 
         if metrics:
             message = "\n".join(metrics)
