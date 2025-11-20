@@ -220,7 +220,7 @@ class BaseDataset(abc.ABC):
         self.splits["candidate_pool"].remove(acquired_candidates.candidates)
 
         # Split the acquired candidates into train and validation splits based on the split ratio
-        num_val = int(len(acquired_candidates) * self.split_ratio["validation"])
+        num_val = math.floor(len(acquired_candidates) * self.split_ratio["validation"])
         shuffled_acquired_candidates = acquired_candidates.shuffle(self.seed)
         # Add num_val candidates to validation split and the rest to train split
         self.splits["train"].append(LabeledCandidates(*shuffled_acquired_candidates[:-num_val]))
