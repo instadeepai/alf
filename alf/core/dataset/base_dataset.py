@@ -166,6 +166,9 @@ class BaseDataset(abc.ABC):
         assert "train" and "test" and "validation" in split_config["split_ratio"], (
             "Train, test, and validation splits ratio must be set and their sum must not exceed 1"
         )
+        assert split_config["split_ratio"]["train"] + split_config["split_ratio"]["test"] <= 1, (
+            "Train and test splits ratio must sum to less than or equal to 1"
+        )
 
     def _split_dataset(self) -> dict[str, LabeledCandidates]:
         """Split the raw dataset into train, validation, test, and candidate pool.
