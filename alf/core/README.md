@@ -295,23 +295,23 @@ The zero-shot task evaluates a pre-trained or untrained model without training:
 
 ## Evaluation Metrics
 
-ALF provides comprehensive utilities for evaluating surrogate model predictions through metrics (see `utils/metrics.py`). Metrics are automatically registered and categorized by their variance requirements:
+ALF provides comprehensive utilities for evaluating surrogate model predictions through metrics (see `utils/metrics.py`). Metrics are automatically added to the regsistry and categorized by whether variance is needed in the calculation of the metric:
 
 **Accuracy Metrics** (no variance required):
 - **MSE**: Mean Squared Error between predictions and targets
-- **Pearson**: Pearson correlation coefficient measuring linear relationship
-- **Spearman**: Spearman correlation coefficient measuring monotonic relationship
+- **Pearson**: Pearson correlation between predictions and targets
+- **Spearman**: Spearman correlation between predictions and targets
 - **Pairwise XEnt**: Ranking loss for pairwise classification
 
 **Calibration Metrics** (variance required):
-- **ECE** (Expected Calibration Error): Area between observed coverage and ideal calibration curve
+- **ECE** (Expected Calibration Error): Area between observed coverage and ideal calibration curve (see [this](https://arxiv.org/abs/1706.04599) paper for more details)
 - **Rank ECE**: ECE computed in rank space using Monte Carlo ranking
 - **Coverage**: Percentage of targets falling within confidence intervals at a given alpha level
 - **Rank Coverage**: Coverage computed in rank space
 - **Width**: Average confidence interval width normalized by dataset range
 - **Rank Width**: Width computed in rank space
 
-**Uncertainty Quality Metrics** (variance required):
+**Uncertainty Quantification (UQ) Metrics** (variance required):
 - **Residual Spearman**: Spearman correlation between absolute residuals and predicted variances
 - **Residual Pearson**: Pearson correlation between absolute residuals and standard deviations
 

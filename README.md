@@ -21,7 +21,7 @@ intelligent candidate selection (data acquisition), model adaptation, and evalua
 - **Diverse Acquisition Strategies**: Built-in acquisition functions (Greedy, UCB,
   Expected Improvement, Thompson Sampling)
 - **Flexible Search Methods**: Support for local (dataset-based and protocol-based
-  e.g. mutagenesis) and global (generative-based) search stratgies
+  e.g. mutagenesis) and global (generative-based) search strategies
 - **Offline and Online Evaluation**: Support for both offline (dataset-based) and
   online (model-based or an external objective function) optimization scenarios
 - **Evaluation Metrics**: Set of metrics for
@@ -137,7 +137,7 @@ alf/
 │   └── tools/             # Example implementations and tools
 │       ├── datasets/      # Example datasets (e.g., GFP)
 │       ├── models/        # Example models (CNN, Random)
-│       └── optimizer/     # Example acquisition functions and search strategies
+│       └── optimizer/     # Example acquisition functions (UCB, Thompson Sampling, etc.) and search strategies
 ├── tests/                 # Test suite
 ├── tutorials/             # Tutorials and example scripts
 └── docs/                  # Documentation
