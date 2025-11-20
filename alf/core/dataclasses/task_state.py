@@ -139,7 +139,7 @@ class TaskState:
             bool: True if the task should be terminated, False otherwise.
         """
         if len(self.dataset.candidate_pool) < self.acq_batch_size:
-            log.info(
+            log.warning(
                 "Optimizer is signalling that optimization is complete, i.e. batch size "
                 + f"({self.acq_batch_size}) > remaining candidate pool"
                 + f"({len(self.dataset.candidate_pool)}), breaking"
