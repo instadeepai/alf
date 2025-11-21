@@ -1,16 +1,16 @@
 """Shared pytest fixtures for experiment tests."""
 
 import pytest
+from dummy_modules import (
+    DummyAcquisitionFunction,
+    DummyDataset,
+    DummyModel,
+)
 
 from alf.core.optimizer.optimizer import Optimizer
 from alf.core.optimizer.search import DatasetSearch
 from alf.core.oracle.oracle import Oracle
 from alf.core.surrogate.surrogate import Surrogate
-from tests.alf.core.dummy_modules import (
-    DummyAcquisitionFunction,
-    DummyDataset,
-    DummyModel,
-)
 
 
 @pytest.fixture

@@ -6,11 +6,11 @@ import tempfile
 import numpy as np
 import pandas as pd
 import pytest
+from dummy_modules import DummyDataset
 
 from alf.core.dataclasses import Candidate, LabeledCandidates
 from alf.core.dataclasses.candidate import Modality
 from alf.core.dataset.base_dataset import BaseDataset
-from tests.alf.core.dummy_modules import DummyDataset
 
 
 class TestBaseDatasetInitialization:
