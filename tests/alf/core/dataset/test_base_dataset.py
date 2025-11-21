@@ -10,8 +10,7 @@ import pytest
 from alf.core.dataclasses import Candidate, LabeledCandidates
 from alf.core.dataclasses.candidate import Modality
 from alf.core.dataset.base_dataset import BaseDataset
-
-from .dummy_modules import DummyDataset
+from tests.alf.core.dummy_modules.dummy_dataset import DummyDataset
 
 
 class TestBaseDatasetInitialization:
