@@ -117,8 +117,6 @@ class DesignTask(BaseTask):
                 filename=f"round_{round_i}_predictions.csv",
             )
             logger.write(state.round_metrics, timestep=round_i)
-
-            if state.should_terminate():
-                break
+            state.check_termination()
 
         return

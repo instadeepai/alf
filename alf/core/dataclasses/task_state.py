@@ -129,20 +129,16 @@ class TaskState:
             self.save_metrics(save_path)
             self.save_history(save_path)
 
-    def should_terminate(self) -> bool:
+    def check_termination(self):
         """Check if the task should be terminated early.
 
         Termination occurs when the remaining candidate pool is smaller than
         the acquisition batch size.
 
-        Returns:
-            bool: True if the task should be terminated, False otherwise.
+        Raises:
+            AssertionError: If acquisition batch size is larger than remaining candidate pool.
         """
-        if len(self.dataset.candidate_pool) < self.acq_batch_size:
-            log.warning(
-                "Optimizer is signalling that optimization is complete, i.e. batch size "
-                + f"({self.acq_batch_size}) > remaining candidate pool"
-                + f"({len(self.dataset.candidate_pool)}), breaking"
-            )
-            return True
-        return False
+        assert len(self.dataset.candidate_pool) > self.acq_batch_size, (
+            f"The acquisition batch size ({self.acq_batch_size}) is larger than the remaining \
+              candidate pool ({len(self.dataset.candidate_pool)}), breaking ..."
+        )
