@@ -52,7 +52,7 @@ class LabeledCandidates:
         """
         return len(self.candidates)
 
-    def __getitem__(self, index: Union[int, slice]) -> tuple[list[Candidate], np.ndarray]:
+    def __getitem__(self, index: Union[int, slice, np.ndarray]) -> tuple[list[Candidate], np.ndarray]:
         """Make LabeledCandidates subscriptable.
 
         Args:
@@ -64,8 +64,10 @@ class LabeledCandidates:
         """
         if isinstance(index, int):
             return ([self.candidates[index]], [self.labels[index]])
-
-        return (self.candidates[index], self.labels[index])
+        elif isinstance(index, np.ndarray):
+            return ([self.candidates[i] for i in index], self.labels[index])
+        else:
+            return (self.candidates[index], self.labels[index])
 
     @property
     def data(self) -> list[Any]:
