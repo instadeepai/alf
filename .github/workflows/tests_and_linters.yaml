@@ -1,0 +1,69 @@
+name: Tests and Linters 🧪
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  linters:
+    runs-on: instadeep-ci
+    container:
+      image: python:3.12-slim-bullseye
+
+    steps:
+      - name: Git setup
+        run: |
+          apt-get update && apt-get install -y \
+          coreutils \
+          git
+          git config --system --add safe.directory $GITHUB_WORKSPACE
+
+      - name: Checkout code  📦
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Lint
+        run: |
+          uv sync --extra cpu
+          uv run --no-sync pre-commit run --all-files --verbose
+
+  tests:
+      runs-on: instadeep-ci-4
+      container:
+        image: python:3.11-slim-bullseye
+
+      steps:
+        - name: Git setup
+          run: |
+            apt-get update && apt-get install -y \
+            coreutils \
+            git
+
+        - name: Checkout code  📦
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: '0'
+
+        - name: Add safe directory 🔒
+          run: git config --system --add safe.directory $GITHUB_WORKSPACE
+
+        - name: Install uv
+          uses: astral-sh/setup-uv@v6
+
+        - name: Run tests 🧪
+          run: |
+            uv sync --extra cpu
+            uv run --no-sync pytest --verbose --cov-report xml:coverage.xml \
+                            --cov-report term-missing \
+                            --junitxml=pytest.xml \
+                            --cov=alf
+
+        - name: Pytest coverage comment 💬
+          id: coverageComment
+          uses: MishaKav/pytest-coverage-comment@main
+          with:
+            pytest-xml-coverage-path: ./coverage.xml
+            junitxml-path: ./pytest.xml
