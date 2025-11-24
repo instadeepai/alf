@@ -6,11 +6,10 @@ from alf.core.optimizer.optimizer import Optimizer
 from alf.core.optimizer.search import DatasetSearch
 from alf.core.oracle.oracle import Oracle
 from alf.core.surrogate.surrogate import Surrogate
-from tests.alf.core.dummy_modules import (
-    DummyAcquisitionFunction,
-    DummyDataset,
-    DummyModel,
-)
+
+from .dummy_modules.acquisition_function import DummyAcquisitionFunction
+from .dummy_modules.dataset import DummyDataset
+from .dummy_modules.model import DummyModel
 
 
 @pytest.fixture
