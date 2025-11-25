@@ -49,7 +49,7 @@ class TestZeroShotTask:
         save_path.mkdir()
 
         metrics_logger = TerminalTaskStateLogger()
-        file_logger = FileTaskStateLogger(file_path=str(save_path))
+        file_logger = FileTaskStateLogger(output_path=save_path)
         task_state_loggers = [metrics_logger, file_logger]
 
         # Create and run the zero-shot task
