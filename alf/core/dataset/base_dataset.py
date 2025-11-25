@@ -17,6 +17,7 @@ import abc
 import copy
 import math
 import os
+from pathlib import Path
 from typing import Any, Union
 
 import numpy as np
@@ -259,14 +260,13 @@ class BaseDataset(abc.ABC):
             metrics[f"{key}_mean"] = np.mean(split.labels)
         return metrics
 
-    def save_splits(self, file_path: str) -> None:
+    def save_splits(self, output_path: str | os.PathLike) -> None:
         """Save the dataset splits to a file.
 
         Args:
-            file_path: Path to the file to save the dataset splits to
+            output_path: Path to the directory to save the dataset splits to
         """
-        os.makedirs(os.path.join(file_path, "data_splits"), exist_ok=True)
+        data_splits_path = Path(output_path) / "data_splits"
+        data_splits_path.mkdir(parents=True, exist_ok=True)
         for key, data_split in self.splits.items():
-            data_split.to_dataframe().to_csv(
-                os.path.join(file_path, f"data_splits/{key}.csv"), index=False
-            )
+            data_split.to_dataframe().to_csv(data_splits_path / f"{key}.csv", index=False)

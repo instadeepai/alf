@@ -15,6 +15,7 @@
 import abc
 import logging
 import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -64,15 +65,15 @@ class FileTaskStateLogger(TaskStateLogger):
     This includes the metrics, the acquisition batch, the data splits, and the predictions.
     """
 
-    def __init__(self, file_path: str):
+    def __init__(self, output_path: str | os.PathLike):
         """Initialize FileTaskStateLogger.
 
         Args:
-            file_path: Path to the file to write metrics to
+            output_path: Path to the directory to save the state information to
         """
-        self.file_path = file_path
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        logger.info(f"Initializing FileTaskStateLogger at {file_path}")
+        self.output_path = Path(output_path)
+        self.output_path.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Initializing FileTaskStateLogger at {self.output_path}")
 
     def log_metrics(self, metrics: dict[str, float]) -> None:
         """Log metrics to file.
@@ -81,10 +82,10 @@ class FileTaskStateLogger(TaskStateLogger):
             metrics: Dictionary of metrics to log
         """
         metrics_df = pd.DataFrame.from_records([metrics])
-        if os.path.exists(os.path.join(self.file_path, "metrics.csv")):
-            saved_df = pd.read_csv(os.path.join(self.file_path, "metrics.csv"))
+        if (self.output_path / "metrics.csv").exists():
+            saved_df = pd.read_csv(self.output_path / "metrics.csv")
             metrics_df = pd.concat([saved_df, metrics_df])
-        metrics_df.to_csv(os.path.join(self.file_path, "metrics.csv"), index=False)
+        metrics_df.to_csv(self.output_path / "metrics.csv", index=False)
 
     def log_acquisition_batch(self, acq_batch: LabeledCandidates, acq_round: int) -> None:
         """Log the acquisition batch to file.
@@ -94,7 +95,7 @@ class FileTaskStateLogger(TaskStateLogger):
             acq_round: the current round
         """
         acq_batch.to_dataframe().to_csv(
-            os.path.join(self.file_path, f"acq_round_{acq_round}.csv"), index=False
+            self.output_path / f"acq_round_{acq_round}.csv", index=False
         )
 
     def log_predictions(
@@ -114,9 +115,7 @@ class FileTaskStateLogger(TaskStateLogger):
         """
         round_name = round_name.lower().replace(" ", "_")
         predictions_df = predictions.to_dataframe(candidates, targets)
-        predictions_df.to_csv(
-            os.path.join(self.file_path, f"{round_name}_predictions.csv"), index=False
-        )
+        predictions_df.to_csv(self.output_path / f"{round_name}_predictions.csv", index=False)
 
     def log(self, state: TaskState, round_name: str | None = None) -> None:
         """Log data from the task state to the logger destination.
