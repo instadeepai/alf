@@ -19,9 +19,9 @@ from alf.core.dataclasses import TaskState
 from alf.core.optimizer.optimizer import Optimizer
 from alf.core.oracle.oracle import Oracle
 from alf.core.tasks.base_task import BaseTask
-from alf.core.utils.logger import Logger
+from alf.core.utils.task_state_logger import TaskStateLogger
 
-log = logging.getLogger("alf-core")
+logger = logging.getLogger("alf-core")
 
 
 class DesignTask(BaseTask):
@@ -38,7 +38,9 @@ class DesignTask(BaseTask):
         """
         super().__init__(task_type="Design", **kwargs)
 
-    def run_initial_train_round(self, state: TaskState, loggers: list[Logger]) -> TaskState:
+    def run_initial_train_round(
+        self, state: TaskState, loggers: list[TaskStateLogger]
+    ) -> TaskState:
         """Run the initial train round on the train and validation sets.
 
         Args:
@@ -48,21 +50,21 @@ class DesignTask(BaseTask):
         Returns:
             TaskState: Updated state with surrogate fine-tuned on the train and validation sets.
         """
-        log.info("Running initial round of surrogate model fine-tuning on the train dataset ...")
+        logger.info("Running initial round of surrogate model fine-tuning on the train dataset ...")
         state.surrogate.fit(
             train_data=state.dataset.train_dataset,
             val_data=state.dataset.validation_dataset,
         )
         state.round_metrics = {"round": 0}
         self.evaluate(state=state)
-        for logger in loggers:
-            logger.write(state, round_name="initial_train_round")
+        for alf_logger in loggers:
+            alf_logger.log(state, round_name="initial_train_round")
         return state
 
     def run(  # type: ignore[override]
         self,
         state: TaskState,
-        loggers: list[Logger],
+        loggers: list[TaskStateLogger],
         optimizer: Optimizer,
         oracle: Oracle,
     ) -> None:
@@ -83,7 +85,7 @@ class DesignTask(BaseTask):
             optimizer: Optimizer for candidate acquisition.
             oracle: Oracle for evaluating candidate labels.
         """
-        log.info(f"Multi-round Design Task: {self.num_acq_rounds} Rounds")
+        logger.info(f"Multi-round Design Task: {self.num_acq_rounds} Rounds")
 
         # If the train data is provided, run an initial round of fine-tuning the surrogate
         # model on the training dataset.
@@ -98,8 +100,8 @@ class DesignTask(BaseTask):
             state = optimizer.tell(state=state)
 
             state = self.evaluate(state=state)
-            for logger in loggers:
-                logger.write(state)
+            for alf_logger in loggers:
+                alf_logger.log(state)
             state.check_termination()
 
         return

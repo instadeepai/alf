@@ -15,72 +15,67 @@
 import abc
 import logging
 import os
-from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions, TaskState
 
-log = logging.getLogger("alf-core")
+logger = logging.getLogger("alf-core")
 
 
-class Logger(abc.ABC):
-    """Abstract base class for loggers that can write data and artifacts."""
+class TaskStateLogger(abc.ABC):
+    """Abstract base class for loggers to write task state information."""
 
     @abc.abstractmethod
-    def write(self, state: TaskState, round_name: str | None = None) -> None:
-        """Write data from the task state to the logger destination.
+    def log(self, state: TaskState, round_name: str | None = None) -> None:
+        """Log data from the task state to the logger destination.
 
         Args:
-            state: TaskState object to write
-            round_name: Name of the round to write
+            state: TaskState object to log
+            round_name: Name of the current round in the task
         """
         pass
 
-    def close(self) -> None:
-        """Close the logger and clean up resources."""
-        pass
 
+class TerminalTaskStateLogger(TaskStateLogger):
+    """Logger that outputs metrics to the terminal."""
 
-class MetricsLogger(Logger):
-    """Logger that outputs metrics to the console."""
-
-    def write(
+    def log(
         self,
         state: TaskState,
         round_name: str | None = None,
     ) -> None:
-        """Write metrics to terminal.
+        """Log metrics in the task state to the terminal.
 
         Args:
-            state: TaskState object with metrics to write
-            round_name: Name of the round to write
+            state: TaskState object with metrics to log
+            round_name: Name of the current round in the task
         """
         if round_name is None:
             round_name = str(state.round)
         metrics = [f"{key}: {value:.3f}" for key, value in state.round_metrics.items()]
         message = "\n".join(metrics)
-        log.info(f"Round {round_name}:\n{message}")
+        logger.info(f"Round {round_name}:\n{message}")
 
 
-class FileLogger(Logger):
+class FileTaskStateLogger(TaskStateLogger):
     """Logger that saves certain components of the state to a file.
     This includes the metrics, the acquisition batch, the data splits, and the predictions.
     """
 
     def __init__(self, file_path: str):
-        """Initialize FileLogger.
+        """Initialize FileTaskStateLogger.
 
         Args:
             file_path: Path to the file to write metrics to
         """
         self.file_path = file_path
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        log.info(f"Initializing FileLogger at {file_path}")
+        logger.info(f"Initializing FileTaskStateLogger at {file_path}")
 
-    def write_metrics(self, metrics: dict[str, float]) -> None:
-        """Write metrics to file.
+    def log_metrics(self, metrics: dict[str, float]) -> None:
+        """Log metrics to file.
 
         Args:
             metrics: Dictionary of metrics to log
@@ -91,8 +86,8 @@ class FileLogger(Logger):
             metrics_df = pd.concat([saved_df, metrics_df])
         metrics_df.to_csv(os.path.join(self.file_path, "metrics.csv"), index=False)
 
-    def write_acquisition_batch(self, acq_batch: LabeledCandidates, acq_round: int) -> None:
-        """Write the acquisition batch to file.
+    def log_acquisition_batch(self, acq_batch: LabeledCandidates, acq_round: int) -> None:
+        """Log the acquisition batch to file.
 
         Args:
             acq_batch: the current batch of acquired candidates
@@ -102,32 +97,20 @@ class FileLogger(Logger):
             os.path.join(self.file_path, f"acq_round_{acq_round}.csv"), index=False
         )
 
-    def write_data_splits(self, data_splits: dict[str, Any]) -> None:
-        """Write data splits to file.
-
-        Args:
-            data_splits: Dictionary of data splits to log
-        """
-        os.makedirs(os.path.join(self.file_path, "data_splits"), exist_ok=True)
-        for key, data_split in data_splits.items():
-            data_split.to_dataframe().to_csv(
-                os.path.join(self.file_path, f"data_splits/{key}.csv"), index=False
-            )
-
-    def write_predictions(
+    def log_predictions(
         self,
         predictions: Predictions,
         candidates: list[Candidate],
         targets: np.ndarray,
         round_name: str,
     ) -> None:
-        """Write predictions to file.
+        """Log predictions to file.
 
         Args:
             predictions: Predictions object to log
             candidates: List of Candidate objects corresponding to the predictions
             targets: Ground truth scores corresponding to the predictions
-            round_name: Name of the round to write
+            round_name: Name of the current round in the task
         """
         round_name = round_name.lower().replace(" ", "_")
         predictions_df = predictions.to_dataframe(candidates, targets)
@@ -135,20 +118,20 @@ class FileLogger(Logger):
             os.path.join(self.file_path, f"{round_name}_predictions.csv"), index=False
         )
 
-    def write(self, state: TaskState, round_name: str | None = None) -> None:
-        """Write data from the task state to the logger destination.
+    def log(self, state: TaskState, round_name: str | None = None) -> None:
+        """Log data from the task state to the logger destination.
 
         Args:
-            state: TaskState object to write
-            round_name: Name of the round to write
+            state: TaskState object to log
+            round_name: Name of the current round in the task
         """
         if round_name is None:
             round_name = "round_" + str(state.round)
 
-        self.write_metrics(state.round_metrics)
+        self.log_metrics(state.round_metrics)
 
         if state.round_predictions is not None:
-            self.write_predictions(
+            self.log_predictions(
                 state.round_predictions,
                 state.dataset.test_dataset.candidates,
                 state.dataset.test_dataset.labels,
@@ -156,4 +139,4 @@ class FileLogger(Logger):
             )
 
         if state.history:
-            self.write_acquisition_batch(state.history[-1], state.round)
+            self.log_acquisition_batch(state.history[-1], state.round)

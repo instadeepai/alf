@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from alf.core.tasks.design_task import DesignTask
-from alf.core.utils.logger import FileLogger, MetricsLogger
+from alf.core.utils.task_state_logger import FileTaskStateLogger, TerminalTaskStateLogger
 
 
 @pytest.fixture
@@ -64,8 +64,8 @@ class TestDesignTask:
         save_path = tmp_path / "design_dummy_surrogate"
         save_path.mkdir()
 
-        metrics_logger = MetricsLogger()
-        file_logger = FileLogger(file_path=str(save_path))
+        metrics_logger = TerminalTaskStateLogger()
+        file_logger = FileTaskStateLogger(file_path=str(save_path))
         loggers = [metrics_logger, file_logger]
 
         # Create and run the design task

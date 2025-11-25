@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from alf.core.tasks.zeroshot_task import ZeroShotTask
-from alf.core.utils.logger import FileLogger, MetricsLogger
+from alf.core.utils.task_state_logger import FileTaskStateLogger, TerminalTaskStateLogger
 
 
 @pytest.fixture
@@ -48,8 +48,8 @@ class TestZeroShotTask:
         save_path = tmp_path / "zeroshot_dummy_surrogate"
         save_path.mkdir()
 
-        metrics_logger = MetricsLogger()
-        file_logger = FileLogger(file_path=str(save_path))
+        metrics_logger = TerminalTaskStateLogger()
+        file_logger = FileTaskStateLogger(file_path=str(save_path))
         loggers = [metrics_logger, file_logger]
 
         # Create and run the zero-shot task

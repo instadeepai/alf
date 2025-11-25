@@ -15,8 +15,8 @@
 
 import abc
 import copy
-import logging
 import math
+import os
 from typing import Any, Union
 
 import numpy as np
@@ -24,8 +24,6 @@ import numpy as np
 from alf.core.dataclasses.candidate import Modality
 from alf.core.dataclasses.labeled_candidates import Candidate, LabeledCandidates
 from alf.core.dataset.splitting_utils import split_dataset
-
-log = logging.getLogger("alf-core")
 
 
 class BaseDataset(abc.ABC):
@@ -260,3 +258,15 @@ class BaseDataset(abc.ABC):
             metrics[f"num_{key}"] = len(split)
             metrics[f"{key}_mean"] = np.mean(split.labels)
         return metrics
+
+    def save_splits(self, file_path: str) -> None:
+        """Save the dataset splits to a file.
+
+        Args:
+            file_path: Path to the file to save the dataset splits to
+        """
+        os.makedirs(os.path.join(file_path, "data_splits"), exist_ok=True)
+        for key, data_split in self.splits.items():
+            data_split.to_dataframe().to_csv(
+                os.path.join(file_path, f"data_splits/{key}.csv"), index=False
+            )

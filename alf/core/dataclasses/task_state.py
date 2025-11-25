@@ -15,13 +15,10 @@
 from __future__ import annotations
 
 import copy
-import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from alf.core.dataclasses import LabeledCandidates
-
-log = logging.getLogger("alf-core")
 
 if TYPE_CHECKING:
     from alf.core.dataclasses import Predictions

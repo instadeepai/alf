@@ -67,7 +67,7 @@ The tool `pip` will automatically make use of these credentials for authenticati
 ### Design Task
 
 ```python
-from alf.core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask, MetricsLogger
+from alf.core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask, TerminalTaskStateLogger
 from alf.tools.datasets.gfp import GFP
 from alf.tools.models.cnn import CNNModel
 from alf.tools.optimizer.acquisition_functions.greedy import Greedy
@@ -83,13 +83,13 @@ oracle = Oracle(module=dataset)
 # Run design task
 task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
 state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, loggers=[MetricsLogger()], optimizer=optimizer, oracle=oracle)
+task.run(state=state, loggers=[TerminalTaskStateLogger()], optimizer=optimizer, oracle=oracle)
 ```
 
 ### Supervised Task
 
 ```python
-from alf.core import Surrogate, SupervisedTask, MetricsLogger
+from alf.core import Surrogate, SupervisedTask, TerminalTaskStateLogger
 from alf.tools.datasets.gfp import GFP
 from alf.tools.models.cnn import CNNModel
 
@@ -100,13 +100,13 @@ surrogate = Surrogate(model=CNNModel())
 # Run supervised task
 task = SupervisedTask()
 state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, loggers=[MetricsLogger()])
+task.run(state=state, loggers=[TerminalTaskStateLogger()])
 ```
 
 ### Zero-Shot Task
 
 ```python
-from alf.core import Surrogate, ZeroShotTask, MetricsLogger
+from alf.core import Surrogate, ZeroShotTask, TerminalTaskStateLogger
 from alf.tools.datasets.gfp import GFP
 from alf.tools.models.random import RandomModel
 
@@ -117,7 +117,7 @@ surrogate = Surrogate(model=RandomModel())  # Pre-trained model
 # Run zero-shot task
 task = ZeroShotTask()
 state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, loggers=[MetricsLogger()])
+task.run(state=state, loggers=[TerminalTaskStateLogger()])
 ```
 
 ## 📁 Project Structure
