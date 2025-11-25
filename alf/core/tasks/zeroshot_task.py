@@ -41,7 +41,7 @@ class ZeroShotTask(BaseTask):
     def run(  # type: ignore[override]
         self,
         state: TaskState,
-        loggers: list[TaskStateLogger],
+        task_state_loggers: list[TaskStateLogger],
     ) -> None:
         """Run the zero-shot evaluation task.
 
@@ -50,7 +50,7 @@ class ZeroShotTask(BaseTask):
 
         Args:
             state: Task state with dataset and pre-trained surrogate model.
-            loggers: List of loggers for recording the state.
+            task_state_loggers: List of TaskStateLogger for recording the state.
         """
         logger.info(
             f"Zero-shot evaluation on test data with {len(state.dataset.test_dataset)} sequences"
@@ -63,5 +63,5 @@ class ZeroShotTask(BaseTask):
             "layers."
         )
 
-        for alf_logger in loggers:
-            alf_logger.log(state, round_name="zero-shot evaluation")
+        for task_state_logger in task_state_loggers:
+            task_state_logger.log(state, round_name="zero-shot evaluation")

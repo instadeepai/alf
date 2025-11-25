@@ -41,7 +41,7 @@ class SupervisedTask(BaseTask):
     def run(  # type: ignore[override]
         self,
         state: TaskState,
-        loggers: list[TaskStateLogger],
+        task_state_loggers: list[TaskStateLogger],
     ) -> None:
         """Run the supervised learning task.
 
@@ -50,7 +50,7 @@ class SupervisedTask(BaseTask):
 
         Args:
             state: Task state with dataset and surrogate model.
-            loggers: List of loggers for recording the state.
+            task_state_loggers: List of TaskStateLogger for recording the state.
         """
         logger.info("Running supervised task ...")
 
@@ -63,7 +63,7 @@ class SupervisedTask(BaseTask):
         state.round_metrics = {"tell_time": t1 - t0}
 
         state = self.evaluate(state=state)
-        for alf_logger in loggers:
-            alf_logger.log(state, round_name="supervised evaluation")
+        for task_state_logger in task_state_loggers:
+            task_state_logger.log(state, round_name="supervised evaluation")
 
         return

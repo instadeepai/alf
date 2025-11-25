@@ -66,14 +66,14 @@ class TestDesignTask:
 
         metrics_logger = TerminalTaskStateLogger()
         file_logger = FileTaskStateLogger(file_path=str(save_path))
-        loggers = [metrics_logger, file_logger]
+        task_state_loggers = [metrics_logger, file_logger]
 
         # Create and run the design task
         task = DesignTask(num_acq_rounds=5, acq_batch_size=10)
         state = task.setup(dataset=dummy_dataset, surrogate=dummy_surrogate)
         task.run(
             state=state,
-            loggers=loggers,
+            task_state_loggers=task_state_loggers,
             optimizer=dummy_optimizer,
             oracle=oracle,
         )

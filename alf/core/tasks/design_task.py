@@ -39,13 +39,13 @@ class DesignTask(BaseTask):
         super().__init__(task_type="Design", **kwargs)
 
     def run_initial_train_round(
-        self, state: TaskState, loggers: list[TaskStateLogger]
+        self, state: TaskState, task_state_loggers: list[TaskStateLogger]
     ) -> TaskState:
         """Run the initial train round on the train and validation sets.
 
         Args:
             state: Task state with dataset and surrogate.
-            loggers: List of loggers for recording the state.
+            task_state_loggers: List of TaskStateLogger for recording the state.
 
         Returns:
             TaskState: Updated state with surrogate fine-tuned on the train and validation sets.
@@ -57,14 +57,14 @@ class DesignTask(BaseTask):
         )
         state.round_metrics = {"round": 0}
         self.evaluate(state=state)
-        for alf_logger in loggers:
-            alf_logger.log(state, round_name="initial_train_round")
+        for task_state_logger in task_state_loggers:
+            task_state_logger.log(state, round_name="initial_train_round")
         return state
 
     def run(  # type: ignore[override]
         self,
         state: TaskState,
-        loggers: list[TaskStateLogger],
+        task_state_loggers: list[TaskStateLogger],
         optimizer: Optimizer,
         oracle: Oracle,
     ) -> None:
@@ -81,7 +81,7 @@ class DesignTask(BaseTask):
 
         Args:
             state: Initial task state with dataset and surrogate.
-            loggers: List of loggers for recording the state.
+            task_state_loggers: List of TaskStateLogger for recording the state.
             optimizer: Optimizer for candidate acquisition.
             oracle: Oracle for evaluating candidate labels.
         """
@@ -90,7 +90,7 @@ class DesignTask(BaseTask):
         # If the train data is provided, run an initial round of fine-tuning the surrogate
         # model on the training dataset.
         if len(state.dataset.train_dataset) > 0:
-            state = self.run_initial_train_round(state, loggers)
+            state = self.run_initial_train_round(state, task_state_loggers)
 
         for round_i in range(1, self.num_acq_rounds + 1):
             state.round_metrics = {"round": round_i}
@@ -100,8 +100,8 @@ class DesignTask(BaseTask):
             state = optimizer.tell(state=state)
 
             state = self.evaluate(state=state)
-            for alf_logger in loggers:
-                alf_logger.log(state)
+            for task_state_logger in task_state_loggers:
+                task_state_logger.log(state)
             state.check_termination()
 
         return

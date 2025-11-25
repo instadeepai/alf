@@ -50,12 +50,12 @@ class TestZeroShotTask:
 
         metrics_logger = TerminalTaskStateLogger()
         file_logger = FileTaskStateLogger(file_path=str(save_path))
-        loggers = [metrics_logger, file_logger]
+        task_state_loggers = [metrics_logger, file_logger]
 
         # Create and run the zero-shot task
         task = ZeroShotTask()
         state = task.setup(dataset=dummy_dataset, surrogate=dummy_surrogate)
-        task.run(state=state, loggers=loggers)
+        task.run(state=state, task_state_loggers=task_state_loggers)
 
         # Load and verify results
         metrics_file = save_path / "metrics.csv"

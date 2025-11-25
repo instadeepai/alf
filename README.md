@@ -83,7 +83,7 @@ oracle = Oracle(module=dataset)
 # Run design task
 task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
 state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, loggers=[TerminalTaskStateLogger()], optimizer=optimizer, oracle=oracle)
+task.run(state=state, task_state_loggers=[TerminalTaskStateLogger()], optimizer=optimizer, oracle=oracle)
 ```
 
 ### Supervised Task
@@ -100,7 +100,7 @@ surrogate = Surrogate(model=CNNModel())
 # Run supervised task
 task = SupervisedTask()
 state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, loggers=[TerminalTaskStateLogger()])
+task.run(state=state, task_state_loggers=[TerminalTaskStateLogger()])
 ```
 
 ### Zero-Shot Task
@@ -117,7 +117,7 @@ surrogate = Surrogate(model=RandomModel())  # Pre-trained model
 # Run zero-shot task
 task = ZeroShotTask()
 state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, loggers=[TerminalTaskStateLogger()])
+task.run(state=state, task_state_loggers=[TerminalTaskStateLogger()])
 ```
 
 ## 📁 Project Structure

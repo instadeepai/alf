@@ -25,7 +25,7 @@ logger = logging.getLogger("alf-core")
 
 
 class TaskStateLogger(abc.ABC):
-    """Abstract base class for loggers to write task state information."""
+    """Abstract base class for task_state_loggers to write task state information."""
 
     @abc.abstractmethod
     def log(self, state: TaskState, round_name: str | None = None) -> None:
