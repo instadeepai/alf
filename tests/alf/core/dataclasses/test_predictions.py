@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import pytest
 
 from alf.core.dataclasses.candidate import Candidate, Modality
@@ -125,9 +124,7 @@ class TestPredictionsToDataFrame:
         means = np.array([1.0, 2.0])
         variances = np.array([0.1, 0.2])
         empirical_dist = np.array([[1.1, 1.2, 1.3], [2.1, 2.2, 2.3]])
-        predictions = Predictions(
-            means=means, variances=variances, empirical_dist=empirical_dist
-        )
+        predictions = Predictions(means=means, variances=variances, empirical_dist=empirical_dist)
 
         candidates = [
             Candidate(data="seq1", modality=Modality.SEQUENCE),
