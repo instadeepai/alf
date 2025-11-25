@@ -17,7 +17,6 @@ import abc
 import copy
 import logging
 import math
-import os
 from typing import Any, Union
 
 import numpy as np
@@ -25,7 +24,6 @@ import numpy as np
 from alf.core.dataclasses.candidate import Modality
 from alf.core.dataclasses.labeled_candidates import Candidate, LabeledCandidates
 from alf.core.dataset.splitting_utils import split_dataset
-from alf.core.utils.io import input_handler
 
 log = logging.getLogger("alf-core")
 
@@ -230,26 +228,6 @@ class BaseDataset(abc.ABC):
         self.splits["validation"].append(
             LabeledCandidates(*shuffled_acquired_candidates[-num_val:])
         )
-
-    def save_splits(self, output_dir: str, _verbose: bool = False) -> None:
-        """Save dataset splits to CSV files in the output directory.
-
-        Saves train, validation, and test splits (but not candidate_pool) as
-        separate CSV files.
-
-        Args:
-            output_dir: Directory path where CSV files will be saved.
-            _verbose: If True, log messages when saving each split.
-        """
-        for key, split in self.splits.items():
-            if key not in ["train", "validation", "test"]:
-                continue
-            if _verbose:
-                log.info(f"Saving {key} split to {output_dir}")
-            input_handler.save_csv(
-                os.path.join(output_dir, f"{key}.csv"),
-                split.to_dataframe(),
-            )
 
     def query(self, candidates: list[Candidate]) -> LabeledCandidates:
         """Query labels for the given candidates from the raw dataset.

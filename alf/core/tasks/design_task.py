@@ -38,15 +38,12 @@ class DesignTask(BaseTask):
         """
         super().__init__(task_type="Design", **kwargs)
 
-    def run_initial_train_round(
-        self, state: TaskState, logger: Logger, save_path: str | None = None
-    ) -> TaskState:
+    def run_initial_train_round(self, state: TaskState, loggers: list[Logger]) -> TaskState:
         """Run the initial train round on the train and validation sets.
 
         Args:
             state: Task state with dataset and surrogate.
-            logger: Logger for recording metrics.
-            save_path: Optional directory path to save predictions.
+            loggers: List of loggers for recording the state.
 
         Returns:
             TaskState: Updated state with surrogate fine-tuned on the train and validation sets.
@@ -55,25 +52,19 @@ class DesignTask(BaseTask):
         state.surrogate.fit(
             train_data=state.dataset.train_dataset,
             val_data=state.dataset.validation_dataset,
-            logger=logger,
         )
         state.round_metrics = {"round": 0}
-        self.evaluate(
-            state=state,
-            round_name="initial_train_round",
-            save_path=save_path,
-            filename="initial_train_predictions.csv",
-        )
-        logger.write(state.round_metrics, timestep=0)
+        self.evaluate(state=state)
+        for logger in loggers:
+            logger.write(state, round_name="initial_train_round")
         return state
 
     def run(  # type: ignore[override]
         self,
         state: TaskState,
-        logger: Logger,
+        loggers: list[Logger],
         optimizer: Optimizer,
         oracle: Oracle,
-        save_path: str | None = None,
     ) -> None:
         """Run the multi-round design task.
 
@@ -88,35 +79,27 @@ class DesignTask(BaseTask):
 
         Args:
             state: Initial task state with dataset and surrogate.
-            logger: Logger for recording metrics and artifacts.
+            loggers: List of loggers for recording the state.
             optimizer: Optimizer for candidate acquisition.
             oracle: Oracle for evaluating candidate labels.
-            save_path: Optional directory path to save dataset splits and predictions.
         """
         log.info(f"Multi-round Design Task: {self.num_acq_rounds} Rounds")
-
-        if save_path:
-            state.dataset.save_splits(save_path, _verbose=True)
 
         # If the train data is provided, run an initial round of fine-tuning the surrogate
         # model on the training dataset.
         if len(state.dataset.train_dataset) > 0:
-            state = self.run_initial_train_round(state, logger, save_path)
+            state = self.run_initial_train_round(state, loggers)
 
         for round_i in range(1, self.num_acq_rounds + 1):
             state.round_metrics = {"round": round_i}
             acquired_candidates, state = optimizer.ask(state)
             labeled_candidates, state = oracle.evaluate(acquired_candidates, state)
             state.update(labeled_candidates)
-            state = optimizer.tell(state=state, logger=logger)
+            state = optimizer.tell(state=state)
 
-            state = self.evaluate(
-                state=state,
-                round_name=round_i,
-                save_path=save_path,
-                filename=f"round_{round_i}_predictions.csv",
-            )
-            logger.write(state.round_metrics, timestep=round_i)
+            state = self.evaluate(state=state)
+            for logger in loggers:
+                logger.write(state)
             state.check_termination()
 
         return

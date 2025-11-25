@@ -67,7 +67,7 @@ The tool `pip` will automatically make use of these credentials for authenticati
 ### Design Task
 
 ```python
-from alf.core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask, TerminalLogger
+from alf.core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask, MetricsLogger
 from alf.tools.datasets.gfp import GFP
 from alf.tools.models.cnn import CNNModel
 from alf.tools.optimizer.acquisition_functions.greedy import Greedy
@@ -83,13 +83,13 @@ oracle = Oracle(module=dataset)
 # Run design task
 task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
 state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, logger=TerminalLogger(), optimizer=optimizer, oracle=oracle)
+task.run(state=state, loggers=[MetricsLogger()], optimizer=optimizer, oracle=oracle)
 ```
 
 ### Supervised Task
 
 ```python
-from alf.core import Surrogate, SupervisedTask, TerminalLogger
+from alf.core import Surrogate, SupervisedTask, MetricsLogger
 from alf.tools.datasets.gfp import GFP
 from alf.tools.models.cnn import CNNModel
 
@@ -100,13 +100,13 @@ surrogate = Surrogate(model=CNNModel())
 # Run supervised task
 task = SupervisedTask()
 state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, logger=TerminalLogger())
+task.run(state=state, loggers=[MetricsLogger()])
 ```
 
 ### Zero-Shot Task
 
 ```python
-from alf.core import Surrogate, ZeroShotTask, TerminalLogger
+from alf.core import Surrogate, ZeroShotTask, MetricsLogger
 from alf.tools.datasets.gfp import GFP
 from alf.tools.models.random import RandomModel
 
@@ -117,7 +117,7 @@ surrogate = Surrogate(model=RandomModel())  # Pre-trained model
 # Run zero-shot task
 task = ZeroShotTask()
 state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, logger=TerminalLogger())
+task.run(state=state, loggers=[MetricsLogger()])
 ```
 
 ## 📁 Project Structure
@@ -133,7 +133,7 @@ alf/
 │   │   ├── oracle/        # Oracle for candidate evaluation
 │   │   ├── surrogate/     # Surrogate model wrapper
 │   │   ├── tasks/         # Task implementations (Design, Supervised, ZeroShot)
-│   │   └── utils/         # Utilities (metrics, logging, I/O)
+│   │   └── utils/         # Utilities (metrics, logging)
 │   └── tools/             # Example implementations and tools
 │       ├── datasets/      # Example datasets (e.g., GFP)
 │       ├── models/        # Example models (CNN, Random)

@@ -1,6 +1,3 @@
-import os
-import tempfile
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -89,125 +86,103 @@ class TestPredictionsValidation:
             Predictions(means=means, variances=variances, empirical_dist=empirical_dist)
 
 
-class TestPredictionsSavePredictions:
-    """Test cases for Predictions save method."""
+class TestPredictionsToDataFrame:
+    """Test cases for Predictions to_dataframe method."""
 
-    def test_save_predictions_basic(self):
-        """Test basic save functionality."""
-        # Create temporary directory
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Setup test data
-            means = np.array([1.0, 2.0, 3.0])
-            variances = np.array([0.1, 0.2, 0.3])
-            predictions = Predictions(means=means, variances=variances)
+    def test_to_dataframe_basic(self):
+        """Test basic to_dataframe functionality."""
+        # Setup test data
+        means = np.array([1.0, 2.0, 3.0])
+        variances = np.array([0.1, 0.2, 0.3])
+        predictions = Predictions(means=means, variances=variances)
 
-            candidates = [
-                Candidate(data="seq1", modality=Modality.SEQUENCE),
-                Candidate(data="seq2", modality=Modality.SEQUENCE),
-                Candidate(data="seq3", modality=Modality.SEQUENCE),
-            ]
-            targets = np.array([1.1, 2.1, 3.1])
+        candidates = [
+            Candidate(data="seq1", modality=Modality.SEQUENCE),
+            Candidate(data="seq2", modality=Modality.SEQUENCE),
+            Candidate(data="seq3", modality=Modality.SEQUENCE),
+        ]
+        targets = np.array([1.1, 2.1, 3.1])
 
-            # Save predictions
-            predictions.save(temp_dir, candidates, targets, "test_predictions.csv")
+        # Convert to DataFrame
+        df = predictions.to_dataframe(candidates, targets)
 
-            # Check if file was created
-            file_path = os.path.join(temp_dir, "test_predictions.csv")
-            assert os.path.exists(file_path)
+        # Verify DataFrame structure
+        assert len(df) == 3
+        assert "sequence" in df.columns
+        assert "mean" in df.columns
+        assert "variance" in df.columns
+        assert "targets" in df.columns
 
-            # Load and verify content
-            df = pd.read_csv(file_path)
-            assert len(df) == 3
-            assert "sequence" in df.columns
-            assert "mean" in df.columns
-            assert "variance" in df.columns
-            assert "targets" in df.columns
+        # Check values
+        np.testing.assert_array_equal(df["sequence"].values, ["seq1", "seq2", "seq3"])
+        np.testing.assert_array_almost_equal(df["mean"].values, [1.0, 2.0, 3.0])
+        np.testing.assert_array_almost_equal(df["variance"].values, [0.1, 0.2, 0.3])
+        np.testing.assert_array_almost_equal(df["targets"].values, [1.1, 2.1, 3.1])
 
-            # Check values
-            np.testing.assert_array_equal(df["sequence"].values, ["seq1", "seq2", "seq3"])
-            np.testing.assert_array_almost_equal(df["mean"].values, [1.0, 2.0, 3.0])
-            np.testing.assert_array_almost_equal(df["variance"].values, [0.1, 0.2, 0.3])
-            np.testing.assert_array_almost_equal(df["targets"].values, [1.1, 2.1, 3.1])
+    def test_to_dataframe_with_empirical_dist(self):
+        """Test to_dataframe with empirical distribution."""
+        # Setup test data
+        means = np.array([1.0, 2.0])
+        variances = np.array([0.1, 0.2])
+        empirical_dist = np.array([[1.1, 1.2, 1.3], [2.1, 2.2, 2.3]])
+        predictions = Predictions(
+            means=means, variances=variances, empirical_dist=empirical_dist
+        )
 
-    def test_save_predictions_with_empirical_dist(self):
-        """Test save_predictions with empirical distribution."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Setup test data
-            means = np.array([1.0, 2.0])
-            variances = np.array([0.1, 0.2])
-            empirical_dist = np.array([[1.1, 1.2, 1.3], [2.1, 2.2, 2.3]])
-            predictions = Predictions(
-                means=means, variances=variances, empirical_dist=empirical_dist
-            )
+        candidates = [
+            Candidate(data="seq1", modality=Modality.SEQUENCE),
+            Candidate(data="seq2", modality=Modality.SEQUENCE),
+        ]
+        targets = np.array([1.1, 2.1])
 
-            candidates = [
-                Candidate(data="seq1", modality=Modality.SEQUENCE),
-                Candidate(data="seq2", modality=Modality.SEQUENCE),
-            ]
-            targets = np.array([1.1, 2.1])
+        # Convert to DataFrame
+        df = predictions.to_dataframe(candidates, targets)
 
-            # Save predictions
-            predictions.save(temp_dir, candidates, targets, "test_empirical.csv")
+        # Check ensemble prediction columns
+        assert "ensemble_pred_0" in df.columns
+        assert "ensemble_pred_1" in df.columns
+        assert "ensemble_pred_2" in df.columns
 
-            # Load and verify content
-            file_path = os.path.join(temp_dir, "test_empirical.csv")
-            df = pd.read_csv(file_path)
+        # Check values
+        np.testing.assert_array_almost_equal(df["ensemble_pred_0"].values, [1.1, 2.1])
+        np.testing.assert_array_almost_equal(df["ensemble_pred_1"].values, [1.2, 2.2])
+        np.testing.assert_array_almost_equal(df["ensemble_pred_2"].values, [1.3, 2.3])
 
-            # Check ensemble prediction columns
-            assert "ensemble_pred_0" in df.columns
-            assert "ensemble_pred_1" in df.columns
-            assert "ensemble_pred_2" in df.columns
+    def test_to_dataframe_without_variances(self):
+        """Test to_dataframe without variances."""
+        # Setup test data
+        means = np.array([1.0, 2.0, 3.0])
+        predictions = Predictions(means=means)  # No variances
 
-            # Check values
-            np.testing.assert_array_almost_equal(df["ensemble_pred_0"].values, [1.1, 2.1])
-            np.testing.assert_array_almost_equal(df["ensemble_pred_1"].values, [1.2, 2.2])
-            np.testing.assert_array_almost_equal(df["ensemble_pred_2"].values, [1.3, 2.3])
+        candidates = [
+            Candidate(data="seq1", modality=Modality.SEQUENCE),
+            Candidate(data="seq2", modality=Modality.SEQUENCE),
+            Candidate(data="seq3", modality=Modality.SEQUENCE),
+        ]
+        targets = np.array([1.1, 2.1, 3.1])
 
-    def test_save_predictions_without_variances(self):
-        """Test save_predictions without variances."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Setup test data
-            means = np.array([1.0, 2.0, 3.0])
-            predictions = Predictions(means=means)  # No variances
+        # Convert to DataFrame
+        df = predictions.to_dataframe(candidates, targets)
 
-            candidates = [
-                Candidate(data="seq1", modality=Modality.SEQUENCE),
-                Candidate(data="seq2", modality=Modality.SEQUENCE),
-                Candidate(data="seq3", modality=Modality.SEQUENCE),
-            ]
-            targets = np.array([1.1, 2.1, 3.1])
+        # Check that variances are set to 0
+        np.testing.assert_array_equal(df["variance"].values, [0, 0, 0])
 
-            # Save predictions
-            predictions.save(temp_dir, candidates, targets, "test_no_var.csv")
+    def test_to_dataframe_without_empirical_dist(self):
+        """Test to_dataframe without empirical distribution."""
+        # Setup test data
+        means = np.array([1.0, 2.0])
+        variances = np.array([0.1, 0.2])
+        predictions = Predictions(means=means, variances=variances)  # No empirical_dist
 
-            # Load and verify content
-            file_path = os.path.join(temp_dir, "test_no_var.csv")
-            df = pd.read_csv(file_path)
+        candidates = [
+            Candidate(data="seq1", modality=Modality.SEQUENCE),
+            Candidate(data="seq2", modality=Modality.SEQUENCE),
+        ]
+        targets = np.array([1.1, 2.1])
 
-            # Check that variances are set to 0
-            np.testing.assert_array_equal(df["variance"].values, [0, 0, 0])
+        # Convert to DataFrame
+        df = predictions.to_dataframe(candidates, targets)
 
-    def test_save_predictions_without_empirical_dist(self):
-        """Test save_predictions without empirical distribution."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Setup test data
-            means = np.array([1.0, 2.0])
-            variances = np.array([0.1, 0.2])
-            predictions = Predictions(means=means, variances=variances)  # No empirical_dist
-
-            candidates = [
-                Candidate(data="seq1", modality=Modality.SEQUENCE),
-                Candidate(data="seq2", modality=Modality.SEQUENCE),
-            ]
-            targets = np.array([1.1, 2.1])
-
-            # Save predictions
-            predictions.save(temp_dir, candidates, targets, "test_no_emp.csv")
-
-            # Load and verify content
-            file_path = os.path.join(temp_dir, "test_no_emp.csv")
-            df = pd.read_csv(file_path)
-
-            # Check that no ensemble columns exist
-            ensemble_cols = [col for col in df.columns if col.startswith("ensemble_pred_")]
-            assert len(ensemble_cols) == 0
+        # Check that no ensemble columns exist
+        ensemble_cols = [col for col in df.columns if col.startswith("ensemble_pred_")]
+        assert len(ensemble_cols) == 0

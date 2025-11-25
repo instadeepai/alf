@@ -41,8 +41,7 @@ class SupervisedTask(BaseTask):
     def run(  # type: ignore[override]
         self,
         state: TaskState,
-        logger: Logger,
-        save_path: str | None = None,
+        loggers: list[Logger],
     ) -> None:
         """Run the supervised learning task.
 
@@ -51,29 +50,20 @@ class SupervisedTask(BaseTask):
 
         Args:
             state: Task state with dataset and surrogate model.
-            logger: Logger for recording metrics.
-            save_path: Optional directory path to save dataset splits and predictions.
+            loggers: List of loggers for recording the state.
         """
         log.info("Running supervised task ...")
-
-        if save_path:
-            state.dataset.save_splits(save_path, _verbose=True)
 
         t0 = time.perf_counter()
         state.surrogate.fit(
             train_data=state.dataset.train_dataset,
             val_data=state.dataset.validation_dataset,
-            logger=logger,
         )
         t1 = time.perf_counter()
         state.round_metrics = {"tell_time": t1 - t0}
 
-        state = self.evaluate(
-            state=state,
-            round_name="supervised evaluation",
-            save_path=save_path,
-            filename="supervised_predictions.csv",
-        )
+        state = self.evaluate(state=state)
+        for logger in loggers:
+            logger.write(state, round_name="supervised evaluation")
 
-        logger.write(state.round_metrics, timestep=0)
         return

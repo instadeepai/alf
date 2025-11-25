@@ -19,7 +19,6 @@ from typing import Any, Union
 import numpy as np
 
 from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions
-from alf.core.utils.logger import Logger
 
 
 class BaseModel(abc.ABC):
@@ -45,14 +44,12 @@ class BaseModel(abc.ABC):
         self,
         train_data: LabeledCandidates,
         val_data: LabeledCandidates,
-        logger: Logger | None = None,
     ) -> None:
         """Train the model on the provided training and validation data.
 
         Args:
             train_data: Labeled candidates for training.
             val_data: Labeled candidates for validation.
-            logger: Optional logger for recording training metrics.
         """
         pass
 

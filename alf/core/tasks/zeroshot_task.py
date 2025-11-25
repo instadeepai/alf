@@ -41,8 +41,7 @@ class ZeroShotTask(BaseTask):
     def run(  # type: ignore[override]
         self,
         state: TaskState,
-        logger: Logger,
-        save_path: str | None = None,
+        loggers: list[Logger],
     ) -> None:
         """Run the zero-shot evaluation task.
 
@@ -51,23 +50,18 @@ class ZeroShotTask(BaseTask):
 
         Args:
             state: Task state with dataset and pre-trained surrogate model.
-            logger: Logger for recording metrics.
-            save_path: Optional directory path to save predictions.
+            loggers: List of loggers for recording the state.
         """
         log.info(
             f"Zero-shot evaluation on test data with {len(state.dataset.test_dataset)} sequences"
         )
 
-        state = self.evaluate(
-            state=state,
-            round_name="zero-shot evaluation",
-            save_path=save_path,
-            filename="zero_shot_predictions.csv",
-        )
+        state = self.evaluate(state=state)
 
         log.info(
             "Note, the zero-shot predictions do not currently exclude any randomly initialised "
             "layers."
         )
 
-        logger.write(state.round_metrics, timestep=0)
+        for logger in loggers:
+            logger.write(state, round_name="zero-shot evaluation")
