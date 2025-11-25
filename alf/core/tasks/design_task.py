@@ -39,13 +39,13 @@ class DesignTask(BaseTask):
         super().__init__(task_type="Design", **kwargs)
 
     def run_initial_train_round(
-        self, state: TaskState, task_state_loggers: list[TaskStateLogger]
+        self, state: TaskState, state_loggers: list[TaskStateLogger]
     ) -> TaskState:
         """Run the initial train round on the train and validation sets.
 
         Args:
             state: Task state with dataset and surrogate.
-            task_state_loggers: List of TaskStateLogger for recording the state.
+            state_loggers: List of TaskStateLogger for recording the state.
 
         Returns:
             TaskState: Updated state with surrogate fine-tuned on the train and validation sets.
@@ -57,8 +57,8 @@ class DesignTask(BaseTask):
         )
         state.round_metrics = {"round": 0}
         self.evaluate(state=state)
-        for task_state_logger in task_state_loggers:
-            task_state_logger.log(state, round_name="initial_train_round")
+        for state_logger in state_loggers:
+            state_logger.log(state, round_name="initial_train_round")
         return state
 
     def run(  # type: ignore[override]
