@@ -16,6 +16,7 @@ import abc
 import logging
 import os
 from pathlib import Path
+from typing import Callable
 
 import numpy as np
 import pandas as pd
@@ -69,14 +70,18 @@ class FileTaskStateLogger(TaskStateLogger):
     This includes the metrics, the acquisition batch, the data splits, and the predictions.
     """
 
-    def __init__(self, output_path: str | os.PathLike):
+    def __init__(
+        self, output_path: str | os.PathLike, upload_function: Callable[[Path], None] | None = None
+    ):
         """Initialize FileTaskStateLogger.
 
         Args:
             output_path: Path to the directory to save the state information to
+            upload_function: Function to upload the state information to a remote location
         """
         self.output_path = Path(output_path)
         self.output_path.mkdir(parents=True, exist_ok=True)
+        self.upload_function = upload_function
         logger.info("Initializing FileTaskStateLogger at %s", self.output_path)
 
     def _log_metrics(self, metrics: dict[str, float]) -> None:
@@ -147,3 +152,6 @@ class FileTaskStateLogger(TaskStateLogger):
 
         if state.history:
             self._log_acquisition_batch(state.history[-1], state.round)
+
+        if self.upload_function is not None:
+            self.upload_function(self.output_path)
