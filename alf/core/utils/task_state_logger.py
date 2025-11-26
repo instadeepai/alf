@@ -34,7 +34,9 @@ class TaskStateLogger(abc.ABC):
 
         Args:
             state: TaskState object to log
-            round_name: Name of the current round in the task
+            round_name: Name of the current round in the task, depending on the task type
+                e.g. "initial_train_round", "supervised evaluation", "zero-shot evaluation",
+                or the round number for design tasks.
         """
         pass
 
@@ -51,13 +53,15 @@ class TerminalTaskStateLogger(TaskStateLogger):
 
         Args:
             state: TaskState object with metrics to log
-            round_name: Name of the current round in the task
+            round_name: Name of the current round in the task, depending on the task type
+                e.g. "initial_train_round", "supervised evaluation", "zero-shot evaluation",
+                or the round number for design tasks.
         """
         if round_name is None:
             round_name = str(state.round)
         metrics = [f"{key}: {value:.3f}" for key, value in state.round_metrics.items()]
         message = "\n".join(metrics)
-        logger.info(f"Round {round_name}:\n{message}")
+        logger.info("Round %s:\n%s", round_name, message)
 
 
 class FileTaskStateLogger(TaskStateLogger):
@@ -73,7 +77,7 @@ class FileTaskStateLogger(TaskStateLogger):
         """
         self.output_path = Path(output_path)
         self.output_path.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Initializing FileTaskStateLogger at {self.output_path}")
+        logger.info("Initializing FileTaskStateLogger at %s", self.output_path)
 
     def log_metrics(self, metrics: dict[str, float]) -> None:
         """Log metrics to file.
@@ -111,7 +115,9 @@ class FileTaskStateLogger(TaskStateLogger):
             predictions: Predictions object to log
             candidates: List of Candidate objects corresponding to the predictions
             targets: Ground truth scores corresponding to the predictions
-            round_name: Name of the current round in the task
+            round_name: Name of the current round in the task, depending on the task type
+                e.g. "initial_train_round", "supervised evaluation", "zero-shot evaluation",
+                or the round number for design tasks.
         """
         round_name = round_name.lower().replace(" ", "_")
         predictions_df = predictions.to_dataframe(candidates, targets)
@@ -122,7 +128,9 @@ class FileTaskStateLogger(TaskStateLogger):
 
         Args:
             state: TaskState object to log
-            round_name: Name of the current round in the task
+            round_name: Name of the current round in the task, depending on the task type
+                e.g. "initial_train_round", "supervised evaluation", "zero-shot evaluation",
+                or the round number for design tasks.
         """
         if round_name is None:
             round_name = "round_" + str(state.round)

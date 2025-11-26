@@ -53,7 +53,7 @@ class ZeroShotTask(BaseTask):
             task_state_loggers: List of TaskStateLogger for recording the state.
         """
         logger.info(
-            f"Zero-shot evaluation on test data with {len(state.dataset.test_dataset)} sequences"
+            "Zero-shot evaluation on test data with %d sequences", len(state.dataset.test_dataset)
         )
 
         state = self.evaluate(state=state)

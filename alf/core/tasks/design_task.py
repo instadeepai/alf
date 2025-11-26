@@ -85,7 +85,7 @@ class DesignTask(BaseTask):
             optimizer: Optimizer for candidate acquisition.
             oracle: Oracle for evaluating candidate labels.
         """
-        logger.info(f"Multi-round Design Task: {self.num_acq_rounds} Rounds")
+        logger.info("Multi-round Design Task: %d Rounds", self.num_acq_rounds)
 
         # If the train data is provided, run an initial round of fine-tuning the surrogate
         # model on the training dataset.
