@@ -79,7 +79,7 @@ class FileTaskStateLogger(TaskStateLogger):
         self.output_path.mkdir(parents=True, exist_ok=True)
         logger.info("Initializing FileTaskStateLogger at %s", self.output_path)
 
-    def log_metrics(self, metrics: dict[str, float]) -> None:
+    def _log_metrics(self, metrics: dict[str, float]) -> None:
         """Log metrics to file.
 
         Args:
@@ -91,7 +91,7 @@ class FileTaskStateLogger(TaskStateLogger):
             metrics_df = pd.concat([saved_df, metrics_df])
         metrics_df.to_csv(self.output_path / "metrics.csv", index=False)
 
-    def log_acquisition_batch(self, acq_batch: LabeledCandidates, acq_round: int) -> None:
+    def _log_acquisition_batch(self, acq_batch: LabeledCandidates, acq_round: int) -> None:
         """Log the acquisition batch to file.
 
         Args:
@@ -102,7 +102,7 @@ class FileTaskStateLogger(TaskStateLogger):
             self.output_path / f"acq_round_{acq_round}.csv", index=False
         )
 
-    def log_predictions(
+    def _log_predictions(
         self,
         predictions: Predictions,
         candidates: list[Candidate],
@@ -135,10 +135,10 @@ class FileTaskStateLogger(TaskStateLogger):
         if round_name is None:
             round_name = "round_" + str(state.round)
 
-        self.log_metrics(state.round_metrics)
+        self._log_metrics(state.round_metrics)
 
         if state.round_predictions is not None:
-            self.log_predictions(
+            self._log_predictions(
                 state.round_predictions,
                 state.dataset.test_dataset.candidates,
                 state.dataset.test_dataset.labels,
@@ -146,4 +146,4 @@ class FileTaskStateLogger(TaskStateLogger):
             )
 
         if state.history:
-            self.log_acquisition_batch(state.history[-1], state.round)
+            self._log_acquisition_batch(state.history[-1], state.round)
