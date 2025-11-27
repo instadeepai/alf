@@ -13,14 +13,12 @@
 # limitations under the License.
 
 
-import os
 from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 
 from alf.core.dataclasses.candidate import Candidate
-from alf.core.utils.io import input_handler
 
 
 @dataclass
@@ -65,23 +63,23 @@ class Predictions:
         """
         return len(self.means)
 
-    def save(
+    def to_dataframe(
         self,
-        output_dir: str,
         candidates: list[Candidate],
         targets: np.ndarray,
-        filename: str,
-    ) -> None:
-        """Save the predictions to disk as a CSV file.
+    ) -> pd.DataFrame:
+        """Convert predictions to a DataFrame.
 
         Creates a DataFrame with predictions, targets, and optionally variances
-        and ensemble predictions, then saves it to the specified directory.
+        and ensemble predictions.
 
         Args:
-            output_dir: Directory path where the CSV file will be saved.
             candidates: List of Candidate objects corresponding to the predictions.
             targets: Ground truth target values corresponding to each candidate.
-            filename: Name of the CSV file to save (e.g., "predictions.csv").
+
+        Returns:
+            DataFrame: A DataFrame with predictions, targets, and optionally variances
+            and ensemble predictions.
         """
         predictions_list = []
         for i in range(len(self.means)):
@@ -99,6 +97,4 @@ class Predictions:
             predictions_list.append(record_i)
 
         df = pd.DataFrame.from_records(predictions_list)
-        input_handler.save_csv(os.path.join(output_dir, filename), df)
-
-        return
+        return df

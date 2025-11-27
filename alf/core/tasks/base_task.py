@@ -80,9 +80,6 @@ class BaseTask(abc.ABC):
     def evaluate(
         self,
         state: TaskState,
-        round_name: int | str,
-        save_path: str | None,
-        filename: str,
     ) -> TaskState:
         """Evaluate the surrogate model on the test dataset and return the updated state.
 
@@ -92,9 +89,6 @@ class BaseTask(abc.ABC):
         Args:
             state: Current task state containing dataset and surrogate.
             round_name: Name or number identifying the current round.
-            save_path: Directory path to save predictions. If None, predictions
-                are not saved.
-            filename: Name of the CSV file to save predictions (e.g., "predictions.csv").
 
         Returns:
             TaskState: Updated task state with evaluation metrics.
@@ -106,22 +100,11 @@ class BaseTask(abc.ABC):
             predictions = state.surrogate.predict(state.dataset.test_dataset.candidates)
             results = Results(predictions=predictions, targets=state.dataset.test_dataset.labels)
 
-            if self.save_round_predictions and save_path:
-                assert filename, "Filename must be provided to save predictions"
-                predictions.save(
-                    save_path,
-                    state.dataset.test_dataset.candidates,
-                    state.dataset.test_dataset.labels,
-                    filename=filename,
-                )
-
+            state.round_predictions = predictions
             state.round_metrics.update({
                 f"surrogate/test_{key}": value for key, value in results.metrics.items()
             })
 
         dataset_metrics = state.dataset.get_metrics()
         state.round_metrics.update({f"dataset/{k}": v for k, v in dataset_metrics.items()})
-
-        state.print_metrics(round_name)
-        state.save(save_path, _verbose=True)
         return state

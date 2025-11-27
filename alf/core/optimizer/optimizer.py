@@ -17,7 +17,6 @@ import time
 from alf.core.dataclasses import Candidate, TaskState
 from alf.core.optimizer.acquisition_function import AcquisitionFunction
 from alf.core.optimizer.search import BaseSearch
-from alf.core.utils.logger import Logger
 
 
 class Optimizer:
@@ -70,7 +69,6 @@ class Optimizer:
     def tell(
         self,
         state: TaskState,
-        logger: Logger | None = None,
     ) -> TaskState:
         """Update the surrogate model with newly acquired data.
 
@@ -88,7 +86,6 @@ class Optimizer:
         state.surrogate.fit(
             train_data=state.dataset.train_dataset,
             val_data=state.dataset.validation_dataset,
-            logger=logger,
         )
         t1 = time.perf_counter()
 
