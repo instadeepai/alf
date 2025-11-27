@@ -16,7 +16,6 @@
 from typing import Union
 
 import numpy as np
-
 from alf_core.dataclasses import Candidate, LabeledCandidates, Predictions
 from alf_core.model.base_model import BaseModel
 

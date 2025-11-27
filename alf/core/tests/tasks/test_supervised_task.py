@@ -5,14 +5,17 @@ import shutil
 import numpy as np
 import pandas as pd
 import pytest
-
 from alf_core.tasks.supervised_task import SupervisedTask
 from alf_core.utils.task_state_logger import FileTaskStateLogger, TerminalTaskStateLogger
 
 
 @pytest.fixture
 def expected_metrics():
-    """Fixture containing expected metric values for assertions."""
+    """Fixture containing expected metric values for assertions.
+
+    Returns:
+        dict: Expected metric values for assertions.
+    """
     return {
         "surrogate": {
             "test_mse": 35.11162,

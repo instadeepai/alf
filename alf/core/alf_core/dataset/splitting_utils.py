@@ -14,7 +14,6 @@
 
 
 import numpy as np
-
 from alf_core.dataclasses.labeled_candidates import LabeledCandidates
 
 

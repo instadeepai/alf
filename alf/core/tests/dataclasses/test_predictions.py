@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-
 from alf_core.dataclasses.candidate import Candidate, Modality
 from alf_core.dataclasses.predictions import Predictions
 

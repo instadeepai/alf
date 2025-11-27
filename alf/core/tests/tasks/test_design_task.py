@@ -5,14 +5,17 @@ import shutil
 import numpy as np
 import pandas as pd
 import pytest
-
 from alf_core.tasks.design_task import DesignTask
 from alf_core.utils.task_state_logger import FileTaskStateLogger, TerminalTaskStateLogger
 
 
 @pytest.fixture
 def expected_metrics():
-    """Fixture containing expected metric values for assertions."""
+    """Fixture containing expected metric values for assertions.
+
+    Returns:
+        dict: Expected metric values for assertions.
+    """
     return {
         "acquired_candidates": {
             "round_mean": 4.77942,

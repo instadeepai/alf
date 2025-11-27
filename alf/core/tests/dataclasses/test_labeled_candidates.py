@@ -2,7 +2,6 @@ import networkx as nx
 import numpy as np
 import pytest
 import torch
-
 from alf_core.dataclasses.candidate import Candidate, Modality
 from alf_core.dataclasses.labeled_candidates import LabeledCandidates
 

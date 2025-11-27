@@ -1,7 +1,6 @@
 from typing import Any
 
 import numpy as np
-
 from alf_core.dataclasses import Candidate, LabeledCandidates
 from alf_core.dataset.base_dataset import BaseDataset
 

@@ -20,7 +20,6 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
-
 from alf_core.dataclasses import Candidate, LabeledCandidates, Predictions, TaskState
 
 logger = logging.getLogger("alf-core")

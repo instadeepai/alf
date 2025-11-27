@@ -21,7 +21,6 @@ from pathlib import Path
 from typing import Any, Union
 
 import numpy as np
-
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataclasses.labeled_candidates import Candidate, LabeledCandidates
 from alf_core.dataset.splitting_utils import split_dataset

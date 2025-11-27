@@ -1,5 +1,4 @@
 import numpy as np
-
 from alf_core.dataclasses import Predictions, TaskState
 from alf_core.optimizer.acquisition_function import AcquisitionFunction
 
@@ -13,5 +12,13 @@ class DummyAcquisitionFunction(AcquisitionFunction):
         self.rng = np.random.RandomState(seed)
 
     def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Generate random acquisition values for the predictions."""
+        """Generate random acquisition values for the predictions.
+
+        Args:
+            predictions: Predictions from the surrogate model.
+            state: Task state.
+
+        Returns:
+            np.ndarray: Acquisition values.
+        """
         return self.rng.randn(len(predictions))

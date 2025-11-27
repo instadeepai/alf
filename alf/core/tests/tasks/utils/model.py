@@ -1,7 +1,6 @@
 from typing import Any, List, Union
 
 import numpy as np
-
 from alf_core.dataclasses import Candidate, LabeledCandidates, Predictions
 from alf_core.model.base_model import BaseModel
 
@@ -21,7 +20,14 @@ class DummyModel(BaseModel):
         self.rng = np.random.RandomState(seed)
 
     def predict(self, candidate_points: List[Candidate]) -> Predictions:
-        """Generate random predictions for the candidate points."""
+        """Generate random predictions for the candidate points.
+
+        Args:
+            candidate_points: List of candidate points to predict.
+
+        Returns:
+            Predictions: Predictions for the candidate points.
+        """
         labels = self.rng.randn(len(candidate_points))
         return Predictions(means=labels)
 
