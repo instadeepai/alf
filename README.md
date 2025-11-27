@@ -14,19 +14,10 @@ intelligent candidate selection (data acquisition), model adaptation, and evalua
 
 ## ✨ Features
 
-- **Modular Architecture**: Flexible, extensible components that can be easily swapped
-  and customized
-- **Multiple experiment setups**: Support for multi-round optimisation, supervised
-  learning, and zero-shot evaluation
-- **Diverse Acquisition Strategies**: Built-in acquisition functions (Greedy, UCB,
-  Expected Improvement, Thompson Sampling)
-- **Flexible Search Methods**: Support for local (dataset-based and protocol-based
-  e.g. mutagenesis) and global (generative-based) search strategies
-- **Offline and Online Evaluation**: Support for both offline (dataset-based) and
-  online (model-based or an external objective function) optimization scenarios
-- **Evaluation Metrics**: Set of metrics for
-  assessing prediction accuracy and uncertainty calibration of surrogate models
-- **Comprehensive Testing**: Full test coverage with end-to-end experiments
+- **Modular Architecture**: Flexible, extensible components that can be easily swapped and customized
+- **Multiple Experiment Setups**: Multi-round optimization, supervised learning, and zero-shot evaluation
+- **Offline and Online Evaluation**: Dataset-based and model-based optimization scenarios
+- **Evaluation Metrics**: Metrics for prediction accuracy and uncertainty calibration
 
 ## 📦 Installation
 
@@ -37,19 +28,16 @@ intelligent candidate selection (data acquisition), model adaptation, and evalua
 
 ### Install from source
 
+This library can be installed with pip from this private GitHub repository. See below for details.
+
+This repository contains two packages, `alf_core` and `alf_tools`. The former contains the task runners which allow you to run different experiments, and the latter contains implementations of specific models, datasets, and optimisation functions. Depending on your use case, you can use the following commands to install the specific packages.
+
 ```bash
-# Clone the repository
-git clone https://github.com/instadeepai/alf.git
-cd alf
+# Install the core package
+pip install git+https://github.com/instadeepai/alf.git#subdirectory=core
 
-# Install with uv (recommended)
-uv sync --extra cpu  # or --extra gpu for GPU support
-```
-
-Alternatively, this library can be installed with pip from this private GitHub repository, like this:
-
-```
-pip install git+https://github.com/instadeepai/alf
+# Install the tools package
+pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 ```
 
 To authenticate, we recommend to set up a `.netrc` file in your home directory with a GitHub personal access token:
@@ -61,13 +49,12 @@ machine github.com login <USERNAME> password <TOKEN>
 The tool `pip` will automatically make use of these credentials for authentication. For more information on creating personal access tokens, see [this](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
 
 
-
 ## 🚀 Quick Start
 
 ### Design Task
 
 ```python
-from alf.core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask, TerminalTaskStateLogger
+from alf_core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask, TerminalTaskStateLogger
 from alf.tools.datasets.gfp import GFP
 from alf.tools.models.cnn import CNNModel
 from alf.tools.optimizer.acquisition_functions.greedy import Greedy
@@ -86,46 +73,12 @@ state = task.setup(dataset=dataset, surrogate=surrogate)
 task.run(state=state, task_state_loggers=[TerminalTaskStateLogger()], optimizer=optimizer, oracle=oracle)
 ```
 
-### Supervised Task
-
-```python
-from alf.core import Surrogate, SupervisedTask, TerminalTaskStateLogger
-from alf.tools.datasets.gfp import GFP
-from alf.tools.models.cnn import CNNModel
-
-# Initialize components
-dataset = GFP(name="gfp", modality="sequence", seed=42, split_config=split_config)
-surrogate = Surrogate(model=CNNModel())
-
-# Run supervised task
-task = SupervisedTask()
-state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, task_state_loggers=[TerminalTaskStateLogger()])
-```
-
-### Zero-Shot Task
-
-```python
-from alf.core import Surrogate, ZeroShotTask, TerminalTaskStateLogger
-from alf.tools.datasets.gfp import GFP
-from alf.tools.models.random import RandomModel
-
-# Initialize components
-dataset = GFP(name="gfp", modality="sequence", seed=42, split_config=split_config)
-surrogate = Surrogate(model=RandomModel())  # Pre-trained model
-
-# Run zero-shot task
-task = ZeroShotTask()
-state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, task_state_loggers=[TerminalTaskStateLogger()])
-```
-
 ## 📁 Project Structure
 
 ```
 alf/
-├── alf/
-│   ├── core/              # Core framework components
+├── core/                  # Core framework
+│   ├── alf_core/          # Core package
 │   │   ├── dataclasses/   # Data structures (Candidate, LabeledCandidates, etc.)
 │   │   ├── dataset/       # Dataset base classes and utilities
 │   │   ├── model/         # Model base classes
@@ -134,20 +87,22 @@ alf/
 │   │   ├── surrogate/     # Surrogate model wrapper
 │   │   ├── tasks/         # Task implementations (Design, Supervised, ZeroShot)
 │   │   └── utils/         # Utilities (metrics, logging)
-│   └── tools/             # Example implementations and tools
+│   └── tests/             # Core framework tests
+├── tools/                 # Example implementations and tools
+│   └── alf_tools/         # Tools package
 │       ├── datasets/      # Example datasets (e.g., GFP)
 │       ├── models/        # Example models (CNN, Random)
 │       └── optimizer/     # Example acquisition functions (UCB, Thompson Sampling, etc.) and search strategies
-├── tests/                 # Test suite
 ├── tutorials/             # Tutorials and example scripts
 └── docs/                  # Documentation
 ```
 
 ## 📖 Documentation
 
-For detailed documentation on core components, see:
-- **[Core Components Documentation](alf/core/README.md)** - Comprehensive guide to all
+For further details, see the following documentation:
+- **[ALF Core](core/README.md)** - Comprehensive guide to all
   core components and their interactions
+- **[ALF Tools](tools/README.md)** - Description of all the datasets, models, and optimisation algorithms available (TBA - this link does not work for now)
 
 ## 🎓 Tutorials
 
@@ -157,28 +112,6 @@ Explore the tutorials to learn how to use ALF:
   to running offline design experiments
 - **[Example Scripts](tutorials/experiments/)** - Ready-to-run examples for all task types
 
-## 🧩 Core Components
-
-ALF is built around a modular architecture with the following key components:
-
-1. **Dataset** (`BaseDataset`) - Data loading, splitting, and querying
-2. **Model** (`BaseModel`) - Abstract base class for all models
-3. **Surrogate** (`Surrogate`) - Approximates expensive experimental evaluation
-4. **Oracle** (`Oracle`) - Provides ground-truth labels for candidates
-5. **Optimizer** (`Optimizer`) - Orchestrates the active learning loop (ask-tell interface)
-6. **Acquisition Function** (`AcquisitionFunction`) - Scores candidates for acquisition
-7. **Search Strategy** (`BaseSearch`) - Defines the candidate pool
-8. **Task State** (`TaskState`) - Tracks the state of active learning tasks
-
-See the [Core Components Documentation](alf/core/README.md) for detailed information.
-
-## 🎯 Task Types
-
-ALF supports three main task types:
-
-- **Design Task** - Multi-round active learning loop for iterative optimization
-- **Supervised Task** - Train and evaluate models on fixed dataset splits
-- **Zero-Shot Task** - Evaluate pre-trained models without training
 
 ## 🛠️ Development
 
@@ -196,10 +129,7 @@ uv sync --extra cpu --group dev
 uv run pytest
 
 # Run with coverage
-uv run pytest --cov=alf --cov-report term-missing
-
-# Run specific test file
-uv run pytest tests/alf/core/tasks/test_design_task.py
+uv run pytest --cov=alf_core --cov-report term-missing
 ```
 
 ### Pre-commit Hooks
