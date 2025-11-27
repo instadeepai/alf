@@ -67,7 +67,7 @@ The tool `pip` will automatically make use of these credentials for authenticati
 ### Design Task
 
 ```python
-from alf.core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask, TerminalTaskStateLogger
+from alf_core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask, TerminalTaskStateLogger
 from alf.tools.datasets.gfp import GFP
 from alf.tools.models.cnn import CNNModel
 from alf.tools.optimizer.acquisition_functions.greedy import Greedy
@@ -89,7 +89,7 @@ task.run(state=state, task_state_loggers=[TerminalTaskStateLogger()], optimizer=
 ### Supervised Task
 
 ```python
-from alf.core import Surrogate, SupervisedTask, TerminalTaskStateLogger
+from alf_core import Surrogate, SupervisedTask, TerminalTaskStateLogger
 from alf.tools.datasets.gfp import GFP
 from alf.tools.models.cnn import CNNModel
 
@@ -106,7 +106,7 @@ task.run(state=state, task_state_loggers=[TerminalTaskStateLogger()])
 ### Zero-Shot Task
 
 ```python
-from alf.core import Surrogate, ZeroShotTask, TerminalTaskStateLogger
+from alf_core import Surrogate, ZeroShotTask, TerminalTaskStateLogger
 from alf.tools.datasets.gfp import GFP
 from alf.tools.models.random import RandomModel
 
@@ -124,8 +124,8 @@ task.run(state=state, task_state_loggers=[TerminalTaskStateLogger()])
 
 ```
 alf/
-├── alf/
-│   ├── core/              # Core framework components
+├── core/                  # Core framework
+│   ├── alf_core/          # Core package
 │   │   ├── dataclasses/   # Data structures (Candidate, LabeledCandidates, etc.)
 │   │   ├── dataset/       # Dataset base classes and utilities
 │   │   ├── model/         # Model base classes
@@ -134,11 +134,12 @@ alf/
 │   │   ├── surrogate/     # Surrogate model wrapper
 │   │   ├── tasks/         # Task implementations (Design, Supervised, ZeroShot)
 │   │   └── utils/         # Utilities (metrics, logging)
-│   └── tools/             # Example implementations and tools
+│   └── tests/             # Core framework tests
+├── tools/                 # Example implementations and tools
+│   └── alf_tools/         # Tools package
 │       ├── datasets/      # Example datasets (e.g., GFP)
 │       ├── models/        # Example models (CNN, Random)
 │       └── optimizer/     # Example acquisition functions (UCB, Thompson Sampling, etc.) and search strategies
-├── tests/                 # Test suite
 ├── tutorials/             # Tutorials and example scripts
 └── docs/                  # Documentation
 ```

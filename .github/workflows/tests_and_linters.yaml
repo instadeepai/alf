@@ -27,7 +27,7 @@ jobs:
 
       - name: Lint
         run: |
-          uv sync --extra cpu
+          cd core && uv sync --extra cpu
           uv run --no-sync pre-commit run --all-files --verbose
 
   tests:
@@ -55,15 +55,15 @@ jobs:
 
         - name: Run tests 🧪
           run: |
-            uv sync --extra cpu
+            cd core && uv sync --extra cpu
             uv run --no-sync pytest --verbose --cov-report xml:coverage.xml \
                             --cov-report term-missing \
                             --junitxml=pytest.xml \
-                            --cov=alf
+                            --cov=alf_core
 
         - name: Pytest coverage comment 💬
           id: coverageComment
           uses: MishaKav/pytest-coverage-comment@main
           with:
-            pytest-xml-coverage-path: ./coverage.xml
-            junitxml-path: ./pytest.xml
+            pytest-xml-coverage-path: core/coverage.xml
+            junitxml-path: core/pytest.xml
