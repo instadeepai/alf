@@ -17,6 +17,7 @@ import time
 from typing import Union
 
 import numpy as np
+
 from alf_core.dataclasses import Candidate, LabeledCandidates, TaskState
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.model.base_model import BaseModel

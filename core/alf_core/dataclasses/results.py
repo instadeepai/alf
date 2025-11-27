@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Union
 
 import numpy as np
+
 from alf_core.dataclasses.predictions import Predictions
 from alf_core.utils.metrics import metric_registry
 
