@@ -19,9 +19,9 @@ from typing import Any
 
 from alf.core.dataclasses import TaskState
 from alf.core.tasks.base_task import BaseTask
-from alf.core.utils.logger import Logger
+from alf.core.utils.task_state_logger import TaskStateLogger
 
-log = logging.getLogger("alf-core")
+logger = logging.getLogger("alf-core")
 
 
 class SupervisedTask(BaseTask):
@@ -41,8 +41,7 @@ class SupervisedTask(BaseTask):
     def run(  # type: ignore[override]
         self,
         state: TaskState,
-        logger: Logger,
-        save_path: str | None = None,
+        task_state_loggers: list[TaskStateLogger],
     ) -> None:
         """Run the supervised learning task.
 
@@ -51,29 +50,20 @@ class SupervisedTask(BaseTask):
 
         Args:
             state: Task state with dataset and surrogate model.
-            logger: Logger for recording metrics.
-            save_path: Optional directory path to save dataset splits and predictions.
+            task_state_loggers: List of TaskStateLogger for recording the state.
         """
-        log.info("Running supervised task ...")
-
-        if save_path:
-            state.dataset.save_splits(save_path, _verbose=True)
+        logger.info("Running supervised task ...")
 
         t0 = time.perf_counter()
         state.surrogate.fit(
             train_data=state.dataset.train_dataset,
             val_data=state.dataset.validation_dataset,
-            logger=logger,
         )
         t1 = time.perf_counter()
         state.round_metrics = {"tell_time": t1 - t0}
 
-        state = self.evaluate(
-            state=state,
-            round_name="supervised evaluation",
-            save_path=save_path,
-            filename="supervised_predictions.csv",
-        )
+        state = self.evaluate(state=state)
+        for task_state_logger in task_state_loggers:
+            task_state_logger.log(state, round_name="supervised evaluation")
 
-        logger.write(state.round_metrics, timestep=0)
         return

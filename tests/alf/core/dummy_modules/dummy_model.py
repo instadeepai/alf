@@ -1,10 +1,9 @@
-from typing import Any, List, Optional, Union
+from typing import Any, List, Union
 
 import numpy as np
 
 from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions
 from alf.core.model.base_model import BaseModel
-from alf.core.utils.logger import Logger
 
 
 class DummyModel(BaseModel):
@@ -34,7 +33,6 @@ class DummyModel(BaseModel):
         self,
         train_data: LabeledCandidates,
         val_data: LabeledCandidates,
-        logger: Optional[Logger] = None,
     ) -> None:
         """Dummy model does not perform any actual training but updates the random seed."""
         self.rng = np.random.RandomState(self.seed + 1)

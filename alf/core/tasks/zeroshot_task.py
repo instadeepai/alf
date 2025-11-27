@@ -17,9 +17,9 @@ from typing import Any
 
 from alf.core.dataclasses import TaskState
 from alf.core.tasks.base_task import BaseTask
-from alf.core.utils.logger import Logger
+from alf.core.utils.task_state_logger import TaskStateLogger
 
-log = logging.getLogger("alf-core")
+logger = logging.getLogger("alf-core")
 
 
 class ZeroShotTask(BaseTask):
@@ -41,8 +41,7 @@ class ZeroShotTask(BaseTask):
     def run(  # type: ignore[override]
         self,
         state: TaskState,
-        logger: Logger,
-        save_path: str | None = None,
+        task_state_loggers: list[TaskStateLogger],
     ) -> None:
         """Run the zero-shot evaluation task.
 
@@ -51,23 +50,18 @@ class ZeroShotTask(BaseTask):
 
         Args:
             state: Task state with dataset and pre-trained surrogate model.
-            logger: Logger for recording metrics.
-            save_path: Optional directory path to save predictions.
+            task_state_loggers: List of TaskStateLogger for recording the state.
         """
-        log.info(
-            f"Zero-shot evaluation on test data with {len(state.dataset.test_dataset)} sequences"
+        logger.info(
+            "Zero-shot evaluation on test data with %d sequences", len(state.dataset.test_dataset)
         )
 
-        state = self.evaluate(
-            state=state,
-            round_name="zero-shot evaluation",
-            save_path=save_path,
-            filename="zero_shot_predictions.csv",
-        )
+        state = self.evaluate(state=state)
 
-        log.info(
+        logger.info(
             "Note, the zero-shot predictions do not currently exclude any randomly initialised "
             "layers."
         )
 
-        logger.write(state.round_metrics, timestep=0)
+        for task_state_logger in task_state_loggers:
+            task_state_logger.log(state, round_name="zero-shot evaluation")

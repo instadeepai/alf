@@ -15,9 +15,9 @@
 
 import abc
 import copy
-import logging
 import os
 from math import floor
+from pathlib import Path
 from typing import Any, Union
 
 import numpy as np
@@ -25,9 +25,6 @@ import numpy as np
 from alf.core.dataclasses.candidate import Modality
 from alf.core.dataclasses.labeled_candidates import Candidate, LabeledCandidates
 from alf.core.dataset.splitting_utils import split_dataset
-from alf.core.utils.io import input_handler
-
-log = logging.getLogger("alf-core")
 
 
 class BaseDataset(abc.ABC):
@@ -257,26 +254,6 @@ class BaseDataset(abc.ABC):
             LabeledCandidates(*shuffled_acquired_candidates[-num_val:])
         )
 
-    def save_splits(self, output_dir: str, _verbose: bool = False) -> None:
-        """Save dataset splits to CSV files in the output directory.
-
-        Saves train, validation, and test splits (but not candidate_pool) as
-        separate CSV files.
-
-        Args:
-            output_dir: Directory path where CSV files will be saved.
-            _verbose: If True, log messages when saving each split.
-        """
-        for key, split in self.splits.items():
-            if key not in ["train", "validation", "test"]:
-                continue
-            if _verbose:
-                log.info(f"Saving {key} split to {output_dir}")
-            input_handler.save_csv(
-                os.path.join(output_dir, f"{key}.csv"),
-                split.to_dataframe(),
-            )
-
     def query(self, candidates: list[Candidate]) -> LabeledCandidates:
         """Query labels for the given candidates from the raw dataset.
 
@@ -308,3 +285,14 @@ class BaseDataset(abc.ABC):
             metrics[f"num_{key}"] = len(split)
             metrics[f"{key}_mean"] = np.mean(split.labels)
         return metrics
+
+    def save_splits(self, output_path: str | os.PathLike) -> None:
+        """Save the dataset splits to a file.
+
+        Args:
+            output_path: Path to the directory to save the dataset splits to
+        """
+        data_splits_path = Path(output_path) / "data_splits"
+        data_splits_path.mkdir(parents=True, exist_ok=True)
+        for key, data_split in self.splits.items():
+            data_split.to_dataframe().to_csv(data_splits_path / f"{key}.csv", index=False)

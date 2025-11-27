@@ -19,9 +19,9 @@ from alf.core.dataclasses import TaskState
 from alf.core.optimizer.optimizer import Optimizer
 from alf.core.oracle.oracle import Oracle
 from alf.core.tasks.base_task import BaseTask
-from alf.core.utils.logger import Logger
+from alf.core.utils.task_state_logger import TaskStateLogger
 
-log = logging.getLogger("alf-core")
+logger = logging.getLogger("alf-core")
 
 
 class DesignTask(BaseTask):
@@ -39,41 +39,34 @@ class DesignTask(BaseTask):
         super().__init__(task_type="Design", **kwargs)
 
     def run_initial_train_round(
-        self, state: TaskState, logger: Logger, save_path: str | None = None
+        self, state: TaskState, state_loggers: list[TaskStateLogger]
     ) -> TaskState:
         """Run the initial train round on the train and validation sets.
 
         Args:
             state: Task state with dataset and surrogate.
-            logger: Logger for recording metrics.
-            save_path: Optional directory path to save predictions.
+            state_loggers: List of TaskStateLogger for recording the state.
 
         Returns:
             TaskState: Updated state with surrogate fine-tuned on the train and validation sets.
         """
-        log.info("Running initial round of surrogate model fine-tuning on the train dataset ...")
+        logger.info("Running initial round of surrogate model fine-tuning on the train dataset ...")
         state.surrogate.fit(
             train_data=state.dataset.train_dataset,
             val_data=state.dataset.validation_dataset,
-            logger=logger,
         )
         state.round_metrics = {"round": 0}
-        self.evaluate(
-            state=state,
-            round_name="initial_train_round",
-            save_path=save_path,
-            filename="initial_train_predictions.csv",
-        )
-        logger.write(state.round_metrics, timestep=0)
+        self.evaluate(state=state)
+        for state_logger in state_loggers:
+            state_logger.log(state, round_name="initial_train_round")
         return state
 
     def run(  # type: ignore[override]
         self,
         state: TaskState,
-        logger: Logger,
+        task_state_loggers: list[TaskStateLogger],
         optimizer: Optimizer,
         oracle: Oracle,
-        save_path: str | None = None,
     ) -> None:
         """Run the multi-round design task.
 
@@ -88,35 +81,27 @@ class DesignTask(BaseTask):
 
         Args:
             state: Initial task state with dataset and surrogate.
-            logger: Logger for recording metrics and artifacts.
+            task_state_loggers: List of TaskStateLogger for recording the state.
             optimizer: Optimizer for candidate acquisition.
             oracle: Oracle for evaluating candidate labels.
-            save_path: Optional directory path to save dataset splits and predictions.
         """
-        log.info(f"Multi-round Design Task: {self.num_acq_rounds} Rounds")
-
-        if save_path:
-            state.dataset.save_splits(save_path, _verbose=True)
+        logger.info("Multi-round Design Task: %d Rounds", self.num_acq_rounds)
 
         # If the train data is provided, run an initial round of fine-tuning the surrogate
         # model on the training dataset.
         if len(state.dataset.train_dataset) > 0:
-            state = self.run_initial_train_round(state, logger, save_path)
+            state = self.run_initial_train_round(state, task_state_loggers)
 
         for round_i in range(1, self.num_acq_rounds + 1):
             state.round_metrics = {"round": round_i}
             acquired_candidates, state = optimizer.ask(state)
             labeled_candidates, state = oracle.evaluate(acquired_candidates, state)
             state.update(labeled_candidates)
-            state = optimizer.tell(state=state, logger=logger)
+            state = optimizer.tell(state=state)
 
-            state = self.evaluate(
-                state=state,
-                round_name=round_i,
-                save_path=save_path,
-                filename=f"round_{round_i}_predictions.csv",
-            )
-            logger.write(state.round_metrics, timestep=round_i)
+            state = self.evaluate(state=state)
+            for task_state_logger in task_state_loggers:
+                task_state_logger.log(state)
             state.check_termination()
 
         return

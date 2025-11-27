@@ -19,7 +19,6 @@ import numpy as np
 
 from alf.core.dataclasses import Candidate, LabeledCandidates, Predictions
 from alf.core.model.base_model import BaseModel
-from alf.core.utils.logger import Logger
 
 
 class Surrogate:
@@ -39,16 +38,14 @@ class Surrogate:
         self,
         train_data: LabeledCandidates,
         val_data: LabeledCandidates,
-        logger: Logger | None = None,
     ) -> None:
         """Fit the surrogate model on training and validation data.
 
         Args:
             train_data: Labeled candidates for training.
             val_data: Labeled candidates for validation.
-            logger: Optional logger for recording training metrics.
         """
-        self.model.train(train_data, val_data, logger)
+        self.model.train(train_data, val_data)
 
     def predict(self, candidates: list[Candidate]) -> Predictions:
         """Predict scores for the given candidates.

@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from alf.core.tasks.supervised_task import SupervisedTask
-from alf.core.utils.logger import TerminalLogger
+from alf.core.utils.task_state_logger import FileTaskStateLogger, TerminalTaskStateLogger
 
 
 @pytest.fixture
@@ -48,10 +48,14 @@ class TestSupervisedTask:
         save_path = tmp_path / "supervised_dummy_surrogate"
         save_path.mkdir()
 
+        metrics_logger = TerminalTaskStateLogger()
+        file_logger = FileTaskStateLogger(output_path=save_path)
+        task_state_loggers = [metrics_logger, file_logger]
+
         # Create and run the supervised task
         task = SupervisedTask()
         state = task.setup(dataset=dummy_dataset, surrogate=dummy_surrogate)
-        task.run(state=state, logger=TerminalLogger(), save_path=str(save_path))
+        task.run(state=state, task_state_loggers=task_state_loggers)
 
         # Load and verify results
         metrics_file = save_path / "metrics.csv"
