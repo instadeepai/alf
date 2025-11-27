@@ -65,5 +65,5 @@ jobs:
           id: coverageComment
           uses: MishaKav/pytest-coverage-comment@main
           with:
-            pytest-xml-coverage-path: ./coverage.xml
-            junitxml-path: ./pytest.xml
+            pytest-xml-coverage-path: core/coverage.xml
+            junitxml-path: core/pytest.xml
