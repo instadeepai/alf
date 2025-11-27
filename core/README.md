@@ -5,7 +5,7 @@ Framework) library, describes the different task types, and explains how compone
 interact during execution.
 
 <div align="center">
-  <img src="../../docs/imgs/alf_components.svg" alt="ALF Components" width="70%">
+  <img src="../docs/imgs/alf_components.svg" alt="ALF Components" width="70%">
 </div>
 
 ## Overview
