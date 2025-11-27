@@ -16,7 +16,6 @@
 import abc
 
 import numpy as np
-
 from alf_core.dataclasses import Candidate, LabeledCandidates, Predictions, TaskState
 
 
