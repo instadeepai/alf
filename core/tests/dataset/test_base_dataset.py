@@ -10,19 +10,17 @@ from alf_core.dataclasses import Candidate, LabeledCandidates
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataset.base_dataset import BaseDataset
 
-from core.tests.dummy_modules import DummyDataset
-
 
 class TestBaseDatasetInitialization:
     """Tests for BaseDataset initialization and configuration."""
 
-    def test_initialization_with_valid_config(self):
+    def test_initialization_with_valid_config(self, dummy_dataset_factory):
         """Test initialization with valid split configuration, without candidate pool."""
         split_config = {
             "split_ratio": {"train": 0.8, "validation_frac": 0.25, "test": 0.2},
             "split_type": "random",
         }
-        dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
 
         assert dataset.name == "dummy"
         assert dataset.modality == Modality.SEQUENCE
@@ -30,7 +28,7 @@ class TestBaseDatasetInitialization:
         assert dataset.split_ratio == split_config["split_ratio"]
         assert dataset.split_type == "random"
 
-    def test_initialization_with_candidate_pool(self):
+    def test_initialization_with_candidate_pool(self, dummy_dataset_factory):
         """Test initialization with candidate pool in split config."""
         split_config = {
             "split_ratio": {
@@ -41,7 +39,7 @@ class TestBaseDatasetInitialization:
             },
             "split_type": "random",
         }
-        dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
 
         assert "candidate_pool" in dataset.split_ratio
         assert dataset.split_ratio["candidate_pool"] == 0.2
@@ -50,28 +48,28 @@ class TestBaseDatasetInitialization:
 class TestBaseDatasetValidation:
     """Tests for BaseDataset configuration validation."""
 
-    def test_validate_split_config_missing_split_ratio(self):
+    def test_validate_split_config_missing_split_ratio(self, dummy_dataset_factory):
         """Test that missing split_ratio raises an assertion error."""
         with pytest.raises(AssertionError, match="split_config must contain 'split_ratio'"):
             split_config = {"split_type": "random"}
-            DummyDataset(seed=42, split_config=split_config, num_samples=100)
+            dummy_dataset_factory(split_config=split_config, num_samples=100)
 
-    def test_validate_split_config_missing_split_type(self):
+    def test_validate_split_config_missing_split_type(self, dummy_dataset_factory):
         """Test that missing split_type raises an assertion error."""
         with pytest.raises(AssertionError, match="split_config must contain 'split_type'"):
             split_config = {"split_ratio": {"train": 0.8, "validation_frac": 0.25, "test": 0.2}}
-            DummyDataset(seed=42, split_config=split_config, num_samples=100)
+            dummy_dataset_factory(split_config=split_config, num_samples=100)
 
-    def test_validate_split_config_ratios_sum_exceeds_one(self):
+    def test_validate_split_config_ratios_sum_exceeds_one(self, dummy_dataset_factory):
         """Test that split ratios summing to more than 1 raises an error."""
         with pytest.raises(AssertionError, match="train \\+ test ratios exceed 1"):
             split_config = {
                 "split_ratio": {"train": 0.8, "validation_frac": 0.5, "test": 0.6},
                 "split_type": "random",
             }
-            DummyDataset(seed=42, split_config=split_config, num_samples=100)
+            dummy_dataset_factory(split_config=split_config, num_samples=100)
 
-    def test_validate_split_config_with_candidate_pool_exceeds_one(self):
+    def test_validate_split_config_with_candidate_pool_exceeds_one(self, dummy_dataset_factory):
         """Test that split ratios with candidate pool summing to more than 1 raises an error."""
         with pytest.raises(
             AssertionError, match="Sum of train, test, and candidate_pool ratios must be <= 1"
@@ -85,26 +83,26 @@ class TestBaseDatasetValidation:
                 },
                 "split_type": "random",
             }
-            DummyDataset(seed=42, split_config=split_config, num_samples=100)
+            dummy_dataset_factory(split_config=split_config, num_samples=100)
 
 
 class TestBaseDatasetSplitting:
     """Tests for dataset splitting functionality."""
 
-    def test_split_dataset_random(self):
+    def test_split_dataset_random(self, dummy_dataset_factory):
         """Test random splitting of dataset."""
         split_config = {
             "split_ratio": {"train": 0.6, "validation_frac": 0.25, "test": 0.2},
             "split_type": "random",
         }
-        dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
 
         # train+val = 60, of which 25% (15) goes to validation, 75% (45) to train
         assert len(dataset.train_dataset) == 45
         assert len(dataset.validation_dataset) == 15
         assert len(dataset.test_dataset) == 20
 
-    def test_split_dataset_with_candidate_pool(self):
+    def test_split_dataset_with_candidate_pool(self, dummy_dataset_factory):
         """Test splitting with explicit candidate pool."""
         split_config = {
             "split_ratio": {
@@ -115,7 +113,7 @@ class TestBaseDatasetSplitting:
             },
             "split_type": "random",
         }
-        dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
 
         # train+val = 50, of which 20% (10) goes to validation, 80% (40) to train
         assert len(dataset.train_dataset) == 40
@@ -123,7 +121,7 @@ class TestBaseDatasetSplitting:
         assert len(dataset.test_dataset) == 25
         assert len(dataset.candidate_pool) == 25
 
-    def test_split_dataset_low_vs_high(self):
+    def test_split_dataset_low_vs_high(self, dummy_dataset_factory):
         """Test low vs high splitting of dataset."""
         split_config = {
             "split_ratio": {
@@ -134,7 +132,7 @@ class TestBaseDatasetSplitting:
             },
             "split_type": "low_vs_high",
         }
-        dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
 
         # Check sizes: train+val = 50, of which 20% (10) goes to validation, 80% (40) to train
         assert len(dataset.train_dataset) == 40
@@ -151,7 +149,7 @@ class TestBaseDatasetSplitting:
         ) / 2
         assert test_pool_mean >= train_val_mean
 
-    def test_init_candidate_pool_is_deepcopy(self):
+    def test_init_candidate_pool_is_deepcopy(self, dummy_dataset_factory):
         """Test that init_candidate_pool is a deep copy of the original candidate pool."""
         split_config = {
             "split_ratio": {
@@ -162,7 +160,7 @@ class TestBaseDatasetSplitting:
             },
             "split_type": "random",
         }
-        dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
 
         # Verify init_candidate_pool exists
         assert hasattr(dataset, "init_candidate_pool")
@@ -180,37 +178,37 @@ class TestBaseDatasetSplitting:
 class TestBaseDatasetProperties:
     """Tests for BaseDataset properties."""
 
-    def test_train_dataset_property(self):
+    def test_train_dataset_property(self, dummy_dataset_factory):
         """Test train_dataset property."""
-        dataset = DummyDataset(seed=42, num_samples=100)
+        dataset = dummy_dataset_factory(num_samples=100)
         train = dataset.train_dataset
 
         assert isinstance(train, LabeledCandidates)
         assert len(train) == 48
 
-    def test_validation_dataset_property(self):
+    def test_validation_dataset_property(self, dummy_dataset_factory):
         """Test validation_dataset property."""
-        dataset = DummyDataset(seed=42, num_samples=100)
+        dataset = dummy_dataset_factory(num_samples=100)
         validation = dataset.validation_dataset
 
         assert isinstance(validation, LabeledCandidates)
         assert len(validation) == 12
 
-    def test_test_dataset_property(self):
+    def test_test_dataset_property(self, dummy_dataset_factory):
         """Test test_dataset property."""
-        dataset = DummyDataset(seed=42, num_samples=100)
+        dataset = dummy_dataset_factory(num_samples=100)
         test = dataset.test_dataset
 
         assert isinstance(test, LabeledCandidates)
         assert len(test) == 20
 
-    def test_candidate_pool_property(self):
+    def test_candidate_pool_property(self, dummy_dataset_factory):
         """Test candidate_pool property."""
         split_config = {
             "split_ratio": {"train": 0.6, "validation_frac": 0.25, "test": 0.2},
             "split_type": "random",
         }
-        dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
         pool = dataset.candidate_pool
 
         assert isinstance(pool, LabeledCandidates)
@@ -246,7 +244,7 @@ class TestBaseDatasetProperties:
 class TestBaseDatasetUpdateSplits:
     """Tests for updating dataset splits with acquired candidates."""
 
-    def test_update_splits_with_acquired_candidates(self):
+    def test_update_splits_with_acquired_candidates(self, dummy_dataset_factory):
         """Test that update_splits correctly moves candidates from pool to train/val."""
         split_config = {
             "split_ratio": {
@@ -257,7 +255,7 @@ class TestBaseDatasetUpdateSplits:
             },
             "split_type": "random",
         }
-        dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
 
         # Get initial sizes
         initial_train_size = len(dataset.train_dataset)
@@ -281,7 +279,7 @@ class TestBaseDatasetUpdateSplits:
             initial_train_size + initial_val_size + num_acquired
         )
 
-    def test_update_splits_respects_validation_ratio(self):
+    def test_update_splits_respects_validation_ratio(self, dummy_dataset_factory):
         """Test that update_splits maintains the validation ratio."""
         split_config = {
             "split_ratio": {
@@ -292,7 +290,7 @@ class TestBaseDatasetUpdateSplits:
             },
             "split_type": "random",
         }
-        dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
 
         # Acquire 10 candidates
         acquired_candidates = LabeledCandidates(*dataset.candidate_pool[:10])
@@ -309,9 +307,9 @@ class TestBaseDatasetUpdateSplits:
 class TestBaseDatasetQuery:
     """Tests for querying labels for candidates."""
 
-    def test_query_returns_correct_labels(self):
+    def test_query_returns_correct_labels(self, dummy_dataset_factory):
         """Test that query returns the correct labels for given candidates."""
-        dataset = DummyDataset(seed=42, num_samples=100)
+        dataset = dummy_dataset_factory(num_samples=100)
 
         # Get some candidates from train set
         candidates_to_query = dataset.train_dataset.candidates[:5]
@@ -333,30 +331,28 @@ class TestBaseDatasetQuery:
 class TestBaseDatasetSaveSplits:
     """Tests for saving dataset splits."""
 
-    def test_save_splits_creates_files(self):
+    def test_save_splits_creates_files(self, dummy_dataset_factory):
         """Test that save_splits creates the expected CSV files."""
-        dataset = DummyDataset(seed=42, num_samples=100)
+        dataset = dummy_dataset_factory(num_samples=100)
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            dataset.save_splits(tmpdir, _verbose=False)
+            dataset.save_splits(tmpdir)
 
             # Check that files were created
-            assert os.path.exists(os.path.join(tmpdir, "train.csv"))
-            assert os.path.exists(os.path.join(tmpdir, "validation.csv"))
-            assert os.path.exists(os.path.join(tmpdir, "test.csv"))
+            assert os.path.exists(os.path.join(tmpdir, "data_splits", "train.csv"))
+            assert os.path.exists(os.path.join(tmpdir, "data_splits", "validation.csv"))
+            assert os.path.exists(os.path.join(tmpdir, "data_splits", "test.csv"))
+            assert os.path.exists(os.path.join(tmpdir, "data_splits", "candidate_pool.csv"))
 
-            # Candidate pool should not be saved
-            assert not os.path.exists(os.path.join(tmpdir, "candidate_pool.csv"))
-
-    def test_save_splits_file_contents(self):
+    def test_save_splits_file_contents(self, dummy_dataset_factory):
         """Test that saved files contain the correct data."""
-        dataset = DummyDataset(seed=42, num_samples=100)
+        dataset = dummy_dataset_factory(num_samples=100)
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            dataset.save_splits(tmpdir, _verbose=False)
+            dataset.save_splits(tmpdir)
 
             # Read back the train file and verify
-            train_df = pd.read_csv(os.path.join(tmpdir, "train.csv"))
+            train_df = pd.read_csv(os.path.join(tmpdir, "data_splits", "train.csv"))
 
             # Check that number of rows matches
             assert len(train_df) == len(dataset.train_dataset)
@@ -365,7 +361,7 @@ class TestBaseDatasetSaveSplits:
 class TestBaseDatasetGetMetrics:
     """Tests for getting dataset metrics."""
 
-    def test_get_metrics_returns_correct_keys(self):
+    def test_get_metrics_returns_correct_keys(self, dummy_dataset_factory):
         """Test that get_metrics returns metrics for all splits."""
         split_config = {
             "split_ratio": {
@@ -376,7 +372,7 @@ class TestBaseDatasetGetMetrics:
             },
             "split_type": "random",
         }
-        dataset = DummyDataset(seed=42, split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
 
         metrics = dataset.get_metrics()
 
@@ -394,9 +390,9 @@ class TestBaseDatasetGetMetrics:
         for key in expected_keys:
             assert key in metrics
 
-    def test_get_metrics_returns_correct_values(self):
+    def test_get_metrics_returns_correct_values(self, dummy_dataset_factory):
         """Test that get_metrics returns correct metric values."""
-        dataset = DummyDataset(seed=42, num_samples=100)
+        dataset = dummy_dataset_factory(num_samples=100)
 
         metrics = dataset.get_metrics()
 
@@ -414,10 +410,10 @@ class TestBaseDatasetGetMetrics:
 class TestBaseDatasetReproducibility:
     """Tests for reproducibility with different seeds."""
 
-    def test_different_seeds_produce_different_splits(self):
+    def test_different_seeds_produce_different_splits(self, dummy_dataset_factory):
         """Test that different seeds produce different random splits."""
-        dataset1 = DummyDataset(seed=42, num_samples=100)
-        dataset2 = DummyDataset(seed=123, num_samples=100)
+        dataset1 = dummy_dataset_factory(seed=42, num_samples=100)
+        dataset2 = dummy_dataset_factory(seed=123, num_samples=100)
 
         # Check that train sets are different
         train1_labels = dataset1.train_dataset.labels
@@ -425,10 +421,10 @@ class TestBaseDatasetReproducibility:
 
         assert not np.array_equal(train1_labels, train2_labels)
 
-    def test_same_seed_produces_same_splits(self):
+    def test_same_seed_produces_same_splits(self, dummy_dataset_factory):
         """Test that the same seed produces identical splits."""
-        dataset1 = DummyDataset(seed=42, num_samples=100)
-        dataset2 = DummyDataset(seed=42, num_samples=100)
+        dataset1 = dummy_dataset_factory(seed=42, num_samples=100)
+        dataset2 = dummy_dataset_factory(seed=42, num_samples=100)
 
         # Check that train sets are identical
         train1_labels = dataset1.train_dataset.labels
