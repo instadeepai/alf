@@ -40,28 +40,29 @@ def dummy_dataset_factory():
 
     Returns:
         Callable: A factory function that creates DummyDataset instances.
-    
+
     Example:
         def test_something(dummy_dataset_factory):
             split_config = {"split_ratio": {"train": 0.5, "test": 0.5}, "split_type": "random"}
             dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
     """
+
     def _create_dummy_dataset(
         split_config: dict[str, Any] | None = None,
         seed: int = 42,
         num_samples: int = 1000,
         name: str = "dummy",
-        modality: str = "sequence"
+        modality: str = "sequence",
     ) -> DummyDataset:
         """Create a DummyDataset with the specified configuration.
-        
+
         Args:
             split_config: Split configuration dictionary
             seed: Random seed for reproducibility
             num_samples: Number of dummy samples to generate
             name: Name of the dataset
             modality: Modality of the data
-            
+
         Returns:
             DummyDataset: A dummy dataset with the specified configuration
         """
@@ -70,9 +71,9 @@ def dummy_dataset_factory():
             modality=modality,
             seed=seed,
             split_config=split_config,
-            num_samples=num_samples
+            num_samples=num_samples,
         )
-    
+
     return _create_dummy_dataset
 
 
