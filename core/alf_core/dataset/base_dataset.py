@@ -153,6 +153,13 @@ class BaseDataset(abc.ABC):
 
         This method validates the split configuration and sets default values
         where appropriate (e.g., candidate_pool ratio).
+        The split_ratio keys must be "train", "test", "validation_frac", and "candidate_pool".
+
+        Args:
+            split_config: Dictionary containing the split configuration.
+
+        Raises:
+            AssertionError: If the split configuration is invalid.
         """
         # Check required top-level keys
         assert "split_ratio" in split_config, "split_config must contain 'split_ratio'"
