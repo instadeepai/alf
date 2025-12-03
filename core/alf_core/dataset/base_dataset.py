@@ -40,9 +40,9 @@ class BaseDataset(abc.ABC):
             modality: Data modality (e.g., "sequence", "graph", "image").
             seed: Random seed for reproducibility.
             split_config: Dictionary containing:
-                - "split_ratio": dict with "train", "validation", "test", and
-                  (optionally) "candidate_pool" ratios
+                - "split_ratio": dict with "train", "validation", "test" ratios
                 - "split_type": Type of split ("random" or "low_vs_high")
+                - "max_candidate_pool_size": optional, maximum size of the candidate pool
         """
         self.name = name
         # Validate and convert modality string to Modality enum
@@ -153,7 +153,10 @@ class BaseDataset(abc.ABC):
 
         This method validates the split configuration and sets default values
         where appropriate (e.g., candidate_pool ratio).
-        The split_ratio keys must be "train", "test", "validation_frac", and "candidate_pool".
+        The split_ratio keys must be "train", "test", "validation_frac".
+        validation_frac is the fraction of the train set that goes to validation.
+        Optionally, the split_config can contain "max_candidate_pool_size",
+        the maximum size of the candidate pool.
 
         Args:
             split_config: Dictionary containing the split configuration.
@@ -174,35 +177,17 @@ class BaseDataset(abc.ABC):
             assert key in self.split_ratio, f"split_ratio must contain '{key}'"
             assert 0 <= self.split_ratio[key] <= 1, f"{key} ratio must be between 0 and 1"
 
-        # Handle candidate_pool ratio
-        if "candidate_pool" in self.split_ratio:
-            assert 0 <= self.split_ratio["candidate_pool"] <= 1, (
-                "candidate_pool ratio must be between 0 and 1"
-            )
-            # Validate sum of all ratios
-            total_ratio = (
-                self.split_ratio["train"]
-                + self.split_ratio["test"]
-                + self.split_ratio["candidate_pool"]
-            )
-            assert round(total_ratio, 4) <= 1, (  # Round to avoid floating point errors
-                f"Sum of train, test, and candidate_pool ratios must be <= 1, got {total_ratio}"
-            )
-        else:
-            # Set candidate_pool to use remaining data
-            remaining = 1 - self.split_ratio["train"] - self.split_ratio["test"]
-            assert round(remaining, 4) >= 0, (  # Round to avoid floating point errors
-                f"train + test ratios exceed 1 (train={self.split_ratio['train']}, "
-                f"test={self.split_ratio['test']})"
-                f"remaining={remaining}"
-            )
-            self.split_ratio["candidate_pool"] = remaining
-            logger.info(
-                f"candidate_pool ratio not specified, using remaining data: {remaining:.3f}"
-            )
+        assert self.split_ratio["train"] + self.split_ratio["test"] <= 1, (
+            "train + test ratios must be <= 1"
+        )
+        self.max_candidate_pool_size = split_config.get("max_candidate_pool_size", None)
 
     def _split_dataset(self) -> dict[str, LabeledCandidates]:
         """Split the raw dataset into train, validation, test, and candidate pool.
+
+        Note, that the candidate pool size is everything that is not in the train, validation,
+        or test sets and is capped at max_candidate_pool_size. The validation_frac is the
+        fraction of the train set that goes to validation.
 
         Returns:
             dict[str, LabeledCandidates]: Dictionary with keys "train", "validation",
@@ -219,7 +204,9 @@ class BaseDataset(abc.ABC):
         validation_size = floor(train_plus_validation_size * self.split_ratio["validation_frac"])
         train_size = train_plus_validation_size - validation_size
         test_size = floor(dataset_size * self.split_ratio["test"])
-        candidate_pool_size = floor(dataset_size * self.split_ratio["candidate_pool"])
+        candidate_pool_size = dataset_size - train_plus_validation_size - test_size
+        if self.max_candidate_pool_size is not None:
+            candidate_pool_size = min(self.max_candidate_pool_size, candidate_pool_size)
 
         # Perform split based on type
         datasets_dict = split_dataset(
