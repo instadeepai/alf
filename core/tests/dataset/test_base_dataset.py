@@ -35,14 +35,13 @@ class TestBaseDatasetInitialization:
                 "train": 0.6,
                 "validation_frac": 0.3,
                 "test": 0.2,
-                "candidate_pool": 0.2,
             },
+            "max_candidate_pool": 20,
             "split_type": "random",
         }
         dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
 
-        assert "candidate_pool" in dataset.split_ratio
-        assert dataset.split_ratio["candidate_pool"] == 0.2
+        assert dataset.max_candidate_pool == 20
 
 
 class TestBaseDatasetValidation:
@@ -62,25 +61,9 @@ class TestBaseDatasetValidation:
 
     def test_validate_split_config_ratios_sum_exceeds_one(self, dummy_dataset_factory):
         """Test that split ratios summing to more than 1 raises an error."""
-        with pytest.raises(AssertionError, match="train \\+ test ratios exceed 1"):
+        with pytest.raises(AssertionError, match="train \\+ test ratios must be <= 1"):
             split_config = {
                 "split_ratio": {"train": 0.8, "validation_frac": 0.5, "test": 0.6},
-                "split_type": "random",
-            }
-            dummy_dataset_factory(split_config=split_config, num_samples=100)
-
-    def test_validate_split_config_with_candidate_pool_exceeds_one(self, dummy_dataset_factory):
-        """Test that split ratios with candidate pool summing to more than 1 raises an error."""
-        with pytest.raises(
-            AssertionError, match="Sum of train, test, and candidate_pool ratios must be <= 1"
-        ):
-            split_config = {
-                "split_ratio": {
-                    "train": 0.5,
-                    "validation_frac": 0.3,
-                    "test": 0.3,
-                    "candidate_pool": 0.3,
-                },
                 "split_type": "random",
             }
             dummy_dataset_factory(split_config=split_config, num_samples=100)
@@ -109,8 +92,8 @@ class TestBaseDatasetSplitting:
                 "train": 0.5,
                 "validation_frac": 0.2,
                 "test": 0.25,
-                "candidate_pool": 0.25,
             },
+            "max_candidate_pool": 25,
             "split_type": "random",
         }
         dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
@@ -128,7 +111,6 @@ class TestBaseDatasetSplitting:
                 "train": 0.5,
                 "validation_frac": 0.2,
                 "test": 0.25,
-                "candidate_pool": 0.25,
             },
             "split_type": "low_vs_high",
         }
@@ -156,7 +138,6 @@ class TestBaseDatasetSplitting:
                 "train": 0.5,
                 "validation_frac": 0.2,
                 "test": 0.25,
-                "candidate_pool": 0.25,
             },
             "split_type": "random",
         }
@@ -251,7 +232,6 @@ class TestBaseDatasetUpdateSplits:
                 "train": 0.5,
                 "validation_frac": 0.2,
                 "test": 0.25,
-                "candidate_pool": 0.25,
             },
             "split_type": "random",
         }
@@ -286,7 +266,6 @@ class TestBaseDatasetUpdateSplits:
                 "train": 0.5,
                 "validation_frac": 0.2,
                 "test": 0.25,
-                "candidate_pool": 0.25,
             },
             "split_type": "random",
         }
@@ -368,7 +347,6 @@ class TestBaseDatasetGetMetrics:
                 "train": 0.5,
                 "validation_frac": 0.2,
                 "test": 0.25,
-                "candidate_pool": 0.25,
             },
             "split_type": "random",
         }
