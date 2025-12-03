@@ -1,0 +1,470 @@
+# Copyright 2023 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import logging
+from dataclasses import dataclass
+from typing import Any, List, Optional, Union
+
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions, Results
+from alf_tools.utils.constants import PROTEIN_ALPHABET
+from torch.utils.data import DataLoader, TensorDataset
+
+logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
+log = logging.getLogger("rich")
+
+
+@dataclass
+class CNNModelConfig:
+    """Configuration for CNN model architecture."""
+
+    num_filters: int = 128
+    kernel_size: int = 3
+    num_conv_layers: int = 3
+    fc_hidden_dim: int = 256
+    dropout: float = 0.3
+
+
+@dataclass
+class CNNTrainConfig:
+    """Configuration for CNN training."""
+
+    learning_rate: float = 1e-3
+    batch_size: int = 32
+    num_epochs: int = 50
+    log_frequency: int = 10
+
+
+class SequenceCNN(nn.Module):
+    """Simple 1D CNN for sequence regression.
+
+    Architecture:
+    - One-hot encoding → Conv1D layers → Fully connected → Scalar output
+    """
+
+    def __init__(
+        self,
+        seq_length: int,
+        alphabet_size: int = 20,
+        num_filters: int = 128,
+        kernel_size: int = 3,
+        num_conv_layers: int = 3,
+        fc_hidden_dim: int = 256,
+        dropout: float = 0.3,
+    ):
+        """Initialize the SequenceCNN model.
+
+        Args:
+            seq_length: Length of input sequences.
+            alphabet_size: Size of the sequence alphabet (default: 20).
+            num_filters: Number of filters in convolutional layers.
+            kernel_size: Size of convolutional kernels.
+            num_conv_layers: Number of convolutional layers.
+            fc_hidden_dim: Dimension of fully connected hidden layers.
+            dropout: Dropout probability.
+        """
+        super().__init__()
+
+        # Convolutional layers
+        conv_layers = []
+        in_channels = alphabet_size
+        current_length = seq_length
+
+        for _ in range(num_conv_layers):
+            conv_layers.extend([
+                nn.Conv1d(in_channels, num_filters, kernel_size, padding=kernel_size // 2),
+                nn.ReLU(),
+                nn.MaxPool1d(kernel_size=2),
+                nn.Dropout(dropout),
+            ])
+            in_channels = num_filters
+            current_length = current_length // 2
+
+        self.conv_block = nn.Sequential(*conv_layers)
+
+        # Fully connected layers
+        flattened_size = num_filters * max(1, current_length)
+        self.fc_layers = nn.Sequential(
+            nn.Linear(flattened_size, fc_hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(fc_hidden_dim, fc_hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(fc_hidden_dim // 2, 1),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass through the network.
+
+        Args:
+            x: One-hot encoded sequences (batch_size, alphabet_size, seq_length).
+
+        Returns:
+            Fitness predictions (batch_size,).
+        """
+        x = self.conv_block(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc_layers(x)
+        return x.squeeze(-1)
+
+
+class CNNModel(BaseModel):
+    """Minimal CNN model for sequence fitness prediction.
+
+    One-hot encodes sequences, trains a simple 1D CNN with MSE loss.
+    """
+
+    def __init__(
+        self,
+        name: str = "cnn_model",
+        model_config: Optional[CNNModelConfig] = None,
+        train_config: Optional[CNNTrainConfig] = None,
+        alphabet: str = PROTEIN_ALPHABET,
+        device: Optional[str] = None,
+    ):
+        """Initialize the CNNModel.
+
+        Args:
+            name: Name of the surrogate model.
+            model_config: Configuration for model architecture.
+            train_config: Configuration for training.
+            alphabet: Sequence alphabet to use.
+            device: Device to use for training ('cuda', 'cpu', or None for auto-detect).
+        """
+        # Use defaults if configs not provided
+        self.model_config = model_config or CNNModelConfig()
+        self.train_config = train_config or CNNTrainConfig()
+
+        self.alphabet = alphabet
+        self.alphabet_size = len(alphabet)
+        self.char_to_idx = {char: idx for idx, char in enumerate(alphabet)}
+
+        # Device setup
+        if device is None:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = torch.device(device)
+
+        # Model initialized on first fit
+        self.model: Optional[SequenceCNN] = None
+        self.seq_length: Optional[int] = None
+
+        # Track metrics
+        self.training_metrics: dict[str, Union[float, int, np.number]] = {}
+
+    def _one_hot_encode(self, sequences: List[str]) -> torch.Tensor:
+        """One-hot encode sequences.
+
+        Args:
+            sequences: List of sequences as strings.
+
+        Returns:
+            One-hot encoded tensor of shape (batch_size, alphabet_size, seq_length).
+        """
+        batch_size = len(sequences)
+        seq_length = len(sequences[0])
+
+        one_hot = torch.zeros(batch_size, self.alphabet_size, seq_length)
+
+        for i, sequence in enumerate(sequences):
+            for j, char in enumerate(sequence):
+                if char in self.char_to_idx:
+                    one_hot[i, self.char_to_idx[char], j] = 1.0
+
+        return one_hot
+
+    def featurise(self, inputs: Union[LabeledCandidates, List[Candidate]]) -> torch.Tensor:
+        """Convert inputs to one-hot encoded tensors.
+
+        Args:
+            inputs: Either LabeledCandidates or list of Candidates to featurise.
+
+        Returns:
+            torch.Tensor: A one-hot encoded tensor of shape (batch_size, alphabet_size, seq_length).
+
+        Raises:
+            ValueError: If the input is not LabeledCandidates or list of Candidates.
+        """
+        if isinstance(inputs, LabeledCandidates):
+            sequences = inputs.data
+        elif isinstance(inputs, list) and all(isinstance(c, Candidate) for c in inputs):
+            sequences = [c.data for c in inputs]
+        else:
+            raise ValueError("Input must be LabeledCandidates or list of Candidates")
+
+        return self._one_hot_encode(sequences)
+
+    def _prepare_data_loader(self, data: LabeledCandidates, shuffle: bool = False) -> DataLoader:
+        """Prepare a DataLoader from LabeledCandidates.
+
+        Args:
+            data: Data containing sequences and oracle values.
+            shuffle: Whether to shuffle the data.
+
+        Returns:
+            DataLoader for the data.
+        """
+        x = self.featurise(data).to(self.device)
+        y = torch.tensor(data.labels, dtype=torch.float32).to(self.device)
+        dataset = TensorDataset(x, y)
+        return DataLoader(
+            dataset,
+            batch_size=self.train_config.batch_size,
+            shuffle=shuffle,
+        )
+
+    def _train_epoch(
+        self,
+        train_loader: DataLoader,
+        optimizer: optim.Optimizer,
+        criterion: nn.Module,
+    ) -> tuple[float, dict]:
+        """Train for one epoch.
+
+        Args:
+            train_loader: DataLoader for training data.
+            optimizer: Optimizer for training.
+            criterion: Loss criterion.
+
+        Returns:
+            Tuple of (average_loss, metrics_dict).
+        """
+        assert self.model is not None, "Model must be initialized before training"
+        self.model.train()
+        train_losses = []
+        train_predictions_all = []
+        train_targets_all = []
+
+        for batch_x, batch_y in train_loader:
+            optimizer.zero_grad()
+            predictions = self.model(batch_x)
+            loss = criterion(predictions, batch_y)
+            loss.backward()
+            optimizer.step()
+            train_losses.append(loss.item())
+            train_predictions_all.append(predictions.detach().cpu().numpy())
+            train_targets_all.append(batch_y.detach().cpu().numpy())
+
+        avg_train_loss = np.mean(train_losses)
+        train_preds = np.concatenate(train_predictions_all)
+        train_targets = np.concatenate(train_targets_all)
+
+        # Use Predictions to compute all metrics
+        train_predictions_obj = Predictions(means=train_preds, variances=None)
+        # Handle case where dataset is too small for correlation metrics
+        if len(train_preds) >= 2:
+            train_metrics = Results(
+                predictions=train_predictions_obj, targets=train_targets
+            ).metrics
+        else:
+            # Only compute MSE for very small datasets
+            mse = np.mean((train_preds - train_targets) ** 2)
+            train_metrics = {"mse": mse}
+
+        return avg_train_loss, train_metrics
+
+    def _validate_epoch(self, val_loader: DataLoader, criterion: nn.Module) -> tuple[float, dict]:
+        """Validate for one epoch.
+
+        Args:
+            val_loader: DataLoader for validation data.
+            criterion: Loss criterion.
+
+        Returns:
+            Tuple of (average_loss, metrics_dict).
+        """
+        assert self.model is not None, "Model must be initialized before validation"
+        self.model.eval()
+        val_losses = []
+        val_predictions_all = []
+        val_targets_all = []
+
+        with torch.no_grad():
+            for batch_x, batch_y in val_loader:
+                predictions = self.model(batch_x)
+                loss = criterion(predictions, batch_y)
+                val_losses.append(loss.item())
+                val_predictions_all.append(predictions.cpu().numpy())
+                val_targets_all.append(batch_y.cpu().numpy())
+
+        avg_val_loss = np.mean(val_losses)
+        val_preds = np.concatenate(val_predictions_all)
+        val_targets = np.concatenate(val_targets_all)
+
+        # Use Predictions to compute all metrics
+        val_predictions_obj = Predictions(means=val_preds, variances=None)
+        # Handle case where dataset is too small for correlation metrics
+        if len(val_preds) >= 2:
+            val_metrics = Results(predictions=val_predictions_obj, targets=val_targets).metrics
+        else:
+            # Only compute MSE for very small datasets
+            mse = np.mean((val_preds - val_targets) ** 2)
+            val_metrics = {"mse": mse}
+
+        return avg_val_loss, val_metrics
+
+    def _log_epoch_metrics(
+        self,
+        epoch: int,
+        avg_train_loss: float,
+        train_metrics: dict,
+        avg_val_loss: Optional[float] = None,
+        val_metrics: Optional[dict] = None,
+    ) -> None:
+        """Log epoch metrics.
+
+        Args:
+            epoch: Current epoch.
+            avg_train_loss: Average training loss.
+            train_metrics: Dictionary of training metrics.
+            avg_val_loss: Average validation loss.
+            val_metrics: Dictionary of validation metrics.
+        """
+        if (epoch + 1) % self.train_config.log_frequency == 0:
+            msg = (
+                f"Epoch {epoch + 1}/{self.train_config.num_epochs} - "
+                f"Train Loss: {avg_train_loss:.4f}, Train Spearman: {train_metrics['spearman']:.4f}"
+            )
+            if avg_val_loss is not None and val_metrics is not None:
+                msg += (
+                    f", Val Loss: {avg_val_loss:.4f}, Val Spearman: {val_metrics['spearman']:.4f}"
+                )
+            log.info(msg)
+
+    def train(
+        self,
+        train_data: LabeledCandidates,
+        val_data: Optional[LabeledCandidates] = None,
+    ) -> None:
+        """Train the CNN model.
+
+        Args:
+            train_data: Training data containing sequences and oracle values.
+            val_data: Optional validation data.
+        """
+        log.info(f"Training CNN with {len(train_data)} samples")
+
+        # Initialize model on first call
+        if self.model is None:
+            self.seq_length = len(train_data.data[0])
+            self.model = SequenceCNN(
+                seq_length=self.seq_length,
+                alphabet_size=self.alphabet_size,
+                num_filters=self.model_config.num_filters,
+                kernel_size=self.model_config.kernel_size,
+                num_conv_layers=self.model_config.num_conv_layers,
+                fc_hidden_dim=self.model_config.fc_hidden_dim,
+                dropout=self.model_config.dropout,
+            ).to(self.device)
+            total_params = sum(p.numel() for p in self.model.parameters())
+            log.info(f"CNN initialized with {total_params:,} parameters")
+
+        # Prepare data loaders
+        train_loader = self._prepare_data_loader(train_data, shuffle=True)
+        val_loader = None
+        if val_data is not None and len(val_data) > 0:
+            val_loader = self._prepare_data_loader(val_data, shuffle=False)
+
+        # Setup training
+        optimizer = optim.Adam(self.model.parameters(), lr=self.train_config.learning_rate)
+        criterion = nn.MSELoss()
+
+        # Training loop
+        for epoch in range(self.train_config.num_epochs):
+            # Train
+            avg_train_loss, train_metrics = self._train_epoch(train_loader, optimizer, criterion)
+
+            # TODO: Do we want to log training metrics?
+            log_dict = {"train_loss": avg_train_loss}
+            log_dict.update({f"train_{k}": v for k, v in train_metrics.items()})
+
+            # Validate
+            if val_loader is not None:
+                avg_val_loss, val_metrics = self._validate_epoch(val_loader, criterion)
+
+                # TODO: Do we want to log validation metrics?
+                # log_dict = {"val_loss": avg_val_loss}
+                # log_dict.update({f"val_{k}": v for k, v in val_metrics.items()})
+
+                self._log_epoch_metrics(
+                    epoch,
+                    avg_train_loss,
+                    train_metrics,
+                    avg_val_loss,
+                    val_metrics,
+                )
+            else:
+                self._log_epoch_metrics(
+                    epoch,
+                    avg_train_loss,
+                    train_metrics,
+                )
+
+        # Store final metrics
+        self.training_metrics = {
+            "final_train_loss": avg_train_loss,
+        }
+        # Add all final train metrics
+        self.training_metrics.update({f"final_train_{k}": v for k, v in train_metrics.items()})
+
+        if val_loader is not None:
+            self.training_metrics["final_val_loss"] = avg_val_loss
+            # Add all final validation metrics
+            self.training_metrics.update({f"final_val_{k}": v for k, v in val_metrics.items()})
+
+    def predict(self, candidate_points: List[Candidate]) -> Predictions:
+        """Make predictions for candidates.
+
+        Args:
+            candidate_points: List of candidates to predict fitness for.
+
+        Returns:
+            Predictions containing predicted fitness values.
+
+        Raises:
+            RuntimeError: If the model is not trained.
+            ValueError: If the input is not a list of candidates.
+        """
+        if self.model is None:
+            raise RuntimeError("Model not trained. Call fit() first.")
+
+        self.model.eval()
+        x = self.featurise(candidate_points).to(self.device)
+
+        with torch.no_grad():
+            predictions = self.model(x).cpu().numpy()
+
+        return Predictions(means=predictions)
+
+    def sample(self, *args: Any, **kwargs: Any) -> List[Candidate]:
+        """Sample candidate points from the model."""
+        raise NotImplementedError("Sampling is not implemented for this model.")
+
+    def get_training_summary_metrics(
+        self,
+    ) -> dict[str, Union[float, int, np.number]]:
+        """Return training metrics.
+
+        Returns:
+            Dictionary of training metrics including losses and Spearman correlations.
+        """
+        return self.training_metrics
+
+    def cleanup(self) -> None:
+        """Clean up resources."""
+        pass

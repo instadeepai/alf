@@ -65,7 +65,7 @@ surrogate = Surrogate(model=CNNModel())
 acquisition_fn = Greedy()
 search_fn = DatasetSearch()
 optimizer = Optimizer(acquisition_fn=acquisition_fn, search_fn=search_fn)
-oracle = Oracle(module=dataset)
+oracle = Oracle(scorer=dataset)
 
 # Run design task
 task = DesignTask(num_acq_rounds=5, acq_batch_size=100)

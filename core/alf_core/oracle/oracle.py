@@ -63,11 +63,11 @@ class Oracle:
         return evaluated_candidates, state
 
     def get_metrics(self) -> dict[str, Union[float, int, np.number]]:
-        """Get metrics from the underlying module if available.
+        """Get metrics from the underlying scorer if available.
 
         Returns:
             dict[str, Union[float, int, np.number]]: Dictionary of metric names to values.
-                Returns empty dict if the module doesn't provide metrics.
+                Returns empty dict if the scorer doesn't provide metrics.
         """
         if hasattr(self.scorer, "get_metrics"):
             return self.scorer.get_metrics()
