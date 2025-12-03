@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 import torch
 from alf_core import FileTaskStateLogger, Oracle, SupervisedTask, Surrogate, TerminalTaskStateLogger
-from alf_tools.datasets.gfp import GFP
-from alf_tools.models.cnn import CNNModel, CNNTrainConfig
+from alf_tools.datasets import GFP
+from alf_tools.models import CNNModel, CNNTrainConfig
 
 
 @pytest.fixture

@@ -12,9 +12,9 @@ from alf_core import (
     Surrogate,
     TerminalTaskStateLogger,
 )
-from alf_tools.datasets.gfp import GFP
-from alf_tools.models.random import RandomModel
-from alf_tools.optimizer.acquisition_functions.greedy import Greedy
+from alf_tools.datasets import GFP
+from alf_tools.models import RandomModel
+from alf_tools.optimizer.acquisition_functions import Greedy
 
 
 @pytest.fixture

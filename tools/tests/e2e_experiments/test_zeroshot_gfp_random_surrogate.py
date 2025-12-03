@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 from alf_core import FileTaskStateLogger, Surrogate, TerminalTaskStateLogger, ZeroShotTask
-from alf_tools.datasets.gfp import GFP
-from alf_tools.models.random import RandomModel
+from alf_tools.datasets import GFP
+from alf_tools.models import RandomModel
 
 
 @pytest.fixture
