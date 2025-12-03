@@ -23,6 +23,7 @@ def split_dataset(
     train_size: int,
     validation_size: int,
     test_size: int,
+    candidate_pool_size: int,
     seed: int,
 ) -> dict[str, LabeledCandidates]:
     """Split dataset into train, validation, test, and candidate pool.
@@ -33,6 +34,7 @@ def split_dataset(
         train_size: Number of samples for training set.
         validation_size: Number of samples for validation set.
         test_size: Number of samples for test set.
+        candidate_pool_size: Number of samples for candidate pool.
         seed: Random seed for reproducibility.
 
     Returns:
@@ -43,9 +45,13 @@ def split_dataset(
         ValueError: If split_type is not "random" or "low_vs_high".
     """
     if split_type == "random":
-        return split_random(dataset, train_size, validation_size, test_size, seed)
+        return split_random(
+            dataset, train_size, validation_size, test_size, candidate_pool_size, seed
+        )
     elif split_type == "low_vs_high":
-        return split_low_vs_high(dataset, train_size, validation_size, test_size, seed)
+        return split_low_vs_high(
+            dataset, train_size, validation_size, test_size, candidate_pool_size, seed
+        )
     else:
         raise ValueError(f"Invalid split type: {split_type}")
 
@@ -55,6 +61,7 @@ def split_random(
     train_size: int,
     validation_size: int,
     test_size: int,
+    candidate_pool_size: int,
     seed: int,
 ) -> dict[str, LabeledCandidates]:
     """Split dataset randomly into train, validation, test, and candidate pool.
@@ -67,6 +74,7 @@ def split_random(
         train_size: Number of samples for training set.
         validation_size: Number of samples for validation set.
         test_size: Number of samples for test set.
+        candidate_pool_size: Number of samples for candidate pool.
         seed: Random seed for shuffling.
 
     Returns:
@@ -85,7 +93,9 @@ def split_random(
     test = LabeledCandidates(*shuffled_candidates[start_idx : start_idx + test_size])
     start_idx += test_size
 
-    candidate_pool = LabeledCandidates(*shuffled_candidates[start_idx:])
+    candidate_pool = LabeledCandidates(
+        *shuffled_candidates[start_idx : start_idx + candidate_pool_size]
+    )
 
     return {
         "train": train,
@@ -100,6 +110,7 @@ def split_low_vs_high(
     train_size: int,
     validation_size: int,
     test_size: int,
+    candidate_pool_size: int,
     seed: int,
 ) -> dict[str, LabeledCandidates]:
     """Split dataset with low-scoring candidates in train/val, high-scoring in test/pool.
@@ -113,14 +124,15 @@ def split_low_vs_high(
         train_size: Number of samples for training set (from low-scoring group).
         validation_size: Number of samples for validation set (from low-scoring group).
         test_size: Number of samples for test set (from high-scoring group).
+        candidate_pool_size: Number of samples for candidate pool (from high-scoring group).
         seed: Random seed for shuffling within groups.
 
     Returns:
         dict[str, LabeledCandidates]: Dictionary with keys "train", "validation",
             "test", and "candidate_pool".
     """
-    # Sort indices by label (highest to lowest)
-    sorted_indices = dataset.labels.argsort()[::-1]
+    # Sort indices by label (lowest to highest)
+    sorted_indices = dataset.labels.argsort()
 
     # Low-scoring candidates go to train/validation, high-scoring to test/pool
     train_plus_validation_size = train_size + validation_size
@@ -139,5 +151,7 @@ def split_low_vs_high(
         "train": LabeledCandidates(*shuffled_low[:train_size]),
         "validation": LabeledCandidates(*shuffled_low[train_size:]),
         "test": LabeledCandidates(*shuffled_high[:test_size]),
-        "candidate_pool": LabeledCandidates(*shuffled_high[test_size:]),
+        "candidate_pool": LabeledCandidates(
+            *shuffled_high[test_size : test_size + candidate_pool_size]
+        ),
     }
