@@ -152,9 +152,9 @@ class BaseDataset(abc.ABC):
         """Validate and process the split config for the dataset.
 
         This method validates the split configuration and sets default values
-        where appropriate (e.g., candidate_pool ratio).
+        where appropriate.
         The split_ratio keys must be "train", "test", "validation_frac".
-        validation_frac is the fraction of the train set that goes to validation.
+        validation_frac is the fraction of the train set that is held out in the validation set.
         Optionally, the split_config can contain "max_candidate_pool_size",
         the maximum size of the candidate pool.
 
@@ -187,7 +187,7 @@ class BaseDataset(abc.ABC):
 
         Note, that the candidate pool size is everything that is not in the train, validation,
         or test sets and is capped at max_candidate_pool_size. The validation_frac is the
-        fraction of the train set that goes to validation.
+        fraction of the train set that is held out in the validation set.
 
         Returns:
             dict[str, LabeledCandidates]: Dictionary with keys "train", "validation",
