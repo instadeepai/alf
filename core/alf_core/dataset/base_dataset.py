@@ -42,7 +42,7 @@ class BaseDataset(abc.ABC):
             split_config: Dictionary containing:
                 - "split_ratio": dict with "train", "validation", "test" ratios
                 - "split_type": Type of split ("random" or "low_vs_high")
-                - "max_candidate_pool_size": optional, maximum size of the candidate pool
+                - "max_candidate_pool": optional, maximum size of the candidate pool
         """
         self.name = name
         # Validate and convert modality string to Modality enum
@@ -155,7 +155,7 @@ class BaseDataset(abc.ABC):
         where appropriate.
         The split_ratio keys must be "train", "test", "validation_frac".
         validation_frac is the fraction of the train set that is held out in the validation set.
-        Optionally, the split_config can contain "max_candidate_pool_size",
+        Optionally, the split_config can contain "max_candidate_pool" (int),
         the maximum size of the candidate pool.
 
         Args:
@@ -180,13 +180,13 @@ class BaseDataset(abc.ABC):
         assert self.split_ratio["train"] + self.split_ratio["test"] <= 1, (
             "train + test ratios must be <= 1"
         )
-        self.max_candidate_pool_size = split_config.get("max_candidate_pool_size", None)
+        self.max_candidate_pool = split_config.get("max_candidate_pool", None)
 
     def _split_dataset(self) -> dict[str, LabeledCandidates]:
         """Split the raw dataset into train, validation, test, and candidate pool.
 
         Note, that the candidate pool size is everything that is not in the train, validation,
-        or test sets and is capped at max_candidate_pool_size. The validation_frac is the
+        or test sets and is capped at max_candidate_pool (int). The validation_frac is the
         fraction of the train set that is held out in the validation set.
 
         Returns:
@@ -205,8 +205,8 @@ class BaseDataset(abc.ABC):
         train_size = train_plus_validation_size - validation_size
         test_size = floor(dataset_size * self.split_ratio["test"])
         candidate_pool_size = dataset_size - train_plus_validation_size - test_size
-        if self.max_candidate_pool_size is not None:
-            candidate_pool_size = min(self.max_candidate_pool_size, candidate_pool_size)
+        if self.max_candidate_pool is not None:
+            candidate_pool_size = min(self.max_candidate_pool, candidate_pool_size)
 
         # Perform split based on type
         datasets_dict = split_dataset(

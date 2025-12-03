@@ -36,12 +36,12 @@ class TestBaseDatasetInitialization:
                 "validation_frac": 0.3,
                 "test": 0.2,
             },
-            "max_candidate_pool_size": 20,
+            "max_candidate_pool": 20,
             "split_type": "random",
         }
         dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
 
-        assert dataset.max_candidate_pool_size == 20
+        assert dataset.max_candidate_pool == 20
 
 
 class TestBaseDatasetValidation:
@@ -93,7 +93,7 @@ class TestBaseDatasetSplitting:
                 "validation_frac": 0.2,
                 "test": 0.25,
             },
-            "max_candidate_pool_size": 25,
+            "max_candidate_pool": 25,
             "split_type": "random",
         }
         dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
