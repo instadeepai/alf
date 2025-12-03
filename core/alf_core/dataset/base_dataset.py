@@ -42,7 +42,7 @@ class BaseDataset(abc.ABC):
             split_config: Dictionary containing:
                 - "split_ratio": dict with "train", "validation", "test" ratios
                 - "split_type": Type of split ("random" or "low_vs_high")
-                - "max_candidate_pool": optional, maximum size of the candidate pool
+                - "max_candidate_pool": optional, maximum size of the candidate pool (int)
         """
         self.name = name
         # Validate and convert modality string to Modality enum
