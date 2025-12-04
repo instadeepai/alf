@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Dict
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -95,11 +95,11 @@ class ProteinGym(BaseDataset):
 
         return dataset
 
-    def _split_dataset(self) -> Dict[str, LabeledCandidates]:
+    def _split_dataset(self) -> dict[str, LabeledCandidates]:
         """Split dataset into train, validation, test and candidate pool splits.
 
         Returns:
-            Dict[str, LabeledCandidates]: A dictionary of the splits.
+            dict[str, LabeledCandidates]: A dictionary of the splits.
         """
         if self.dataset_config.get("cross_validation", False):
             assert self.dataset_config.get("cross_validation_type", None) is not None, (
@@ -120,11 +120,11 @@ class ProteinGym(BaseDataset):
         else:
             return super()._split_dataset()
 
-    def _split_cross_validation(self) -> Dict[str, LabeledCandidates]:
+    def _split_cross_validation(self) -> dict[str, LabeledCandidates]:
         """Split dataset into cross-validation folds.
 
         Returns:
-            Dict[str, LabeledCandidates]: A dictionary of the splits.
+            dict[str, LabeledCandidates]: A dictionary of the splits.
         """
         assert self._raw_dataset is not None, "Dataset must be loaded before splitting"
         # Calculate split sizes
