@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alf_tutorials"
+version = "0.1.0"
+description = "Tutorials for the ALF active learning framework."
+requires-python = ">=3.12"
+dependencies = [
+    "alf_core",
+    "alf_tools",
+    "matplotlib>=3.3.0",
+    "ipykernel>=6.25.0",
+]
+
+[tool.uv.sources]
+alf_core = {path = "../core", editable = true}
+alf_tools = {path = "../tools", editable = true}
+
