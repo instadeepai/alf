@@ -32,6 +32,8 @@ jobs:
 
   tests:
       runs-on: instadeep-ci-4
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
       container:
         image: python:3.11-slim-bullseye
 
