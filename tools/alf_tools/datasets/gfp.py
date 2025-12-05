@@ -35,6 +35,9 @@ class GFP(BaseDataset):
 
         Returns:
             LabeledCandidates: A LabeledCandidates object containing the GFP data.
+
+        Raises:
+            FileNotFoundError: If the GFP dataset file is not found.
         """
         if not os.path.exists(os.path.join(DATAPATH, FILENAME)):
             os.makedirs(DATAPATH, exist_ok=True)
@@ -44,7 +47,9 @@ class GFP(BaseDataset):
                     file.write(response.content)
                 logger.info("GFP dataset downloaded successfully.")
             else:
-                raise ValueError(f"Failed to download GFP dataset. Status code: {response.status_code}")
+                raise FileNotFoundError(
+                    f"Failed to download GFP dataset. Status code: {response.status_code}"
+                )
 
         gfp_dataset = pd.read_csv(os.path.join(DATAPATH, FILENAME))
         # Note, here we are only using the first 1000 rows of the dataset,
