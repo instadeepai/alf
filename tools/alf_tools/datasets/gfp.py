@@ -1,5 +1,5 @@
 import logging
-import os
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -9,7 +9,7 @@ from alf_core import BaseDataset, Candidate, LabeledCandidates
 
 logger = logging.getLogger("alf-tools")
 
-DATAPATH = "alf_tools/datasets/data/"
+DATAPATH = Path(__file__).parent / "data"
 FILENAME = "gfp_dataset.csv"
 URL = "https://raw.githubusercontent.com/dhbrookes/CbAS/master/data/gfp_data.csv"
 
@@ -39,11 +39,12 @@ class GFP(BaseDataset):
         Raises:
             FileNotFoundError: If the GFP dataset file is not found.
         """
-        if not os.path.exists(os.path.join(DATAPATH, FILENAME)):
-            os.makedirs(DATAPATH, exist_ok=True)
+        filepath = DATAPATH / FILENAME
+        if not filepath.exists():
+            DATAPATH.mkdir(parents=True, exist_ok=True)
             response = requests.get(URL)
             if response.status_code == 200:
-                with open(os.path.join(DATAPATH, FILENAME), "wb") as file:
+                with open(filepath, "wb") as file:
                     file.write(response.content)
                 logger.info("GFP dataset downloaded successfully.")
             else:
@@ -51,7 +52,7 @@ class GFP(BaseDataset):
                     f"Failed to download GFP dataset. Status code: {response.status_code}"
                 )
 
-        gfp_dataset = pd.read_csv(os.path.join(DATAPATH, FILENAME))
+        gfp_dataset = pd.read_csv(filepath)
         # Note, here we are only using the first 1000 rows of the dataset,
         # otherwise the candidate pool is too large and becomes compute intensive
         data = list(gfp_dataset["nucSequence"])[:1000]
