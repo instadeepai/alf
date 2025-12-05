@@ -15,13 +15,17 @@
 from typing import Any, List, Union
 
 import numpy as np
-from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions
 import pytest
+from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions
 
 
 @pytest.fixture
 def random_model():
-    """Fixture to create a random model for testing."""
+    """Fixture to create a random model for testing.
+
+    Returns:
+        RandomModel: A random model.
+    """
     return RandomModel()
 
 
