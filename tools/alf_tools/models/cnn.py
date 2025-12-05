@@ -24,8 +24,7 @@ from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions, Resul
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 from torch.utils.data import DataLoader, TensorDataset
 
-logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
-log = logging.getLogger("rich")
+logger = logging.getLogger("alf-tools")
 
 
 @dataclass
@@ -344,7 +343,7 @@ class CNNModel(BaseModel):
                 msg += (
                     f", Val Loss: {avg_val_loss:.4f}, Val Spearman: {val_metrics['spearman']:.4f}"
                 )
-            log.info(msg)
+            logger.info(msg)
 
     def train(
         self,
@@ -357,7 +356,7 @@ class CNNModel(BaseModel):
             train_data: Training data containing sequences and oracle values.
             val_data: Optional validation data.
         """
-        log.info(f"Training CNN with {len(train_data)} samples")
+        logger.info(f"Training CNN with {len(train_data)} samples")
 
         # Initialize model on first call
         if self.model is None:
@@ -372,7 +371,7 @@ class CNNModel(BaseModel):
                 dropout=self.model_config.dropout,
             ).to(self.device)
             total_params = sum(p.numel() for p in self.model.parameters())
-            log.info(f"CNN initialized with {total_params:,} parameters")
+            logger.info(f"CNN initialized with {total_params:,} parameters")
 
         # Prepare data loaders
         train_loader = self._prepare_data_loader(train_data, shuffle=True)

@@ -7,8 +7,7 @@ import pandas as pd
 import requests
 from alf_core import BaseDataset, Candidate, LabeledCandidates
 
-logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
-log = logging.getLogger("rich")
+logger = logging.getLogger("alf-tools")
 
 DATAPATH = "alf_tools/datasets/data/"
 FILENAME = "gfp_dataset.csv"
@@ -43,9 +42,9 @@ class GFP(BaseDataset):
             if response.status_code == 200:
                 with open(os.path.join(DATAPATH, FILENAME), "wb") as file:
                     file.write(response.content)
-                print("GFP dataset downloaded successfully.")
+                logger.info("GFP dataset downloaded successfully.")
             else:
-                print(f"Failed to download GFP dataset. Status code: {response.status_code}")
+                raise ValueError(f"Failed to download GFP dataset. Status code: {response.status_code}")
 
         gfp_dataset = pd.read_csv(os.path.join(DATAPATH, FILENAME))
         # Note, here we are only using the first 1000 rows of the dataset,

@@ -8,8 +8,7 @@ from alf_core import BaseDataset, Candidate, LabeledCandidates
 from alf_tools.utils.constants import HF_DATASETS_REPOSITORY_NAME
 from huggingface_hub import hf_hub_download
 
-logging.basicConfig(level="NOTSET", format="%(message)s", datefmt="[%X]")
-log = logging.getLogger("rich")
+logger = logging.getLogger("alf-tools")
 
 DATAPATH = "alf_tools/datasets/data/"
 
@@ -64,14 +63,14 @@ class ProteinGym(BaseDataset):
         filename = f"ProteinGym/ProteinGym_Cross_Validation/{dms_type}/{dms_name}.csv"
         if not os.path.exists(f"{DATAPATH}/{filename}"):
             os.makedirs(DATAPATH, exist_ok=True)
-            log.info("No local copy of file, so downloading from hub")
+            logger.info("No local copy of file, so downloading from hub")
             hf_hub_download(
                 repo_id=HF_DATASETS_REPOSITORY_NAME,
                 filename=filename,
                 repo_type="dataset",
                 local_dir=DATAPATH,
             )
-            log.info("ProteinGym dataset downloaded successfully.")
+            logger.info("ProteinGym dataset downloaded successfully.")
 
         df = pd.read_csv(f"{DATAPATH}/{filename}")
         dataset = LabeledCandidates(candidates=[], labels=np.array([]))
