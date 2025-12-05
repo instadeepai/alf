@@ -111,12 +111,24 @@ class ProteinGym(BaseDataset):
         """
         if self.dataset_config.get("cross_validation", False):
             cross_validation_type = self.dataset_config.get("cross_validation_type", None)
-            if cross_validation_type is None and cross_validation_type not in ["random", "modulo", "contiguous"]:
-                raise ValueError("Cross-validation type must be set and must be one of random, modulo, or contiguous")
+            if cross_validation_type is None and cross_validation_type not in [
+                "random",
+                "modulo",
+                "contiguous",
+            ]:
+                raise ValueError(
+                    "Cross-validation type must be set and be one of random, modulo, or contiguous"
+                )
 
             cross_validation_fold = self.dataset_config.get("cross_validation_fold", None)
-            if cross_validation_fold is None or cross_validation_fold < 0 or cross_validation_fold > 4:
-                raise ValueError("Cross-validation fold must be set and must be between 0 and 4 inclusive")
+            if (
+                cross_validation_fold is None
+                or cross_validation_fold < 0
+                or cross_validation_fold > 4
+            ):
+                raise ValueError(
+                    "Cross-validation fold must be set and must be between 0 and 4 inclusive"
+                )
 
             return self._split_cross_validation()
         else:
