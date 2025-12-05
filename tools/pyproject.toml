@@ -30,17 +30,17 @@ dev = [
 ]
 
 [project.optional-dependencies]
-cpu = [
+torch_cpu = [
     "torch>=1.9.0",
 ]
-gpu = [
+torch_gpu = [
    "torch>=1.9.0",
 ]
 
 [tool.uv.sources]
 torch = [
-  { index = "pytorch-cpu", extra = "cpu" },
-  { index = "pytorch-gpu", extra = "gpu" },
+  { index = "pytorch-cpu", extra = "torch_cpu" },
+  { index = "pytorch-gpu", extra = "torch_gpu" },
 ]
 alf_core = {path = "../core", editable = true}
 
@@ -57,8 +57,8 @@ explicit = true
 [tool.uv]
 conflicts = [
   [
-    { extra = "cpu" },
-    { extra = "gpu" },
+    { extra = "torch_cpu" },
+    { extra = "torch_gpu" },
   ],
 ]
 default-groups = [
