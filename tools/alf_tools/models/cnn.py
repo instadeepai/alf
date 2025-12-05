@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, List, Optional, Union
+from typing import Any, Union
 
 import numpy as np
 import torch
@@ -131,10 +131,10 @@ class CNNModel(BaseModel):
     def __init__(
         self,
         name: str = "cnn_model",
-        model_config: Optional[CNNModelConfig] = None,
-        train_config: Optional[CNNTrainConfig] = None,
+        model_config: CNNModelConfig | None = None,
+        train_config: CNNTrainConfig | None = None,
         alphabet: str = PROTEIN_ALPHABET,
-        device: Optional[str] = None,
+        device: str | None = None,
     ):
         """Initialize the CNNModel.
 
@@ -160,13 +160,13 @@ class CNNModel(BaseModel):
             self.device = torch.device(device)
 
         # Model initialized on first fit
-        self.model: Optional[SequenceCNN] = None
-        self.seq_length: Optional[int] = None
+        self.model: SequenceCNN | None = None
+        self.seq_length: int | None = None
 
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
 
-    def _one_hot_encode(self, sequences: List[str]) -> torch.Tensor:
+    def _one_hot_encode(self, sequences: list[str]) -> torch.Tensor:
         """One-hot encode sequences.
 
         Args:
@@ -187,7 +187,7 @@ class CNNModel(BaseModel):
 
         return one_hot
 
-    def featurise(self, inputs: Union[LabeledCandidates, List[Candidate]]) -> torch.Tensor:
+    def featurise(self, inputs: Union[LabeledCandidates, list[Candidate]]) -> torch.Tensor:
         """Convert inputs to one-hot encoded tensors.
 
         Args:
@@ -242,8 +242,12 @@ class CNNModel(BaseModel):
 
         Returns:
             Tuple of (average_loss, metrics_dict).
+
+        Raises:
+            ValueError: If the model is not initialized.
         """
-        assert self.model is not None, "Model must be initialized before training"
+        if self.model is None:
+            raise ValueError("Model must be initialized before training")
         self.model.train()
         train_losses = []
         train_predictions_all = []
@@ -322,8 +326,8 @@ class CNNModel(BaseModel):
         epoch: int,
         avg_train_loss: float,
         train_metrics: dict,
-        avg_val_loss: Optional[float] = None,
-        val_metrics: Optional[dict] = None,
+        avg_val_loss: float | None = None,
+        val_metrics: dict | None = None,
     ) -> None:
         """Log epoch metrics.
 
@@ -348,7 +352,7 @@ class CNNModel(BaseModel):
     def train(
         self,
         train_data: LabeledCandidates,
-        val_data: Optional[LabeledCandidates] = None,
+        val_data: LabeledCandidates | None = None,
     ) -> None:
         """Train the CNN model.
 
@@ -388,18 +392,9 @@ class CNNModel(BaseModel):
             # Train
             avg_train_loss, train_metrics = self._train_epoch(train_loader, optimizer, criterion)
 
-            # TODO: Do we want to log training metrics?
-            log_dict = {"train_loss": avg_train_loss}
-            log_dict.update({f"train_{k}": v for k, v in train_metrics.items()})
-
             # Validate
             if val_loader is not None:
                 avg_val_loss, val_metrics = self._validate_epoch(val_loader, criterion)
-
-                # TODO: Do we want to log validation metrics?
-                # log_dict = {"val_loss": avg_val_loss}
-                # log_dict.update({f"val_{k}": v for k, v in val_metrics.items()})
-
                 self._log_epoch_metrics(
                     epoch,
                     avg_train_loss,
@@ -426,7 +421,7 @@ class CNNModel(BaseModel):
             # Add all final validation metrics
             self.training_metrics.update({f"final_val_{k}": v for k, v in val_metrics.items()})
 
-    def predict(self, candidate_points: List[Candidate]) -> Predictions:
+    def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Make predictions for candidates.
 
         Args:
@@ -450,7 +445,7 @@ class CNNModel(BaseModel):
 
         return Predictions(means=predictions)
 
-    def sample(self, *args: Any, **kwargs: Any) -> List[Candidate]:
+    def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
         """Sample candidate points from the model."""
         raise NotImplementedError("Sampling is not implemented for this model.")
 
