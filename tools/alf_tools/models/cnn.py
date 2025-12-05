@@ -463,7 +463,3 @@ class CNNModel(BaseModel):
             Dictionary of training metrics including losses and Spearman correlations.
         """
         return self.training_metrics
-
-    def cleanup(self) -> None:
-        """Clean up resources."""
-        pass
