@@ -1,7 +1,5 @@
 """Tests for the zero-shot task."""
 
-import shutil
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -71,9 +69,6 @@ class TestZeroShotTask:
 
         # Test dataset metrics
         self._assert_dataset_metrics(metrics, expected_metrics["dataset"])
-
-        # Clean up: remove the results folder after assertions
-        shutil.rmtree(save_path)
 
     def _assert_surrogate_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert surrogate model performance metrics."""

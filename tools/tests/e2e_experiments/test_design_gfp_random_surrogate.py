@@ -1,5 +1,3 @@
-import shutil
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -231,9 +229,6 @@ class TestDesignGFPRandomSurrogate:
 
         # Test surrogate metrics
         self._assert_surrogate_metrics(metrics, expected_metrics["surrogate"])
-
-        # Clean up: remove the results folder after assertions
-        shutil.rmtree(save_path)
 
     def _assert_dataset_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert dataset metrics."""

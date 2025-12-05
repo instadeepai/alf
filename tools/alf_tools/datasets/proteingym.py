@@ -51,15 +51,19 @@ class ProteinGym(BaseDataset):
 
         Returns:
             LabeledCandidates: Labeled candidates with ProteinGym data.
-        """
-        dms_name = self.dataset_config.get("dms_name", None)
-        assert dms_name is not None, "DMS name must be set"
-        dms_type = self.dataset_config.get("dms_type", None)
-        assert dms_type is not None and dms_type in ["singles", "multiples"], (
-            "DMS type must be set and must be one of singles or multiples"
-        )
 
-        assert os.environ.get("HF_TOKEN") is not None, "HF token must be set"
+        Raises:
+            ValueError: If HF token is not set as environment variable or config has missing fields.
+        """
+        # Check HF token is set as environment variable and config has required fields
+        if os.environ.get("HF_TOKEN") is None:
+            raise ValueError("HF token must be set as environment variable")
+        dms_name = self.dataset_config.get("dms_name", None)
+        if dms_name is None:
+            raise ValueError("DMS name must be set")
+        dms_type = self.dataset_config.get("dms_type", None)
+        if dms_type is None or dms_type not in ["singles", "multiples"]:
+            raise ValueError("DMS type must be set and must be one of singles or multiples")
 
         filename = f"ProteinGym/ProteinGym_Cross_Validation/{dms_type}/{dms_name}.csv"
         filepath = DATAPATH / filename
