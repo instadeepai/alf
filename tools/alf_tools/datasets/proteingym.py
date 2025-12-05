@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -10,7 +11,7 @@ from huggingface_hub import hf_hub_download
 
 logger = logging.getLogger("alf-tools")
 
-DATAPATH = "alf_tools/datasets/data/"
+DATAPATH = Path(__file__).parent / "data"
 
 
 class ProteinGym(BaseDataset):
@@ -61,8 +62,9 @@ class ProteinGym(BaseDataset):
         assert os.environ.get("HF_TOKEN") is not None, "HF token must be set"
 
         filename = f"ProteinGym/ProteinGym_Cross_Validation/{dms_type}/{dms_name}.csv"
-        if not os.path.exists(f"{DATAPATH}/{filename}"):
-            os.makedirs(DATAPATH, exist_ok=True)
+        filepath = DATAPATH / filename
+        if not filepath.exists():
+            DATAPATH.mkdir(parents=True, exist_ok=True)
             logger.info("No local copy of file, so downloading from hub")
             hf_hub_download(
                 repo_id=HF_DATASETS_REPOSITORY_NAME,
@@ -72,7 +74,7 @@ class ProteinGym(BaseDataset):
             )
             logger.info("ProteinGym dataset downloaded successfully.")
 
-        df = pd.read_csv(f"{DATAPATH}/{filename}")
+        df = pd.read_csv(filepath)
         dataset = LabeledCandidates(candidates=[], labels=np.array([]))
         for _, row in df.iterrows():
             data = row["mutated_sequence"]
