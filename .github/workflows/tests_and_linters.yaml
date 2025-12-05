@@ -60,7 +60,7 @@ jobs:
                             --cov-report term-missing \
                             --junitxml=pytest.xml \
                             --cov=alf_core
-            cd tools && uv sync --extra torch_cpu
+            cd ../tools && uv sync --extra torch_cpu
             uv run --no-sync pytest --verbose --cov-report xml:coverage.xml \
                             --cov-report term-missing \
                             --junitxml=pytest.xml \
