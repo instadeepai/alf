@@ -44,9 +44,8 @@ class Results:
         """Compute evaluation metrics based on predictions and targets.
 
         Returns:
-            dict[str, Union[float, int, np.number]]: A dictionary of metric names
-                to their computed values. The metrics depend on whether variances
-                are available.
+            A dictionary of metric names to their computed values. The metrics
+            depend on whether variances are available.
         """
         metrics: dict[str, Union[float, int, np.number]] = {}
         metrics_dict = (

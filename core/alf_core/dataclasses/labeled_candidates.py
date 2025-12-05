@@ -60,8 +60,7 @@ class LabeledCandidates:
             index: Integer index or slice to select candidates and labels.
 
         Returns:
-            tuple[list[Candidate], np.ndarray]: The candidates and labels at the specified
-                index or slice.
+            The candidates and labels at the specified index or slice.
         """
         if isinstance(index, int):
             return ([self.candidates[index]], [self.labels[index]])
@@ -75,8 +74,8 @@ class LabeledCandidates:
         """Return the raw data of each candidate.
 
         Returns:
-            list[Any]: A list containing the raw data (sequence, graph, image, etc.)
-                of each candidate in the collection.
+            A list containing the raw data (sequence, graph, image, etc.)
+            of each candidate in the collection.
         """
         return [cand.data for cand in self.candidates]
 
@@ -87,7 +86,7 @@ class LabeledCandidates:
             candidates: A list of Candidate objects to validate.
 
         Returns:
-            bool: True if all candidates are in this collection, False otherwise.
+            True if all candidates are in this collection, False otherwise.
         """
         return all(candidate in self.candidates for candidate in candidates)
 
@@ -125,8 +124,8 @@ class LabeledCandidates:
             seed: Random seed for reproducibility of the shuffle.
 
         Returns:
-            LabeledCandidates: A new LabeledCandidates object with the same candidates
-                and labels, but in a randomly shuffled order.
+            A new LabeledCandidates object with the same candidates and labels,
+            but in a randomly shuffled order.
         """
         shuffled_indices = np.random.RandomState(seed).permutation(len(self.candidates))
         return LabeledCandidates(
@@ -143,8 +142,8 @@ class LabeledCandidates:
                 Defaults to True.
 
         Returns:
-            LabeledCandidates: A new LabeledCandidates object with candidates and
-                labels sorted by label values.
+            A new LabeledCandidates object with candidates and labels sorted
+            by label values.
         """
         sorted_indices = np.argsort(self.labels)
         if not ascending:
@@ -176,10 +175,10 @@ class LabeledCandidates:
         """Convert the labeled candidates to a pandas DataFrame.
 
         Returns:
-            pd.DataFrame: A DataFrame with columns:
-                - "data": The stringified data of each candidate
-                - "label": The label value for each candidate
-                - Additional columns for any features present in the candidates
+            A DataFrame with columns:
+            - "data": The stringified data of each candidate
+            - "label": The label value for each candidate
+            - Additional columns for any features present in the candidates
         """
         rows = []
         for cand, label in zip(self.candidates, self.labels):
@@ -198,8 +197,8 @@ class LabeledCandidates:
             k: Number of top candidates to select.
 
         Returns:
-            LabeledCandidates: New LabeledCandidates object containing the top k candidates
-                sorted by label values (highest first).
+            New LabeledCandidates object containing the top k candidates sorted
+            by label values (highest first).
         """
         top_k_indices = self.labels.argsort()[::-1][:k]
         top_k_candidates = [self.candidates[i] for i in top_k_indices]

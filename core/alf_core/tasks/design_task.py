@@ -48,7 +48,7 @@ class DesignTask(BaseTask):
             state_loggers: List of TaskStateLogger for recording the state.
 
         Returns:
-            TaskState: Updated state with surrogate fine-tuned on the train and validation sets.
+            Updated state with surrogate fine-tuned on the train and validation sets.
         """
         logger.info("Running initial round of surrogate model fine-tuning on the train dataset ...")
         state.surrogate.fit(

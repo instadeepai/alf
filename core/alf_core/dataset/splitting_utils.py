@@ -38,8 +38,7 @@ def split_dataset(
         seed: Random seed for reproducibility.
 
     Returns:
-        dict[str, LabeledCandidates]: Dictionary with keys "train", "validation",
-            "test", and "candidate_pool".
+        Dictionary with keys "train", "validation", "test", and "candidate_pool".
 
     Raises:
         ValueError: If split_type is not "random" or "low_vs_high".
@@ -78,8 +77,7 @@ def split_random(
         seed: Random seed for shuffling.
 
     Returns:
-        dict[str, LabeledCandidates]: Dictionary with keys "train", "validation",
-            "test", and "candidate_pool".
+        Dictionary with keys "train", "validation", "test", and "candidate_pool".
     """
     shuffled_candidates = dataset.shuffle(seed=seed)
 
@@ -128,8 +126,7 @@ def split_low_vs_high(
         seed: Random seed for shuffling within groups.
 
     Returns:
-        dict[str, LabeledCandidates]: Dictionary with keys "train", "validation",
-            "test", and "candidate_pool".
+        Dictionary with keys "train", "validation", "test", and "candidate_pool".
     """
     # Sort indices by label (lowest to highest)
     sorted_indices = dataset.labels.argsort()

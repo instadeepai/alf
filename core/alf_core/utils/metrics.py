@@ -81,7 +81,7 @@ class MetricRegistry:
         """Get all registered metrics that require variance.
 
         Returns:
-            dict[str, Callable]: Dictionary mapping metric names to their functions.
+            Dictionary mapping metric names to their functions.
         """
         return {name: fn for name, fn in self.metrics.items() if self.variance_required[name]}
 
@@ -89,7 +89,7 @@ class MetricRegistry:
         """Get all registered metrics that don't require variance.
 
         Returns:
-            dict[str, Callable]: Dictionary mapping metric names to their functions.
+            Dictionary mapping metric names to their functions.
         """
         return {name: fn for name, fn in self.metrics.items() if not self.variance_required[name]}
 
@@ -108,7 +108,7 @@ def requires_variance(metric_fn: Callable) -> Callable:
         metric_fn: The metric function to decorate.
 
     Returns:
-        Callable: Wrapped metric function with validation and registration.
+        Wrapped metric function with validation and registration.
     """
 
     @wraps(metric_fn)
@@ -138,7 +138,7 @@ def no_variance_required(metric_fn: Callable) -> Callable:
         metric_fn: The metric function to decorate.
 
     Returns:
-        Callable: Wrapped metric function with validation and registration.
+        Wrapped metric function with validation and registration.
     """
 
     @wraps(metric_fn)
@@ -174,9 +174,9 @@ def monte_carlo_ranking(
             Defaults to 10000.
 
     Returns:
-        tuple[np.ndarray, np.ndarray]: A tuple containing:
-            - mean_rank: Mean rank for each candidate
-            - rank_variances: Variance of ranks for each candidate
+        A tuple containing:
+        - mean_rank: Mean rank for each candidate
+        - rank_variances: Variance of ranks for each candidate
     """
     np.random.seed(42)
     n = len(means)
@@ -207,7 +207,7 @@ def mse(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dict[st
         targets: Array of shape (b,). True labels
 
     Returns:
-        dict[str, float]: {"mse": MSE float}
+        {"mse": MSE float}
     """
     return {"mse": ((targets - means) ** 2).mean(0)}
 
@@ -228,7 +228,7 @@ def spearman(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> di
         targets: Array of shape (b,). True labels
 
     Returns:
-        dict[str, float]: {"spearman": Spearman correlation float}
+        {"spearman": Spearman correlation float}
     """
     return {"spearman": spearmanr(targets, means)[0]}
 
@@ -248,7 +248,7 @@ def pearson(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dic
         targets: Array of shape (b,). True labels
 
     Returns:
-        dict[str, float]: {"pearson": Pearson correlation float}
+        {"pearson": Pearson correlation float}
     """
     return {"pearson": pearsonr(targets, means)[0]}
 
@@ -266,7 +266,7 @@ def pairwise_xent(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) 
         targets: Array of shape (b,). True labels
 
     Returns:
-        dict[str, float]: {"pairwise_xent": Ranking Loss float}
+        {"pairwise_xent": Ranking Loss float}
     """
     # Compute pairwise differences
     pairwise_logits = means[:, None] - means[None, :]
@@ -308,7 +308,7 @@ def expected_calibration_error(
             Defaults to 100.
 
     Returns:
-        dict[str, float]: Dictionary with key "ece" mapping to the ECE value.
+        Dictionary with key "ece" mapping to the ECE value.
     """
     grid = np.linspace(0, 1, n_grid_points)
     perc = np.zeros(n_grid_points)
@@ -341,7 +341,7 @@ def rank_expected_calibration_error(
         targets: Array of shape (b,). True labels.
 
     Returns:
-        dict[str, float]: Dictionary with key "rank_ece" mapping to the ECE value.
+        Dictionary with key "rank_ece" mapping to the ECE value.
     """
     mean_rank, rank_variances = monte_carlo_ranking(means, variances)
     target_ranks = (-targets).argsort().argsort() + 1
@@ -371,8 +371,8 @@ def width(
         alpha: Confidence level (e.g., 0.95 for 95% CI). Defaults to 0.95.
 
     Returns:
-        dict[str, float]: Dictionary with key "width_{alpha:.2f}" mapping to
-            the normalized average width value.
+        Dictionary with key "width_{alpha:.2f}" mapping to the normalized
+        average width value.
 
     Raises:
         AssertionError: If alpha is not in [0, 1].
@@ -410,8 +410,8 @@ def rank_width(
         alpha: Confidence level (e.g., 0.95 for 95% CI). Defaults to 0.95.
 
     Returns:
-        dict[str, float]: Dictionary with key "rank_width_{alpha:.2f}" mapping to
-            the normalized average width value in rank space.
+        Dictionary with key "rank_width_{alpha:.2f}" mapping to the normalized
+        average width value in rank space.
 
     Raises:
         AssertionError: If alpha is not in [0, 1].
@@ -446,8 +446,8 @@ def coverage(
         alpha: Confidence level (e.g., 0.95 for 95% CI). Defaults to 0.95.
 
     Returns:
-        dict[str, float]: Dictionary with key "coverage_{alpha:.2f}" mapping to
-            the coverage percentage.
+        Dictionary with key "coverage_{alpha:.2f}" mapping to the coverage
+        percentage.
 
     Raises:
         AssertionError: If alpha is not in [0, 1].
@@ -482,8 +482,8 @@ def rank_coverage(
         alpha: Confidence level (e.g., 0.95 for 95% CI). Defaults to 0.95.
 
     Returns:
-        dict[str, float]: Dictionary with key "rank_coverage_{alpha:.2f}" mapping to
-            the coverage percentage in rank space.
+        Dictionary with key "rank_coverage_{alpha:.2f}" mapping to the coverage
+        percentage in rank space.
 
     Raises:
         AssertionError: If alpha is not in [0, 1].
@@ -517,8 +517,8 @@ def residual_spearman(
         targets: Array of shape (b,). True labels.
 
     Returns:
-        dict[str, float]: Dictionary with key "residual_spearman" mapping to
-            the correlation coefficient.
+        Dictionary with key "residual_spearman" mapping to the correlation
+        coefficient.
     """
     residuals = np.abs(targets - means)
     return {"residual_spearman": spearmanr(residuals, variances)[0]}
@@ -542,8 +542,8 @@ def residual_pearson(
         targets: Array of shape (b,). True labels.
 
     Returns:
-        dict[str, float]: Dictionary with key "residual_pearson" mapping to
-            the correlation coefficient.
+        Dictionary with key "residual_pearson" mapping to the correlation
+        coefficient.
     """
     residuals = np.abs(targets - means)
     return {"residual_pearson": pearsonr(residuals, np.sqrt(variances))[0]}
@@ -571,8 +571,8 @@ def regret_ucb_alpha(
         num_acquisitions: Number of candidates to acquire. Defaults to 100.
 
     Returns:
-        dict[str, float]: Dictionary with key "regret_ucb_{alpha:.2f}" mapping to
-            the cumulative regret value.
+        Dictionary with key "regret_ucb_{alpha:.2f}" mapping to the cumulative
+        regret value.
 
     Raises:
         AssertionError: If num_acquisitions is not a positive integer.
@@ -628,8 +628,8 @@ def regret_ucb_alpha_sweep(
         num_acquisitions: Number of candidates to acquire. Defaults to 100.
 
     Returns:
-        dict[str, float]: Dictionary mapping "regret_ucb_{alpha:.2f}" to regret value
-            for each alpha value.
+        Dictionary mapping "regret_ucb_{alpha:.2f}" to regret value for each
+        alpha value.
 
     Raises:
         ValueError: If alpha is an empty list.

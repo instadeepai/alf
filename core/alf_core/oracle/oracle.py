@@ -47,9 +47,9 @@ class Oracle:
             state: Current task state (updated with evaluation time).
 
         Returns:
-            tuple[LabeledCandidates, TaskState]: A tuple containing:
-                - LabeledCandidates: Candidates paired with their evaluated labels
-                - TaskState: Updated state with oracle_time metric
+            A tuple containing:
+            - Candidates paired with their evaluated labels
+            - Updated state with oracle_time metric
         """
         t0 = time.perf_counter()
         if isinstance(self.scorer, BaseDataset):
@@ -66,8 +66,8 @@ class Oracle:
         """Get metrics from the underlying module if available.
 
         Returns:
-            dict[str, Union[float, int, np.number]]: Dictionary of metric names to values.
-                Returns empty dict if the module doesn't provide metrics.
+            Dictionary of metric names to values. Returns empty dict if the module
+            doesn't provide metrics.
         """
         if hasattr(self.scorer, "get_metrics"):
             return self.scorer.get_metrics()

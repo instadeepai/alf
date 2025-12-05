@@ -14,7 +14,7 @@ def expected_metrics():
     """Fixture containing expected metric values for assertions.
 
     Returns:
-        dict: Expected metric values for assertions.
+        Expected metric values for assertions.
     """
     return {
         "acquired_candidates": {
