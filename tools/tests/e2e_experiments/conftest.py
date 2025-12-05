@@ -16,6 +16,13 @@ from typing import Any, List, Union
 
 import numpy as np
 from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions
+import pytest
+
+
+@pytest.fixture
+def random_model():
+    """Fixture to create a random model for testing."""
+    return RandomModel()
 
 
 class RandomModel(BaseModel):
@@ -79,11 +86,3 @@ class RandomModel(BaseModel):
             NotImplementedError: Sampling is not implemented for this model.
         """
         raise NotImplementedError("Sampling is not implemented for this model.")
-
-    def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
-        """Get the training summary metrics.
-
-        Returns:
-            dict[str, Union[float, int, np.number]]: The training summary metrics.
-        """
-        return {}

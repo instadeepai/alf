@@ -17,7 +17,6 @@ import pandas as pd
 import pytest
 from alf_core import FileTaskStateLogger, Surrogate, TerminalTaskStateLogger, ZeroShotTask
 from alf_tools.datasets import GFP
-from alf_tools.models import RandomModel
 
 
 @pytest.fixture
@@ -35,13 +34,13 @@ def gfp_dataset():
 
 
 @pytest.fixture
-def surrogate_model():
+def surrogate_model(random_model):
     """Fixture to create a random surrogate model for testing.
 
     Returns:
         Surrogate: A random surrogate model.
     """
-    return Surrogate(model=RandomModel())
+    return Surrogate(model=random_model)
 
 
 @pytest.fixture
