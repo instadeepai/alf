@@ -105,22 +105,19 @@ class ProteinGym(BaseDataset):
 
         Returns:
             dict[str, LabeledCandidates]: A dictionary of the splits.
+
+        Raises:
+            ValueError: If cross-validation type or fold is not set or invalid.
         """
         if self.dataset_config.get("cross_validation", False):
-            assert self.dataset_config.get("cross_validation_type", None) is not None, (
-                "Cross-validation type must be set"
-            )
-            assert self.dataset_config.get("cross_validation_fold", None) is not None, (
-                "Cross-validation fold must be set"
-            )
-            assert self.dataset_config["cross_validation_type"] in [
-                "random",
-                "modulo",
-                "contiguous",
-            ], "Cross-validation type must be one of random, modulo, or contiguous"
-            assert 5 > self.dataset_config["cross_validation_fold"] >= 0, (
-                "Cross-validation fold must be between 0 and 4 inclusive"
-            )
+            cross_validation_type = self.dataset_config.get("cross_validation_type", None)
+            if cross_validation_type is None and cross_validation_type not in ["random", "modulo", "contiguous"]:
+                raise ValueError("Cross-validation type must be set and must be one of random, modulo, or contiguous")
+
+            cross_validation_fold = self.dataset_config.get("cross_validation_fold", None)
+            if cross_validation_fold is None or cross_validation_fold < 0 or cross_validation_fold > 4:
+                raise ValueError("Cross-validation fold must be set and must be between 0 and 4 inclusive")
+
             return self._split_cross_validation()
         else:
             return super()._split_dataset()
@@ -130,8 +127,12 @@ class ProteinGym(BaseDataset):
 
         Returns:
             dict[str, LabeledCandidates]: A dictionary of the splits.
+
+        Raises:
+            ValueError: If dataset is not loaded before splitting.
         """
-        assert self._raw_dataset is not None, "Dataset must be loaded before splitting"
+        if self._raw_dataset is None:
+            raise ValueError("Dataset must be loaded before splitting")
         # Calculate split sizes
         dataset_size = len(self._raw_dataset)
         train_plus_validation_size = round(dataset_size * self.split_ratio["train"])
