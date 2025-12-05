@@ -27,11 +27,12 @@ class SingleMutantSearch(SearchProtocol):
         single_mutant_pool = []
         for i in range(len(best_sequence)):
             for j in range(len(self.alphabet)):
-                if best_sequence[i] != self.alphabet[j]:
-                    single_mutant_pool.append(
-                        Candidate(
-                            data=best_sequence[:i] + self.alphabet[j] + best_sequence[i + 1 :],
-                            modality="sequence",
-                        )
+                if best_sequence[i] == self.alphabet[j]:
+                    continue
+                single_mutant_pool.append(
+                    Candidate(
+                        data=best_sequence[:i] + self.alphabet[j] + best_sequence[i + 1 :],
+                        modality="sequence",
                     )
+                )
         return single_mutant_pool
