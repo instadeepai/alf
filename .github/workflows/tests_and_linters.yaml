@@ -59,46 +59,34 @@ jobs:
           run: |
             cd core
             uv sync --extra cpu
-            uv run --no-sync pytest --verbose \
-                --cov=alf_core \
-                --cov-report= \
-                --junitxml=../pytest-core.xml \
-                --cov-report xml:../coverage-core.xml
+            uv run --no-sync pytest --verbose --cov-report xml:coverage-core.xml \
+                            --cov-report term-missing \
+                            --junitxml=pytest-core.xml \
+                            --cov=alf_core
 
         - name: Run tests (tools) 🧪
           run: |
             cd tools
             uv sync --extra torch_cpu
-            uv run --no-sync pytest --verbose \
-                --cov=alf_tools \
-                --cov-report= \
-                --junitxml=../pytest-tools.xml \
-                --cov-report xml:../coverage-tools.xml
+            uv run --no-sync pytest --verbose --cov-report xml:coverage-tools.xml \
+                            --cov-report term-missing \
+                            --junitxml=pytest-tools.xml \
+                            --cov=alf_tools
 
-        - name: Combine coverage files
-          run: |
-            pip install coverage junitparser
-            coverage combine
-            coverage xml -o coverage.xml
-
-        - name: Merge JUnit reports
-          run: |
-            python - << 'EOF'
-            from junitparser import JUnitXml
-            core = JUnitXml.fromfile("pytest-core.xml")
-            tools = JUnitXml.fromfile("pytest-tools.xml")
-
-            merged = JUnitXml()
-            merged.add_testsuite(core)
-            merged.add_testsuite(tools)
-
-            merged.write("pytest-merged.xml")
-            EOF
-
-        - name: Pytest coverage 💬
-          id: coverageComment
+        - name: Pytest coverage comment (core) 💬
+          id: coverageCommentCore
           uses: MishaKav/pytest-coverage-comment@main
           with:
-            coverage-path: coverage.xml
-            junitxml-path: pytest-merged.xml
-            title: Coverage
+            title: Coverage Report (core)
+            unique-id-for-comment: coverage-core
+            pytest-xml-coverage-path: core/coverage-core.xml
+            junitxml-path: core/pytest-core.xml
+
+        - name: Pytest coverage comment (tools) 💬
+          id: coverageCommentTools
+          uses: MishaKav/pytest-coverage-comment@main
+          with:
+            title: Coverage Report (tools)
+            unique-id-for-comment: coverage-tools
+            pytest-xml-coverage-path: tools/coverage-tools.xml
+            junitxml-path: tools/pytest-tools.xml
