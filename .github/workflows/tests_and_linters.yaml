@@ -77,7 +77,7 @@ jobs:
           id: coverageCommentCore
           uses: MishaKav/pytest-coverage-comment@main
           with:
-            title: Coverage Report (core)
+            title: Core Coverage Report
             unique-id-for-comment: coverage-core
             pytest-xml-coverage-path: core/coverage-core.xml
             junitxml-path: core/pytest-core.xml
@@ -86,7 +86,7 @@ jobs:
           id: coverageCommentTools
           uses: MishaKav/pytest-coverage-comment@main
           with:
-            title: Coverage Report (tools)
+            title: Tools Coverage Report
             unique-id-for-comment: coverage-tools
             pytest-xml-coverage-path: tools/coverage-tools.xml
             junitxml-path: tools/pytest-tools.xml
