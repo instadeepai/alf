@@ -78,6 +78,7 @@ jobs:
 
         - name: Combine coverage files
           run: |
+            pip install coverage junitparser
             coverage combine
             coverage xml -o coverage.xml
 
