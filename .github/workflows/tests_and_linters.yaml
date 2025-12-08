@@ -57,14 +57,13 @@ jobs:
 
         - name: Run tests (core) 🧪
           run: |
-            mkdir -p reports
             cd core
             uv sync --extra cpu
             uv run --no-sync pytest --verbose \
                 --cov=alf_core \
                 --cov-report= \
-                --junitxml=../reports/pytest-core.xml \
-                --cov-report xml:../reports/coverage-core.xml
+                --junitxml=../pytest-core.xml \
+                --cov-report xml:../coverage-core.xml
 
         - name: Run tests (tools) 🧪
           run: |
@@ -73,8 +72,8 @@ jobs:
             uv run --no-sync pytest --verbose \
                 --cov=alf_tools \
                 --cov-report= \
-                --junitxml=../reports/pytest-tools.xml \
-                --cov-report xml:../reports/coverage-tools.xml
+                --junitxml=../pytest-tools.xml \
+                --cov-report xml:../coverage-tools.xml
 
         - name: Combine coverage files
           run: |
@@ -86,14 +85,14 @@ jobs:
           run: |
             python - << 'EOF'
             from junitparser import JUnitXml
-            core = JUnitXml.fromfile("reports/pytest-core.xml")
-            tools = JUnitXml.fromfile("reports/pytest-tools.xml")
+            core = JUnitXml.fromfile("pytest-core.xml")
+            tools = JUnitXml.fromfile("pytest-tools.xml")
 
             merged = JUnitXml()
             merged.add_testsuite(core)
             merged.add_testsuite(tools)
 
-            merged.write("reports/pytest-merged.xml")
+            merged.write("pytest-merged.xml")
             EOF
 
         - name: Pytest coverage 💬
@@ -101,5 +100,5 @@ jobs:
           uses: MishaKav/pytest-coverage-comment@main
           with:
             coverage-path: coverage.xml
-            junitxml-path: reports/pytest-merged.xml
+            junitxml-path: pytest-merged.xml
             title: Coverage
