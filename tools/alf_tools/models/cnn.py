@@ -290,13 +290,13 @@ class CNNModel(BaseModel):
 
         Returns:
             Tuple of (average_loss, metrics_dict).
-        
+
         Raises:
             ValueError: If the model is not initialized.
         """
         if self.model is None:
             raise ValueError("Model must be initialized before validation")
-        
+
         self.model.eval()
         val_losses = []
         val_predictions_all = []
