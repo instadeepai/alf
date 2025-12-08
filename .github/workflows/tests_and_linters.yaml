@@ -68,10 +68,27 @@ jobs:
                             --junitxml=pytest.xml \
                             --cov=alf_tools
 
-        - name: Pytest coverage comment 💬
-          id: coverageComment
+        # - name: Pytest coverage comment 💬
+        #   id: coverageComment
+        #   uses: MishaKav/pytest-coverage-comment@main
+        #   with:
+        #     multiple-files: |
+        #       Core, core/coverage.xml, core/pytest.xml
+        #       Tools, tools/coverage.xml, tools/pytest.xml
+
+        - name: Pytest coverage for core 💬
+          id: coverageCommentCore
           uses: MishaKav/pytest-coverage-comment@main
           with:
-            multiple-files: |
-              Core, core/coverage.xml, core/pytest.xml
-              Tools, tools/coverage.xml, tools/pytest.xml
+            pytest-xml-coverage-path: core/coverage.xml
+            junitxml-path: core/pytest.xml
+            title: Core Coverage
+
+        - name: Pytest coverage for tools 💬
+          id: coverageCommentTools
+          uses: MishaKav/pytest-coverage-comment@main
+          with:
+            pytest-xml-coverage-path: tools/coverage.xml
+            junitxml-path: tools/pytest.xml
+            title: Tools Coverage
+            create-new-comment: false
