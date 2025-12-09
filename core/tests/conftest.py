@@ -1,3 +1,17 @@
+# Copyright 2023 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Shared pytest fixtures for experiment tests."""
 
 from typing import Any, List, Union
@@ -19,7 +33,7 @@ def dummy_surrogate():
     """Fixture to create a dummy surrogate model for testing.
 
     Returns:
-        Surrogate: A dummy surrogate model for testing.
+        A dummy surrogate model for testing.
     """
     return Surrogate(model=DummyModel(seed=42))
 
@@ -29,7 +43,7 @@ def dummy_dataset():
     """Fixture to create a dummy dataset for testing.
 
     Returns:
-        DummyDataset: A dummy dataset for testing.
+        A dummy dataset for testing.
     """
     return DummyDataset(seed=42, num_samples=1000)
 
@@ -39,7 +53,7 @@ def dummy_dataset_factory():
     """Fixture factory to create dummy datasets with custom configurations.
 
     Returns:
-        Callable: A factory function that creates DummyDataset instances.
+        A factory function that creates DummyDataset instances.
 
     Example:
         def test_something(dummy_dataset_factory):
@@ -64,7 +78,7 @@ def dummy_dataset_factory():
             modality: Modality of the data
 
         Returns:
-            DummyDataset: A dummy dataset with the specified configuration
+            A dummy dataset with the specified configuration.
         """
         return DummyDataset(
             name=name,
@@ -85,7 +99,7 @@ def oracle(dummy_dataset):
         dummy_dataset: A dummy dataset for testing.
 
     Returns:
-        Oracle: An oracle for testing.
+        An oracle for testing.
     """
     return Oracle(scorer=dummy_dataset)
 
@@ -95,7 +109,7 @@ def dummy_optimizer():
     """Fixture to create a dummy optimizer for testing.
 
     Returns:
-        Optimizer: A dummy optimizer for testing.
+        A dummy optimizer for testing.
     """
     return Optimizer(acquisition_fn=DummyAcquisitionFunction(seed=42), search_fn=DatasetSearch())
 
@@ -121,7 +135,7 @@ class DummyModel(BaseModel):
             candidate_points: List of candidate points to predict.
 
         Returns:
-            Predictions: Predictions for the candidate points.
+            Predictions for the candidate points.
         """
         labels = self.rng.randn(len(candidate_points))
         return Predictions(means=labels)
@@ -212,6 +226,6 @@ class DummyAcquisitionFunction(AcquisitionFunction):
             state: Task state.
 
         Returns:
-            np.ndarray: Acquisition values.
+            Acquisition values.
         """
         return self.rng.randn(len(predictions))

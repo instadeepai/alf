@@ -34,9 +34,9 @@ def compute_recall(
         top_n: Number of top candidates to consider. Defaults to 100.
 
     Returns:
-        dict[str, float]: Dictionary containing:
-            - "optimizer/top_percentile_recall": Recall at top_percentile threshold
-            - "optimizer/top_n_recall": Recall at top_n threshold
+        Dictionary containing:
+        - "optimizer/top_percentile_recall": Recall at top_percentile threshold
+        - "optimizer/top_n_recall": Recall at top_n threshold
     """
     init_candidate_pool = init_candidate_pool.sort(ascending=False)
     top_percentile_threshold = init_candidate_pool[
@@ -75,8 +75,8 @@ def compute_regret(
         acquired_candidates: Candidates that were acquired during optimization.
 
     Returns:
-        dict[str, float]: Dictionary containing:
-            - "optimizer/regret": The regret value (lower is better).
+        Dictionary containing:
+        - "optimizer/regret": The regret value (lower is better).
     """
     best_possible_candidate_label = init_candidate_pool.labels.max()
     best_acquired_candidate_label = acquired_candidates.labels.max()

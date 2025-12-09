@@ -53,8 +53,8 @@ class Surrogate:
             candidates: List of Candidate objects to make predictions for.
 
         Returns:
-            Predictions: Predictions object containing means and optionally variances
-                and empirical distributions.
+            Predictions object containing means and optionally variances
+            and empirical distributions.
         """
         return self.model.predict(candidates)
 
@@ -62,7 +62,6 @@ class Surrogate:
         """Get summary metrics from the most recent training run.
 
         Returns:
-            dict[str, Union[float, int, np.number]]: Dictionary of metric names to values
-                from the underlying model's training.
+            Dictionary of metric names to values from the underlying model's training.
         """
         return self.model.get_training_summary_metrics()

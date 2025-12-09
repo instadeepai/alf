@@ -63,7 +63,7 @@ class Candidate:
         """Return a string representation of the candidate.
 
         Returns:
-            str: A string representation showing the candidate's data, modality, and features.
+            A string representation showing the candidate's data, modality, and features.
         """
         return f"Candidate(data={self.data}, modality={self.modality}, features={self.features})"
 
@@ -71,7 +71,7 @@ class Candidate:
         """Convert the candidate data to a string representation.
 
         Returns:
-            str: The string representation of the candidate's data.
+            The string representation of the candidate's data.
 
         Raises:
             ValueError: If the modality is not "sequence" (other modalities not yet supported).
