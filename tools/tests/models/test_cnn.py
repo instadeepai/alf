@@ -28,7 +28,7 @@ def sample_data():
     """Create sample training data.
 
     Returns:
-        LabeledCandidates: A LabeledCandidates object containing the training data.
+        A LabeledCandidates object containing the training data.
     """
     sequences = ["ACDEFGHIKLMNPQRSTVWY"] * 10  # Simple repeated sequence
     candidates = [Candidate(data=seq, modality="sequence") for seq in sequences]
@@ -41,7 +41,7 @@ def cnn_model():
     """Create a CNNModel with small settings for fast testing.
 
     Returns:
-        CNNModel: A CNNModel.
+        A CNNModel.
     """
     model_config = CNNModelConfig(num_filters=16, num_conv_layers=1, fc_hidden_dim=32)
     train_config = CNNTrainConfig(batch_size=4, num_epochs=2)

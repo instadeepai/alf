@@ -32,7 +32,7 @@ class SingleMutantSearch(SearchProtocol):
             task_state: The task state containing the dataset and surrogate model.
 
         Returns:
-            List[Candidate]: A list of candidates.
+            A list of candidates.
         """
         # TODO: Add features to the candidates
         train_dataset = task_state.dataset.train_dataset

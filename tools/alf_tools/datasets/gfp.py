@@ -48,7 +48,7 @@ class GFP(BaseDataset):
         Clean dataset and return as HF dataset.
 
         Returns:
-            LabeledCandidates: A LabeledCandidates object containing the GFP data.
+            A LabeledCandidates object containing the GFP data.
 
         Raises:
             FileNotFoundError: If the GFP dataset file is not found.

@@ -27,6 +27,6 @@ class Greedy(AcquisitionFunction):
             state: The task state containing the dataset and surrogate model.
 
         Returns:
-            np.ndarray: The acquisition values for the candidates.
+            The acquisition values for the candidates.
         """
         return predictions.means

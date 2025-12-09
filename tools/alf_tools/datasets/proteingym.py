@@ -64,7 +64,7 @@ class ProteinGym(BaseDataset):
         Process dataset and return as labeled candidates.
 
         Returns:
-            LabeledCandidates: Labeled candidates with ProteinGym data.
+            Labeled candidates with ProteinGym data.
 
         Raises:
             ValueError: If HF token is not set as environment variable or config has missing fields.
@@ -118,7 +118,7 @@ class ProteinGym(BaseDataset):
         """Split dataset into train, validation, test and candidate pool splits.
 
         Returns:
-            dict[str, LabeledCandidates]: A dictionary of the splits.
+            A dictionary of the splits.
 
         Raises:
             ValueError: If cross-validation type or fold is not set or invalid.
@@ -152,7 +152,7 @@ class ProteinGym(BaseDataset):
         """Split dataset into cross-validation folds.
 
         Returns:
-            dict[str, LabeledCandidates]: A dictionary of the splits.
+            A dictionary of the splits.
 
         Raises:
             ValueError: If dataset is not loaded before splitting.

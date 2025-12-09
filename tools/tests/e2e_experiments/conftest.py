@@ -24,7 +24,7 @@ def random_model():
     """Fixture to create a random model for testing.
 
     Returns:
-        RandomModel: A random model.
+        A random model.
     """
     return RandomModel()
 
@@ -50,7 +50,7 @@ class RandomModel(BaseModel):
             inputs: The input data to featurise.
 
         Returns:
-            Any: The featurised input data.
+            The featurised input data.
         """
         pass
 
@@ -74,7 +74,7 @@ class RandomModel(BaseModel):
             candidate_points: The candidate points to predict the labels for.
 
         Returns:
-            Predictions: The predictions for the candidate points.
+            The predictions for the candidate points.
         """
         labels = self.rng.randn(len(candidate_points))
         return Predictions(means=labels)

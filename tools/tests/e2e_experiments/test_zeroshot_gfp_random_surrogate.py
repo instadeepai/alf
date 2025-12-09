@@ -24,7 +24,7 @@ def gfp_dataset():
     """Fixture to create a GFP dataset for testing.
 
     Returns:
-        GFP: A GFP dataset.
+        A GFP dataset.
     """
     split_config = {
         "split_ratio": {"train": 0, "validation_frac": 0, "test": 1.0, "candidate_pool": 0},
@@ -38,7 +38,7 @@ def surrogate_model(random_model):
     """Fixture to create a random surrogate model for testing.
 
     Returns:
-        Surrogate: A random surrogate model.
+        A random surrogate model.
     """
     return Surrogate(model=random_model)
 
@@ -48,7 +48,7 @@ def expected_metrics():
     """Fixture containing expected metric values for assertions.
 
     Returns:
-        dict: Expected metric values for assertions.
+        Expected metric values for assertions.
     """
     return {
         "surrogate": {

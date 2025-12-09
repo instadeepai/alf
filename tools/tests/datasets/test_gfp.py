@@ -23,7 +23,7 @@ def gfp_dataset():
     """Create a GFP dataset fixture for testing.
 
     Returns:
-        GFP: A GFP dataset.
+        A GFP dataset.
     """
     return GFP(
         name="gfp",
