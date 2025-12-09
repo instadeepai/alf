@@ -31,7 +31,7 @@ class AcquisitionFunction(abc.ABC):
             state: Current task state.
 
         Returns:
-            np.ndarray: Array of acquisition values, one per candidate.
+            Array of acquisition values, one per candidate.
         """
         pass
 
@@ -47,7 +47,7 @@ class AcquisitionFunction(abc.ABC):
             state: Current task state containing the dataset and surrogate model.
 
         Returns:
-            LabeledCandidates: Candidates paired with their acquisition values.
+            Candidates paired with their acquisition values.
         """
         predictions: Predictions = state.surrogate.predict(search_candidates)
         acquisition_values = self._get_acquisition_values(predictions, state)

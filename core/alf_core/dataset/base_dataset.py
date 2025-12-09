@@ -66,7 +66,7 @@ class BaseDataset(abc.ABC):
         specific source.
 
         Returns:
-            LabeledCandidates: The loaded dataset with candidates and labels.
+            The loaded dataset with candidates and labels.
         """
         pass
 
@@ -83,7 +83,7 @@ class BaseDataset(abc.ABC):
         """Get the training dataset split.
 
         Returns:
-            LabeledCandidates: Training dataset.
+            Training dataset.
 
         Raises:
             AssertionError: If dataset hasn't been split yet.
@@ -96,7 +96,7 @@ class BaseDataset(abc.ABC):
         """Get the test dataset split.
 
         Returns:
-            LabeledCandidates: Test dataset.
+            Test dataset.
 
         Raises:
             AssertionError: If dataset hasn't been split yet.
@@ -109,7 +109,7 @@ class BaseDataset(abc.ABC):
         """Get the validation dataset split.
 
         Returns:
-            LabeledCandidates: Validation dataset.
+            Validation dataset.
 
         Raises:
             AssertionError: If dataset hasn't been split yet.
@@ -124,7 +124,7 @@ class BaseDataset(abc.ABC):
         """Get the candidate pool split.
 
         Returns:
-            LabeledCandidates: Candidate pool available for acquisition.
+            Candidate pool available for acquisition.
 
         Raises:
             AssertionError: If dataset hasn't been split yet.
@@ -138,7 +138,7 @@ class BaseDataset(abc.ABC):
         """Return a string representation of the dataset.
 
         Returns:
-            str: String showing dataset name, modality, seed, and split sizes.
+            String showing dataset name, modality, seed, and split sizes.
         """
         return (
             f"Dataset(name={self.name}, modality={self.modality}, seed={self.seed}, "
@@ -190,8 +190,8 @@ class BaseDataset(abc.ABC):
         fraction of the train set that is held out in the validation set.
 
         Returns:
-            dict[str, LabeledCandidates]: Dictionary with keys "train", "validation",
-                "test", and "candidate_pool", each containing a LabeledCandidates object.
+            Dictionary with keys "train", "validation", "test", and "candidate_pool",
+            each containing a LabeledCandidates object.
 
         Raises:
             AssertionError: If dataset hasn't been loaded yet.
@@ -259,7 +259,7 @@ class BaseDataset(abc.ABC):
             candidates: List of Candidate objects to query.
 
         Returns:
-            LabeledCandidates: Candidates paired with their labels from the dataset.
+            Candidates paired with their labels from the dataset.
 
         Raises:
             AssertionError: If dataset hasn't been loaded yet.
@@ -274,9 +274,9 @@ class BaseDataset(abc.ABC):
         """Get summary metrics for all dataset splits.
 
         Returns:
-            dict[str, Union[float, int, np.number]]: Dictionary containing:
-                - "num_{split}": Number of samples in each split
-                - "{split}_mean": Mean label value for each split
+            Dictionary containing:
+            - "num_{split}": Number of samples in each split
+            - "{split}_mean": Mean label value for each split
         """
         metrics: dict[str, Union[float, int, np.number]] = {}
         for key, split in self.splits.items():

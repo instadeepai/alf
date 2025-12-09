@@ -54,9 +54,9 @@ class Optimizer:
             state: Current task state.
 
         Returns:
-            tuple[list[Candidate], TaskState]: A tuple containing:
-                - list[Candidate]: The proposed candidates to evaluate
-                - TaskState: Updated state with ask_time metric
+            A tuple containing:
+            - The proposed candidates to evaluate
+            - Updated state with ask_time metric
         """
         t0 = time.perf_counter()
         search_candidates = self.search_fn(state)
@@ -80,7 +80,7 @@ class Optimizer:
             logger: Optional logger for recording training metrics.
 
         Returns:
-            TaskState: Updated state with tell_time and optimizer metrics.
+            Updated state with tell_time and optimizer metrics.
         """
         t0 = time.perf_counter()
         state.surrogate.fit(
@@ -104,10 +104,10 @@ class Optimizer:
             state: Current task state.
 
         Returns:
-            dict[str, float]: Dictionary of metric names to values, including:
-                - Metrics on acquired candidates (mean, max, min)
-                - Surrogate training metrics (if available)
-                - Search function metrics
+            Dictionary of metric names to values, including:
+            - Metrics on acquired candidates (mean, max, min)
+            - Surrogate training metrics (if available)
+            - Search function metrics
         """
         acquired_candidates = state.history[-1]
         metrics = {
