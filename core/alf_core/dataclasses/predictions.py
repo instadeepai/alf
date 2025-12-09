@@ -58,7 +58,7 @@ class Predictions:
         """Return the number of predictions.
 
         Returns:
-            int: The number of predictions (length of the means array).
+            The number of predictions (length of the means array).
         """
         return len(self.means)
 
@@ -77,7 +77,7 @@ class Predictions:
             targets: Ground truth target values corresponding to each candidate.
 
         Returns:
-            DataFrame: A DataFrame with predictions, targets, and optionally variances
+            A DataFrame with predictions, targets, and optionally variances
             and ensemble predictions.
         """
         predictions_list = []

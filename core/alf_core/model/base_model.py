@@ -34,7 +34,7 @@ class BaseModel(abc.ABC):
             inputs: List of Candidate objects to featurize.
 
         Returns:
-            Any: Feature representation of the inputs (format depends on implementation).
+            Feature representation of the inputs (format depends on implementation).
         """
         pass
 
@@ -60,8 +60,8 @@ class BaseModel(abc.ABC):
             candidate_points: List of Candidate objects to make predictions for.
 
         Returns:
-            Predictions: Predictions object containing means and optionally variances
-                and empirical distributions.
+            Predictions object containing means and optionally variances
+            and empirical distributions.
         """
         pass
 
@@ -73,7 +73,7 @@ class BaseModel(abc.ABC):
             condition: Optional conditioning information for sampling.
 
         Returns:
-            list[Candidate]: List of sampled candidate points.
+            List of sampled candidate points.
         """
         pass
 
@@ -81,8 +81,8 @@ class BaseModel(abc.ABC):
         """Get summary metrics from the most recent training run.
 
         Returns:
-            dict[str, Union[float, int, np.number]]: Dictionary of metric names to values.
-                Returns empty dict by default; subclasses should override to provide metrics.
+            Dictionary of metric names to values. Returns empty dict by default;
+            subclasses should override to provide metrics.
         """
         return {}
 

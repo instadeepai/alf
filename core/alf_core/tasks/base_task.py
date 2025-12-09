@@ -57,7 +57,7 @@ class BaseTask(abc.ABC):
             surrogate: The surrogate model to use for predictions.
 
         Returns:
-            TaskState: Initialized task state with the provided dataset and surrogate.
+            Initialized task state with the provided dataset and surrogate.
         """
         return TaskState(
             dataset=dataset,
@@ -91,7 +91,7 @@ class BaseTask(abc.ABC):
             round_name: Name or number identifying the current round.
 
         Returns:
-            TaskState: Updated task state with evaluation metrics.
+            Updated task state with evaluation metrics.
 
         Raises:
             AssertionError: If save_round_predictions is True but filename is empty.
