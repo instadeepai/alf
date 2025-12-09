@@ -33,7 +33,7 @@ def gfp_dataset():
     """Fixture to create a GFP dataset for testing.
 
     Returns:
-        GFP: A GFP dataset.
+        A GFP dataset.
     """
     return GFP(
         name="gfp",
@@ -51,7 +51,7 @@ def surrogate_model(random_model):
     """Fixture to create a random surrogate model for testing.
 
     Returns:
-        Surrogate: A random surrogate model.
+        A random surrogate model.
     """
     return Surrogate(model=random_model)
 
@@ -61,7 +61,7 @@ def acquisition_fn():
     """Fixture to create acquisition function.
 
     Returns:
-        Greedy: A Greedy acquisition function.
+        A Greedy acquisition function.
     """
     return Greedy()
 
@@ -71,7 +71,7 @@ def search_fn():
     """Fixture to create search strategy.
 
     Returns:
-        DatasetSearch: A DatasetSearch.
+        A DatasetSearch.
     """
     return DatasetSearch()
 
@@ -81,7 +81,7 @@ def optimizer(acquisition_fn, search_fn):
     """Fixture to create optimizer.
 
     Returns:
-        Optimizer: An Optimizer.
+        An Optimizer.
     """
     return Optimizer(acquisition_fn=acquisition_fn, search_fn=search_fn)
 
@@ -91,7 +91,7 @@ def oracle(gfp_dataset):
     """Fixture to create oracle.
 
     Returns:
-        Oracle: An Oracle.
+        An Oracle.
     """
     return Oracle(scorer=gfp_dataset)
 
@@ -101,7 +101,7 @@ def expected_metrics():
     """Fixture containing expected metric values for assertions.
 
     Returns:
-        dict: Expected metric values for assertions.
+        Expected metric values for assertions.
     """
     return {
         "dataset": {

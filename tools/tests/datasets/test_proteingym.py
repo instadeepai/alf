@@ -23,7 +23,7 @@ def proteingym_dataset_singles():
     """Create a ProteinGym singles dataset fixture for testing.
 
     Returns:
-        ProteinGym: A ProteinGym singles dataset.
+        A ProteinGym singles dataset.
     """
     return ProteinGym(
         name="proteingym",
@@ -42,7 +42,7 @@ def proteingym_dataset_multiples():
     """Create a ProteinGym multiples dataset fixture for testing.
 
     Returns:
-        ProteinGym: A ProteinGym multiples dataset.
+        A ProteinGym multiples dataset.
     """
     return ProteinGym(
         name="proteingym",
@@ -61,7 +61,7 @@ def proteingym_dataset_cv_singles():
     """Create a ProteinGym cross-validation singles dataset fixture for testing.
 
     Returns:
-        ProteinGym: A ProteinGym cross-validation singles dataset.
+        A ProteinGym cross-validation singles dataset.
     """
     return ProteinGym(
         name="proteingym",
@@ -86,7 +86,7 @@ def proteingym_dataset_cv_multiples():
     """Create a ProteinGym cross-validation multiples dataset fixture for testing.
 
     Returns:
-        ProteinGym: A ProteinGym cross-validation multiples dataset.
+        A ProteinGym cross-validation multiples dataset.
     """
     return ProteinGym(
         name="proteingym",

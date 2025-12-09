@@ -194,7 +194,7 @@ class CNNModel(BaseModel):
             inputs: Either LabeledCandidates or list of Candidates to featurise.
 
         Returns:
-            torch.Tensor: A one-hot encoded tensor of shape (batch_size, alphabet_size, seq_length).
+            A one-hot encoded tensor of shape (batch_size, alphabet_size, seq_length).
 
         Raises:
             ValueError: If the input is not LabeledCandidates or list of Candidates.

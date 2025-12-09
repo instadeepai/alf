@@ -26,7 +26,7 @@ def set_seed():
     """Fixture to set random seeds for reproducible tests.
 
     Returns:
-        callable: A function that sets the random seeds.
+        A function that sets the random seeds.
     """
 
     def _set_seed(seed: int):
@@ -45,7 +45,7 @@ def gfp_dataset():
     """Fixture to create a GFP dataset for testing.
 
     Returns:
-        GFP: A GFP dataset.
+        A GFP dataset.
     """
     return GFP(
         name="gfp",
@@ -68,7 +68,7 @@ def surrogate_model():
     """Fixture to create a surrogate model for testing.
 
     Returns:
-        Surrogate: A surrogate model.
+        A surrogate model.
     """
     return Surrogate(model=CNNModel(train_config=CNNTrainConfig(num_epochs=10)))
 
@@ -78,7 +78,7 @@ def oracle(gfp_dataset):
     """Fixture to create optimizer components.
 
     Returns:
-        Oracle: An Oracle.
+        An Oracle.
     """
     oracle = Oracle(scorer=gfp_dataset)
     return oracle
@@ -89,7 +89,7 @@ def expected_metrics():
     """Fixture containing expected metric values for assertions.
 
     Returns:
-        dict: Expected metric values for assertions.
+        Expected metric values for assertions.
     """
     return {
         "surrogate": {
