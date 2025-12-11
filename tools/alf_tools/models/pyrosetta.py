@@ -15,14 +15,13 @@
 # You need to run the following command before:
 # pip install pyrosetta-installer
 # python -c 'import pyrosetta_installer; pyrosetta_installer.install_pyrosetta()'
-import os
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 import pyrosetta
-from core.alf_core import BaseModel, Candidate, LabeledCandidates, Predictions
-from tools.alf_tools.utils.constants import PROTEIN_ALPHABET
+from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions
+from alf_tools.utils.constants import PROTEIN_ALPHABET
 from pyrosetta import rosetta
 from pyrosetta.rosetta.core.pose import Pose
 
@@ -30,22 +29,28 @@ from pyrosetta.rosetta.core.pose import Pose
 class PyRosetta(BaseModel):
     def __init__(
         self,
-        dms_structure_name: str,
-        dms_name: str,
+        pdb_path: str,
         initial_relax_repeats: int = 20,
         repeats_per_prediction: int = 1,
         average_fn_over_repeats: str = "mean",
         alphabet: str = PROTEIN_ALPHABET,
-        length: Optional[int] = None,
         seed: int = 0,
     ) -> None:
-        self.dms_structure_name = dms_structure_name
-        self.dms_name = dms_name
+        """Initialize the PyRosetta model.
+
+        Args:
+            pdb_path: Path to the PDB structure file.
+            initial_relax_repeats: Number of relaxation repeats for initial structure.
+            repeats_per_prediction: Number of scoring repeats per prediction.
+            average_fn_over_repeats: How to average repeated scores ("mean" or "median").
+            alphabet: Protein alphabet to use.
+            seed: Random seed for reproducibility.
+        """
+        self.pdb_path = pdb_path
         self.initial_relax_repeats = initial_relax_repeats
         self.repeats_per_prediction = repeats_per_prediction
         self.average_fn_over_repeats = average_fn_over_repeats
         self.alphabet = alphabet
-        self.length = length
         self.seed = seed
         self._is_setup = False
 
@@ -57,14 +62,8 @@ class PyRosetta(BaseModel):
         pyrosetta.init(f"-constant_seed -jran {self.seed}")
         self.score_function = pyrosetta.get_fa_scorefxn()
 
-        # Load the DMS structure from s3 bucket and relax structure
-        remote_path = f"ProteinGym_AF2_structures/{self.dms_structure_name}.pdb"
-        local_path = "structures"
-        os.makedirs(local_path, exist_ok=True)
-        # TODO: input_handler.download(remote_path, local_path)
-        self.pose = pyrosetta.pose_from_pdb(
-            f"{local_path}/{self.dms_structure_name}.pdb"
-        )
+        # Load and relax structure
+        self.pose = pyrosetta.pose_from_pdb(self.pdb_path)
         self.wt_sequence = self.pose.sequence()
         self.pose, relax_time_taken = self.relax_structure(
             self.pose, n_repeats=self.initial_relax_repeats
