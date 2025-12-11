@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_core.dataclasses.candidate import Candidate, Modality
-from alf_core.dataclasses.labeled_candidates import LabeledCandidates
-from alf_core.dataclasses.predictions import Predictions
-from alf_core.dataclasses.results import Results
-from alf_core.dataclasses.task_state import TaskState
+import os
+
+PROTEIN_ALPHABET = "ARNDCQEGHILKMFPSTWYV"
+HF_DATASETS_REPOSITORY_NAME = "InstaDeepAI/alfred"
+HF_DATASETS_REPOSITORY_URL = f"hf://datasets/{HF_DATASETS_REPOSITORY_NAME}"
+BASEDIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))

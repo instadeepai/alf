@@ -44,7 +44,18 @@ class Candidate:
     features: dict | None = None
 
     def __post_init__(self) -> None:
-        """Initialize features to empty dict if None."""
+        """Check and convert modality to Modality enum if necessary and
+        initialize features to empty dict if None.
+
+        Raises:
+            ValueError: If the modality is not a valid Modality enum.
+        """
+        if not isinstance(self.modality, Modality):
+            try:
+                self.modality = Modality(self.modality)
+            except ValueError:
+                raise ValueError(f"Invalid modality: {self.modality}")
+
         if self.features is None:
             self.features = {}
 

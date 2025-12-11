@@ -14,8 +14,6 @@
 
 """Tests for the design task."""
 
-import shutil
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -112,9 +110,6 @@ class TestDesignTask:
 
         # Test dataset metrics (last round)
         self._assert_dataset_metrics(metrics, expected_metrics["dataset"])
-
-        # Clean up: remove the results folder after assertions
-        shutil.rmtree(save_path)
 
     def _assert_acquired_candidates_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert acquired candidates metrics."""

@@ -63,7 +63,7 @@ class Oracle:
         return evaluated_candidates, state
 
     def get_metrics(self) -> dict[str, Union[float, int, np.number]]:
-        """Get metrics from the underlying module if available.
+        """Get metrics from the underlying scorer if available.
 
         Returns:
             Dictionary of metric names to values. Returns empty dict if the module

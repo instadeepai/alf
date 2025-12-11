@@ -12,8 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_core.dataclasses.candidate import Candidate, Modality
-from alf_core.dataclasses.labeled_candidates import LabeledCandidates
-from alf_core.dataclasses.predictions import Predictions
-from alf_core.dataclasses.results import Results
-from alf_core.dataclasses.task_state import TaskState
+from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig

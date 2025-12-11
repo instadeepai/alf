@@ -204,3 +204,12 @@ class LabeledCandidates:
         top_k_candidates = [self.candidates[i] for i in top_k_indices]
         top_k_labels = self.labels[top_k_indices]
         return LabeledCandidates(candidates=top_k_candidates, labels=top_k_labels)
+
+    def __iter__(self):
+        """Iterate over candidates and labels, yielding (candidate, label) tuples.
+
+        Yields:
+            Tuple of (Candidate, float): A candidate and its corresponding label
+        """
+        for candidate, label in zip(self.candidates, self.labels):
+            yield candidate, label

@@ -32,6 +32,8 @@ jobs:
 
   tests:
       runs-on: instadeep-ci-4
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
       container:
         image: python:3.11-slim-bullseye
 
@@ -53,17 +55,38 @@ jobs:
         - name: Install uv
           uses: astral-sh/setup-uv@v6
 
-        - name: Run tests 🧪
+        - name: Run tests (core) 🧪
           run: |
-            cd core && uv sync --extra cpu
-            uv run --no-sync pytest --verbose --cov-report xml:coverage.xml \
+            cd core
+            uv sync --extra cpu
+            uv run --no-sync pytest --verbose --cov-report xml:coverage-core.xml \
                             --cov-report term-missing \
-                            --junitxml=pytest.xml \
+                            --junitxml=pytest-core.xml \
                             --cov=alf_core
 
-        - name: Pytest coverage comment 💬
-          id: coverageComment
+        - name: Run tests (tools) 🧪
+          run: |
+            cd tools
+            uv sync --extra torch_cpu
+            uv run --no-sync pytest --verbose --cov-report xml:coverage-tools.xml \
+                            --cov-report term-missing \
+                            --junitxml=pytest-tools.xml \
+                            --cov=alf_tools
+
+        - name: Pytest coverage comment (core) 💬
+          id: coverageCommentCore
           uses: MishaKav/pytest-coverage-comment@main
           with:
-            pytest-xml-coverage-path: core/coverage.xml
-            junitxml-path: core/pytest.xml
+            title: Core Coverage Report
+            unique-id-for-comment: coverage-core
+            pytest-xml-coverage-path: core/coverage-core.xml
+            junitxml-path: core/pytest-core.xml
+
+        - name: Pytest coverage comment (tools) 💬
+          id: coverageCommentTools
+          uses: MishaKav/pytest-coverage-comment@main
+          with:
+            title: Tools Coverage Report
+            unique-id-for-comment: coverage-tools
+            pytest-xml-coverage-path: tools/coverage-tools.xml
+            junitxml-path: tools/pytest-tools.xml
