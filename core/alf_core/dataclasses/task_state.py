@@ -59,17 +59,3 @@ class TaskState:
         self.history.append(copy.copy(acquired_candidates))
         self.dataset.update_splits(acquired_candidates)
         self.round += 1
-
-    def check_termination(self):
-        """Check if the task should be terminated early.
-
-        Termination occurs when the remaining candidate pool is smaller than
-        the acquisition batch size.
-
-        Raises:
-            AssertionError: If acquisition batch size is larger than remaining candidate pool.
-        """
-        assert len(self.dataset.candidate_pool) > self.acq_batch_size, (
-            f"The acquisition batch size ({self.acq_batch_size}) is larger than the remaining \
-              candidate pool ({len(self.dataset.candidate_pool)}), breaking ..."
-        )
