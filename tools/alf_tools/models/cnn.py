@@ -29,7 +29,15 @@ logger = logging.getLogger("alf-tools")
 
 @dataclass
 class CNNModelConfig:
-    """Configuration for CNN model architecture."""
+    """Configuration for CNN model architecture.
+
+    Args:
+        num_filters: Number of filters in convolutional layers.
+        kernel_size: Size of convolutional kernels.
+        num_conv_layers: Number of convolutional layers.
+        fc_hidden_dim: Dimension of fully connected hidden layers.
+        dropout: Dropout rate.
+    """
 
     num_filters: int = 128
     kernel_size: int = 3
@@ -40,7 +48,14 @@ class CNNModelConfig:
 
 @dataclass
 class CNNTrainConfig:
-    """Configuration for CNN training."""
+    """Configuration for CNN training.
+
+    Args:
+        learning_rate: Learning rate for the optimizer.
+        batch_size: Batch size for training.
+        num_epochs: Number of epochs to train for.
+        log_frequency: Frequency of logging training metrics.
+    """
 
     learning_rate: float = 1e-3
     batch_size: int = 32
