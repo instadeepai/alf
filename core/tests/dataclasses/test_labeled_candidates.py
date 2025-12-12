@@ -249,10 +249,10 @@ class TestLabeledCandidatesValidateShuffleSortRemove:
         c1 = Candidate(data="a", modality=Modality.SEQUENCE)
         c2 = Candidate(data="b", modality=Modality.SEQUENCE)
         lc = LabeledCandidates(candidates=[c1], labels=np.array([1]))
-        
+
         # Should not raise, just ignore c2
         lc.remove([c2])
-        
+
         # Collection should be unchanged
         assert [c.data for c in lc.candidates] == ["a"]
         np.testing.assert_array_equal(lc.labels, np.array([1]))

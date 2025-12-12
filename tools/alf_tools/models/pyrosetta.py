@@ -27,6 +27,8 @@ from pyrosetta.rosetta.core.pose import Pose
 
 
 class PyRosetta(BaseModel):
+    """Physics-based protein fitness scorer using PyRosetta energy functions."""
+
     def __init__(
         self,
         pdb_path: str,
@@ -122,7 +124,6 @@ class PyRosetta(BaseModel):
         Returns:
             Locally minimised Pose object.
         """
-
         # Setup the MoveMap to select which residues are included
         movemap = pyrosetta.MoveMap()
         movemap.set_bb(False)  # Initially set all backbone torsions to not move
@@ -133,11 +134,7 @@ class PyRosetta(BaseModel):
         # roughly ensures that residues with any heavy atom within the distance threshold move.
         for i in range(1, pose.total_residue() + 1):
             ca_dist = [
-                (
-                    pose.residue(rosetta_residue_num_i)
-                    .xyz("CA")
-                    .distance(pose.residue(i).xyz("CA"))
-                )
+                (pose.residue(rosetta_residue_num_i).xyz("CA").distance(pose.residue(i).xyz("CA")))
                 < distance_threshold + 6
                 for rosetta_residue_num_i in rosetta_residue_num
             ]
@@ -162,12 +159,9 @@ class PyRosetta(BaseModel):
         Returns:
             Score of the relaxed structure.
         """
-
         pose = self.pose.clone()
 
-        mutants = [
-            (i, b) for i, (a, b) in enumerate(zip(self.wt_sequence, sequence)) if a != b
-        ]
+        mutants = [(i, b) for i, (a, b) in enumerate(zip(self.wt_sequence, sequence)) if a != b]
 
         for index, residue in mutants:
             pyrosetta.toolbox.mutants.mutate_residue(pose, index + 1, residue)
@@ -217,27 +211,23 @@ class PyRosetta(BaseModel):
 
         Raises:
             RuntimeError: If model has not been setup.
+            ValueError: If average_fn_over_repeats is not "mean" or "median".
         """
         if not self._is_setup:
             raise RuntimeError("Model not setup. Call train() or setup() first.")
-
-        t0 = time.perf_counter()
 
         fitness_scores = []
         variances = []
         for candidate in candidate_points:
             scores = [
-                self.mutate_and_relax(candidate.data)
-                for _ in range(self.repeats_per_prediction)
+                self.mutate_and_relax(candidate.data) for _ in range(self.repeats_per_prediction)
             ]
             if self.average_fn_over_repeats == "mean":
                 score = np.mean(np.array(scores))
             elif self.average_fn_over_repeats == "median":
                 score = np.median(np.array(scores))
             else:
-                raise ValueError(
-                    f"Invalid average function: {self.average_fn_over_repeats}"
-                )
+                raise ValueError(f"Invalid average function: {self.average_fn_over_repeats}")
             fitness_scores.append(score)
             if self.repeats_per_prediction > 1:
                 variances.append(np.var(scores))
