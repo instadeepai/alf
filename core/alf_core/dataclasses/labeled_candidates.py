@@ -154,7 +154,7 @@ class LabeledCandidates:
         if isinstance(candidates, LabeledCandidates):
             candidates = candidates.candidates
 
-        # Filter to only candidates that are actually present
+        # Filter to only remove candidates that are actually present in the collection
         candidates_to_remove = [c for c in candidates if c in self.candidates]
         if not candidates_to_remove:
             return
