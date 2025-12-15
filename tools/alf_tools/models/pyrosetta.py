@@ -18,15 +18,16 @@ from typing import Any, Dict, List, Tuple, Union
 import numpy as np
 from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions
 from alf_tools.utils.constants import PROTEIN_ALPHABET
-
 try:
     import pyrosetta
     from pyrosetta import rosetta
     from pyrosetta.rosetta.core.pose import Pose
-
-    PYROSETTA_AVAILABLE = True
 except ImportError:
-    PYROSETTA_AVAILABLE = False
+    raise ImportError(
+        "PyRosetta is not installed. Install it with:\n"
+        "  pip install pyrosetta-installer\n"
+        "  python -c 'import pyrosetta_installer; pyrosetta_installer.install_pyrosetta()'"
+    )
 
 
 class PyRosetta(BaseModel):
@@ -54,12 +55,6 @@ class PyRosetta(BaseModel):
         Raises:
             ImportError: If PyRosetta is not installed.
         """
-        if not PYROSETTA_AVAILABLE:
-            raise ImportError(
-                "PyRosetta is not installed. Install it with:\n"
-                "  pip install pyrosetta-installer\n"
-                "  python -c 'import pyrosetta_installer; pyrosetta_installer.install_pyrosetta()'"
-            )
 
         self.pdb_path = pdb_path
         self.initial_relax_repeats = initial_relax_repeats
