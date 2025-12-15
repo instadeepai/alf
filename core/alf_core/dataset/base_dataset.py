@@ -17,9 +17,10 @@ import abc
 import copy
 import logging
 import os
+from dataclasses import dataclass
 from math import floor
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Literal, Union
 
 import numpy as np
 from alf_core.dataclasses.candidate import Modality
@@ -29,31 +30,63 @@ from alf_core.dataset.splitting_utils import split_dataset
 logger = logging.getLogger("alf-core")
 
 
+@dataclass
+class BaseDatasetConfig:
+    """Configuration for BaseDataset.
+
+    Attributes:
+        name: Name identifier for the dataset.
+        modality: Data modality.
+        seed: Random seed for reproducibility.
+        train_ratio: Fraction of data for training (0-1).
+        validation_frac: Fraction of training data held out for validation (0-1).
+        test_ratio: Fraction of data for testing (0-1).
+        split_type: Type of split.
+        max_candidate_pool: Optional maximum size of the candidate pool.
+    """
+
+    name: str
+    modality: str
+    seed: int
+    train_ratio: float
+    validation_frac: float
+    test_ratio: float
+    split_type: Literal["random", "low_vs_high"]
+    max_candidate_pool: int | None = None
+
+    def __post_init__(self) -> None:
+        """Validate configuration values."""
+        valid_modalities = [m.value for m in Modality]
+        assert self.modality in valid_modalities, (
+            f"Invalid modality: {self.modality}. Must be one of {valid_modalities}"
+        )
+        assert 0 <= self.train_ratio <= 1, "train_ratio must be between 0 and 1"
+        assert 0 <= self.validation_frac <= 1, "validation_frac must be between 0 and 1"
+        assert 0 <= self.test_ratio <= 1, "test_ratio must be between 0 and 1"
+        assert self.train_ratio + self.test_ratio <= 1, "train_ratio + test_ratio must be <= 1"
+
+
 class BaseDataset(abc.ABC):
     """Base class for all datasets."""
 
-    def __init__(self, name: str, modality: str, seed: int, split_config: dict[str, Any]) -> None:
+    def __init__(self, config: BaseDatasetConfig) -> None:
         """Initialize the base dataset.
 
         Args:
-            name: Name identifier for the dataset.
-            modality: Data modality (e.g., "sequence", "graph", "image").
-            seed: Random seed for reproducibility.
-            split_config: Dictionary containing:
-                - "split_ratio": dict with "train", "validation", "test" ratios
-                - "split_type": Type of split ("random" or "low_vs_high")
-                - "max_candidate_pool": optional, maximum size of the candidate pool (int)
+            config: Configuration for the dataset.
         """
-        self.name = name
-        # Validate and convert modality string to Modality enum
-        valid_modalities = [m.value for m in Modality]
-        assert modality in valid_modalities, (
-            f"Invalid modality: {modality}. Must be one of {valid_modalities}"
-        )
-        self.modality = Modality(modality)
-        self.seed = seed
-        self.rng = np.random.RandomState(seed)
-        self._validate_and_process_split_config(split_config)
+        self.config = config
+        self.name = config.name
+        self.modality = Modality(config.modality)
+        self.seed = config.seed
+        self.rng = np.random.RandomState(config.seed)
+        self.split_type = config.split_type
+        self.split_ratio = {
+            "train": config.train_ratio,
+            "validation_frac": config.validation_frac,
+            "test": config.test_ratio,
+        }
+        self.max_candidate_pool = config.max_candidate_pool
         self.metadata: dict | None = None
         self._raw_dataset: LabeledCandidates | None = None
         self.splits: dict[str, LabeledCandidates] = {}
