@@ -98,7 +98,7 @@ class DatasetSearch(BaseSearch):
     """Offline search method based on a dataset defining the search pool."""
 
     def __call__(self, task_state: TaskState, **kwargs) -> list[Candidate]:
-        """Get the candidate pool from the dataset.
+        """Get the candidate pool from the dataset. If the acquisition batch size is larger than the remaining candidate pool, break.
 
         Args:
             task_state: Current task state containing the dataset.
@@ -107,22 +107,11 @@ class DatasetSearch(BaseSearch):
         Returns:
             List of candidates from the dataset's candidate pool.
         """
-        self.check_termination(task_state)
-        return task_state.dataset.candidate_pool.candidates
-
-    def check_termination(self, task_state: TaskState) -> None:
-        """Check if the task should be terminated early.
-
-        Termination occurs when the remaining candidate pool is smaller than
-        the acquisition batch size.
-
-        Raises:
-            AssertionError: If acquisition batch size is larger than remaining candidate pool.
-        """
         assert len(task_state.dataset.candidate_pool) > task_state.acq_batch_size, (
             f"The acquisition batch size ({task_state.acq_batch_size}) is larger than the \
               remaining candidate pool ({len(task_state.dataset.candidate_pool)}), breaking ..."
         )
+        return task_state.dataset.candidate_pool.candidates
 
     def get_metrics(self, task_state: TaskState) -> dict[str, float]:
         """Return recall and regret metrics for the dataset search method.
