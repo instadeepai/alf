@@ -109,7 +109,7 @@ class DatasetSearch(BaseSearch):
         """
         self.check_termination(task_state)
         return task_state.dataset.candidate_pool.candidates
-    
+
     def check_termination(self, task_state: TaskState) -> None:
         """Check if the task should be terminated early.
 
@@ -120,8 +120,8 @@ class DatasetSearch(BaseSearch):
             AssertionError: If acquisition batch size is larger than remaining candidate pool.
         """
         assert len(task_state.dataset.candidate_pool) > task_state.acq_batch_size, (
-            f"The acquisition batch size ({task_state.acq_batch_size}) is larger than the remaining \
-              candidate pool ({len(task_state.dataset.candidate_pool)}), breaking ..."
+            f"The acquisition batch size ({task_state.acq_batch_size}) is larger than the \
+              remaining candidate pool ({len(task_state.dataset.candidate_pool)}), breaking ..."
         )
 
     def get_metrics(self, task_state: TaskState) -> dict[str, float]:
