@@ -12,18 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# You need to run the following command before:
-# pip install pyrosetta-installer
-# python -c 'import pyrosetta_installer; pyrosetta_installer.install_pyrosetta()'
 import time
 from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
-import pyrosetta
 from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions
 from alf_tools.utils.constants import PROTEIN_ALPHABET
-from pyrosetta import rosetta
-from pyrosetta.rosetta.core.pose import Pose
+
+try:
+    import pyrosetta
+    from pyrosetta import rosetta
+    from pyrosetta.rosetta.core.pose import Pose
+
+    PYROSETTA_AVAILABLE = True
+except ImportError:
+    PYROSETTA_AVAILABLE = False
 
 
 class PyRosetta(BaseModel):
@@ -47,20 +50,25 @@ class PyRosetta(BaseModel):
             average_fn_over_repeats: How to average repeated scores ("mean" or "median").
             alphabet: Protein alphabet to use.
             seed: Random seed for reproducibility.
+
+        Raises:
+            ImportError: If PyRosetta is not installed.
         """
+        if not PYROSETTA_AVAILABLE:
+            raise ImportError(
+                "PyRosetta is not installed. Install it with:\n"
+                "  pip install pyrosetta-installer\n"
+                "  python -c 'import pyrosetta_installer; pyrosetta_installer.install_pyrosetta()'"
+            )
+
         self.pdb_path = pdb_path
         self.initial_relax_repeats = initial_relax_repeats
         self.repeats_per_prediction = repeats_per_prediction
         self.average_fn_over_repeats = average_fn_over_repeats
         self.alphabet = alphabet
         self.seed = seed
-        self._is_setup = False
 
-    def setup(self) -> None:
-        """Setup the PyRosetta model."""
-        if self._is_setup:
-            return
-
+        # Initialize PyRosetta
         pyrosetta.init(f"-constant_seed -jran {self.seed}")
         self.score_function = pyrosetta.get_fa_scorefxn()
 
@@ -75,7 +83,6 @@ class PyRosetta(BaseModel):
             f"Initial relaxation took {relax_time_taken:.2f} seconds "
             f"with a score of {self.wt_score}."
         )
-        self._is_setup = True
 
     def relax_structure(self, pose: Pose, n_repeats: int = 5) -> Tuple[Pose, float]:
         """Relaxes a Pose object using the FastRelax protocol. This involves rounds of
@@ -183,16 +190,12 @@ class PyRosetta(BaseModel):
         train_data: LabeledCandidates,
         val_data: LabeledCandidates | None = None,
     ) -> None:
-        """Initialize the PyRosetta model by calling setup.
+        """Training is not implemented for this model.
 
-        For this physics-based model, training consists of setting up PyRosetta
-        and relaxing the initial structure. The training data is not used.
-
-        Args:
-            train_data: Training data (not used for physics-based model).
-            val_data: Validation data (not used for physics-based model).
+        Raises:
+            NotImplementedError: Training is not implemented for this model.
         """
-        self.setup()
+        raise NotImplementedError("Training is not implemented for this model.")
 
     def predict(self, candidate_points: List[Candidate]) -> Predictions:
         """Predict fitness scores for the given candidate points.
@@ -210,12 +213,8 @@ class PyRosetta(BaseModel):
             Predictions containing fitness scores.
 
         Raises:
-            RuntimeError: If model has not been setup.
             ValueError: If average_fn_over_repeats is not "mean" or "median".
         """
-        if not self._is_setup:
-            raise RuntimeError("Model not setup. Call train() or setup() first.")
-
         fitness_scores = []
         variances = []
         for candidate in candidate_points:
