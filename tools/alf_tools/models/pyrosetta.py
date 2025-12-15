@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Tuple, Union
 import numpy as np
 from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions
 from alf_tools.utils.constants import PROTEIN_ALPHABET
+
 try:
     import pyrosetta
     from pyrosetta import rosetta
@@ -55,7 +56,6 @@ class PyRosetta(BaseModel):
         Raises:
             ImportError: If PyRosetta is not installed.
         """
-
         self.pdb_path = pdb_path
         self.initial_relax_repeats = initial_relax_repeats
         self.repeats_per_prediction = repeats_per_prediction
