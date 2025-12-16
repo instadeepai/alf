@@ -102,6 +102,5 @@ class DesignTask(BaseTask):
             state = self.evaluate(state=state)
             for task_state_logger in task_state_loggers:
                 task_state_logger.log(state)
-            state.check_termination()
 
         return

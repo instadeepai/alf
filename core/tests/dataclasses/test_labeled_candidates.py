@@ -191,15 +191,7 @@ class TestLabeledCandidatesGetItem:
 
 
 class TestLabeledCandidatesValidateShuffleSortRemove:
-    """Tests for validate_candidates, shuffle, sort, and remove methods."""
-
-    def test_validate_candidates(self):
-        """Test validate_candidates method returns True for existing candidates."""
-        c1 = Candidate(data="a", modality=Modality.SEQUENCE)
-        c2 = Candidate(data="b", modality=Modality.SEQUENCE)
-        lc = LabeledCandidates(candidates=[c1], labels=np.array([1]))
-        assert lc.validate_candidates([c1]) is True
-        assert lc.validate_candidates([c2]) is False
+    """Tests for shuffle, sort, and remove methods."""
 
     def test_shuffle_deterministic(self):
         """Test that shuffle with same seed produces deterministic results."""
@@ -252,13 +244,18 @@ class TestLabeledCandidatesValidateShuffleSortRemove:
         assert [c.data for c in lc.candidates] == ["c"]
         np.testing.assert_array_equal(lc.labels, np.array([3]))
 
-    def test_remove_raises_when_candidate_not_present(self):
-        """Test that remove raises AssertionError when candidate is not in collection."""
+    def test_remove_ignores_candidates_not_present(self):
+        """Test that remove silently ignores candidates not in the collection."""
         c1 = Candidate(data="a", modality=Modality.SEQUENCE)
         c2 = Candidate(data="b", modality=Modality.SEQUENCE)
         lc = LabeledCandidates(candidates=[c1], labels=np.array([1]))
-        with pytest.raises(AssertionError, match="Candidates must be in this collection"):
-            lc.remove([c2])
+
+        # Should not raise, just ignore c2
+        lc.remove([c2])
+
+        # Collection should be unchanged
+        assert [c.data for c in lc.candidates] == ["a"]
+        np.testing.assert_array_equal(lc.labels, np.array([1]))
 
 
 class TestLabeledCandidatesToDataFrame:

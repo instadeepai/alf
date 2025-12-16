@@ -31,6 +31,7 @@ from alf_core.optimizer.search import (
     GeneratorSearch,
     ModelProtocolSearch,
     ProtocolSearch,
+    SearchProtocol,
 )
 from alf_core.oracle.oracle import Oracle
 from alf_core.surrogate.surrogate import Surrogate
