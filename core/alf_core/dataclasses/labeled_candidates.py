@@ -79,17 +79,6 @@ class LabeledCandidates:
         """
         return [cand.data for cand in self.candidates]
 
-    def validate_candidates(self, candidates: list[Candidate]) -> bool:
-        """Check if all given candidates are present in this collection.
-
-        Args:
-            candidates: A list of Candidate objects to validate.
-
-        Returns:
-            True if all candidates are in this collection, False otherwise.
-        """
-        return all(candidate in self.candidates for candidate in candidates)
-
     def append(
         self,
         candidates: Union[list[Candidate], "LabeledCandidates"],
@@ -156,20 +145,23 @@ class LabeledCandidates:
     def remove(self, candidates: Union[list[Candidate], "LabeledCandidates"]) -> None:
         """Remove specified candidates and their corresponding labels from this collection.
 
+        Candidates not present in the collection are silently ignored.
+
         Args:
             candidates: Either a list of Candidate objects or a LabeledCandidates
                 object containing the candidates to remove.
-
-        Raises:
-            AssertionError: If any of the candidates to remove are not present
-                in this collection.
         """
         if isinstance(candidates, LabeledCandidates):
             candidates = candidates.candidates
 
-        assert self.validate_candidates(candidates), "Candidates must be in this collection"
-        self.labels = np.delete(self.labels, [self.candidates.index(cand) for cand in candidates])
-        self.candidates = [cand for cand in self.candidates if cand not in candidates]
+        # Filter to only remove candidates that are actually present in the collection
+        candidates_to_remove = [c for c in candidates if c in self.candidates]
+        if not candidates_to_remove:
+            return
+
+        indices_to_remove = [self.candidates.index(cand) for cand in candidates_to_remove]
+        self.labels = np.delete(self.labels, indices_to_remove)
+        self.candidates = [cand for cand in self.candidates if cand not in candidates_to_remove]
 
     def to_dataframe(self) -> pd.DataFrame:
         """Convert the labeled candidates to a pandas DataFrame.
