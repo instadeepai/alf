@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import time
 from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions
 from alf_tools.utils.constants import PROTEIN_ALPHABET
+
+logger = logging.getLogger("alf-tools")
 
 try:
     import pyrosetta
@@ -74,9 +77,10 @@ class PyRosetta(BaseModel):
             self.pose, n_repeats=self.initial_relax_repeats
         )
         self.wt_score = self.score_function(self.pose)
-        print(
-            f"Initial relaxation took {relax_time_taken:.2f} seconds "
-            f"with a score of {self.wt_score}."
+        logger.info(
+            "Initial relaxation took %.2f seconds with a score of %.2f.",
+            relax_time_taken,
+            self.wt_score,
         )
 
     def relax_structure(self, pose: Pose, n_repeats: int = 5) -> Tuple[Pose, float]:
