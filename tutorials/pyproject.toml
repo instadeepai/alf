@@ -12,9 +12,7 @@ dependencies = [
     "alf_tools",
     "matplotlib>=3.3.0",
     "ipykernel>=6.25.0",
-    "python-dotenv",
     "pyrosetta-installer",
-    "s3fs",
 ]
 
 [tool.setuptools]
