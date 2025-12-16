@@ -98,7 +98,9 @@ class DatasetSearch(BaseSearch):
     """Offline search method based on a dataset defining the search pool."""
 
     def __call__(self, task_state: TaskState, **kwargs) -> list[Candidate]:
-        """Get the candidate pool from the dataset. If the acquisition batch size is larger than the remaining candidate pool, break.
+        """Get the candidate pool from the dataset.
+        If the acquisition batch size is larger than the remaining candidate pool,
+        raise a ValueError.
 
         Args:
             task_state: Current task state containing the dataset.
@@ -106,11 +108,15 @@ class DatasetSearch(BaseSearch):
 
         Returns:
             List of candidates from the dataset's candidate pool.
+
+        Raises:
+            ValueError: If the acquisition batch size is larger than the remaining candidate pool.
         """
-        assert len(task_state.dataset.candidate_pool) > task_state.acq_batch_size, (
-            f"The acquisition batch size ({task_state.acq_batch_size}) is larger than the \
-              remaining candidate pool ({len(task_state.dataset.candidate_pool)}), breaking ..."
-        )
+        if len(task_state.dataset.candidate_pool) <= task_state.acq_batch_size:
+            raise ValueError(
+                f"The acquisition batch size ({task_state.acq_batch_size}) is larger than the "
+                f"remaining candidate pool ({len(task_state.dataset.candidate_pool)}), breaking ..."
+            )
         return task_state.dataset.candidate_pool.candidates
 
     def get_metrics(self, task_state: TaskState) -> dict[str, float]:
