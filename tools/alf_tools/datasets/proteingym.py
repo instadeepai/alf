@@ -64,8 +64,9 @@ class ProteinGym(BaseDataset):
     def __repr__(self) -> str:
         """Return a string representation of the dataset."""
         return (
-            f"ProteinGym(name={self.name}, modality={self.modality}, seed={self.seed}, "
-            f"split_ratio={self.split_ratio}, dms_name={self.config.dms_name})"
+            f"ProteinGym(name={self.config.name}, modality={self.modality}, "
+            f"seed={self.config.seed}, split_ratio={self.split_ratio}, "
+            f"dms_name={self.config.dms_name})"
         )
 
     def load_dataset(self) -> LabeledCandidates:
@@ -148,11 +149,11 @@ class ProteinGym(BaseDataset):
         train_size = train_plus_validation_size - validation_size
         test_size = round(dataset_size * self.split_ratio["test"])
         candidate_pool_size = dataset_size - train_plus_validation_size - test_size
-        if self.max_candidate_pool is not None:
-            candidate_pool_size = min(candidate_pool_size, self.max_candidate_pool)
+        if self.config.max_candidate_pool is not None:
+            candidate_pool_size = min(candidate_pool_size, self.config.max_candidate_pool)
 
         # Shuffle dataset
-        shuffled_dataset = self._raw_dataset.shuffle(self.seed)
+        shuffled_dataset = self._raw_dataset.shuffle(self.config.seed)
         train_and_validation_dataset = LabeledCandidates(candidates=[], labels=[])
         test_and_candidate_pool_dataset = LabeledCandidates(candidates=[], labels=[])
 

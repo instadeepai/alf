@@ -76,17 +76,13 @@ class BaseDataset(abc.ABC):
             config: Configuration for the dataset.
         """
         self.config = config
-        self.name = config.name
         self.modality = Modality(config.modality)
-        self.seed = config.seed
         self.rng = np.random.RandomState(config.seed)
-        self.split_type = config.split_type
         self.split_ratio = {
             "train": config.train_ratio,
             "validation_frac": config.validation_frac,
             "test": config.test_ratio,
         }
-        self.max_candidate_pool = config.max_candidate_pool
         self.metadata: dict | None = None
         self._raw_dataset: LabeledCandidates | None = None
         self.splits: dict[str, LabeledCandidates] = {}
@@ -174,7 +170,8 @@ class BaseDataset(abc.ABC):
             String showing dataset name, modality, seed, and split sizes.
         """
         return (
-            f"Dataset(name={self.name}, modality={self.modality}, seed={self.seed}, "
+            f"Dataset(name={self.config.name}, modality={self.modality}, "
+            f"seed={self.config.seed}, "
             f"train_size={len(self.train_dataset)}, "
             f"validation_size={len(self.validation_dataset)}, "
             f"test_size={len(self.test_dataset)}, "
@@ -201,7 +198,7 @@ class BaseDataset(abc.ABC):
         assert "split_ratio" in split_config, "split_config must contain 'split_ratio'"
         assert "split_type" in split_config, "split_config must contain 'split_type'"
 
-        self.split_type = split_config["split_type"]
+        self.config.split_type = split_config["split_type"]
         self.split_ratio = split_config["split_ratio"]
 
         # Check required split_ratio keys present and between 0 and 1
@@ -213,7 +210,7 @@ class BaseDataset(abc.ABC):
         assert self.split_ratio["train"] + self.split_ratio["test"] <= 1, (
             "train + test ratios must be <= 1"
         )
-        self.max_candidate_pool = split_config.get("max_candidate_pool", None)
+        self.config.max_candidate_pool = split_config.get("max_candidate_pool", None)
 
     def _split_dataset(self) -> dict[str, LabeledCandidates]:
         """Split the raw dataset into train, validation, test, and candidate pool.
@@ -238,18 +235,18 @@ class BaseDataset(abc.ABC):
         train_size = train_plus_validation_size - validation_size
         test_size = floor(dataset_size * self.split_ratio["test"])
         candidate_pool_size = dataset_size - train_plus_validation_size - test_size
-        if self.max_candidate_pool is not None:
-            candidate_pool_size = min(self.max_candidate_pool, candidate_pool_size)
+        if self.config.max_candidate_pool is not None:
+            candidate_pool_size = min(self.config.max_candidate_pool, candidate_pool_size)
 
         # Perform split based on type
         datasets_dict = split_dataset(
-            self.split_type,
+            self.config.split_type,
             self._raw_dataset,
             train_size,
             validation_size,
             test_size,
             candidate_pool_size,
-            self.seed,
+            self.config.seed,
         )
         self.init_candidate_pool = copy.deepcopy(datasets_dict["candidate_pool"])
         return datasets_dict
@@ -278,7 +275,7 @@ class BaseDataset(abc.ABC):
 
         # Split the acquired candidates into train and validation splits based on the split ratio
         num_val = floor(len(acquired_candidates) * self.split_ratio["validation_frac"])
-        shuffled_acquired_candidates = acquired_candidates.shuffle(self.seed)
+        shuffled_acquired_candidates = acquired_candidates.shuffle(self.config.seed)
         # Add num_val candidates to validation split and the rest to train split
         self.splits["train"].append(LabeledCandidates(*shuffled_acquired_candidates[:-num_val]))
         self.splits["validation"].append(
