@@ -14,18 +14,30 @@
 
 """Shared pytest fixtures for experiment tests."""
 
-from typing import Any, List, Union
+from dataclasses import dataclass
+from typing import Any, List, Literal, Union
 
 import numpy as np
 import pytest
 from alf_core.dataclasses import Candidate, LabeledCandidates, Predictions, TaskState
-from alf_core.dataset.base_dataset import BaseDataset
+from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.model.base_model import BaseModel
 from alf_core.optimizer.acquisition_function import AcquisitionFunction
 from alf_core.optimizer.optimizer import Optimizer
 from alf_core.optimizer.search import DatasetSearch
 from alf_core.oracle.oracle import Oracle
 from alf_core.surrogate.surrogate import Surrogate
+
+
+@dataclass
+class DummyDatasetConfig(BaseDatasetConfig):
+    """Configuration for DummyDataset.
+
+    Attributes:
+        num_samples: Number of dummy samples to generate.
+    """
+
+    num_samples: int = 1000
 
 
 @pytest.fixture
@@ -45,7 +57,17 @@ def dummy_dataset():
     Returns:
         A dummy dataset for testing.
     """
-    return DummyDataset(seed=42, num_samples=1000)
+    config = DummyDatasetConfig(
+        name="dummy",
+        modality="sequence",
+        seed=42,
+        train_ratio=0.6,
+        validation_frac=0.2,
+        test_ratio=0.2,
+        split_type="random",
+        num_samples=1000,
+    )
+    return DummyDataset(config)
 
 
 @pytest.fixture
@@ -57,36 +79,57 @@ def dummy_dataset_factory():
 
     Example:
         def test_something(dummy_dataset_factory):
-            split_config = {"split_ratio": {"train": 0.5, "test": 0.5}, "split_type": "random"}
-            dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
+            config = DummyDatasetConfig(
+                name="test", modality="sequence", seed=42,
+                train_ratio=0.5, validation_frac=0.2, test_ratio=0.3,
+                split_type="random", num_samples=100
+            )
+            dataset = dummy_dataset_factory(config=config)
     """
 
     def _create_dummy_dataset(
-        split_config: dict[str, Any] | None = None,
+        config: DummyDatasetConfig | None = None,
+        # Legacy parameters for backwards compatibility with existing tests
         seed: int = 42,
         num_samples: int = 1000,
         name: str = "dummy",
         modality: str = "sequence",
+        train_ratio: float = 0.6,
+        validation_frac: float = 0.2,
+        test_ratio: float = 0.2,
+        split_type: Literal["random", "low_vs_high"] = "random",
+        max_candidate_pool: int | None = None,
     ) -> DummyDataset:
         """Create a DummyDataset with the specified configuration.
 
         Args:
-            split_config: Split configuration dictionary
-            seed: Random seed for reproducibility
-            num_samples: Number of dummy samples to generate
-            name: Name of the dataset
-            modality: Modality of the data
+            config: Full configuration object (preferred).
+            seed: Random seed for reproducibility.
+            num_samples: Number of dummy samples to generate.
+            name: Name of the dataset.
+            modality: Modality of the data.
+            train_ratio: Fraction of data for training.
+            validation_frac: Fraction of training data for validation.
+            test_ratio: Fraction of data for testing.
+            split_type: Type of split.
+            max_candidate_pool: Maximum candidate pool size.
 
         Returns:
             A dummy dataset with the specified configuration.
         """
-        return DummyDataset(
-            name=name,
-            modality=modality,
-            seed=seed,
-            split_config=split_config,
-            num_samples=num_samples,
-        )
+        if config is None:
+            config = DummyDatasetConfig(
+                name=name,
+                modality=modality,
+                seed=seed,
+                train_ratio=train_ratio,
+                validation_frac=validation_frac,
+                test_ratio=test_ratio,
+                split_type=split_type,
+                max_candidate_pool=max_candidate_pool,
+                num_samples=num_samples,
+            )
+        return DummyDataset(config)
 
     return _create_dummy_dataset
 
@@ -160,31 +203,13 @@ class DummyModel(BaseModel):
 class DummyDataset(BaseDataset):
     """Dummy dataset that generates random data for testing."""
 
-    def __init__(
-        self,
-        name: str = "dummy",
-        modality: str = "sequence",
-        seed: int = 42,
-        split_config: dict[str, Any] | None = None,
-        num_samples: int = 1000,
-    ):
+    def __init__(self, config: DummyDatasetConfig):
         """Initialize a dummy dataset.
 
         Args:
-            name: Name of the dataset
-            modality: Modality of the data (e.g., "sequence")
-            seed: Random seed for reproducibility
-            split_config: Split configuration dictionary
-            num_samples: Number of dummy samples to generate
+            config: Configuration for the dummy dataset.
         """
-        # Default split config if none provided
-        if split_config is None:
-            split_config = {
-                "split_ratio": {"train": 0.6, "validation_frac": 0.2, "test": 0.2},
-                "split_type": "random",
-            }
-        super().__init__(name, modality, seed, split_config)
-        self.num_samples = num_samples
+        super().__init__(config)
         self.setup()
 
     def load_dataset(self) -> LabeledCandidates:
@@ -193,12 +218,11 @@ class DummyDataset(BaseDataset):
         Returns:
             LabeledCandidates with dummy data
         """
-        # Generate dummy sequences (e.g., random strings)
         candidates = []
         labels = []
 
-        for i in range(self.num_samples):
-            # Generate a dummy sequence (e.g., random string of length 10)
+        for _ in range(self.config.num_samples):
+            # Generate a dummy sequence (random string of length 10)
             dummy_sequence = "".join(self.rng.choice(list("ACGT"), size=10))
 
             # Generate a dummy label (random float between 0 and 10)

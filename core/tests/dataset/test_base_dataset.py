@@ -22,7 +22,7 @@ import pandas as pd
 import pytest
 from alf_core.dataclasses import Candidate, LabeledCandidates
 from alf_core.dataclasses.candidate import Modality
-from alf_core.dataset.base_dataset import BaseDataset
+from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 
 
 class TestBaseDatasetInitialization:
@@ -30,57 +30,71 @@ class TestBaseDatasetInitialization:
 
     def test_initialization_with_valid_config(self, dummy_dataset_factory):
         """Test initialization with valid split configuration, without candidate pool."""
-        split_config = {
-            "split_ratio": {"train": 0.8, "validation_frac": 0.25, "test": 0.2},
-            "split_type": "random",
-        }
-        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(
+            train_ratio=0.8,
+            validation_frac=0.25,
+            test_ratio=0.2,
+            split_type="random",
+            num_samples=100,
+        )
 
-        assert dataset.name == "dummy"
+        assert dataset.config.name == "dummy"
         assert dataset.modality == Modality.SEQUENCE
-        assert dataset.seed == 42
-        assert dataset.split_ratio == split_config["split_ratio"]
-        assert dataset.split_type == "random"
+        assert dataset.config.seed == 42
+        assert dataset.split_ratio == {"train": 0.8, "validation_frac": 0.25, "test": 0.2}
+        assert dataset.config.split_type == "random"
 
     def test_initialization_with_candidate_pool(self, dummy_dataset_factory):
-        """Test initialization with candidate pool in split config."""
-        split_config = {
-            "split_ratio": {
-                "train": 0.6,
-                "validation_frac": 0.3,
-                "test": 0.2,
-            },
-            "max_candidate_pool": 20,
-            "split_type": "random",
-        }
-        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
+        """Test initialization with candidate pool in config."""
+        dataset = dummy_dataset_factory(
+            train_ratio=0.6,
+            validation_frac=0.3,
+            test_ratio=0.2,
+            split_type="random",
+            max_candidate_pool=20,
+            num_samples=100,
+        )
 
-        assert dataset.max_candidate_pool == 20
+        assert dataset.config.max_candidate_pool == 20
 
 
 class TestBaseDatasetValidation:
     """Tests for BaseDataset configuration validation."""
 
-    def test_validate_split_config_missing_split_ratio(self, dummy_dataset_factory):
-        """Test that missing split_ratio raises an assertion error."""
-        with pytest.raises(AssertionError, match="split_config must contain 'split_ratio'"):
-            split_config = {"split_type": "random"}
-            dummy_dataset_factory(split_config=split_config, num_samples=100)
-
-    def test_validate_split_config_missing_split_type(self, dummy_dataset_factory):
-        """Test that missing split_type raises an assertion error."""
-        with pytest.raises(AssertionError, match="split_config must contain 'split_type'"):
-            split_config = {"split_ratio": {"train": 0.8, "validation_frac": 0.25, "test": 0.2}}
-            dummy_dataset_factory(split_config=split_config, num_samples=100)
-
-    def test_validate_split_config_ratios_sum_exceeds_one(self, dummy_dataset_factory):
+    def test_validate_config_ratios_sum_exceeds_one(self, dummy_dataset_factory):
         """Test that split ratios summing to more than 1 raises an error."""
-        with pytest.raises(AssertionError, match="train \\+ test ratios must be <= 1"):
-            split_config = {
-                "split_ratio": {"train": 0.8, "validation_frac": 0.5, "test": 0.6},
-                "split_type": "random",
-            }
-            dummy_dataset_factory(split_config=split_config, num_samples=100)
+        with pytest.raises(AssertionError, match="train_ratio \\+ test_ratio must be <= 1"):
+            dummy_dataset_factory(
+                train_ratio=0.8,
+                validation_frac=0.5,
+                test_ratio=0.6,
+                split_type="random",
+                num_samples=100,
+            )
+
+    def test_validate_config_invalid_train_ratio(self, dummy_dataset_factory):
+        """Test that invalid train_ratio raises an error."""
+        with pytest.raises(AssertionError, match="train_ratio must be between 0 and 1"):
+            dummy_dataset_factory(
+                train_ratio=1.5,
+                validation_frac=0.2,
+                test_ratio=0.2,
+                split_type="random",
+                num_samples=100,
+            )
+
+    def test_validate_config_invalid_modality(self):
+        """Test that invalid modality raises an error."""
+        with pytest.raises(AssertionError, match="Invalid modality"):
+            BaseDatasetConfig(
+                name="test",
+                modality="invalid_modality",
+                seed=42,
+                train_ratio=0.6,
+                validation_frac=0.2,
+                test_ratio=0.2,
+                split_type="random",
+            )
 
 
 class TestBaseDatasetSplitting:
@@ -88,11 +102,13 @@ class TestBaseDatasetSplitting:
 
     def test_split_dataset_random(self, dummy_dataset_factory):
         """Test random splitting of dataset."""
-        split_config = {
-            "split_ratio": {"train": 0.6, "validation_frac": 0.25, "test": 0.2},
-            "split_type": "random",
-        }
-        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(
+            train_ratio=0.6,
+            validation_frac=0.25,
+            test_ratio=0.2,
+            split_type="random",
+            num_samples=100,
+        )
 
         # train+val = 60, of which 25% (15) goes to validation, 75% (45) to train
         assert len(dataset.train_dataset) == 45
@@ -101,16 +117,14 @@ class TestBaseDatasetSplitting:
 
     def test_split_dataset_with_candidate_pool(self, dummy_dataset_factory):
         """Test splitting with explicit candidate pool."""
-        split_config = {
-            "split_ratio": {
-                "train": 0.5,
-                "validation_frac": 0.2,
-                "test": 0.25,
-            },
-            "max_candidate_pool": 25,
-            "split_type": "random",
-        }
-        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(
+            train_ratio=0.5,
+            validation_frac=0.2,
+            test_ratio=0.25,
+            split_type="random",
+            max_candidate_pool=25,
+            num_samples=100,
+        )
 
         # train+val = 50, of which 20% (10) goes to validation, 80% (40) to train
         assert len(dataset.train_dataset) == 40
@@ -120,15 +134,13 @@ class TestBaseDatasetSplitting:
 
     def test_split_dataset_low_vs_high(self, dummy_dataset_factory):
         """Test low vs high splitting of dataset."""
-        split_config = {
-            "split_ratio": {
-                "train": 0.5,
-                "validation_frac": 0.2,
-                "test": 0.25,
-            },
-            "split_type": "low_vs_high",
-        }
-        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(
+            train_ratio=0.5,
+            validation_frac=0.2,
+            test_ratio=0.25,
+            split_type="low_vs_high",
+            num_samples=100,
+        )
 
         # Check sizes: train+val = 50, of which 20% (10) goes to validation, 80% (40) to train
         assert len(dataset.train_dataset) == 40
@@ -147,15 +159,13 @@ class TestBaseDatasetSplitting:
 
     def test_init_candidate_pool_is_deepcopy(self, dummy_dataset_factory):
         """Test that init_candidate_pool is a deep copy of the original candidate pool."""
-        split_config = {
-            "split_ratio": {
-                "train": 0.5,
-                "validation_frac": 0.2,
-                "test": 0.25,
-            },
-            "split_type": "random",
-        }
-        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(
+            train_ratio=0.5,
+            validation_frac=0.2,
+            test_ratio=0.25,
+            split_type="random",
+            num_samples=100,
+        )
 
         # Verify init_candidate_pool exists
         assert hasattr(dataset, "init_candidate_pool")
@@ -199,11 +209,13 @@ class TestBaseDatasetProperties:
 
     def test_candidate_pool_property(self, dummy_dataset_factory):
         """Test candidate_pool property."""
-        split_config = {
-            "split_ratio": {"train": 0.6, "validation_frac": 0.25, "test": 0.2},
-            "split_type": "random",
-        }
-        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(
+            train_ratio=0.6,
+            validation_frac=0.25,
+            test_ratio=0.2,
+            split_type="random",
+            num_samples=100,
+        )
         pool = dataset.candidate_pool
 
         assert isinstance(pool, LabeledCandidates)
@@ -224,13 +236,16 @@ class TestBaseDatasetProperties:
                     labels=np.random.rand(100),
                 )
 
-        split_config = {
-            "split_ratio": {"train": 0.6, "validation_frac": 0.25, "test": 0.2},
-            "split_type": "random",
-        }
-        dataset = NoSetupDataset(
-            name="test", modality="sequence", seed=42, split_config=split_config
+        config = BaseDatasetConfig(
+            name="test",
+            modality="sequence",
+            seed=42,
+            train_ratio=0.6,
+            validation_frac=0.25,
+            test_ratio=0.2,
+            split_type="random",
         )
+        dataset = NoSetupDataset(config)
 
         with pytest.raises(AssertionError, match="Dataset must be split before accessing"):
             _ = dataset.train_dataset
@@ -241,15 +256,13 @@ class TestBaseDatasetUpdateSplits:
 
     def test_update_splits_with_acquired_candidates(self, dummy_dataset_factory):
         """Test that update_splits correctly moves candidates from pool to train/val."""
-        split_config = {
-            "split_ratio": {
-                "train": 0.5,
-                "validation_frac": 0.2,
-                "test": 0.25,
-            },
-            "split_type": "random",
-        }
-        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(
+            train_ratio=0.5,
+            validation_frac=0.2,
+            test_ratio=0.25,
+            split_type="random",
+            num_samples=100,
+        )
 
         # Get initial sizes
         initial_train_size = len(dataset.train_dataset)
@@ -275,15 +288,13 @@ class TestBaseDatasetUpdateSplits:
 
     def test_update_splits_respects_validation_ratio(self, dummy_dataset_factory):
         """Test that update_splits maintains the validation ratio."""
-        split_config = {
-            "split_ratio": {
-                "train": 0.5,
-                "validation_frac": 0.2,
-                "test": 0.25,
-            },
-            "split_type": "random",
-        }
-        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(
+            train_ratio=0.5,
+            validation_frac=0.2,
+            test_ratio=0.25,
+            split_type="random",
+            num_samples=100,
+        )
 
         # Acquire 10 candidates
         acquired_candidates = LabeledCandidates(*dataset.candidate_pool[:10])
@@ -356,15 +367,13 @@ class TestBaseDatasetGetMetrics:
 
     def test_get_metrics_returns_correct_keys(self, dummy_dataset_factory):
         """Test that get_metrics returns metrics for all splits."""
-        split_config = {
-            "split_ratio": {
-                "train": 0.5,
-                "validation_frac": 0.2,
-                "test": 0.25,
-            },
-            "split_type": "random",
-        }
-        dataset = dummy_dataset_factory(split_config=split_config, num_samples=100)
+        dataset = dummy_dataset_factory(
+            train_ratio=0.5,
+            validation_frac=0.2,
+            test_ratio=0.25,
+            split_type="random",
+            num_samples=100,
+        )
 
         metrics = dataset.get_metrics()
 
