@@ -20,7 +20,7 @@ import os
 from dataclasses import dataclass
 from math import floor
 from pathlib import Path
-from typing import Any, Literal, Union
+from typing import Literal, Union
 
 import numpy as np
 from alf_core.dataclasses.candidate import Modality
@@ -177,40 +177,6 @@ class BaseDataset(abc.ABC):
             f"test_size={len(self.test_dataset)}, "
             f"candidate_pool_size={len(self.candidate_pool)})"
         )
-
-    def _validate_and_process_split_config(self, split_config: dict[str, Any]) -> None:
-        """Validate and process the split config for the dataset.
-
-        This method validates the split configuration and sets default values
-        where appropriate.
-        The split_ratio keys must be "train", "test", "validation_frac".
-        validation_frac is the fraction of the train set that is held out in the validation set.
-        Optionally, the split_config can contain "max_candidate_pool" (int),
-        the maximum size of the candidate pool.
-
-        Args:
-            split_config: Dictionary containing the split configuration.
-
-        Raises:
-            AssertionError: If the split configuration is invalid.
-        """
-        # Check required top-level keys
-        assert "split_ratio" in split_config, "split_config must contain 'split_ratio'"
-        assert "split_type" in split_config, "split_config must contain 'split_type'"
-
-        self.config.split_type = split_config["split_type"]
-        self.split_ratio = split_config["split_ratio"]
-
-        # Check required split_ratio keys present and between 0 and 1
-        required_keys = ["train", "test", "validation_frac"]
-        for key in required_keys:
-            assert key in self.split_ratio, f"split_ratio must contain '{key}'"
-            assert 0 <= self.split_ratio[key] <= 1, f"{key} ratio must be between 0 and 1"
-
-        assert self.split_ratio["train"] + self.split_ratio["test"] <= 1, (
-            "train + test ratios must be <= 1"
-        )
-        self.config.max_candidate_pool = split_config.get("max_candidate_pool", None)
 
     def _split_dataset(self) -> dict[str, LabeledCandidates]:
         """Split the raw dataset into train, validation, test, and candidate pool.
