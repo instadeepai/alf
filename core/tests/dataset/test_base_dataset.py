@@ -75,7 +75,7 @@ class TestBaseDatasetValidation:
 
     def test_validate_config_invalid_train_ratio(self, dummy_dataset_factory):
         """Test that invalid train_ratio raises an error."""
-        with pytest.raises(ValidationError, match="train_ratio must be between 0 and 1"):
+        with pytest.raises(ValidationError, match="less than or equal to 1"):
             dummy_dataset_factory(
                 train_ratio=1.5,
                 validation_frac=0.2,
@@ -86,7 +86,7 @@ class TestBaseDatasetValidation:
 
     def test_validate_config_invalid_modality(self):
         """Test that invalid modality raises an error."""
-        with pytest.raises(ValidationError, match="Invalid modality"):
+        with pytest.raises(ValidationError, match="Input should be"):
             BaseDatasetConfig(
                 name="test",
                 modality="invalid_modality",

@@ -19,13 +19,15 @@ import logging
 import os
 from math import floor
 from pathlib import Path
-from typing import Literal, Self, Union
+from typing import Annotated, Literal, Self, Union
 
 import numpy as np
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataclasses.labeled_candidates import Candidate, LabeledCandidates
 from alf_core.dataset.splitting_utils import split_dataset
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
+
+FloatBetweenZeroAndOne = Annotated[float, Field(ge=0, le=1)]
 
 logger = logging.getLogger("alf-core")
 
@@ -35,7 +37,7 @@ class BaseDatasetConfig(BaseModel):
 
     Attributes:
         name: Name identifier for the dataset.
-        modality: Data modality.
+        modality: Data modality (validated against Modality enum).
         seed: Random seed for reproducibility.
         train_ratio: Fraction of data for training (0-1).
         validation_frac: Fraction of training data held out for validation (0-1).
@@ -45,29 +47,26 @@ class BaseDatasetConfig(BaseModel):
     """
 
     name: str
-    modality: str
+    modality: Modality
     seed: int
-    train_ratio: float
-    validation_frac: float
-    test_ratio: float
+    train_ratio: FloatBetweenZeroAndOne
+    validation_frac: FloatBetweenZeroAndOne
+    test_ratio: FloatBetweenZeroAndOne
     split_type: Literal["random", "low_vs_high"]
     max_candidate_pool: int | None = None
 
     @model_validator(mode="after")
     def validate_config(self) -> Self:
-        """Validate configuration values.
+        """Validate that train and test ratios don't exceed 1.
 
         Returns:
             The validated configuration instance.
+
+        Raises:
+            ValueError: If train_ratio + test_ratio exceeds 1.
         """
-        valid_modalities = [m.value for m in Modality]
-        assert self.modality in valid_modalities, (
-            f"Invalid modality: {self.modality}. Must be one of {valid_modalities}"
-        )
-        assert 0 <= self.train_ratio <= 1, "train_ratio must be between 0 and 1"
-        assert 0 <= self.validation_frac <= 1, "validation_frac must be between 0 and 1"
-        assert 0 <= self.test_ratio <= 1, "test_ratio must be between 0 and 1"
-        assert self.train_ratio + self.test_ratio <= 1, "train_ratio + test_ratio must be <= 1"
+        if self.train_ratio + self.test_ratio > 1:
+            raise ValueError("train_ratio + test_ratio must be <= 1")
         return self
 
 
@@ -81,7 +80,7 @@ class BaseDataset(abc.ABC):
             config: Configuration for the dataset.
         """
         self.config = config
-        self.modality = Modality(config.modality)
+        self.modality = config.modality
         self.rng = np.random.RandomState(config.seed)
         self.split_ratio = {
             "train": config.train_ratio,
