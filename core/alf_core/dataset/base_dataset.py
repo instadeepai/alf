@@ -17,12 +17,13 @@ import abc
 import copy
 import logging
 import os
-from dataclasses import dataclass
 from math import floor
 from pathlib import Path
-from typing import Literal, Union
+from typing import Literal, Self, Union
 
 import numpy as np
+from pydantic import BaseModel, model_validator
+
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataclasses.labeled_candidates import Candidate, LabeledCandidates
 from alf_core.dataset.splitting_utils import split_dataset
@@ -30,8 +31,7 @@ from alf_core.dataset.splitting_utils import split_dataset
 logger = logging.getLogger("alf-core")
 
 
-@dataclass
-class BaseDatasetConfig:
+class BaseDatasetConfig(BaseModel):
     """Configuration for BaseDataset.
 
     Attributes:
@@ -54,7 +54,8 @@ class BaseDatasetConfig:
     split_type: Literal["random", "low_vs_high"]
     max_candidate_pool: int | None = None
 
-    def __post_init__(self) -> None:
+    @model_validator(mode="after")
+    def validate_config(self) -> Self:
         """Validate configuration values."""
         valid_modalities = [m.value for m in Modality]
         assert self.modality in valid_modalities, (
@@ -64,6 +65,7 @@ class BaseDatasetConfig:
         assert 0 <= self.validation_frac <= 1, "validation_frac must be between 0 and 1"
         assert 0 <= self.test_ratio <= 1, "test_ratio must be between 0 and 1"
         assert self.train_ratio + self.test_ratio <= 1, "train_ratio + test_ratio must be <= 1"
+        return self
 
 
 class BaseDataset(abc.ABC):

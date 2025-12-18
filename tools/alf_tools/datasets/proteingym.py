@@ -14,7 +14,6 @@
 
 import logging
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -30,7 +29,6 @@ logger = logging.getLogger("alf-tools")
 DATAPATH = Path(__file__).parent / "data"
 
 
-@dataclass
 class ProteinGymConfig(BaseDatasetConfig):
     """Configuration for ProteinGym dataset.
 
