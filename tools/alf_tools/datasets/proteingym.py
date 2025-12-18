@@ -15,11 +15,12 @@
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Literal
 
 import numpy as np
 import pandas as pd
 from alf_core import BaseDataset, Candidate, LabeledCandidates
+from alf_core.dataset.base_dataset import BaseDatasetConfig
 from alf_tools.utils.constants import HF_DATASETS_REPOSITORY_NAME
 from huggingface_hub import hf_hub_download
 
@@ -28,35 +29,42 @@ logger = logging.getLogger("alf-tools")
 DATAPATH = Path(__file__).parent / "data"
 
 
+class ProteinGymConfig(BaseDatasetConfig):
+    """Configuration for ProteinGym dataset.
+
+    Attributes:
+        dms_name: Name of the DMS assay (e.g., "IF1_ECOLI_Kelsic_2016").
+        dms_type: Type of DMS data ("singles" or "multiples").
+        cross_validation: Whether to use cross-validation splits.
+        cross_validation_type: Type of CV split ("random", "modulo", or "contiguous").
+        cross_validation_fold: Which CV fold to use (0-4).
+    """
+
+    dms_name: str
+    dms_type: Literal["singles", "multiples"]
+    cross_validation: bool = False
+    cross_validation_type: Literal["random", "modulo", "contiguous"] | None = None
+    cross_validation_fold: Literal[0, 1, 2, 3, 4] | None = None
+
+
 class ProteinGym(BaseDataset):
     """ProteinGym dataset class."""
 
-    def __init__(
-        self,
-        name: str,
-        modality: str,
-        seed: int,
-        split_config: dict[str, Any],
-        dataset_config: dict[str, Any],
-    ):
+    def __init__(self, config: ProteinGymConfig):
         """Initialize ProteinGym dataset.
 
         Args:
-            name: Name of the dataset.
-            modality: Modality of the data.
-            seed: Random seed for reproducibility.
-            split_config: Split configuration.
-            dataset_config: Dataset configuration.
+            config: Configuration for the ProteinGym dataset.
         """
-        super().__init__(name, modality, seed, split_config)
-        self.dataset_config = dataset_config
+        super().__init__(config)
         self.setup()
 
     def __repr__(self) -> str:
         """Return a string representation of the dataset."""
         return (
-            f"ProteinGym(name={self.name}, modality={self.modality}, seed={self.seed}, "
-            f"split_ratio={self.split_ratio}, dataset_config={self.dataset_config})"
+            f"ProteinGym(name={self.config.name}, modality={self.modality}, "
+            f"seed={self.config.seed}, split_ratio={self.split_ratio}, "
+            f"dms_name={self.config.dms_name})"
         )
 
     def load_dataset(self) -> LabeledCandidates:
@@ -67,17 +75,13 @@ class ProteinGym(BaseDataset):
             Labeled candidates with ProteinGym data.
 
         Raises:
-            ValueError: If HF token is not set as environment variable or config has missing fields.
+            ValueError: If HF token is not set as environment variable.
         """
-        # Check HF token is set as environment variable and config has required fields
         if os.environ.get("HF_TOKEN") is None:
             raise ValueError("HF token must be set as environment variable")
-        dms_name = self.dataset_config.get("dms_name", None)
-        if dms_name is None:
-            raise ValueError("DMS name must be set")
-        dms_type = self.dataset_config.get("dms_type", None)
-        if dms_type is None or dms_type not in ["singles", "multiples"]:
-            raise ValueError("DMS type must be set and must be one of singles or multiples")
+
+        dms_name = self.config.dms_name
+        dms_type = self.config.dms_type
 
         filename = f"ProteinGym/ProteinGym_Cross_Validation/{dms_type}/{dms_name}.csv"
         filepath = DATAPATH / filename
@@ -119,31 +123,8 @@ class ProteinGym(BaseDataset):
 
         Returns:
             A dictionary of the splits.
-
-        Raises:
-            ValueError: If cross-validation type or fold is not set or invalid.
         """
-        if self.dataset_config.get("cross_validation", False):
-            cross_validation_type = self.dataset_config.get("cross_validation_type", None)
-            if cross_validation_type is None and cross_validation_type not in [
-                "random",
-                "modulo",
-                "contiguous",
-            ]:
-                raise ValueError(
-                    "Cross-validation type must be set and be one of random, modulo, or contiguous"
-                )
-
-            cross_validation_fold = self.dataset_config.get("cross_validation_fold", None)
-            if (
-                cross_validation_fold is None
-                or cross_validation_fold < 0
-                or cross_validation_fold > 4
-            ):
-                raise ValueError(
-                    "Cross-validation fold must be set and must be between 0 and 4 inclusive"
-                )
-
+        if self.config.cross_validation:
             return self._split_cross_validation()
         else:
             return super()._split_dataset()
@@ -166,17 +147,17 @@ class ProteinGym(BaseDataset):
         train_size = train_plus_validation_size - validation_size
         test_size = round(dataset_size * self.split_ratio["test"])
         candidate_pool_size = dataset_size - train_plus_validation_size - test_size
-        if self.max_candidate_pool is not None:
-            candidate_pool_size = min(candidate_pool_size, self.max_candidate_pool)
+        if self.config.max_candidate_pool is not None:
+            candidate_pool_size = min(candidate_pool_size, self.config.max_candidate_pool)
 
         # Shuffle dataset
-        shuffled_dataset = self._raw_dataset.shuffle(self.seed)
+        shuffled_dataset = self._raw_dataset.shuffle(self.config.seed)
         train_and_validation_dataset = LabeledCandidates(candidates=[], labels=[])
         test_and_candidate_pool_dataset = LabeledCandidates(candidates=[], labels=[])
 
         # Split dataset into train/test sets depending on cross-validation fold
-        cv_type = f"{self.dataset_config['cross_validation_type']}_fold_id"
-        cv_fold = self.dataset_config["cross_validation_fold"]
+        cv_type = f"{self.config.cross_validation_type}_fold_id"
+        cv_fold = self.config.cross_validation_fold
         for candidate, label in shuffled_dataset:
             if cv_fold == candidate.features[cv_type]:
                 test_and_candidate_pool_dataset.append([candidate], [label])

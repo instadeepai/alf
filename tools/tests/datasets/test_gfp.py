@@ -14,7 +14,7 @@
 
 import numpy as np
 import pytest
-from alf_core import Modality
+from alf_core import BaseDatasetConfig, Modality
 from alf_tools.datasets.gfp import GFP
 
 
@@ -25,19 +25,16 @@ def gfp_dataset():
     Returns:
         A GFP dataset.
     """
-    return GFP(
+    config = BaseDatasetConfig(
         name="gfp",
         modality="sequence",
         seed=51505,
-        split_config={
-            "split_ratio": {
-                "train": 0.1,
-                "test": 0.2,
-                "validation_frac": 0.5,
-            },
-            "split_type": "random",
-        },
+        train_ratio=0.1,
+        test_ratio=0.2,
+        validation_frac=0.5,
+        split_type="random",
     )
+    return GFP(config)
 
 
 class TestGFPDataset:
@@ -45,9 +42,9 @@ class TestGFPDataset:
 
     def test_dataset_initialization(self, gfp_dataset):
         """Test that dataset initializes correctly."""
-        assert gfp_dataset.name == "gfp"
+        assert gfp_dataset.config.name == "gfp"
         assert gfp_dataset.modality == Modality.SEQUENCE
-        assert gfp_dataset.seed == 51505
+        assert gfp_dataset.config.seed == 51505
 
     def test_dataset_split_sizes(self, gfp_dataset):
         """Test that dataset splits have correct sizes."""

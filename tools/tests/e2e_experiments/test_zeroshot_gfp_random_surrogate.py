@@ -15,7 +15,13 @@
 import numpy as np
 import pandas as pd
 import pytest
-from alf_core import FileTaskStateLogger, Surrogate, TerminalTaskStateLogger, ZeroShotTask
+from alf_core import (
+    BaseDatasetConfig,
+    FileTaskStateLogger,
+    Surrogate,
+    TerminalTaskStateLogger,
+    ZeroShotTask,
+)
 from alf_tools.datasets import GFP
 
 
@@ -26,11 +32,16 @@ def gfp_dataset():
     Returns:
         A GFP dataset.
     """
-    split_config = {
-        "split_ratio": {"train": 0, "validation_frac": 0, "test": 1.0, "candidate_pool": 0},
-        "split_type": "random",
-    }
-    return GFP(name="gfp", modality="sequence", seed=51505, split_config=split_config)
+    config = BaseDatasetConfig(
+        name="gfp",
+        modality="sequence",
+        seed=51505,
+        train_ratio=0.0,
+        validation_frac=0.0,
+        test_ratio=1.0,
+        split_type="random",
+    )
+    return GFP(config)
 
 
 @pytest.fixture

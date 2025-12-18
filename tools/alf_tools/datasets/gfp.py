@@ -14,12 +14,11 @@
 
 import logging
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pandas as pd
 import requests
-from alf_core import BaseDataset, Candidate, LabeledCandidates
+from alf_core import BaseDataset, BaseDatasetConfig, Candidate, LabeledCandidates
 
 logger = logging.getLogger("alf-tools")
 
@@ -31,16 +30,13 @@ URL = "https://raw.githubusercontent.com/dhbrookes/CbAS/master/data/gfp_data.csv
 class GFP(BaseDataset):
     """GFP dataset class."""
 
-    def __init__(self, name: str, modality: str, seed: int, split_config: dict[str, Any]):
+    def __init__(self, config: BaseDatasetConfig):
         """Initialize the GFP dataset.
 
         Args:
-            name: The name of the dataset.
-            modality: The modality of the dataset.
-            seed: The seed for the dataset.
-            split_config: The split configuration for the dataset.
+            config: Configuration for the GFP dataset.
         """
-        super().__init__(name, modality, seed, split_config)
+        super().__init__(config)
         self.setup()
 
     def load_dataset(self) -> LabeledCandidates:

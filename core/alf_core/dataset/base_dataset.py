@@ -19,41 +19,74 @@ import logging
 import os
 from math import floor
 from pathlib import Path
-from typing import Any, Union
+from typing import Annotated, Literal, Self, Union
 
 import numpy as np
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataclasses.labeled_candidates import Candidate, LabeledCandidates
 from alf_core.dataset.splitting_utils import split_dataset
+from pydantic import BaseModel, Field, model_validator
+
+FloatBetweenZeroAndOne = Annotated[float, Field(ge=0, le=1)]
 
 logger = logging.getLogger("alf-core")
+
+
+class BaseDatasetConfig(BaseModel):
+    """Configuration for BaseDataset.
+
+    Attributes:
+        name: Name identifier for the dataset.
+        modality: Data modality (validated against Modality enum).
+        seed: Random seed for reproducibility.
+        train_ratio: Fraction of data for training (0-1).
+        validation_frac: Fraction of training data held out for validation (0-1).
+        test_ratio: Fraction of data for testing (0-1).
+        split_type: Type of split.
+        max_candidate_pool: Optional maximum size of the candidate pool.
+    """
+
+    name: str
+    modality: Modality
+    seed: int
+    train_ratio: FloatBetweenZeroAndOne
+    validation_frac: FloatBetweenZeroAndOne
+    test_ratio: FloatBetweenZeroAndOne
+    split_type: Literal["random", "low_vs_high"]
+    max_candidate_pool: int | None = None
+
+    @model_validator(mode="after")
+    def validate_config(self) -> Self:
+        """Validate that train and test ratios don't exceed 1.
+
+        Returns:
+            The validated configuration instance.
+
+        Raises:
+            ValueError: If train_ratio + test_ratio exceeds 1.
+        """
+        if self.train_ratio + self.test_ratio > 1:
+            raise ValueError("train_ratio + test_ratio must be <= 1")
+        return self
 
 
 class BaseDataset(abc.ABC):
     """Base class for all datasets."""
 
-    def __init__(self, name: str, modality: str, seed: int, split_config: dict[str, Any]) -> None:
+    def __init__(self, config: BaseDatasetConfig) -> None:
         """Initialize the base dataset.
 
         Args:
-            name: Name identifier for the dataset.
-            modality: Data modality (e.g., "sequence", "graph", "image").
-            seed: Random seed for reproducibility.
-            split_config: Dictionary containing:
-                - "split_ratio": dict with "train", "validation", "test" ratios
-                - "split_type": Type of split ("random" or "low_vs_high")
-                - "max_candidate_pool": optional, maximum size of the candidate pool (int)
+            config: Configuration for the dataset.
         """
-        self.name = name
-        # Validate and convert modality string to Modality enum
-        valid_modalities = [m.value for m in Modality]
-        assert modality in valid_modalities, (
-            f"Invalid modality: {modality}. Must be one of {valid_modalities}"
-        )
-        self.modality = Modality(modality)
-        self.seed = seed
-        self.rng = np.random.RandomState(seed)
-        self._validate_and_process_split_config(split_config)
+        self.config = config
+        self.modality = config.modality
+        self.rng = np.random.RandomState(config.seed)
+        self.split_ratio = {
+            "train": config.train_ratio,
+            "validation_frac": config.validation_frac,
+            "test": config.test_ratio,
+        }
         self.metadata: dict | None = None
         self._raw_dataset: LabeledCandidates | None = None
         self.splits: dict[str, LabeledCandidates] = {}
@@ -141,46 +174,13 @@ class BaseDataset(abc.ABC):
             String showing dataset name, modality, seed, and split sizes.
         """
         return (
-            f"Dataset(name={self.name}, modality={self.modality}, seed={self.seed}, "
+            f"Dataset(name={self.config.name}, modality={self.modality}, "
+            f"seed={self.config.seed}, "
             f"train_size={len(self.train_dataset)}, "
             f"validation_size={len(self.validation_dataset)}, "
             f"test_size={len(self.test_dataset)}, "
             f"candidate_pool_size={len(self.candidate_pool)})"
         )
-
-    def _validate_and_process_split_config(self, split_config: dict[str, Any]) -> None:
-        """Validate and process the split config for the dataset.
-
-        This method validates the split configuration and sets default values
-        where appropriate.
-        The split_ratio keys must be "train", "test", "validation_frac".
-        validation_frac is the fraction of the train set that is held out in the validation set.
-        Optionally, the split_config can contain "max_candidate_pool" (int),
-        the maximum size of the candidate pool.
-
-        Args:
-            split_config: Dictionary containing the split configuration.
-
-        Raises:
-            AssertionError: If the split configuration is invalid.
-        """
-        # Check required top-level keys
-        assert "split_ratio" in split_config, "split_config must contain 'split_ratio'"
-        assert "split_type" in split_config, "split_config must contain 'split_type'"
-
-        self.split_type = split_config["split_type"]
-        self.split_ratio = split_config["split_ratio"]
-
-        # Check required split_ratio keys present and between 0 and 1
-        required_keys = ["train", "test", "validation_frac"]
-        for key in required_keys:
-            assert key in self.split_ratio, f"split_ratio must contain '{key}'"
-            assert 0 <= self.split_ratio[key] <= 1, f"{key} ratio must be between 0 and 1"
-
-        assert self.split_ratio["train"] + self.split_ratio["test"] <= 1, (
-            "train + test ratios must be <= 1"
-        )
-        self.max_candidate_pool = split_config.get("max_candidate_pool", None)
 
     def _split_dataset(self) -> dict[str, LabeledCandidates]:
         """Split the raw dataset into train, validation, test, and candidate pool.
@@ -205,18 +205,18 @@ class BaseDataset(abc.ABC):
         train_size = train_plus_validation_size - validation_size
         test_size = floor(dataset_size * self.split_ratio["test"])
         candidate_pool_size = dataset_size - train_plus_validation_size - test_size
-        if self.max_candidate_pool is not None:
-            candidate_pool_size = min(self.max_candidate_pool, candidate_pool_size)
+        if self.config.max_candidate_pool is not None:
+            candidate_pool_size = min(self.config.max_candidate_pool, candidate_pool_size)
 
         # Perform split based on type
         datasets_dict = split_dataset(
-            self.split_type,
+            self.config.split_type,
             self._raw_dataset,
             train_size,
             validation_size,
             test_size,
             candidate_pool_size,
-            self.seed,
+            self.config.seed,
         )
         self.init_candidate_pool = copy.deepcopy(datasets_dict["candidate_pool"])
         return datasets_dict
@@ -245,7 +245,7 @@ class BaseDataset(abc.ABC):
 
         # Split the acquired candidates into train and validation splits based on the split ratio
         num_val = floor(len(acquired_candidates) * self.split_ratio["validation_frac"])
-        shuffled_acquired_candidates = acquired_candidates.shuffle(self.seed)
+        shuffled_acquired_candidates = acquired_candidates.shuffle(self.config.seed)
         # Add num_val candidates to validation split and the rest to train split
         self.splits["train"].append(LabeledCandidates(*shuffled_acquired_candidates[:-num_val]))
         self.splits["validation"].append(

@@ -21,7 +21,7 @@ from alf_core.dataclasses import (
     Results,
     TaskState,
 )
-from alf_core.dataset.base_dataset import BaseDataset
+from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.model.base_model import BaseModel
 from alf_core.optimizer.acquisition_function import AcquisitionFunction
 from alf_core.optimizer.optimizer import Optimizer

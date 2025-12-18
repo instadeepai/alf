@@ -16,7 +16,14 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
-from alf_core import FileTaskStateLogger, Oracle, SupervisedTask, Surrogate, TerminalTaskStateLogger
+from alf_core import (
+    BaseDatasetConfig,
+    FileTaskStateLogger,
+    Oracle,
+    SupervisedTask,
+    Surrogate,
+    TerminalTaskStateLogger,
+)
 from alf_tools.datasets import GFP
 from alf_tools.models import CNNModel, CNNTrainConfig
 
@@ -47,20 +54,16 @@ def gfp_dataset():
     Returns:
         A GFP dataset.
     """
-    return GFP(
+    config = BaseDatasetConfig(
         name="gfp",
         modality="sequence",
         seed=51505,
-        split_config={
-            "split_ratio": {
-                "train": 0.1,
-                "test": 0.2,
-                "validation_frac": 0.5,
-                "candidate_pool": 0.7,
-            },
-            "split_type": "random",
-        },
+        train_ratio=0.1,
+        test_ratio=0.2,
+        validation_frac=0.5,
+        split_type="random",
     )
+    return GFP(config)
 
 
 @pytest.fixture
