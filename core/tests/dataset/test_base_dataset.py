@@ -20,11 +20,10 @@ import tempfile
 import numpy as np
 import pandas as pd
 import pytest
-from pydantic import ValidationError
-
 from alf_core.dataclasses import Candidate, LabeledCandidates
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
+from pydantic import ValidationError
 
 
 class TestBaseDatasetInitialization:

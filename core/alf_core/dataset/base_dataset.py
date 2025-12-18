@@ -22,11 +22,10 @@ from pathlib import Path
 from typing import Literal, Self, Union
 
 import numpy as np
-from pydantic import BaseModel, model_validator
-
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataclasses.labeled_candidates import Candidate, LabeledCandidates
 from alf_core.dataset.splitting_utils import split_dataset
+from pydantic import BaseModel, model_validator
 
 logger = logging.getLogger("alf-core")
 
@@ -56,7 +55,11 @@ class BaseDatasetConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_config(self) -> Self:
-        """Validate configuration values."""
+        """Validate configuration values.
+
+        Returns:
+            The validated configuration instance.
+        """
         valid_modalities = [m.value for m in Modality]
         assert self.modality in valid_modalities, (
             f"Invalid modality: {self.modality}. Must be one of {valid_modalities}"
