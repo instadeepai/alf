@@ -20,6 +20,8 @@ import tempfile
 import numpy as np
 import pandas as pd
 import pytest
+from pydantic import ValidationError
+
 from alf_core.dataclasses import Candidate, LabeledCandidates
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
@@ -63,7 +65,7 @@ class TestBaseDatasetValidation:
 
     def test_validate_config_ratios_sum_exceeds_one(self, dummy_dataset_factory):
         """Test that split ratios summing to more than 1 raises an error."""
-        with pytest.raises(AssertionError, match="train_ratio \\+ test_ratio must be <= 1"):
+        with pytest.raises(ValidationError, match="train_ratio \\+ test_ratio must be <= 1"):
             dummy_dataset_factory(
                 train_ratio=0.8,
                 validation_frac=0.5,
@@ -74,7 +76,7 @@ class TestBaseDatasetValidation:
 
     def test_validate_config_invalid_train_ratio(self, dummy_dataset_factory):
         """Test that invalid train_ratio raises an error."""
-        with pytest.raises(AssertionError, match="train_ratio must be between 0 and 1"):
+        with pytest.raises(ValidationError, match="train_ratio must be between 0 and 1"):
             dummy_dataset_factory(
                 train_ratio=1.5,
                 validation_frac=0.2,
@@ -85,7 +87,7 @@ class TestBaseDatasetValidation:
 
     def test_validate_config_invalid_modality(self):
         """Test that invalid modality raises an error."""
-        with pytest.raises(AssertionError, match="Invalid modality"):
+        with pytest.raises(ValidationError, match="Invalid modality"):
             BaseDatasetConfig(
                 name="test",
                 modality="invalid_modality",

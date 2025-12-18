@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from alf_core import (
+    BaseDatasetConfig,
     DatasetSearch,
     DesignTask,
     FileTaskStateLogger,
@@ -35,15 +36,16 @@ def gfp_dataset():
     Returns:
         A GFP dataset.
     """
-    return GFP(
+    config = BaseDatasetConfig(
         name="gfp",
         modality="sequence",
         seed=51505,
-        split_config={
-            "split_ratio": {"train": 0.1, "validation_frac": 0.2, "test": 0.2},
-            "split_type": "random",
-        },
+        train_ratio=0.1,
+        validation_frac=0.2,
+        test_ratio=0.2,
+        split_type="random",
     )
+    return GFP(config)
 
 
 @pytest.fixture

@@ -14,7 +14,6 @@
 
 """Shared pytest fixtures for experiment tests."""
 
-from dataclasses import dataclass
 from typing import Any, List, Literal, Union
 
 import numpy as np
@@ -29,7 +28,6 @@ from alf_core.oracle.oracle import Oracle
 from alf_core.surrogate.surrogate import Surrogate
 
 
-@dataclass
 class DummyDatasetConfig(BaseDatasetConfig):
     """Configuration for DummyDataset.
 

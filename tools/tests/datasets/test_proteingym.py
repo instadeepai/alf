@@ -15,7 +15,7 @@
 import numpy as np
 import pytest
 from alf_core import Modality
-from alf_tools.datasets.proteingym import ProteinGym
+from alf_tools.datasets.proteingym import ProteinGym, ProteinGymConfig
 
 
 @pytest.fixture
@@ -25,16 +25,18 @@ def proteingym_dataset_singles():
     Returns:
         A ProteinGym singles dataset.
     """
-    return ProteinGym(
+    config = ProteinGymConfig(
         name="proteingym",
         modality="sequence",
         seed=51505,
-        split_config={
-            "split_ratio": {"train": 0.6, "validation_frac": 0.2, "test": 0.2},
-            "split_type": "random",
-        },
-        dataset_config={"dms_name": "IF1_ECOLI_Kelsic_2016", "dms_type": "singles"},
+        train_ratio=0.6,
+        validation_frac=0.2,
+        test_ratio=0.2,
+        split_type="random",
+        dms_name="IF1_ECOLI_Kelsic_2016",
+        dms_type="singles",
     )
+    return ProteinGym(config)
 
 
 @pytest.fixture
@@ -44,16 +46,18 @@ def proteingym_dataset_multiples():
     Returns:
         A ProteinGym multiples dataset.
     """
-    return ProteinGym(
+    config = ProteinGymConfig(
         name="proteingym",
         modality="sequence",
         seed=51505,
-        split_config={
-            "split_ratio": {"train": 0.6, "validation_frac": 0.2, "test": 0.2},
-            "split_type": "random",
-        },
-        dataset_config={"dms_name": "CAPSD_AAV2S_Sinai_2021", "dms_type": "multiples"},
+        train_ratio=0.6,
+        validation_frac=0.2,
+        test_ratio=0.2,
+        split_type="random",
+        dms_name="CAPSD_AAV2S_Sinai_2021",
+        dms_type="multiples",
     )
+    return ProteinGym(config)
 
 
 @pytest.fixture
@@ -63,22 +67,21 @@ def proteingym_dataset_cv_singles():
     Returns:
         A ProteinGym cross-validation singles dataset.
     """
-    return ProteinGym(
+    config = ProteinGymConfig(
         name="proteingym",
         modality="sequence",
         seed=51505,
-        split_config={
-            "split_ratio": {"train": 0.7827, "validation_frac": 0.0, "test": 0.2173},
-            "split_type": "random",
-        },
-        dataset_config={
-            "dms_name": "IF1_ECOLI_Kelsic_2016",
-            "dms_type": "singles",
-            "cross_validation": True,
-            "cross_validation_type": "random",
-            "cross_validation_fold": 0,
-        },
+        train_ratio=0.7827,
+        validation_frac=0.0,
+        test_ratio=0.2173,
+        split_type="random",
+        dms_name="IF1_ECOLI_Kelsic_2016",
+        dms_type="singles",
+        cross_validation=True,
+        cross_validation_type="random",
+        cross_validation_fold=0,
     )
+    return ProteinGym(config)
 
 
 @pytest.fixture
@@ -88,22 +91,21 @@ def proteingym_dataset_cv_multiples():
     Returns:
         A ProteinGym cross-validation multiples dataset.
     """
-    return ProteinGym(
+    config = ProteinGymConfig(
         name="proteingym",
         modality="sequence",
         seed=51505,
-        split_config={
-            "split_ratio": {"train": 0.79968, "validation_frac": 0.0, "test": 0.20032},
-            "split_type": "random",
-        },
-        dataset_config={
-            "dms_name": "CAPSD_AAV2S_Sinai_2021",
-            "dms_type": "multiples",
-            "cross_validation": True,
-            "cross_validation_type": "random",
-            "cross_validation_fold": 0,
-        },
+        train_ratio=0.79968,
+        validation_frac=0.0,
+        test_ratio=0.20032,
+        split_type="random",
+        dms_name="CAPSD_AAV2S_Sinai_2021",
+        dms_type="multiples",
+        cross_validation=True,
+        cross_validation_type="random",
+        cross_validation_fold=0,
     )
+    return ProteinGym(config)
 
 
 class TestProteinGymDataset:
@@ -111,15 +113,15 @@ class TestProteinGymDataset:
 
     def test_dataset_initialization_singles(self, proteingym_dataset_singles):
         """Test that singles dataset initializes correctly."""
-        assert proteingym_dataset_singles.name == "proteingym"
+        assert proteingym_dataset_singles.config.name == "proteingym"
         assert proteingym_dataset_singles.modality == Modality.SEQUENCE
-        assert proteingym_dataset_singles.seed == 51505
+        assert proteingym_dataset_singles.config.seed == 51505
 
     def test_dataset_initialization_multiples(self, proteingym_dataset_multiples):
         """Test that multiples dataset initializes correctly."""
-        assert proteingym_dataset_multiples.name == "proteingym"
+        assert proteingym_dataset_multiples.config.name == "proteingym"
         assert proteingym_dataset_multiples.modality == Modality.SEQUENCE
-        assert proteingym_dataset_multiples.seed == 51505
+        assert proteingym_dataset_multiples.config.seed == 51505
 
     def test_cross_validation_singles_split_sizes(self, proteingym_dataset_cv_singles):
         """Test that cross-validation singles dataset splits have correct sizes."""
