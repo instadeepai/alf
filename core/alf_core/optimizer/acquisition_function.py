@@ -14,6 +14,7 @@
 
 
 import abc
+from typing import Any
 
 import numpy as np
 from alf_core.dataclasses import Candidate, LabeledCandidates, Predictions, TaskState
@@ -23,15 +24,31 @@ class AcquisitionFunction(abc.ABC):
     """Abstract base class for acquisition functions."""
 
     @abc.abstractmethod
-    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Compute acquisition values for candidates based on surrogate predictions.
+    def _get_acquisition_values(self, features: Any, state: TaskState) -> np.ndarray:
+        """Compute acquisition values for candidates based on their features.
 
         Args:
-            predictions: Predictions from the surrogate model.
+            features: Features of the candidates.
             state: Current task state.
 
         Returns:
             Array of acquisition values, one per candidate.
+        """
+        pass
+
+    @abc.abstractmethod
+    def _get_features(self, candidates: list[Candidate], state: TaskState) -> Any:
+        """Get features of the candidates.
+        
+        Examples include: computing predictions or embeddings of the candidates, 
+        either through the surrogate model or some kernel function.
+
+        Args:
+            candidates: List of Candidate objects.
+            state: Current task state.
+
+        Returns:
+            Features of the candidates.
         """
         pass
 
@@ -49,6 +66,6 @@ class AcquisitionFunction(abc.ABC):
         Returns:
             Candidates paired with their acquisition values.
         """
-        predictions: Predictions = state.surrogate.predict(search_candidates)
-        acquisition_values = self._get_acquisition_values(predictions, state)
+        candidate_features = self._get_features(search_candidates, state)
+        acquisition_values = self._get_acquisition_values(candidate_features, state)
         return LabeledCandidates(search_candidates, acquisition_values)
