@@ -12,19 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
+
 import numpy as np
-from alf_core import AcquisitionFunction, Predictions, TaskState
+from alf_core import AcquisitionFunction, Candidate, TaskState
 from scipy.stats import norm
 
 
 class ExpectedImprovement(AcquisitionFunction):
     """Expected improvement acquisition function."""
 
-    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Computes acquisition values for candidates based on surrogate predictions.
+    def _get_acquisition_values(self, features: Any, state: TaskState) -> np.ndarray:
+        """Computes acquisition values for candidates based on their features.
 
         Args:
-            predictions: The predictions from the surrogate model.
+            features: The features of the candidates which are the surrogate predictions.
             state: The task state containing the dataset and surrogate model.
 
         Returns:
@@ -33,6 +35,7 @@ class ExpectedImprovement(AcquisitionFunction):
         Raises:
             ValueError: If `empirical_dist` or `variances` is not found in predictions.
         """
+        predictions = features
         best_f = state.dataset.train_dataset.labels.max()
         if predictions.empirical_dist is not None:
             return np.mean(np.maximum(predictions.empirical_dist - best_f, 0), -1)
@@ -50,3 +53,15 @@ class ExpectedImprovement(AcquisitionFunction):
                 "Expected either `empirical_dist` or `variances` in predictions, "
                 "but neither was found. Cannot compute expected improvement."
             )
+
+    def _get_features(self, candidates: list[Candidate], state: TaskState) -> Any:
+        """Get surrogatepredictions of the candidates.
+
+        Args:
+            candidates: List of Candidate objects.
+            state: Current task state.
+
+        Returns:
+            Predictions of the candidates.
+        """
+        return state.surrogate.predict(candidates)

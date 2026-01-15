@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Any
+
 import numpy as np
-from alf_core import AcquisitionFunction, Predictions, TaskState
+from alf_core import AcquisitionFunction, Candidate, TaskState
 
 
 class ThompsonSampling(AcquisitionFunction):
@@ -28,11 +30,11 @@ class ThompsonSampling(AcquisitionFunction):
     is better.
     """
 
-    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
+    def _get_acquisition_values(self, features: Any, state: TaskState) -> np.ndarray:
         """Computes acquisition values for candidates based on surrogate predictions.
 
         Args:
-            predictions: The predictions from the surrogate model.
+            features: The features of the candidates which are the surrogate predictions.
             state: The task state containing the dataset and surrogate model.
 
         Returns:
@@ -42,6 +44,7 @@ class ThompsonSampling(AcquisitionFunction):
             ValueError: If `empirical_dist` or `variances` is not found in predictions.
             NotImplementedError: If `variances` is not found in predictions.
         """
+        predictions = features
         if predictions.empirical_dist is not None:
             samples = predictions.empirical_dist
             ranks = samples.argsort(axis=0).argsort(axis=0) + 1
@@ -54,3 +57,15 @@ class ThompsonSampling(AcquisitionFunction):
                 "Expected either `empirical_dist` or `variances` in predictions, "
                 "but neither was found. Cannot perform Thomson Sampling."
             )
+
+    def _get_features(self, candidates: list[Candidate], state: TaskState) -> Any:
+        """Get surrogate predictions of the candidates.
+
+        Args:
+            candidates: List of Candidate objects.
+            state: Current task state.
+
+        Returns:
+            Predictions of the candidates.
+        """
+        return state.surrogate.predict(candidates)
