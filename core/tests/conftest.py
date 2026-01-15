@@ -251,3 +251,15 @@ class DummyAcquisitionFunction(AcquisitionFunction):
             Acquisition values.
         """
         return self.rng.randn(len(predictions))
+
+    def _get_features(self, candidates: list[Candidate], state: TaskState) -> Any:
+        """Get surrogate predictions of the candidates.
+
+        Args:
+            candidates: List of Candidate objects.
+            state: Current task state.
+
+        Returns:
+            Predictions of the candidates.
+        """
+        return state.surrogate.predict(candidates)
