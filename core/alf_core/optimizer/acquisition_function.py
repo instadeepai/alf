@@ -17,7 +17,7 @@ import abc
 from typing import Any
 
 import numpy as np
-from alf_core.dataclasses import Candidate, LabeledCandidates, Predictions, TaskState
+from alf_core.dataclasses import Candidate, LabeledCandidates, TaskState
 
 
 class AcquisitionFunction(abc.ABC):
@@ -39,8 +39,8 @@ class AcquisitionFunction(abc.ABC):
     @abc.abstractmethod
     def _get_features(self, candidates: list[Candidate], state: TaskState) -> Any:
         """Get features of the candidates.
-        
-        Examples include: computing predictions or embeddings of the candidates, 
+
+        Examples include: computing predictions or embeddings of the candidates,
         either through the surrogate model or some kernel function.
 
         Args:
