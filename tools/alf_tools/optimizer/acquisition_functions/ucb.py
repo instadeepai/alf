@@ -33,7 +33,7 @@ class UCB(AcquisitionFunction):
         """Computes acquisition values for candidates based on surrogate predictions.
 
         Args:
-            features: The features of the candidates which are the surrogate predictions.
+            features: The predictions of the candidates.
             state: The task state containing the dataset and surrogate model.
 
         Returns:
@@ -62,4 +62,5 @@ class UCB(AcquisitionFunction):
         Returns:
             Predictions of the candidates.
         """
-        return state.surrogate.predict(candidates)
+        predictions = state.surrogate.predict(candidates)
+        return predictions

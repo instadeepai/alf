@@ -28,7 +28,8 @@ class AcquisitionFunction(abc.ABC):
         """Compute acquisition values for candidates based on their features.
 
         Args:
-            features: Features of the candidates.
+            features: Features of the candidates, the child classes' implementation of the
+                _get_features method determines the type of this argument.
             state: Current task state.
 
         Returns:
