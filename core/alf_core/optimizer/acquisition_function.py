@@ -30,7 +30,7 @@ class AcquisitionFunction(abc.ABC):
         """Compute acquisition values for candidates and return them as LabeledCandidates.
 
         Args:
-            search_candidates: List of Candidate objects to score.
+            search_candidates: List of unlabeled candidates to score.
             state: Current task state containing the dataset and surrogate model.
 
         Returns:

@@ -22,10 +22,10 @@ class ExpectedImprovement(AcquisitionFunction):
     """Expected improvement acquisition function."""
 
     def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
-        """Generate expected improvement values for the search candidates.
+        """Generate expected improvement values for the unlabeled candidates.
 
         Args:
-            search_candidates: List of Candidate objects to score.
+            search_candidates: List of unlabeled candidates to score.
             state: Current task state containing the dataset and surrogate model.
 
         Raises:

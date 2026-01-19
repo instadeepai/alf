@@ -29,10 +29,10 @@ class UCB(AcquisitionFunction):
         self.alpha = alpha
 
     def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
-        """Generate acquisition values based on UCB for the search candidates.
+        """Generate acquisition values based on UCB of the unlabeled candidates.
 
         Args:
-            search_candidates: List of Candidate objects to score.
+            search_candidates: List of unlabeled candidates to score.
             state: Current task state containing the dataset and surrogate model.
 
         Raises:
