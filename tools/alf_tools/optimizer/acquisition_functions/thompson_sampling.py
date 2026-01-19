@@ -12,10 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any
 
-import numpy as np
-from alf_core import AcquisitionFunction, Candidate, TaskState
+from alf_core import AcquisitionFunction, Candidate, LabeledCandidates, TaskState
 
 
 class ThompsonSampling(AcquisitionFunction):
@@ -30,25 +28,24 @@ class ThompsonSampling(AcquisitionFunction):
     is better.
     """
 
-    def _get_acquisition_values(self, features: Any, state: TaskState) -> np.ndarray:
-        """Computes acquisition values for candidates based on surrogate predictions.
+    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
+        """Generate acquisition values based on Thompson Sampling for the search candidates.
 
         Args:
-            features: The predictions of the candidates.
-            state: The task state containing the dataset and surrogate model.
-
-        Returns:
-            The acquisition values for the candidates.
+            search_candidates: List of Candidate objects to score.
+            state: Current task state containing the dataset and surrogate model.
 
         Raises:
             ValueError: If `empirical_dist` or `variances` is not found in predictions.
-            NotImplementedError: If `variances` is not found in predictions.
+
+        Returns:
+            LabeledCandidates with Thompson Sampling acquisition values.
         """
-        predictions = features
+        predictions = state.surrogate.predict(search_candidates)
         if predictions.empirical_dist is not None:
             samples = predictions.empirical_dist
             ranks = samples.argsort(axis=0).argsort(axis=0) + 1
-            return ranks.max(-1)
+            acquisition_values = ranks.max(-1)
         elif predictions.variances is not None:
             # NOTE: This needs to be implemented for GP
             raise NotImplementedError
@@ -57,16 +54,4 @@ class ThompsonSampling(AcquisitionFunction):
                 "Expected either `empirical_dist` or `variances` in predictions, "
                 "but neither was found. Cannot perform Thomson Sampling."
             )
-
-    def _get_features(self, candidates: list[Candidate], state: TaskState) -> Any:
-        """Get surrogate predictions of the candidates.
-
-        Args:
-            candidates: List of Candidate objects.
-            state: Current task state.
-
-        Returns:
-            Predictions of the candidates.
-        """
-        predictions = state.surrogate.predict(candidates)
-        return predictions
+        return LabeledCandidates(candidates=search_candidates, labels=acquisition_values)

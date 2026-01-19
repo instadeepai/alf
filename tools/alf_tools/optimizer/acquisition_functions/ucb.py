@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any
 
 import numpy as np
-from alf_core import AcquisitionFunction, Candidate, TaskState
+from alf_core import AcquisitionFunction, Candidate, LabeledCandidates, TaskState
 
 
 class UCB(AcquisitionFunction):
@@ -29,38 +28,26 @@ class UCB(AcquisitionFunction):
         """
         self.alpha = alpha
 
-    def _get_acquisition_values(self, features: Any, state: TaskState) -> np.ndarray:
-        """Computes acquisition values for candidates based on surrogate predictions.
+    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
+        """Generate acquisition values based on UCB for the search candidates.
 
         Args:
-            features: The predictions of the candidates.
-            state: The task state containing the dataset and surrogate model.
-
-        Returns:
-            The acquisition values for the candidates.
+            search_candidates: List of Candidate objects to score.
+            state: Current task state containing the dataset and surrogate model.
 
         Raises:
             ValueError: If `variances` is not found in predictions.
+
+        Returns:
+            LabeledCandidates with UCB acquisition values.
         """
-        predictions = features
+        predictions = state.surrogate.predict(search_candidates)
         if predictions.variances is not None:
             sigma = np.sqrt(predictions.variances)
             mu = predictions.means
-            return mu + self.alpha * sigma
+            acquisition_values = mu + self.alpha * sigma
         else:
             raise ValueError(
                 "Expected `variances` in predictions, but was not found. Cannot compute UCB."
             )
-
-    def _get_features(self, candidates: list[Candidate], state: TaskState) -> Any:
-        """Get surrogate predictions of the candidates.
-
-        Args:
-            candidates: List of Candidate objects.
-            state: Current task state.
-
-        Returns:
-            Predictions of the candidates.
-        """
-        predictions = state.surrogate.predict(candidates)
-        return predictions
+        return LabeledCandidates(candidates=search_candidates, labels=acquisition_values)

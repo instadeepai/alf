@@ -12,37 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any
 
-import numpy as np
-from alf_core import AcquisitionFunction, Candidate, TaskState
+from alf_core import AcquisitionFunction, Candidate, LabeledCandidates, TaskState
 
 
 class Greedy(AcquisitionFunction):
     """Greedy acquisition function."""
 
-    def _get_acquisition_values(self, features: Any, state: TaskState) -> np.ndarray:
-        """Computes acquisition values for candidates based on surrogate predictions.
+    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
+        """Generate greedy acquisition values for the search candidates.
 
         Args:
-            features: The predictions of the candidates.
-            state: The task state containing the dataset and surrogate model.
-
-        Returns:
-            The acquisition values for the candidates.
-        """
-        predictions = features
-        return predictions.means
-
-    def _get_features(self, candidates: list[Candidate], state: TaskState) -> Any:
-        """Get surrogate predictions of the candidates.
-
-        Args:
-            candidates: List of Candidate objects.
-            state: Current task state.
+            search_candidates: List of Candidate objects to score.
+            state: Current task state containing the dataset and surrogate model.
 
         Returns:
             Predictions of the candidates.
         """
-        predictions = state.surrogate.predict(candidates)
-        return predictions
+        predictions = state.surrogate.predict(search_candidates)
+        acquisition_values = predictions.means
+        return LabeledCandidates(candidates=search_candidates, labels=acquisition_values)
