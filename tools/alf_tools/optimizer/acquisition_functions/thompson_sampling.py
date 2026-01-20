@@ -26,6 +26,7 @@ class ThompsonSampling(AcquisitionFunction):
     (Higher predictions correspond to higher ranks)
     We return the maximum rank for each candidate as an acquisition value, so that higher
     is better.
+    This is a maximising acquisition function.
     """
 
     def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:

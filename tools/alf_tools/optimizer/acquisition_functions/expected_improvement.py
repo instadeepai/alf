@@ -27,6 +27,7 @@ class ExpectedImprovement(AcquisitionFunction):
     z is (μ - best_f) / σ, and Φ and φ are the CDF and PDF of the
     standard normal distribution.
     Higher EI values indicate more improvement over the best observed value.
+    This is a maximising acquisition function.
     """
 
     def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:

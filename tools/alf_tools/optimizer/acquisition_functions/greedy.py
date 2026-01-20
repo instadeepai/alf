@@ -17,7 +17,12 @@ from alf_core import AcquisitionFunction, Candidate, LabeledCandidates, TaskStat
 
 
 class Greedy(AcquisitionFunction):
-    """Greedy acquisition function."""
+    """Greedy acquisition function.
+
+    The Greedy acquisition value is given by: Greedy = μ, where μ is the mean prediction.
+    Higher Greedy values indicate more promising candidates.
+    This is a maximising acquisition function.
+    """
 
     def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
         """Compute greedy acquisition values for unlabelled candidates.

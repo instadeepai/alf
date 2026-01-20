@@ -23,6 +23,7 @@ class UCB(AcquisitionFunction):
     The UCB acquisition value is given by: UCB = μ + ασ, where μ is the mean prediction,
     σ is the standard deviation, and α is the exploration parameter.
     Higher α values lead to more exploration, while lower α values lead to more exploitation.
+    This is a maximising acquisition function.
     """
 
     def __init__(self, alpha: float):
