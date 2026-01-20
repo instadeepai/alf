@@ -18,7 +18,12 @@ from alf_core import AcquisitionFunction, Candidate, LabeledCandidates, TaskStat
 
 
 class UCB(AcquisitionFunction):
-    """Upper Confidence Bound acquisition function."""
+    """Upper Confidence Bound acquisition function.
+    
+    The UCB acquisition value is given by: UCB = μ + ασ, where μ is the mean prediction, 
+    σ is the standard deviation, and α is the exploration parameter.
+    Higher α values lead to more exploration, while lower α values lead to more exploitation.
+    """
 
     def __init__(self, alpha: float):
         """Initialize UCB with exploration parameter alpha.

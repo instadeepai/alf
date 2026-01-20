@@ -19,7 +19,14 @@ from scipy.stats import norm
 
 
 class ExpectedImprovement(AcquisitionFunction):
-    """Expected improvement acquisition function."""
+    """Expected improvement acquisition function.
+    
+    The Expected Improvement acquisition value is given by:
+    EI = (μ - best_f) * Φ(z) + σ * φ(z), where μ is the mean prediction, 
+    σ is the standard deviation, best_f is the best observed value, 
+    and Φ and φ are the CDF and PDF of the standard normal distribution.
+    Higher EI values indicate more improvement over the best observed value.
+    """
 
     def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
         """Compute Expected Improvement acquisition values for unlabelled candidates.
