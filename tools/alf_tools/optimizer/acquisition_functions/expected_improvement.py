@@ -32,7 +32,7 @@ class ExpectedImprovement(AcquisitionFunction):
             ValueError: If `empirical_dist` or `variances` is not found in predictions.
 
         Returns:
-            LabeledCandidates with expected improvement values.
+            LabeledCandidates with Expected Improvement acquisition values.
         """
         predictions = state.surrogate.predict(search_candidates)
         best_f = state.dataset.train_dataset.labels.max()

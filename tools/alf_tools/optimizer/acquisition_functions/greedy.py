@@ -27,7 +27,7 @@ class Greedy(AcquisitionFunction):
             state: The task state containing the current datasets and surrogate model.
 
         Returns:
-            Predictions of the candidates.
+            LabeledCandidates with Greedy acquisition values.
         """
         predictions = state.surrogate.predict(search_candidates)
         acquisition_values = predictions.means
