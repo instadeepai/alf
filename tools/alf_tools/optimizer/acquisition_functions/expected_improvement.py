@@ -23,8 +23,9 @@ class ExpectedImprovement(AcquisitionFunction):
 
     The Expected Improvement acquisition value is given by:
     EI = (μ - best_f) * Φ(z) + σ * φ(z), where μ is the mean prediction,
-    σ is the standard deviation, best_f is the best observed value,
-    and Φ and φ are the CDF and PDF of the standard normal distribution.
+    σ is the standard deviation, best_f is the best observed value, 
+    z is (μ - best_f) / σ, and Φ and φ are the CDF and PDF of the 
+    standard normal distribution.
     Higher EI values indicate more improvement over the best observed value.
     """
 
