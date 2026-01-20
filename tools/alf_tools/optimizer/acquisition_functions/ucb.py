@@ -29,11 +29,11 @@ class UCB(AcquisitionFunction):
         self.alpha = alpha
 
     def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
-        """Generate acquisition values based on UCB of the unlabeled candidates.
+        """Compute Upper Confidence Bound (UCB) acquisition values for unlabelled candidates.
 
         Args:
-            search_candidates: List of unlabeled candidates to score.
-            state: Current task state containing the dataset and surrogate model.
+            search_candidates: List of unlabelled candidates to score.
+            state: The task state containing the current datasets and surrogate model.
 
         Raises:
             ValueError: If `variances` is not found in predictions.

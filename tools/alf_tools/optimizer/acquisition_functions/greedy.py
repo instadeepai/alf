@@ -20,11 +20,11 @@ class Greedy(AcquisitionFunction):
     """Greedy acquisition function."""
 
     def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
-        """Generate greedy acquisition values for the unlabeled candidates.
+        """Compute greedy acquisition values for unlabelled candidates.
 
         Args:
-            search_candidates: List of unlabeled candidates to score.
-            state: Current task state containing the dataset and surrogate model.
+            search_candidates: List of unlabelled candidates to score.
+            state: The task state containing the current datasets and surrogate model.
 
         Returns:
             Predictions of the candidates.

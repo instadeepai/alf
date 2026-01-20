@@ -22,11 +22,11 @@ class ExpectedImprovement(AcquisitionFunction):
     """Expected improvement acquisition function."""
 
     def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
-        """Generate expected improvement values for the unlabeled candidates.
+        """Compute Expected Improvement acquisition values for unlabelled candidates.
 
         Args:
-            search_candidates: List of unlabeled candidates to score.
-            state: Current task state containing the dataset and surrogate model.
+            search_candidates: List of unlabelled candidates to score.
+            state: The task state containing the current datasets and surrogate model.
 
         Raises:
             ValueError: If `empirical_dist` or `variances` is not found in predictions.
