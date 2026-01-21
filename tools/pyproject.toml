@@ -12,6 +12,7 @@ dependencies = [
     "alf_core",
     "requests>=2.25.0",
     "huggingface_hub==0.27.0",
+    "jaxtyping>=0.3.5",
 ]
 
 [tool.setuptools.packages.find]
@@ -31,9 +32,11 @@ dev = [
 [project.optional-dependencies]
 torch_cpu = [
     "torch>=1.9.0",
+    "gpytorch>=1.9.0",
 ]
 torch_gpu = [
    "torch>=1.9.0",
+   "gpytorch>=1.9.0",
 ]
 
 [tool.uv.sources]
