@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+import numpy as np
+
 
 class Modality(Enum):
     """Enum for different data modalities."""
@@ -29,7 +31,7 @@ class Modality(Enum):
     EMBEDDING = "embedding"
 
 
-@dataclass
+@dataclass(eq=False, unsafe_hash=False)
 class Candidate:
     """A candidate is a data point with a modality and features.
 
@@ -82,3 +84,64 @@ class Candidate:
             # TODO: Implement stringification for other modalities
             # Once implemented, add test cases to test_candidate.py
             raise ValueError(f"Unsupported modality: {self.modality}")
+
+    def _safe_equal(self, a: Any, b: Any) -> bool:
+        """Compare two values, handling numpy arrays and nested structures.
+
+        Args:
+            a: First value to compare.
+            b: Second value to compare.
+
+        Returns:
+            True if the values are equal, False otherwise.
+        """
+        # Handle None cases
+        if a is None and b is None:
+            return True
+        if a is None or b is None:
+            return False
+
+        # Handle numpy arrays
+        if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):
+            return np.array_equal(a, b)
+
+        # Handle dict (for features)
+        if isinstance(a, dict) and isinstance(b, dict):
+            if a.keys() != b.keys():
+                return False
+            return all(self._safe_equal(a[k], b[k]) for k in a.keys())
+
+        # Handle lists/tuples (for nested data)
+        if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+            if len(a) != len(b):
+                return False
+            return all(self._safe_equal(x, y) for x, y in zip(a, b))
+
+        # Default comparison
+        try:
+            return a == b
+        except (ValueError, TypeError):
+            # If comparison fails (e.g., unexpected numpy arrays or incompatible types)
+            return False
+
+    def __eq__(self, other: object) -> bool:
+        """Compare two Candidate objects for equality.
+
+        Handles numpy arrays in data and features fields correctly.
+
+        Args:
+            other: The object to compare with.
+
+        Returns:
+            True if the candidates are equal, False otherwise.
+        """
+        if not isinstance(other, Candidate):
+            return False
+
+        return (
+            self._safe_equal(self.data, other.data)
+            and self.modality == other.modality
+            and self._safe_equal(self.features, other.features)
+        )
+
+    __hash__ = None

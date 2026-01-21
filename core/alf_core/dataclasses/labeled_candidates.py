@@ -21,7 +21,7 @@ import pandas as pd
 from alf_core.dataclasses.candidate import Candidate
 
 
-@dataclass
+@dataclass(eq=False, unsafe_hash=False)
 class LabeledCandidates:
     """A collection of candidates paired with their labels.
 
@@ -145,6 +145,7 @@ class LabeledCandidates:
     def remove(self, candidates: Union[list[Candidate], "LabeledCandidates"]) -> None:
         """Remove specified candidates and their corresponding labels from this collection.
 
+        Uses identity-based comparison (same object instance) for removal.
         Candidates not present in the collection are silently ignored.
 
         Args:
@@ -154,14 +155,15 @@ class LabeledCandidates:
         if isinstance(candidates, LabeledCandidates):
             candidates = candidates.candidates
 
-        # Filter to only remove candidates that are actually present in the collection
-        candidates_to_remove = [c for c in candidates if c in self.candidates]
-        if not candidates_to_remove:
-            return
+        # Build set of object IDs to remove for O(1) lookup
+        ids_to_remove = {id(c) for c in candidates}
 
-        indices_to_remove = [self.candidates.index(cand) for cand in candidates_to_remove]
-        self.labels = np.delete(self.labels, indices_to_remove)
-        self.candidates = [cand for cand in self.candidates if cand not in candidates_to_remove]
+        # Find indices to keep (single pass)
+        indices_to_keep = [i for i, c in enumerate(self.candidates) if id(c) not in ids_to_remove]
+
+        # Update candidates and labels
+        self.candidates = [self.candidates[i] for i in indices_to_keep]
+        self.labels = self.labels[indices_to_keep]
 
     def to_dataframe(self) -> pd.DataFrame:
         """Convert the labeled candidates to a pandas DataFrame.
@@ -205,3 +207,21 @@ class LabeledCandidates:
         """
         for candidate, label in zip(self.candidates, self.labels):
             yield candidate, label
+
+    def __eq__(self, other: object) -> bool:
+        """Compare two LabeledCandidates objects for equality.
+
+        Handles numpy array labels correctly.
+
+        Args:
+            other: The object to compare with.
+
+        Returns:
+            True if the labeled candidates are equal, False otherwise.
+        """
+        if not isinstance(other, LabeledCandidates):
+            return False
+
+        return self.candidates == other.candidates and np.array_equal(self.labels, other.labels)
+
+    __hash__ = None
