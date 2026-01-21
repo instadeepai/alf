@@ -131,6 +131,7 @@ dmypy.json
 *.swp
 *.swo
 *~
+.cursor/
 
 # macOS
 .DS_Store
