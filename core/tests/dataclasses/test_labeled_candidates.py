@@ -520,7 +520,7 @@ class TestLabeledCandidatesEquality:
         lc = LabeledCandidates(candidates=[c1], labels=np.array([0.5]))
         assert lc != "not a labeled candidates"
         assert lc != [c1]
-        assert lc != None
+        assert lc is not None
 
     def test_unhashable(self):
         """Test that LabeledCandidates objects are unhashable."""
@@ -592,7 +592,7 @@ class TestLabeledCandidatesEquality:
         # Should be equal initially
         assert lc1 == lc2
 
-        # After shuffle with same seed, should still be comparable (but not equal due to different order)
+        # After shuffle with same seed, should still be comparable
         lc1_shuffled = lc1.shuffle(seed=42)
         lc2_shuffled = lc2.shuffle(seed=42)
         assert lc1_shuffled == lc2_shuffled  # Same shuffle seed produces equal results

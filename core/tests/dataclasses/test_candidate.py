@@ -369,7 +369,7 @@ class TestCandidateEquality:
         c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
         assert c1 != "not a candidate"
         assert c1 != 42
-        assert c1 != None
+        assert c1 is not None
 
     def test_unhashable(self):
         """Test that Candidate objects are unhashable."""
