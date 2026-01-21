@@ -12,17 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
-from typing import Any, Callable, Literal, Union
+from typing import Any, Callable, Literal, TypeAlias, Union
 
 import gpytorch
 import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions, Results
+from alf_tools.models.model_utils import (
+    get_device,
+)
 from alf_tools.utils.constants import PROTEIN_ALPHABET
+from jaxtyping import Float
 
 logger = logging.getLogger("alf-tools")
+
+KernelTypes: TypeAlias = Literal["rbf", "matern", "linear", "polynomial", "rbf_linear"]
 
 
 @dataclass
@@ -45,7 +53,7 @@ class GPModelConfig:
         mean_type: Type of mean function ('constant' or 'zero').
     """
 
-    kernel_type: Literal["rbf", "matern", "linear", "polynomial", "rbf_linear"] = "rbf"
+    kernel_type: KernelTypes = "rbf"
     matern_nu: float = 2.5
     ard: bool = True
     lengthscale_prior: gpytorch.priors.Prior | None = None
@@ -63,12 +71,13 @@ class GPTrainConfig:
         num_iterations: Number of optimization iterations.
         optimizer_type: Type of optimizer to use ('adam' or 'lbfgs').
         log_frequency: Frequency of logging training metrics (in iterations).
-        early_stopping_patience: Number of iterations without improvement before stopping.
-            If None, no early stopping is used.
-        early_stopping_delta: Minimum change in loss to qualify as an improvement.
+        early_stopping_patience: Number of iterations without improvement
+            before stopping. If None, no early stopping is used.
+        early_stopping_delta: Minimum change in loss to qualify as an
+            improvement. If None, no early stopping is used.
     """
 
-    learning_rate: float = 0.1
+    learning_rate: float = 0.01
     num_iterations: int = 100
     optimizer_type: Literal["adam", "lbfgs"] = "adam"
     log_frequency: int = 10
@@ -76,6 +85,7 @@ class GPTrainConfig:
     early_stopping_delta: float = 1e-4
 
 
+# TODO: Might not need this.
 @dataclass
 class FeaturizerConfig:
     """Configuration for sequence featurization.
@@ -94,7 +104,9 @@ class FeaturizerConfig:
     """
 
     featurizer_type: Literal["one_hot", "custom", "precomputed"] = "precomputed"
-    custom_featurizer: Callable[[list[str]], torch.Tensor] | None = None
+    custom_featurizer: (
+        Callable[[list[str]], Float[torch.Tensor, "batch_size n_features"]] | None
+    ) = None
     flatten_one_hot: bool = True
 
 
@@ -107,10 +119,10 @@ class ExactGPModel(gpytorch.models.ExactGP):
 
     def __init__(
         self,
-        train_x: torch.Tensor,
-        train_y: torch.Tensor,
+        train_x: Float[torch.Tensor, "n_samples n_features"],
+        train_y: Float[torch.Tensor, "n_samples"],
         likelihood: gpytorch.likelihoods.GaussianLikelihood,
-        kernel_type: str = "rbf",
+        kernel_type: KernelTypes = "rbf",
         matern_nu: float = 2.5,
         ard: bool = True,
         mean_type: str = "constant",
@@ -223,7 +235,9 @@ class ExactGPModel(gpytorch.models.ExactGP):
 
         return kernel
 
-    def forward(self, x: torch.Tensor) -> gpytorch.distributions.MultivariateNormal:
+    def forward(
+        self, x: Float[torch.Tensor, "n_samples n_features"]
+    ) -> gpytorch.distributions.MultivariateNormal:
         """Forward pass through the GP.
 
         Args:
@@ -273,10 +287,7 @@ class GPModelTrainer(BaseModel):
         self.char_to_idx = {char: idx for idx, char in enumerate(alphabet)}
 
         # Device setup
-        if device is None:
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        else:
-            self.device = torch.device(device)
+        self.device = get_device(device)
 
         # Model and likelihood initialized on first fit
         self.gp_model: ExactGPModel | None = None
@@ -284,8 +295,8 @@ class GPModelTrainer(BaseModel):
         self.feature_dim: int | None = None
 
         # Store training data for GP predictions
-        self.train_x: torch.Tensor | None = None
-        self.train_y: torch.Tensor | None = None
+        self.train_x: Float[torch.Tensor, "n_samples n_features"] | None = None
+        self.train_y: Float[torch.Tensor, "n_samples"] | None = None
 
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
@@ -398,7 +409,11 @@ class GPModelTrainer(BaseModel):
         likelihood = gpytorch.likelihoods.GaussianLikelihood(noise_constraint=noise_constraint)
         return likelihood
 
-    def _initialize_gp_model(self, train_x: torch.Tensor, train_y: torch.Tensor) -> ExactGPModel:
+    def _initialize_gp_model(
+        self,
+        train_x: Float[torch.Tensor, "n_samples n_features"],
+        train_y: Float[torch.Tensor, "n_samples"],
+    ) -> ExactGPModel:
         """Initialize the GP model with training data.
 
         Args:
@@ -429,7 +444,9 @@ class GPModelTrainer(BaseModel):
         return gp_model.to(self.device)
 
     def _optimize_hyperparameters(
-        self, train_x: torch.Tensor, train_y: torch.Tensor
+        self,
+        train_x: Float[torch.Tensor, "n_samples n_features"],
+        train_y: Float[torch.Tensor, "n_samples"],
     ) -> dict[str, float]:
         """Optimize GP hyperparameters using marginal log likelihood.
 
@@ -578,7 +595,7 @@ class GPModelTrainer(BaseModel):
             f"final_train_{k}": v for k, v in train_results.metrics.items()
         })
 
-        logger.info(f"Training complete - Train Spearman: {train_results.metrics['spearman']:.4f}")
+        logger.info(f"Training completewith metrics: {self.training_metrics}")
 
         # Evaluate on validation data if provided
         if val_data is not None and len(val_data) > 0:
@@ -587,9 +604,7 @@ class GPModelTrainer(BaseModel):
             self.training_metrics.update({
                 f"final_val_{k}": v for k, v in val_results.metrics.items()
             })
-            logger.info(
-                f"Validation complete - Val Spearman: {val_results.metrics['spearman']:.4f}"
-            )
+            logger.info(f"Validation complete - {val_results.metrics}")
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Make predictions with uncertainty quantification.

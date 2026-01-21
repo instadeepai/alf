@@ -1,0 +1,92 @@
+[project]
+name = "alf"
+version = "0.1.0"
+description = "Active Learning Framework (ALF) - A comprehensive framework for active learning experiments"
+readme = "README.md"
+requires-python = ">=3.12,<3.14.1"
+dependencies = [
+    "alf_core",
+    "alf_tools",
+    "alf_tutorials",
+]
+
+[project.optional-dependencies]
+torch_cpu = [
+    "torch",
+    "alf_tools[torch_cpu]",
+]
+torch_gpu = [
+    "torch",
+    "alf_tools[torch_gpu]",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=6.2.0",
+    "pytest-cov>=2.12.0",
+    "black>=21.0.0",
+    "flake8>=3.9.0",
+    "mypy>=0.910",
+    "pre-commit>=4.1.0",
+]
+
+# Path sources for local packages
+[tool.uv.sources]
+alf_core = { path = "core", editable = true }
+alf_tools = { path = "tools", editable = true }
+alf_tutorials = { path = "tutorials", editable = true }
+torch = [
+  { index = "pytorch-cpu", extra = "torch_cpu" },
+  { index = "pytorch-gpu", extra = "torch_gpu" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-gpu"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.uv]
+conflicts = [
+  [
+    { extra = "torch_cpu" },
+    { extra = "torch_gpu" },
+  ],
+]
+default-groups = [
+  "dev",
+]
+
+# Pyright/Pylance configuration for type checking and imports
+# This is needed because the project uses editable installs (development mode)
+# where packages are linked from source directories rather than installed in site-packages.
+# Pyright doesn't automatically follow these dynamic import hooks, so we explicitly
+# tell it where to find the alf_core, alf_tools, and alf_tutorials packages.
+[tool.pyright]
+venvPath = "."  # Virtual environment is in the root directory
+venv = ".venv"  # Name of the virtual environment folder
+pythonVersion = "3.12"  # Match the Python version used in the project
+# extraPaths: Additional directories to search for imports beyond site-packages
+extraPaths = ["core/alf_core", "tools/alf_tools", "tutorials"]
+# include: Directories that should be analyzed for type checking
+include = ["core", "tools", "tutorials"]
+
+# Execution environment configuration for the entire workspace
+[[tool.pyright.executionEnvironments]]
+root = "."
+extraPaths = ["core", "tools", "tutorials"]
+
+[tool.mypy]
+# Allow jaxtyping annotations with string literals
+disable_error_code = ["name-defined", "valid-type"]
+
+[tool.setuptools]
+packages = []  # No Python packages at root level - just a meta-package
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
