@@ -21,6 +21,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions, Results
+from alf_tools.models.model_utils import (
+    create_char_to_idx_mapping,
+    extract_sequences_from_inputs,
+    get_device,
+    one_hot_encode,
+)
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -166,13 +172,10 @@ class CNNModel(BaseModel):
 
         self.alphabet = alphabet
         self.alphabet_size = len(alphabet)
-        self.char_to_idx = {char: idx for idx, char in enumerate(alphabet)}
+        self.char_to_idx = create_char_to_idx_mapping(alphabet)
 
         # Device setup
-        if device is None:
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        else:
-            self.device = torch.device(device)
+        self.device = get_device(device)
 
         # Model initialized on first fit
         self.model: SequenceCNN | None = None
@@ -190,17 +193,12 @@ class CNNModel(BaseModel):
         Returns:
             One-hot encoded tensor of shape (batch_size, alphabet_size, seq_length).
         """
-        batch_size = len(sequences)
-        seq_length = len(sequences[0])
-
-        one_hot = torch.zeros(batch_size, self.alphabet_size, seq_length)
-
-        for i, sequence in enumerate(sequences):
-            for j, char in enumerate(sequence):
-                if char in self.char_to_idx:
-                    one_hot[i, self.char_to_idx[char], j] = 1.0
-
-        return one_hot
+        return one_hot_encode(
+            sequences=sequences,
+            char_to_idx=self.char_to_idx,
+            alphabet_size=self.alphabet_size,
+            flatten=False,
+        )
 
     def featurise(self, inputs: Union[LabeledCandidates, list[Candidate]]) -> torch.Tensor:
         """Convert inputs to one-hot encoded tensors.
@@ -214,13 +212,7 @@ class CNNModel(BaseModel):
         Raises:
             ValueError: If the input is not LabeledCandidates or list of Candidates.
         """
-        if isinstance(inputs, LabeledCandidates):
-            sequences = inputs.data
-        elif isinstance(inputs, list) and all(isinstance(c, Candidate) for c in inputs):
-            sequences = [c.data for c in inputs]
-        else:
-            raise ValueError("Input must be LabeledCandidates or list of Candidates")
-
+        sequences = extract_sequences_from_inputs(inputs)
         return self._one_hot_encode(sequences)
 
     def _prepare_data_loader(self, data: LabeledCandidates, shuffle: bool = False) -> DataLoader:
