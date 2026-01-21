@@ -15,7 +15,9 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import Any, Union
+
+import numpy as np
 
 
 class Modality(Enum):
@@ -82,3 +84,22 @@ class Candidate:
             # TODO: Implement stringification for other modalities
             # Once implemented, add test cases to test_candidate.py
             raise ValueError(f"Unsupported modality: {self.modality}")
+
+    def to_dataframe_format(self) -> Union[str, np.ndarray, Any]:
+        """Return the appropriate format for DataFrame representation.
+
+        Returns:
+            The candidate data formatted for inclusion in a pandas DataFrame.
+            - SEQUENCE: Returns stringified data
+            - TABULAR: Returns raw numpy array data
+            - Other modalities: Returns raw data as fallback
+
+        """
+        if self.modality == Modality.SEQUENCE:
+            return self.stringify()
+        elif self.modality == Modality.TABULAR:
+            return self.data
+        else:
+            # For other modalities (IMAGE, GRAPH, STRUCTURE, EMBEDDING),
+            # return raw data as fallback
+            return self.data
