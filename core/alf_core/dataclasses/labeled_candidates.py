@@ -222,6 +222,8 @@ class LabeledCandidates:
         if not isinstance(other, LabeledCandidates):
             return False
 
-        return self.candidates == other.candidates and np.array_equal(self.labels, other.labels)
+        return self.candidates == other.candidates and np.array_equal(
+            self.labels, other.labels, equal_nan=True
+        )
 
     __hash__ = None  # type: ignore[assignment]

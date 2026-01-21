@@ -234,3 +234,164 @@ def test_candidate_features_parametrized(features):
     """Parametrized test for different feature configurations."""
     candidate = Candidate(data="test", modality=Modality.SEQUENCE, features=features)
     assert candidate.features == features
+
+
+class TestCandidateEquality:
+    """Test cases for Candidate equality with numpy arrays and nested structures."""
+
+    def test_equality_basic_same_candidates(self):
+        """Test that two candidates with same data are equal."""
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
+        c2 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
+        assert c1 == c2
+
+    def test_equality_basic_different_data(self):
+        """Test that candidates with different data are not equal."""
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
+        c2 = Candidate(data="GCTA", modality=Modality.SEQUENCE)
+        assert c1 != c2
+
+    def test_equality_different_modality(self):
+        """Test that candidates with different modalities are not equal."""
+        c1 = Candidate(data="test", modality=Modality.SEQUENCE)
+        c2 = Candidate(data="test", modality=Modality.EMBEDDING)
+        assert c1 != c2
+
+    def test_equality_with_numpy_array_in_features(self):
+        """Test equality when features contain numpy arrays."""
+        arr = np.array([1.0, 2.0, 3.0])
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features={"embedding": arr})
+        c2 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features={"embedding": arr.copy()})
+        assert c1 == c2
+
+    def test_equality_with_numpy_array_in_features_different_values(self):
+        """Test inequality when features contain different numpy arrays."""
+        c1 = Candidate(
+            data="ATCG",
+            modality=Modality.SEQUENCE,
+            features={"embedding": np.array([1.0, 2.0, 3.0])},
+        )
+        c2 = Candidate(
+            data="ATCG",
+            modality=Modality.SEQUENCE,
+            features={"embedding": np.array([1.0, 2.0, 4.0])},
+        )
+        assert c1 != c2
+
+    def test_equality_with_numpy_array_in_data(self):
+        """Test equality when data is a numpy array (IMAGE modality)."""
+        img_data = np.random.rand(3, 64, 64).astype(np.float32)
+        c1 = Candidate(data=img_data, modality=Modality.IMAGE)
+        c2 = Candidate(data=img_data.copy(), modality=Modality.IMAGE)
+        assert c1 == c2
+
+    def test_equality_with_numpy_array_in_data_different_values(self):
+        """Test inequality when data contains different numpy arrays."""
+        c1 = Candidate(data=np.array([[1, 2], [3, 4]]), modality=Modality.STRUCTURE)
+        c2 = Candidate(data=np.array([[1, 2], [3, 5]]), modality=Modality.STRUCTURE)
+        assert c1 != c2
+
+    def test_equality_with_nested_list_of_numpy_arrays_in_data(self):
+        """Test equality with nested list containing numpy arrays."""
+        arr1 = np.array([1, 2, 3])
+        arr2 = np.array([4, 5, 6])
+        c1 = Candidate(data=[arr1, arr2], modality=Modality.EMBEDDING)
+        c2 = Candidate(data=[arr1.copy(), arr2.copy()], modality=Modality.EMBEDDING)
+        assert c1 == c2
+
+    def test_equality_with_nested_dict_of_numpy_arrays_in_features(self):
+        """Test equality with nested dict containing numpy arrays in features."""
+        features = {"layer1": np.array([1, 2]), "layer2": {"hidden": np.array([3, 4])}}
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features=features)
+        # Create a deep copy of nested features
+        features_copy = {
+            "layer1": features["layer1"].copy(),
+            "layer2": {"hidden": features["layer2"]["hidden"].copy()},
+        }
+        c2 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features=features_copy)
+        assert c1 == c2
+
+    def test_equality_with_mixed_features(self):
+        """Test equality with features containing mix of numpy arrays and regular values."""
+        features = {"score": 0.95, "embedding": np.array([1.0, 2.0]), "name": "test"}
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features=features)
+        features_copy = {"score": 0.95, "embedding": features["embedding"].copy(), "name": "test"}
+        c2 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features=features_copy)
+        assert c1 == c2
+
+    def test_equality_different_feature_keys(self):
+        """Test inequality when features have different keys."""
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features={"a": np.array([1])})
+        c2 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features={"b": np.array([1])})
+        assert c1 != c2
+
+    def test_equality_with_none_features(self):
+        """Test equality when features are None (should become empty dict)."""
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features=None)
+        c2 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features={})
+        assert c1 == c2
+
+    def test_equality_with_torch_tensors_in_features(self):
+        """Test equality with torch tensors in features."""
+        tensor = torch.tensor([1.0, 2.0, 3.0])
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features={"tensor": tensor})
+        c2 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features={"tensor": tensor.clone()})
+        # torch.equal() should be used for exact tensor comparison, but our fallback handles it
+        assert c1 == c2
+
+    def test_equality_with_nan_in_numpy_arrays(self):
+        """Test equality with NaN values in numpy arrays."""
+        arr_with_nan = np.array([1.0, np.nan, 3.0])
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features={"values": arr_with_nan})
+        c2 = Candidate(
+            data="ATCG", modality=Modality.SEQUENCE, features={"values": arr_with_nan.copy()}
+        )
+        # np.array_equal treats NaN as equal to NaN
+        assert c1 == c2
+
+    def test_equality_with_different_numpy_dtypes(self):
+        """Test equality with numpy arrays of different dtypes but same values."""
+        c1 = Candidate(
+            data="ATCG",
+            modality=Modality.SEQUENCE,
+            features={"arr": np.array([1, 2, 3], dtype=np.int32)},
+        )
+        c2 = Candidate(
+            data="ATCG",
+            modality=Modality.SEQUENCE,
+            features={"arr": np.array([1, 2, 3], dtype=np.int64)},
+        )
+        # np.array_equal actually considers different dtypes with same values as equal
+        assert c1 == c2
+
+    def test_equality_with_non_candidate_object(self):
+        """Test that comparing with non-Candidate returns False."""
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
+        assert c1 != "not a candidate"
+        assert c1 != 42
+        assert c1 != None
+
+    def test_unhashable(self):
+        """Test that Candidate objects are unhashable."""
+        c = Candidate(data="ATCG", modality=Modality.SEQUENCE)
+        with pytest.raises(TypeError):
+            hash(c)
+
+    def test_cannot_use_in_set(self):
+        """Test that Candidate objects cannot be added to sets."""
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
+        c2 = Candidate(data="GCTA", modality=Modality.SEQUENCE)
+        with pytest.raises(TypeError):
+            {c1, c2}
+
+    def test_equality_preserves_in_operator_semantics(self):
+        """Test that equality works correctly with 'in' operator in lists."""
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features={"arr": np.array([1, 2])})
+        c2 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features={"arr": np.array([1, 2])})
+        c3 = Candidate(data="GCTA", modality=Modality.SEQUENCE)
+
+        candidates_list = [c1, c3]
+        # c2 should be found because it's equal to c1
+        assert c2 in candidates_list
+        # But note: using 'in' checks equality, not identity
+        assert c1 in candidates_list

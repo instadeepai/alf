@@ -19,6 +19,13 @@ from typing import Any
 
 import numpy as np
 
+try:
+    import torch
+
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+
 
 class Modality(Enum):
     """Enum for different data modalities."""
@@ -103,7 +110,11 @@ class Candidate:
 
         # Handle numpy arrays
         if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):
-            return np.array_equal(a, b)
+            return np.array_equal(a, b, equal_nan=True)
+
+        # Handle torch tensors
+        if HAS_TORCH and isinstance(a, torch.Tensor) and isinstance(b, torch.Tensor):
+            return torch.equal(a, b)
 
         # Handle dict (for features)
         if isinstance(a, dict) and isinstance(b, dict):
@@ -119,8 +130,15 @@ class Candidate:
 
         # Default comparison
         try:
-            return a == b
-        except (ValueError, TypeError):
+            result = a == b
+            # Handle case where comparison returns array-like object
+            # Convert to boolean if possible
+            if hasattr(result, "__len__") and len(result) == 1:
+                return bool(result[0])
+            elif hasattr(result, "item"):  # For single-element tensors/arrays
+                return bool(result.item())
+            return bool(result)
+        except (ValueError, TypeError, RuntimeError):
             # If comparison fails (e.g., unexpected numpy arrays or incompatible types)
             return False
 
