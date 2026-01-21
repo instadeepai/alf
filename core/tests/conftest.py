@@ -240,14 +240,16 @@ class DummyAcquisitionFunction(AcquisitionFunction):
         self.seed = seed
         self.rng = np.random.RandomState(seed)
 
-    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Generate random acquisition values for the predictions.
+    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
+        """Generate random acquisition values for the candidates.
 
         Args:
-            predictions: Predictions from the surrogate model.
-            state: Task state.
+            search_candidates: List of Candidate objects to score.
+            state: Current task state containing the dataset and surrogate model.
 
         Returns:
-            Acquisition values.
+            LabeledCandidates with random acquisition values.
         """
-        return self.rng.randn(len(predictions))
+        predictions = state.surrogate.predict(search_candidates)
+        acquisition_values = self.rng.randn(len(predictions.means))
+        return LabeledCandidates(candidates=search_candidates, labels=acquisition_values)
