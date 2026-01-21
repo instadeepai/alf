@@ -144,4 +144,4 @@ class Candidate:
             and self._safe_equal(self.features, other.features)
         )
 
-    __hash__ = None
+    __hash__ = None  # type: ignore[assignment]

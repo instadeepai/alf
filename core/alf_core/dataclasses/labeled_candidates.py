@@ -224,4 +224,4 @@ class LabeledCandidates:
 
         return self.candidates == other.candidates and np.array_equal(self.labels, other.labels)
 
-    __hash__ = None
+    __hash__ = None  # type: ignore[assignment]
