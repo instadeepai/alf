@@ -47,24 +47,24 @@ jobs:
             ```
             gh pr create --title "Your descriptive title" --body "## Summary
             Your summary of what was implemented.
-             
+
             Closes #${{ github.event.issue.number }}"
             ```
             Always include a summary of changes AND "Closes #${{ github.event.issue.number }}" in the body.
-             
+
             **COMMIT RULES:**
             - Do NOT add "Co-authored-by" lines to commits
             - Do NOT add "Generated with Claude Code" or similar attributions
             - Keep commits clean and professional
-          
+
             **WHEN WORKING ON PR FEEDBACK:**
             Make the requested changes and commit. The PR will automatically update - do NOT create a new PR.
-           
+
             **WHEN FIXING CI FAILURES:**
             Fix the issues, commit the fix. The CI will automatically re-run.
-           
+
             **OUTPUT RULES:**
-          
+
             ## Commit Message Requirements (max 72 chars)
             - Imperative mood: "Add" not "Added"
             - Action verbs: Add, Update, Fix, Remove, Refactor, Implement
