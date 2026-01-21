@@ -586,7 +586,15 @@ def regret_ucb_alpha(
             f"of available items ({len(means)}). Using round({len(means)}/2) acquisitions instead.",
             stacklevel=2,
         )
-        num_acquisitions = round(len(means) / 2)
+        num_acquisitions = max(1, round(len(means) / 2))
+
+    # If the dataset is too small, skip the metric
+    if len(means) < 2:
+        warnings.warn(
+            f"Dataset size ({len(means)}) is too small to compute UCB regret. Returning NaN.",
+            stacklevel=2,
+        )
+        return {f"regret_ucb_{alpha:.2f}": np.nan}
 
     # Compute UCB values
     ucb_values = means + alpha * np.sqrt(variances)
