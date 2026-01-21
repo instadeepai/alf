@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-from alf_core import AcquisitionFunction, Predictions, TaskState
+
+from alf_core import AcquisitionFunction, Candidate, LabeledCandidates, TaskState
 
 
 class ThompsonSampling(AcquisitionFunction):
@@ -26,26 +26,27 @@ class ThompsonSampling(AcquisitionFunction):
     (Higher predictions correspond to higher ranks)
     We return the maximum rank for each candidate as an acquisition value, so that higher
     is better.
+    This is a maximising acquisition function.
     """
 
-    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Computes acquisition values for candidates based on surrogate predictions.
+    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
+        """Compute Thompson Sampling acquisition values for unlabelled candidates.
 
         Args:
-            predictions: The predictions from the surrogate model.
-            state: The task state containing the dataset and surrogate model.
-
-        Returns:
-            The acquisition values for the candidates.
+            search_candidates: List of unlabelled candidates to score.
+            state: The task state containing the current datasets and surrogate model.
 
         Raises:
             ValueError: If `empirical_dist` or `variances` is not found in predictions.
-            NotImplementedError: If `variances` is not found in predictions.
+
+        Returns:
+            LabeledCandidates with Thompson Sampling acquisition values.
         """
+        predictions = state.surrogate.predict(search_candidates)
         if predictions.empirical_dist is not None:
             samples = predictions.empirical_dist
             ranks = samples.argsort(axis=0).argsort(axis=0) + 1
-            return ranks.max(-1)
+            acquisition_values = ranks.max(-1)
         elif predictions.variances is not None:
             # NOTE: This needs to be implemented for GP
             raise NotImplementedError
@@ -54,3 +55,4 @@ class ThompsonSampling(AcquisitionFunction):
                 "Expected either `empirical_dist` or `variances` in predictions, "
                 "but neither was found. Cannot perform Thomson Sampling."
             )
+        return LabeledCandidates(candidates=search_candidates, labels=acquisition_values)
