@@ -19,3 +19,53 @@ from alf_tools.models.gp import (
     GPModelTrainer,
     GPTrainConfig,
 )
+from alf_tools.models.model_utils import (
+    create_char_to_idx_mapping,
+    extract_sequences_from_inputs,
+    get_device,
+    one_hot_encode,
+)
+
+# Lazy import for PyRosetta to avoid heavy downloads on module import
+# PyRosetta will only be imported when explicitly accessed
+__all__ = [
+    "CNNModel",
+    "CNNModelConfig",
+    "CNNTrainConfig",
+    "FeaturizerConfig",
+    "GPModelConfig",
+    "GPModelTrainer",
+    "GPTrainConfig",
+    "create_char_to_idx_mapping",
+    "extract_sequences_from_inputs",
+    "get_device",
+    "one_hot_encode",
+    "PyRosetta",
+]
+
+
+def __getattr__(name: str):
+    """Lazy import for heavy dependencies.
+    
+    This defers the import of PyRosetta until it's actually accessed,
+    avoiding the heavy download and initialization overhead if it's not needed.
+    
+    TODO: I think that there should be a script for downloading and installing rosetta that should be 
+    triggered if PyRosetta is being imported.
+    """
+    if name == "PyRosetta":
+        try:
+            from alf_tools.models.pyrosetta import PyRosetta
+            return PyRosetta
+        except ImportError as e:
+            # Provide a clear, actionable error message
+            raise ImportError(
+                "PyRosetta is not installed or could not be imported.\n"
+                "To install PyRosetta, run:\n"
+                "  python -c 'import pyrosetta_installer; pyrosetta_installer.install_pyrosetta()'\n"
+                "\n"
+                "Note: PyRosetta is a large package (~1-2GB) and installation may take 20-30 minutes.\n"
+                f"Original error: {e}"
+            ) from e
+    
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
