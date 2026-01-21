@@ -40,10 +40,45 @@ jobs:
           additional_permissions: |
             actions: read
 
-          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
-          # prompt: 'Update the pull request description to include a summary of changes.'
+          # Custom prompt with strict formatting rules
+          prompt: |
+            **IMPORTANT - WHEN WORKING ON ISSUES:**
+            After you finish implementing the code changes and committing them, create a pull request:
+            ```
+            gh pr create --title "Your descriptive title" --body "## Summary
+            Your summary of what was implemented.
+             
+            Closes #${{ github.event.issue.number }}"
+            ```
+            Always include a summary of changes AND "Closes #${{ github.event.issue.number }}" in the body.
+             
+            **COMMIT RULES:**
+            - Do NOT add "Co-authored-by" lines to commits
+            - Do NOT add "Generated with Claude Code" or similar attributions
+            - Keep commits clean and professional
+          
+            **WHEN WORKING ON PR FEEDBACK:**
+            Make the requested changes and commit. The PR will automatically update - do NOT create a new PR.
+           
+            **WHEN FIXING CI FAILURES:**
+            Fix the issues, commit the fix. The CI will automatically re-run.
+           
+            **OUTPUT RULES:**
+          
+            ## Commit Message Requirements (max 72 chars)
+            - Imperative mood: "Add" not "Added"
+            - Action verbs: Add, Update, Fix, Remove, Refactor, Implement
+            - No articles (a, an, the)
+            - No punctuation at end
+            - No prefixes like "feat:", "fix:"
+            - Single line only
+            - NO co-author attributions
 
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr:*)'
+          # Enable progress tracking
+          track_progress: true
+
+          # Claude CLI arguments
+          claude_args: |
+            --model "claude-opus-4-5"
+            --max-turns 100
+            --allowedTools "Bash(git:*),Bash(gh issue:*),Bash(gh pr:*),Bash(gh repo:*),Bash(npm:*),Bash(npx:*),Edit,Write,Read,Glob,Grep,LS,WebSearch,WebFetch"
