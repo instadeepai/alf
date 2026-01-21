@@ -18,7 +18,7 @@ from typing import Any, Union
 
 import numpy as np
 import pandas as pd
-from alf_core.dataclasses.candidate import Candidate
+from alf_core.dataclasses.candidate import Candidate, Modality
 
 
 @dataclass
@@ -172,9 +172,19 @@ class LabeledCandidates:
             - "label": The label value for each candidate
             - Additional columns for any features present in the candidates
         """
+
+        def _determine_data_format(cand: Candidate) -> Union[str, np.array]:
+            if cand.modality == Modality.SEQUENCE:
+                return cand.stringify()
+            if cand.modality == Modality.TABULAR:
+                return cand.data
+            return cand.stringify()
+
         rows = []
         for cand, label in zip(self.candidates, self.labels):
-            d = {"data": cand.stringify(), "label": label}
+            # TODO: Handle different modalities appropriately
+            # (tabular vs sequence, label terminology for regression)
+            d = {"data": _determine_data_format(cand), "label": label}
             if cand.features is not None and isinstance(cand.features, dict):
                 for k, v in cand.features.items():
                     d[k] = v
