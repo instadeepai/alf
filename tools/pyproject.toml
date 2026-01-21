@@ -41,6 +41,20 @@ torch_gpu = [
 
 [tool.uv.sources]
 alf_core = { path = "../core", editable = true }
+torch = [
+    { index = "pytorch-cpu", extra = "torch_cpu" },
+    { index = "pytorch-gpu", extra = "torch_gpu" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-gpu"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
 
 [tool.uv]
 default-groups = [
