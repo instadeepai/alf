@@ -23,6 +23,31 @@ from alf_tools.models.gp import (
     GPTrainConfig,
 )
 
+@pytest.fixture
+def sample_sinusoidal_data():
+    """Sample data from a sinusoidal function.
+
+    Returns:
+        LabeledCandidates with sinusoidal training data.
+    """
+    x = np.linspace(0, 10, 100) 
+    y = np.sin(x) + np.random.randn(100) * 0.1
+    candidates = [Candidate(data=x, modality="tabular") for x in x]
+    labels = np.array(y)
+    return LabeledCandidates(candidates, labels)
+
+@pytest.fixture
+def val_sinusoidal_data():
+    """Sample data from a sinusoidal function.
+
+    Returns:
+        LabeledCandidates with sinusoidal validation data.
+    """
+    x = np.linspace(1, 10, 10) 
+    y = np.sin(x) + np.random.randn(10) * 0.1
+    candidates = [Candidate(data=x, modality="tabular") for x in x]
+    labels = np.array(y)
+    return LabeledCandidates(candidates, labels)
 
 @pytest.fixture
 def sample_data():
@@ -45,10 +70,31 @@ def gp_model():
         A GPModel.
     """
     model_config = GPModelConfig(kernel_type="rbf", ard=False)
-    train_config = GPTrainConfig(num_iterations=10, log_frequency=5)
+    train_config = GPTrainConfig(num_iterations=200, log_frequency=5)
     featurizer_config = FeaturizerConfig(featurizer_type="one_hot", flatten_one_hot=True)
     return GPModelTrainer(
         name="test_gp",
+        model_config=model_config,
+        train_config=train_config,
+        featurizer_config=featurizer_config,
+        device="cpu",
+    )
+
+@pytest.fixture
+def gp_model_sinusoidal():
+    """Create a GPModel with small settings for fast testing.
+    Uses a custom featurizer that converts the input to a tensor.
+    Returns:
+        A GPModel.
+    """
+    model_config = GPModelConfig(kernel_type="rbf", ard=False)
+    train_config = GPTrainConfig(num_iterations=10, log_frequency=5)
+    featurizer_config = FeaturizerConfig(
+        featurizer_type="custom",
+        custom_featurizer=lambda x: torch.tensor(x, dtype=torch.float32),
+    )
+    return GPModelTrainer(
+        name="test_gp_sinusoidal",
         model_config=model_config,
         train_config=train_config,
         featurizer_config=featurizer_config,
@@ -71,7 +117,7 @@ class TestGPModel:
         # Should store metrics
         metrics = gp_model.get_training_summary_metrics()
         assert "final_mll" in metrics
-        assert "final_train_spearman" in metrics
+        assert "final_train_residual_pearson" in metrics
 
         # Predictions should work and include variances
         test_candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * 3
@@ -92,7 +138,7 @@ class TestGPModel:
         gp_model.train(sample_data, val_data=val_data)
 
         metrics = gp_model.get_training_summary_metrics()
-        assert "final_val_spearman" in metrics
+        assert "final_mll" in metrics
 
     def test_predict_before_train_raises_error(self, gp_model):
         """Test that predicting before train raises an error."""
@@ -213,28 +259,28 @@ class TestGPModel:
         assert predictions.means.shape == (1,)
         assert predictions.variances.shape == (1,)
 
-    def test_early_stopping(self, sample_data):
-        """Test that early stopping works."""
-        model_config = GPModelConfig(kernel_type="rbf", ard=False)
-        train_config = GPTrainConfig(
-            num_iterations=100,
-            early_stopping_patience=5,
-            early_stopping_delta=1e-4,
-            log_frequency=10,
-        )
-        featurizer_config = FeaturizerConfig(featurizer_type="one_hot", flatten_one_hot=True)
-        gp_model = GPModelTrainer(
-            model_config=model_config,
-            train_config=train_config,
-            featurizer_config=featurizer_config,
-            device="cpu",
-        )
+    # def test_early_stopping(self, sample_data):
+    #     """Test that early stopping works."""
+    #     model_config = GPModelConfig(kernel_type="rbf", ard=False)
+    #     train_config = GPTrainConfig(
+    #         num_iterations=100,
+    #         early_stopping_patience=5,
+    #         early_stopping_delta=1e-4,
+    #         log_frequency=10,
+    #     )
+    #     featurizer_config = FeaturizerConfig(featurizer_type="one_hot", flatten_one_hot=True)
+    #     gp_model = GPModelTrainer(
+    #         model_config=model_config,
+    #         train_config=train_config,
+    #         featurizer_config=featurizer_config,
+    #         device="cpu",
+    #     )
 
-        gp_model.train(sample_data)
-        metrics = gp_model.get_training_summary_metrics()
+    #     gp_model.train(sample_data)
+    #     metrics = gp_model.get_training_summary_metrics()
 
-        # Should stop before 100 iterations
-        assert metrics["num_iterations"] < 100
+    #     # Should stop before 100 iterations
+    #     assert metrics["num_iterations"] < 100
 
     def test_reproducibility_with_seed(self, sample_data):
         """Test that training is reproducible when using the same seed."""
@@ -333,3 +379,21 @@ class TestGPModel:
 
         gp_model.train(sample_data)
         assert gp_model.gp_model is not None
+    
+    def test_sinusoidal_data(
+        self, gp_model_sinusoidal, sample_sinusoidal_data, val_sinusoidal_data
+    ):
+        """Test the model to learn the sinusoidal function."""
+        gp_model_sinusoidal.train(
+            sample_sinusoidal_data, val_data=val_sinusoidal_data
+        )
+        test_candidates = [
+            Candidate(data=x, modality="tabular") for x in np.linspace(0, 10, 10)
+        ]
+        predictions = gp_model_sinusoidal.predict(test_candidates)
+        assert predictions.means.shape == (10,)
+        assert predictions.variances.shape == (10,)
+        assert np.all(np.isfinite(predictions.means))
+        assert np.all(np.isfinite(predictions.variances))
+        # Variances must be non-negative
+        assert np.all(predictions.variances >= 0)

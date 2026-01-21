@@ -14,10 +14,13 @@
 
 """Common utilities for model implementations."""
 
+from __future__ import annotations
+
 from typing import Union
 
 import torch
 from alf_core import Candidate, LabeledCandidates
+from jaxtyping import Float
 
 
 def create_char_to_idx_mapping(alphabet: str) -> dict[str, int]:
@@ -71,7 +74,7 @@ def one_hot_encode(
     char_to_idx: dict[str, int],
     alphabet_size: int,
     flatten: bool = False,
-) -> torch.Tensor:
+) -> Float[torch.Tensor, "batch_size ..."]:
     """One-hot encode sequences.
 
     Args:

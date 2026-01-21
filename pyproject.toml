@@ -20,6 +20,16 @@ torch_gpu = [
     "alf_tools[torch_gpu]",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=6.2.0",
+    "pytest-cov>=2.12.0",
+    "black>=21.0.0",
+    "flake8>=3.9.0",
+    "mypy>=0.910",
+    "pre-commit>=4.1.0",
+]
+
 # Path sources for local packages
 [tool.uv.sources]
 alf_core = { path = "core", editable = true }
@@ -47,6 +57,9 @@ conflicts = [
     { extra = "torch_gpu" },
   ],
 ]
+default-groups = [
+  "dev",
+]
 
 # Pyright/Pylance configuration for type checking and imports
 # This is needed because the project uses editable installs (development mode)
@@ -66,6 +79,10 @@ include = ["core", "tools", "tutorials"]
 [[tool.pyright.executionEnvironments]]
 root = "."
 extraPaths = ["core", "tools", "tutorials"]
+
+[tool.mypy]
+# Allow jaxtyping annotations with string literals
+disable_error_code = ["name-defined", "valid-type"]
 
 [tool.setuptools]
 packages = []  # No Python packages at root level - just a meta-package
