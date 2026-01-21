@@ -57,6 +57,12 @@ url = "https://download.pytorch.org/whl/cu121"
 explicit = true
 
 [tool.uv]
+conflicts = [
+  [
+    { extra = "torch_cpu" },
+    { extra = "torch_gpu" },
+  ],
+]
 default-groups = [
   "dev",
 ]
