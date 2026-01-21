@@ -15,4 +15,5 @@
 from alf_tools.optimizer.acquisition_functions.expected_improvement import ExpectedImprovement
 from alf_tools.optimizer.acquisition_functions.greedy import Greedy
 from alf_tools.optimizer.acquisition_functions.thompson_sampling import ThompsonSampling
+from alf_tools.optimizer.acquisition_functions.threshold_ucb import ThresholdUCB
 from alf_tools.optimizer.acquisition_functions.ucb import UCB
