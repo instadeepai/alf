@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from alf_core import AcquisitionFunction, Candidate, LabeledCandidates, TaskState
+from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, TaskState
 
 
 class ThompsonSampling(AcquisitionFunction):
@@ -29,7 +29,7 @@ class ThompsonSampling(AcquisitionFunction):
     This is a maximising acquisition function.
     """
 
-    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
+    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabelledCandidates:
         """Compute Thompson Sampling acquisition values for unlabelled candidates.
 
         Args:
@@ -40,7 +40,7 @@ class ThompsonSampling(AcquisitionFunction):
             ValueError: If `empirical_dist` or `variances` is not found in predictions.
 
         Returns:
-            LabeledCandidates with Thompson Sampling acquisition values.
+            LabelledCandidates with Thompson Sampling acquisition values.
         """
         predictions = state.surrogate.predict(search_candidates)
         if predictions.empirical_dist is not None:
@@ -55,4 +55,4 @@ class ThompsonSampling(AcquisitionFunction):
                 "Expected either `empirical_dist` or `variances` in predictions, "
                 "but neither was found. Cannot perform Thomson Sampling."
             )
-        return LabeledCandidates(candidates=search_candidates, labels=acquisition_values)
+        return LabelledCandidates(candidates=search_candidates, labels=acquisition_values)

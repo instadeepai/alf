@@ -18,7 +18,7 @@ import copy
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from alf_core.dataclasses import LabeledCandidates
+from alf_core.dataclasses import LabelledCandidates
 
 if TYPE_CHECKING:
     from alf_core.dataclasses import Predictions
@@ -35,7 +35,7 @@ class TaskState:
         surrogate: The surrogate model used for predictions.
         round: Current round number in the active learning loop.
         acq_batch_size: Number of candidates to acquire per round.
-        history: List of LabeledCandidates acquired in each round.
+        history: List of LabelledCandidates acquired in each round.
         round_metrics: Dictionary of metrics computed for the current round.
     """
 
@@ -47,7 +47,7 @@ class TaskState:
     round_metrics: dict[str, Any] = field(default_factory=dict)
     round_predictions: "Predictions" | None = None
 
-    def update(self, acquired_candidates: LabeledCandidates) -> None:
+    def update(self, acquired_candidates: LabelledCandidates) -> None:
         """Update the task state with newly acquired candidates.
 
         Adds the acquired candidates to history and updates the dataset splits.

@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import requests
-from alf_core import BaseDataset, BaseDatasetConfig, Candidate, LabeledCandidates
+from alf_core import BaseDataset, BaseDatasetConfig, Candidate, LabelledCandidates
 
 logger = logging.getLogger("alf-tools")
 
@@ -39,12 +39,12 @@ class GFP(BaseDataset):
         super().__init__(config)
         self.setup()
 
-    def load_dataset(self) -> LabeledCandidates:
+    def load_dataset(self) -> LabelledCandidates:
         """Load GFP dataset from local file or download from URL if not present.
         Clean dataset and return as HF dataset.
 
         Returns:
-            A LabeledCandidates object containing the GFP data.
+            A LabelledCandidates object containing the GFP data.
 
         Raises:
             FileNotFoundError: If the GFP dataset file is not found.
@@ -67,7 +67,7 @@ class GFP(BaseDataset):
         # otherwise the candidate pool is too large and becomes compute intensive
         data = list(gfp_dataset["nucSequence"])[:1000]
         labels = np.array(gfp_dataset["medianBrightness"].values)[:1000]
-        return LabeledCandidates(
+        return LabelledCandidates(
             candidates=[Candidate(data=data, modality=self.modality) for data in data],
             labels=labels,
         )
