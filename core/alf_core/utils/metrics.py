@@ -582,11 +582,26 @@ def regret_ucb_alpha(
     # Handle case where num_acquisitions > available items
     if num_acquisitions > len(means):
         warnings.warn(
-            f"num_acquisitions ({num_acquisitions}) is greater than the number "
-            f"of available items ({len(means)}). Using round({len(means)}/2) acquisitions instead.",
+            f"num_acquisitions ({num_acquisitions}) is greater than the number"
+            f"of available items ({len(means)}). Using round({len(means) / 2})"
+            f"acquisitions instead.",
             stacklevel=2,
         )
-        num_acquisitions = round(len(means) / 2)
+        num_acquisitions = max(1, round(len(means) / 2))
+
+    # With 1 candidate:
+    # UCB would select that 1 candidate (the only option)
+    # The "optimal" selection would also be that same 1 candidate
+    # Regret would always be 0 (no matter how good/bad the model is)
+    # The metric provides no useful signal about model quality
+    # With 0 candidates:
+    # The computation would break or return nonsensical results
+    if len(means) < 2:
+        warnings.warn(
+            f"Dataset size ({len(means)}) is too small to compute UCB regret. Returning NaN.",
+            stacklevel=2,
+        )
+        return {f"regret_ucb_{alpha:.2f}": np.nan}
 
     # Compute UCB values
     ucb_values = means + alpha * np.sqrt(variances)
