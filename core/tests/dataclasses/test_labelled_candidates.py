@@ -17,14 +17,14 @@ import numpy as np
 import pytest
 import torch
 from alf_core.dataclasses.candidate import Candidate, Modality
-from alf_core.dataclasses.labeled_candidates import LabeledCandidates
+from alf_core.dataclasses.labelled_candidates import LabelledCandidates
 
 
-class TestLabeledCandidatesInitialization:
-    """Test cases for LabeledCandidates initialization and basic functionality."""
+class TestLabelledCandidatesInitialization:
+    """Test cases for LabelledCandidates initialization and basic functionality."""
 
     def test_initialization_with_valid_data(self):
-        """Test LabeledCandidates initialization with valid candidates and labels."""
+        """Test LabelledCandidates initialization with valid candidates and labels."""
         candidates = [
             Candidate(data="sequence1", modality=Modality.SEQUENCE),
             Candidate(data="sequence2", modality=Modality.SEQUENCE),
@@ -32,46 +32,46 @@ class TestLabeledCandidatesInitialization:
         ]
         labels = np.array([1, 0, 1])
 
-        labeled_candidates = LabeledCandidates(candidates=candidates, labels=labels)
+        labelled_candidates = LabelledCandidates(candidates=candidates, labels=labels)
 
-        assert len(labeled_candidates) == 3
-        assert labeled_candidates.candidates == candidates
-        np.testing.assert_array_equal(labeled_candidates.labels, labels)
+        assert len(labelled_candidates) == 3
+        assert labelled_candidates.candidates == candidates
+        np.testing.assert_array_equal(labelled_candidates.labels, labels)
 
     def test_initialization_with_empty_data(self):
-        """Test LabeledCandidates initialization with empty lists."""
+        """Test LabelledCandidates initialization with empty lists."""
         candidates = []
         labels = np.array([])
 
-        labeled_candidates = LabeledCandidates(candidates=candidates, labels=labels)
+        labelled_candidates = LabelledCandidates(candidates=candidates, labels=labels)
 
-        assert len(labeled_candidates) == 0
-        assert labeled_candidates.candidates == []
-        assert len(labeled_candidates.labels) == 0
+        assert len(labelled_candidates) == 0
+        assert labelled_candidates.candidates == []
+        assert len(labelled_candidates.labels) == 0
 
     def test_initialization_with_single_item(self):
-        """Test LabeledCandidates initialization with single candidate and label."""
+        """Test LabelledCandidates initialization with single candidate and label."""
         candidates = [Candidate(data="test", modality=Modality.SEQUENCE)]
         labels = np.array([1])
 
-        labeled_candidates = LabeledCandidates(candidates=candidates, labels=labels)
+        labelled_candidates = LabelledCandidates(candidates=candidates, labels=labels)
 
-        assert len(labeled_candidates) == 1
-        assert labeled_candidates.candidates[0].data == "test"
-        assert labeled_candidates.labels[0] == 1
+        assert len(labelled_candidates) == 1
+        assert labelled_candidates.candidates[0].data == "test"
+        assert labelled_candidates.labels[0] == 1
 
     def test_large_number_of_candidates(self):
-        """Test LabeledCandidates with a large number of candidates."""
+        """Test LabelledCandidates with a large number of candidates."""
         n_candidates = 1000
         candidates = [
             Candidate(data=f"test{i}", modality=Modality.SEQUENCE) for i in range(n_candidates)
         ]
         labels = np.random.randint(0, 2, size=n_candidates)
 
-        labeled_candidates = LabeledCandidates(candidates=candidates, labels=labels)
+        labelled_candidates = LabelledCandidates(candidates=candidates, labels=labels)
 
-        assert len(labeled_candidates) == n_candidates
-        assert len(labeled_candidates.labels) == n_candidates
+        assert len(labelled_candidates) == n_candidates
+        assert len(labelled_candidates.labels) == n_candidates
 
     def test_multidimensional_labels(self):
         """Test labels with multidimensional arrays."""
@@ -81,14 +81,14 @@ class TestLabeledCandidatesInitialization:
         ]
         labels = np.array([[1, 0], [0, 1]])  # 2D labels
 
-        labeled_candidates = LabeledCandidates(candidates=candidates, labels=labels)
+        labelled_candidates = LabelledCandidates(candidates=candidates, labels=labels)
 
-        assert labeled_candidates.labels.shape == (2, 2)
-        np.testing.assert_array_equal(labeled_candidates.labels, np.array([[1, 0], [0, 1]]))
+        assert labelled_candidates.labels.shape == (2, 2)
+        np.testing.assert_array_equal(labelled_candidates.labels, np.array([[1, 0], [0, 1]]))
 
 
-class TestLabeledCandidatesValidation:
-    """Test cases for LabeledCandidates validation and error handling."""
+class TestLabelledCandidatesValidation:
+    """Test cases for LabelledCandidates validation and error handling."""
 
     def test_initialization_with_mismatched_lengths_raises_assertion(self):
         """Test that initialization with mismatched candidates and labels lengths
@@ -101,7 +101,7 @@ class TestLabeledCandidatesValidation:
         labels = np.array([1])  # Only one label for two candidates
 
         with pytest.raises(AssertionError, match="Candidates and labels must have the same length"):
-            LabeledCandidates(candidates=candidates, labels=labels)
+            LabelledCandidates(candidates=candidates, labels=labels)
 
     def test_initialization_with_empty_candidates_non_empty_labels(self):
         """Test initialization with empty candidates but non-empty labels."""
@@ -109,7 +109,7 @@ class TestLabeledCandidatesValidation:
         labels = np.array([1, 2, 3])
 
         with pytest.raises(AssertionError, match="Candidates and labels must have the same length"):
-            LabeledCandidates(candidates=candidates, labels=labels)
+            LabelledCandidates(candidates=candidates, labels=labels)
 
     def test_initialization_with_non_empty_candidates_empty_labels(self):
         """Test initialization with non-empty candidates but empty labels."""
@@ -120,11 +120,11 @@ class TestLabeledCandidatesValidation:
         labels = np.array([])
 
         with pytest.raises(AssertionError, match="Candidates and labels must have the same length"):
-            LabeledCandidates(candidates=candidates, labels=labels)
+            LabelledCandidates(candidates=candidates, labels=labels)
 
 
-class TestLabeledCandidatesMethods:
-    """Test cases for LabeledCandidates methods."""
+class TestLabelledCandidatesMethods:
+    """Test cases for LabelledCandidates methods."""
 
     def test_len_method(self):
         """Test __len__ method returns correct length."""
@@ -135,9 +135,9 @@ class TestLabeledCandidatesMethods:
         ]
         labels = np.array([1, 0, 1])
 
-        labeled_candidates = LabeledCandidates(candidates=candidates, labels=labels)
+        labelled_candidates = LabelledCandidates(candidates=candidates, labels=labels)
 
-        assert len(labeled_candidates) == 3
+        assert len(labelled_candidates) == 3
 
     def test_data_property(self):
         """Test data property returns raw data from candidates."""
@@ -148,23 +148,23 @@ class TestLabeledCandidatesMethods:
         ]
         labels = np.array([1, 0, 1])
 
-        labeled_candidates = LabeledCandidates(candidates=candidates, labels=labels)
+        labelled_candidates = LabelledCandidates(candidates=candidates, labels=labels)
 
         expected_data = ["sequence1", "sequence2", "sequence3"]
-        assert labeled_candidates.data == expected_data
+        assert labelled_candidates.data == expected_data
 
 
-class TestLabeledCandidatesGetItem:
+class TestLabelledCandidatesGetItem:
     """Tests for __getitem__ behavior."""
 
     def test_getitem_int_returns_singleton_collection(self):
-        """Test that indexing with integer returns a singleton LabeledCandidates."""
+        """Test that indexing with integer returns a singleton LabelledCandidates."""
         candidates = [
             Candidate(data="a", modality=Modality.SEQUENCE),
             Candidate(data="b", modality=Modality.SEQUENCE),
         ]
         labels = np.array([0, 1])
-        lc = LabeledCandidates(candidates=candidates, labels=labels)
+        lc = LabelledCandidates(candidates=candidates, labels=labels)
 
         item = lc[1]
         assert isinstance(item, tuple)
@@ -173,14 +173,14 @@ class TestLabeledCandidatesGetItem:
         np.testing.assert_array_equal(labels, np.array([1]))
 
     def test_getitem_slice_returns_subcollection(self):
-        """Test that slicing returns a subcollection of LabeledCandidates."""
+        """Test that slicing returns a subcollection of LabelledCandidates."""
         candidates = [
             Candidate(data="a", modality=Modality.SEQUENCE),
             Candidate(data="b", modality=Modality.SEQUENCE),
             Candidate(data="c", modality=Modality.SEQUENCE),
         ]
         labels = np.array([0, 1, 0])
-        lc = LabeledCandidates(candidates=candidates, labels=labels)
+        lc = LabelledCandidates(candidates=candidates, labels=labels)
 
         sub = lc[1:3]
         candidates, labels = sub
@@ -190,14 +190,14 @@ class TestLabeledCandidatesGetItem:
         np.testing.assert_array_equal(labels, np.array([1, 0]))
 
 
-class TestLabeledCandidatesValidateShuffleSortRemove:
+class TestLabelledCandidatesValidateShuffleSortRemove:
     """Tests for shuffle, sort, and remove methods."""
 
     def test_shuffle_deterministic(self):
         """Test that shuffle with same seed produces deterministic results."""
         candidates = [Candidate(data=str(i), modality=Modality.SEQUENCE) for i in range(5)]
         labels = np.array([0, 1, 2, 3, 4])
-        lc = LabeledCandidates(candidates=candidates, labels=labels)
+        lc = LabelledCandidates(candidates=candidates, labels=labels)
 
         shuffled1 = lc.shuffle(seed=42)
         shuffled2 = lc.shuffle(seed=42)
@@ -215,7 +215,7 @@ class TestLabeledCandidatesValidateShuffleSortRemove:
             Candidate(data="z", modality=Modality.SEQUENCE),
         ]
         labels = np.array([2.0, 1.0, 3.0])
-        lc = LabeledCandidates(candidates=candidates, labels=labels)
+        lc = LabelledCandidates(candidates=candidates, labels=labels)
 
         asc = lc.sort(ascending=True)
         desc = lc.sort(ascending=False)
@@ -227,19 +227,19 @@ class TestLabeledCandidatesValidateShuffleSortRemove:
         np.testing.assert_array_equal(desc.labels, np.array([3.0, 2.0, 1.0]))
 
     def test_remove_with_list_and_with_collection(self):
-        """Test remove method with both list and LabeledCandidates input."""
+        """Test remove method with both list and LabelledCandidates input."""
         c1 = Candidate(data="a", modality=Modality.SEQUENCE)
         c2 = Candidate(data="b", modality=Modality.SEQUENCE)
         c3 = Candidate(data="c", modality=Modality.SEQUENCE)
-        lc = LabeledCandidates(candidates=[c1, c2, c3], labels=np.array([1, 2, 3]))
+        lc = LabelledCandidates(candidates=[c1, c2, c3], labels=np.array([1, 2, 3]))
 
         # remove with list
         lc.remove([c2])
         assert [c.data for c in lc.candidates] == ["a", "c"]
         np.testing.assert_array_equal(lc.labels, np.array([1, 3]))
 
-        # remove with LabeledCandidates
-        lc2 = LabeledCandidates(candidates=[c1], labels=np.array([1]))
+        # remove with LabelledCandidates
+        lc2 = LabelledCandidates(candidates=[c1], labels=np.array([1]))
         lc.remove(lc2)
         assert [c.data for c in lc.candidates] == ["c"]
         np.testing.assert_array_equal(lc.labels, np.array([3]))
@@ -248,7 +248,7 @@ class TestLabeledCandidatesValidateShuffleSortRemove:
         """Test that remove silently ignores candidates not in the collection."""
         c1 = Candidate(data="a", modality=Modality.SEQUENCE)
         c2 = Candidate(data="b", modality=Modality.SEQUENCE)
-        lc = LabeledCandidates(candidates=[c1], labels=np.array([1]))
+        lc = LabelledCandidates(candidates=[c1], labels=np.array([1]))
 
         # Should not raise, just ignore c2
         lc.remove([c2])
@@ -258,14 +258,14 @@ class TestLabeledCandidatesValidateShuffleSortRemove:
         np.testing.assert_array_equal(lc.labels, np.array([1]))
 
 
-class TestLabeledCandidatesToDataFrame:
+class TestLabelledCandidatesToDataFrame:
     """Tests for to_dataframe ensuring features and stringify are used."""
 
     def test_to_dataframe_with_features(self):
         """Test to_dataframe method includes candidate features as columns."""
         c1 = Candidate(data="SEQ1", modality=Modality.SEQUENCE, features={"a": 1, "b": "x"})
         c2 = Candidate(data="SEQ2", modality=Modality.SEQUENCE, features={"a": 2})
-        lc = LabeledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        lc = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
 
         df = lc.to_dataframe()
         assert list(df.columns) == ["data", "label", "a", "b"] or list(df.columns) == [
@@ -283,14 +283,14 @@ class TestLabeledCandidatesToDataFrame:
         assert df.loc[1, "a"] == 2
 
 
-class TestLabeledCandidatesAppend:
-    """Test cases for LabeledCandidates append method."""
+class TestLabelledCandidatesAppend:
+    """Test cases for LabelledCandidates append method."""
 
     def test_append_with_candidates_list(self):
         """Test append method with list of candidates and labels."""
         candidates = [Candidate(data="test1", modality=Modality.SEQUENCE)]
         labels = np.array([1])
-        labeled_candidates = LabeledCandidates(candidates=candidates, labels=labels)
+        labelled_candidates = LabelledCandidates(candidates=candidates, labels=labels)
 
         new_candidates = [
             Candidate(data="test2", modality=Modality.SEQUENCE),
@@ -298,40 +298,40 @@ class TestLabeledCandidatesAppend:
         ]
         new_labels = np.array([0, 1])
 
-        labeled_candidates.append(new_candidates, new_labels)
+        labelled_candidates.append(new_candidates, new_labels)
 
-        assert len(labeled_candidates) == 3
-        assert labeled_candidates.candidates[0].data == "test1"
-        assert labeled_candidates.candidates[1].data == "test2"
-        assert labeled_candidates.candidates[2].data == "test3"
-        np.testing.assert_array_equal(labeled_candidates.labels, np.array([1, 0, 1]))
+        assert len(labelled_candidates) == 3
+        assert labelled_candidates.candidates[0].data == "test1"
+        assert labelled_candidates.candidates[1].data == "test2"
+        assert labelled_candidates.candidates[2].data == "test3"
+        np.testing.assert_array_equal(labelled_candidates.labels, np.array([1, 0, 1]))
 
-    def test_append_with_labeled_candidates(self):
-        """Test append method with another LabeledCandidates object."""
+    def test_append_with_labelled_candidates(self):
+        """Test append method with another LabelledCandidates object."""
         candidates1 = [Candidate(data="test1", modality=Modality.SEQUENCE)]
         labels1 = np.array([1])
-        labeled_candidates1 = LabeledCandidates(candidates=candidates1, labels=labels1)
+        labelled_candidates1 = LabelledCandidates(candidates=candidates1, labels=labels1)
 
         candidates2 = [
             Candidate(data="test2", modality=Modality.SEQUENCE),
             Candidate(data="test3", modality=Modality.SEQUENCE),
         ]
         labels2 = np.array([0, 1])
-        labeled_candidates2 = LabeledCandidates(candidates=candidates2, labels=labels2)
+        labelled_candidates2 = LabelledCandidates(candidates=candidates2, labels=labels2)
 
-        labeled_candidates1.append(labeled_candidates2)
+        labelled_candidates1.append(labelled_candidates2)
 
-        assert len(labeled_candidates1) == 3
-        assert labeled_candidates1.candidates[0].data == "test1"
-        assert labeled_candidates1.candidates[1].data == "test2"
-        assert labeled_candidates1.candidates[2].data == "test3"
-        np.testing.assert_array_equal(labeled_candidates1.labels, np.array([1, 0, 1]))
+        assert len(labelled_candidates1) == 3
+        assert labelled_candidates1.candidates[0].data == "test1"
+        assert labelled_candidates1.candidates[1].data == "test2"
+        assert labelled_candidates1.candidates[2].data == "test3"
+        np.testing.assert_array_equal(labelled_candidates1.labels, np.array([1, 0, 1]))
 
     def test_append_with_mismatched_lengths_raises_assertion(self):
         """Test that append with mismatched candidates and labels lengths raises AssertionError."""
         candidates = [Candidate(data="test1", modality=Modality.SEQUENCE)]
         labels = np.array([1])
-        labeled_candidates = LabeledCandidates(candidates=candidates, labels=labels)
+        labelled_candidates = LabelledCandidates(candidates=candidates, labels=labels)
 
         new_candidates = [
             Candidate(data="test2", modality=Modality.SEQUENCE),
@@ -340,59 +340,59 @@ class TestLabeledCandidatesAppend:
         new_labels = np.array([0])  # Only one label for two candidates
 
         with pytest.raises(AssertionError, match="Candidates and labels must have the same length"):
-            labeled_candidates.append(new_candidates, new_labels)
+            labelled_candidates.append(new_candidates, new_labels)
 
     def test_append_with_none_labels_raises_assertion(self):
         """Test that append with None labels raises AssertionError."""
         candidates = [Candidate(data="test1", modality=Modality.SEQUENCE)]
         labels = np.array([1])
-        labeled_candidates = LabeledCandidates(candidates=candidates, labels=labels)
+        labelled_candidates = LabelledCandidates(candidates=candidates, labels=labels)
 
         new_candidates = [Candidate(data="test2", modality=Modality.SEQUENCE)]
 
         with pytest.raises(AssertionError, match="Candidates and labels must have the same length"):
-            labeled_candidates.append(new_candidates, None)
+            labelled_candidates.append(new_candidates, None)
 
     def test_multiple_append_operations(self):
         """Test multiple consecutive append operations."""
-        labeled_candidates = LabeledCandidates(candidates=[], labels=np.array([]))
+        labelled_candidates = LabelledCandidates(candidates=[], labels=np.array([]))
 
         # First append
         candidates1 = [Candidate(data="test1", modality=Modality.SEQUENCE)]
         labels1 = np.array([1])
-        labeled_candidates.append(candidates1, labels1)
+        labelled_candidates.append(candidates1, labels1)
 
         # Second append
         candidates2 = [Candidate(data="test2", modality=Modality.SEQUENCE)]
         labels2 = np.array([0])
-        labeled_candidates.append(candidates2, labels2)
+        labelled_candidates.append(candidates2, labels2)
 
-        # Third append with LabeledCandidates
+        # Third append with LabelledCandidates
         candidates3 = [Candidate(data="test3", modality=Modality.SEQUENCE)]
         labels3 = np.array([1])
-        labeled_candidates3 = LabeledCandidates(candidates=candidates3, labels=labels3)
-        labeled_candidates.append(labeled_candidates3)
+        labelled_candidates3 = LabelledCandidates(candidates=candidates3, labels=labels3)
+        labelled_candidates.append(labelled_candidates3)
 
-        assert len(labeled_candidates) == 3
-        assert labeled_candidates.candidates[0].data == "test1"
-        assert labeled_candidates.candidates[1].data == "test2"
-        assert labeled_candidates.candidates[2].data == "test3"
-        np.testing.assert_array_equal(labeled_candidates.labels, np.array([1, 0, 1]))
+        assert len(labelled_candidates) == 3
+        assert labelled_candidates.candidates[0].data == "test1"
+        assert labelled_candidates.candidates[1].data == "test2"
+        assert labelled_candidates.candidates[2].data == "test3"
+        np.testing.assert_array_equal(labelled_candidates.labels, np.array([1, 0, 1]))
 
 
 @pytest.mark.parametrize("n_candidates", [0, 1, 5, 10, 100])
-def test_labeled_candidates_length_consistency(n_candidates):
+def test_labelled_candidates_length_consistency(n_candidates):
     """Parametrized test for length consistency with different numbers of candidates."""
     candidates = [
         Candidate(data=f"test{i}", modality=Modality.SEQUENCE) for i in range(n_candidates)
     ]
     labels = np.random.randint(0, 2, size=n_candidates)
 
-    labeled_candidates = LabeledCandidates(candidates=candidates, labels=labels)
+    labelled_candidates = LabelledCandidates(candidates=candidates, labels=labels)
 
-    assert len(labeled_candidates) == n_candidates
-    assert len(labeled_candidates.candidates) == n_candidates
-    assert len(labeled_candidates.labels) == n_candidates
+    assert len(labelled_candidates) == n_candidates
+    assert len(labelled_candidates.candidates) == n_candidates
+    assert len(labelled_candidates.labels) == n_candidates
 
 
 @pytest.mark.parametrize(
@@ -406,45 +406,45 @@ def test_labeled_candidates_length_consistency(n_candidates):
         (Modality.EMBEDDING, lambda: torch.randn(10, 5)),
     ],
 )
-def test_labeled_candidates_modality_consistency(modality, data_factory):
+def test_labelled_candidates_modality_consistency(modality, data_factory):
     """Parametrized test for different modalities with consistent data types."""
     data = data_factory()
     candidates = [Candidate(data=data, modality=modality)]
     labels = np.array([1])
 
-    labeled_candidates = LabeledCandidates(candidates=candidates, labels=labels)
+    labelled_candidates = LabelledCandidates(candidates=candidates, labels=labels)
 
-    assert len(labeled_candidates) == 1
-    assert labeled_candidates.candidates[0].modality == modality
-    assert labeled_candidates.data[0] is not None
+    assert len(labelled_candidates) == 1
+    assert labelled_candidates.candidates[0].modality == modality
+    assert labelled_candidates.data[0] is not None
 
 
-class TestLabeledCandidatesEquality:
-    """Test cases for LabeledCandidates equality with numpy arrays."""
+class TestLabelledCandidatesEquality:
+    """Test cases for LabelledCandidates equality with numpy arrays."""
 
     def test_equality_basic_same_labeled_candidates(self):
-        """Test that two LabeledCandidates with same data are equal."""
+        """Test that two LabelledCandidates with same data are equal."""
         c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
         c2 = Candidate(data="GCTA", modality=Modality.SEQUENCE)
-        lc1 = LabeledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
-        lc2 = LabeledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        lc1 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        lc2 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
         assert lc1 == lc2
 
     def test_equality_different_labels(self):
-        """Test that LabeledCandidates with different labels are not equal."""
+        """Test that LabelledCandidates with different labels are not equal."""
         c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
         c2 = Candidate(data="GCTA", modality=Modality.SEQUENCE)
-        lc1 = LabeledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
-        lc2 = LabeledCandidates(candidates=[c1, c2], labels=np.array([0.5, 2.0]))
+        lc1 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        lc2 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 2.0]))
         assert lc1 != lc2
 
     def test_equality_different_candidates(self):
-        """Test that LabeledCandidates with different candidates are not equal."""
+        """Test that LabelledCandidates with different candidates are not equal."""
         c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
         c2 = Candidate(data="GCTA", modality=Modality.SEQUENCE)
         c3 = Candidate(data="TTTT", modality=Modality.SEQUENCE)
-        lc1 = LabeledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
-        lc2 = LabeledCandidates(candidates=[c1, c3], labels=np.array([0.5, 1.5]))
+        lc1 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        lc2 = LabelledCandidates(candidates=[c1, c3], labels=np.array([0.5, 1.5]))
         assert lc1 != lc2
 
     def test_equality_with_numpy_arrays_in_candidate_features(self):
@@ -455,7 +455,7 @@ class TestLabeledCandidatesEquality:
         c2 = Candidate(
             data="GCTA", modality=Modality.SEQUENCE, features={"embedding": np.array([3.0, 4.0])}
         )
-        lc1 = LabeledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        lc1 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
 
         # Create copies with same values
         c1_copy = Candidate(
@@ -464,7 +464,7 @@ class TestLabeledCandidatesEquality:
         c2_copy = Candidate(
             data="GCTA", modality=Modality.SEQUENCE, features={"embedding": np.array([3.0, 4.0])}
         )
-        lc2 = LabeledCandidates(candidates=[c1_copy, c2_copy], labels=np.array([0.5, 1.5]))
+        lc2 = LabelledCandidates(candidates=[c1_copy, c2_copy], labels=np.array([0.5, 1.5]))
 
         assert lc1 == lc2
 
@@ -474,12 +474,12 @@ class TestLabeledCandidatesEquality:
         img2 = np.random.rand(3, 32, 32).astype(np.float32)
         c1 = Candidate(data=img1, modality=Modality.IMAGE)
         c2 = Candidate(data=img2, modality=Modality.IMAGE)
-        lc1 = LabeledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        lc1 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
 
         # Create copies
         c1_copy = Candidate(data=img1.copy(), modality=Modality.IMAGE)
         c2_copy = Candidate(data=img2.copy(), modality=Modality.IMAGE)
-        lc2 = LabeledCandidates(candidates=[c1_copy, c2_copy], labels=np.array([0.5, 1.5]))
+        lc2 = LabelledCandidates(candidates=[c1_copy, c2_copy], labels=np.array([0.5, 1.5]))
 
         assert lc1 == lc2
 
@@ -487,53 +487,53 @@ class TestLabeledCandidatesEquality:
         """Test equality with multidimensional label arrays."""
         c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
         labels_2d = np.array([[0.1, 0.9], [0.3, 0.7]])
-        lc1 = LabeledCandidates(candidates=[c1, c1], labels=labels_2d)
-        lc2 = LabeledCandidates(candidates=[c1, c1], labels=labels_2d.copy())
+        lc1 = LabelledCandidates(candidates=[c1, c1], labels=labels_2d)
+        lc2 = LabelledCandidates(candidates=[c1, c1], labels=labels_2d.copy())
         assert lc1 == lc2
 
     def test_equality_empty_collections(self):
-        """Test equality of empty LabeledCandidates collections."""
-        lc1 = LabeledCandidates(candidates=[], labels=np.array([]))
-        lc2 = LabeledCandidates(candidates=[], labels=np.array([]))
+        """Test equality of empty LabelledCandidates collections."""
+        lc1 = LabelledCandidates(candidates=[], labels=np.array([]))
+        lc2 = LabelledCandidates(candidates=[], labels=np.array([]))
         assert lc1 == lc2
 
     def test_equality_different_lengths(self):
         """Test inequality when collections have different lengths."""
         c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
         c2 = Candidate(data="GCTA", modality=Modality.SEQUENCE)
-        lc1 = LabeledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
-        lc2 = LabeledCandidates(candidates=[c1], labels=np.array([0.5]))
+        lc1 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        lc2 = LabelledCandidates(candidates=[c1], labels=np.array([0.5]))
         assert lc1 != lc2
 
     def test_equality_with_nan_in_labels(self):
         """Test equality when labels contain NaN values."""
         c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
         labels_with_nan = np.array([0.5, np.nan, 1.5])
-        lc1 = LabeledCandidates(candidates=[c1, c1, c1], labels=labels_with_nan)
-        lc2 = LabeledCandidates(candidates=[c1, c1, c1], labels=labels_with_nan.copy())
+        lc1 = LabelledCandidates(candidates=[c1, c1, c1], labels=labels_with_nan)
+        lc2 = LabelledCandidates(candidates=[c1, c1, c1], labels=labels_with_nan.copy())
         # np.array_equal treats NaN as equal to NaN
         assert lc1 == lc2
 
     def test_equality_with_non_labeled_candidates_object(self):
-        """Test that comparing with non-LabeledCandidates returns False."""
+        """Test that comparing with non-LabelledCandidates returns False."""
         c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
-        lc = LabeledCandidates(candidates=[c1], labels=np.array([0.5]))
+        lc = LabelledCandidates(candidates=[c1], labels=np.array([0.5]))
         assert lc != "not a labeled candidates"
         assert lc != [c1]
         assert lc is not None
 
     def test_unhashable(self):
-        """Test that LabeledCandidates objects are unhashable."""
+        """Test that LabelledCandidates objects are unhashable."""
         c = Candidate(data="ATCG", modality=Modality.SEQUENCE)
-        lc = LabeledCandidates(candidates=[c], labels=np.array([0.5]))
+        lc = LabelledCandidates(candidates=[c], labels=np.array([0.5]))
         with pytest.raises(TypeError):
             hash(lc)
 
     def test_cannot_use_in_set(self):
-        """Test that LabeledCandidates objects cannot be added to sets."""
+        """Test that LabelledCandidates objects cannot be added to sets."""
         c = Candidate(data="ATCG", modality=Modality.SEQUENCE)
-        lc1 = LabeledCandidates(candidates=[c], labels=np.array([0.5]))
-        lc2 = LabeledCandidates(candidates=[c], labels=np.array([1.5]))
+        lc1 = LabelledCandidates(candidates=[c], labels=np.array([0.5]))
+        lc2 = LabelledCandidates(candidates=[c], labels=np.array([1.5]))
         with pytest.raises(TypeError):
             {lc1, lc2}
 
@@ -550,7 +550,7 @@ class TestLabeledCandidatesEquality:
             data="TTTT", modality=Modality.SEQUENCE, features={"arr": np.array([7, 8, 9])}
         )
 
-        lc = LabeledCandidates(candidates=[c1, c2, c3], labels=np.array([0.1, 0.5, 0.9]))
+        lc = LabelledCandidates(candidates=[c1, c2, c3], labels=np.array([0.1, 0.5, 0.9]))
 
         # This should not raise ValueError anymore
         lc.remove([c2])
@@ -571,7 +571,7 @@ class TestLabeledCandidatesEquality:
         c2 = Candidate(data=img2, modality=Modality.IMAGE)
         c3 = Candidate(data=img3, modality=Modality.IMAGE)
 
-        lc = LabeledCandidates(candidates=[c1, c2, c3], labels=np.array([0.1, 0.5, 0.9]))
+        lc = LabelledCandidates(candidates=[c1, c2, c3], labels=np.array([0.1, 0.5, 0.9]))
 
         # Remove using identity (the actual object)
         lc.remove([c2])
@@ -586,8 +586,8 @@ class TestLabeledCandidatesEquality:
         c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features={"x": np.array([1])})
         c2 = Candidate(data="GCTA", modality=Modality.SEQUENCE, features={"x": np.array([2])})
 
-        lc1 = LabeledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
-        lc2 = LabeledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        lc1 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        lc2 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
 
         # Should be equal initially
         assert lc1 == lc2
