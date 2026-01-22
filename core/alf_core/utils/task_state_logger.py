@@ -20,7 +20,7 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
-from alf_core.dataclasses import Candidate, LabeledCandidates, Predictions, TaskState
+from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions, TaskState
 
 logger = logging.getLogger("alf-core")
 
@@ -95,7 +95,7 @@ class FileTaskStateLogger(TaskStateLogger):
             metrics_df = pd.concat([saved_df, metrics_df])
         metrics_df.to_csv(self.output_path / "metrics.csv", index=False)
 
-    def _log_acquisition_batch(self, acq_batch: LabeledCandidates, acq_round: int) -> None:
+    def _log_acquisition_batch(self, acq_batch: LabelledCandidates, acq_round: int) -> None:
         """Log the acquisition batch to file.
 
         Args:

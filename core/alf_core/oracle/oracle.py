@@ -17,7 +17,7 @@ import time
 from typing import Union
 
 import numpy as np
-from alf_core.dataclasses import Candidate, LabeledCandidates, TaskState
+from alf_core.dataclasses import Candidate, LabelledCandidates, TaskState
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.model.base_model import BaseModel
 
@@ -39,7 +39,7 @@ class Oracle:
 
     def evaluate(
         self, candidates: list[Candidate], state: TaskState
-    ) -> tuple[LabeledCandidates, TaskState]:
+    ) -> tuple[LabelledCandidates, TaskState]:
         """Evaluate candidates and return their labels.
 
         Args:
@@ -55,7 +55,7 @@ class Oracle:
         if isinstance(self.scorer, BaseDataset):
             evaluated_candidates = self.scorer.query(candidates)
         else:
-            evaluated_candidates = LabeledCandidates(
+            evaluated_candidates = LabelledCandidates(
                 candidates=candidates, labels=self.scorer.predict(candidates).means
             )
         t1 = time.perf_counter()
