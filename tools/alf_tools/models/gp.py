@@ -23,7 +23,10 @@ import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions, Results
 from alf_tools.models.model_utils import (
+    create_char_to_idx_mapping,
+    extract_sequences_from_inputs,
     get_device,
+    one_hot_encode,
 )
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 from jaxtyping import Float
@@ -284,7 +287,7 @@ class GPModelTrainer(BaseModel):
 
         self.alphabet = alphabet
         self.alphabet_size = len(alphabet)
-        self.char_to_idx = {char: idx for idx, char in enumerate(alphabet)}
+        self.char_to_idx = create_char_to_idx_mapping(alphabet)
 
         # Device setup
         self.device = get_device(device)
@@ -300,38 +303,6 @@ class GPModelTrainer(BaseModel):
 
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
-
-    def _one_hot_encode(self, sequences: list[str]) -> torch.Tensor:
-        """One-hot encode sequences.
-
-        Args:
-            sequences: List of sequences as strings.
-
-        Returns:
-            One-hot encoded tensor. Shape depends on flatten_one_hot config:
-            - If flatten_one_hot=True: (batch_size, alphabet_size * seq_length)
-            - If flatten_one_hot=False: (batch_size, alphabet_size, seq_length)
-
-        Raises:
-            ValueError: If sequences contain characters not in alphabet.
-        """
-        batch_size = len(sequences)
-        seq_length = len(sequences[0])
-
-        one_hot = torch.zeros(batch_size, self.alphabet_size, seq_length)
-
-        for i, sequence in enumerate(sequences):
-            for j, char in enumerate(sequence):
-                if char in self.char_to_idx:
-                    one_hot[i, self.char_to_idx[char], j] = 1.0
-                else:
-                    raise ValueError(f"Character '{char}' not in alphabet")
-
-        # Flatten if configured
-        if self.featurizer_config.flatten_one_hot:
-            one_hot = one_hot.view(batch_size, -1)
-
-        return one_hot
 
     def _apply_custom_featurizer(self, sequences: list[str]) -> torch.Tensor:
         """Apply custom featurization function.
@@ -365,16 +336,16 @@ class GPModelTrainer(BaseModel):
             ValueError: If input type is invalid or featurizer_type is unsupported.
         """
         # Extract sequences from inputs
-        if isinstance(inputs, LabeledCandidates):
-            sequences = inputs.data
-        elif isinstance(inputs, list) and all(isinstance(c, Candidate) for c in inputs):
-            sequences = [c.data for c in inputs]
-        else:
-            raise ValueError("Input must be LabeledCandidates or list of Candidates")
+        sequences = extract_sequences_from_inputs(inputs)
 
         # Dispatch to appropriate featurization method
         if self.featurizer_config.featurizer_type == "one_hot":
-            return self._one_hot_encode(sequences)
+            return one_hot_encode(
+                sequences,
+                self.char_to_idx,
+                self.alphabet_size,
+                flatten=self.featurizer_config.flatten_one_hot,
+            )
         elif self.featurizer_config.featurizer_type == "custom":
             return self._apply_custom_featurizer(sequences)
         elif self.featurizer_config.featurizer_type == "precomputed":
