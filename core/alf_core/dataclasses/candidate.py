@@ -129,18 +129,15 @@ class Candidate:
             return all(self._safe_equal(x, y) for x, y in zip(a, b))
 
         # Default comparison
-        try:
-            result = a == b
-            # Handle case where comparison returns array-like object
-            # Convert to boolean if possible
-            if hasattr(result, "__len__") and len(result) == 1:
-                return bool(result[0])
-            elif hasattr(result, "item"):  # For single-element tensors/arrays
-                return bool(result.item())
-            return bool(result)
-        except (ValueError, TypeError, RuntimeError):
-            # If comparison fails (e.g., unexpected numpy arrays or incompatible types)
-            return False
+        # Note, if comparison fails, an error will be thrown
+        result = a == b
+        # Handle case where comparison returns array-like object
+        # Convert to boolean if possible
+        if hasattr(result, "__len__") and len(result) == 1:
+            return bool(result[0])
+        elif hasattr(result, "item"):  # For single-element tensors/arrays
+            return bool(result.item())
+        return bool(result)
 
     def __eq__(self, other: object) -> bool:
         """Compare two Candidate objects for equality.
