@@ -417,3 +417,182 @@ def test_labelled_candidates_modality_consistency(modality, data_factory):
     assert len(labelled_candidates) == 1
     assert labelled_candidates.candidates[0].modality == modality
     assert labelled_candidates.data[0] is not None
+
+
+class TestLabelledCandidatesEquality:
+    """Test cases for LabelledCandidates equality with numpy arrays."""
+
+    def test_equality_basic_same_labeled_candidates(self):
+        """Test that two LabelledCandidates with same data are equal."""
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
+        c2 = Candidate(data="GCTA", modality=Modality.SEQUENCE)
+        lc1 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        lc2 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        assert lc1 == lc2
+
+    def test_equality_different_labels(self):
+        """Test that LabelledCandidates with different labels are not equal."""
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
+        c2 = Candidate(data="GCTA", modality=Modality.SEQUENCE)
+        lc1 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        lc2 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 2.0]))
+        assert lc1 != lc2
+
+    def test_equality_different_candidates(self):
+        """Test that LabelledCandidates with different candidates are not equal."""
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
+        c2 = Candidate(data="GCTA", modality=Modality.SEQUENCE)
+        c3 = Candidate(data="TTTT", modality=Modality.SEQUENCE)
+        lc1 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        lc2 = LabelledCandidates(candidates=[c1, c3], labels=np.array([0.5, 1.5]))
+        assert lc1 != lc2
+
+    def test_equality_with_numpy_arrays_in_candidate_features(self):
+        """Test equality when candidates contain numpy arrays in features."""
+        c1 = Candidate(
+            data="ATCG", modality=Modality.SEQUENCE, features={"embedding": np.array([1.0, 2.0])}
+        )
+        c2 = Candidate(
+            data="GCTA", modality=Modality.SEQUENCE, features={"embedding": np.array([3.0, 4.0])}
+        )
+        lc1 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+
+        # Create copies with same values
+        c1_copy = Candidate(
+            data="ATCG", modality=Modality.SEQUENCE, features={"embedding": np.array([1.0, 2.0])}
+        )
+        c2_copy = Candidate(
+            data="GCTA", modality=Modality.SEQUENCE, features={"embedding": np.array([3.0, 4.0])}
+        )
+        lc2 = LabelledCandidates(candidates=[c1_copy, c2_copy], labels=np.array([0.5, 1.5]))
+
+        assert lc1 == lc2
+
+    def test_equality_with_numpy_arrays_in_candidate_data(self):
+        """Test equality when candidates have numpy arrays as data."""
+        img1 = np.random.rand(3, 32, 32).astype(np.float32)
+        img2 = np.random.rand(3, 32, 32).astype(np.float32)
+        c1 = Candidate(data=img1, modality=Modality.IMAGE)
+        c2 = Candidate(data=img2, modality=Modality.IMAGE)
+        lc1 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+
+        # Create copies
+        c1_copy = Candidate(data=img1.copy(), modality=Modality.IMAGE)
+        c2_copy = Candidate(data=img2.copy(), modality=Modality.IMAGE)
+        lc2 = LabelledCandidates(candidates=[c1_copy, c2_copy], labels=np.array([0.5, 1.5]))
+
+        assert lc1 == lc2
+
+    def test_equality_with_multidimensional_labels(self):
+        """Test equality with multidimensional label arrays."""
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
+        labels_2d = np.array([[0.1, 0.9], [0.3, 0.7]])
+        lc1 = LabelledCandidates(candidates=[c1, c1], labels=labels_2d)
+        lc2 = LabelledCandidates(candidates=[c1, c1], labels=labels_2d.copy())
+        assert lc1 == lc2
+
+    def test_equality_empty_collections(self):
+        """Test equality of empty LabelledCandidates collections."""
+        lc1 = LabelledCandidates(candidates=[], labels=np.array([]))
+        lc2 = LabelledCandidates(candidates=[], labels=np.array([]))
+        assert lc1 == lc2
+
+    def test_equality_different_lengths(self):
+        """Test inequality when collections have different lengths."""
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
+        c2 = Candidate(data="GCTA", modality=Modality.SEQUENCE)
+        lc1 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        lc2 = LabelledCandidates(candidates=[c1], labels=np.array([0.5]))
+        assert lc1 != lc2
+
+    def test_equality_with_nan_in_labels(self):
+        """Test equality when labels contain NaN values."""
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
+        labels_with_nan = np.array([0.5, np.nan, 1.5])
+        lc1 = LabelledCandidates(candidates=[c1, c1, c1], labels=labels_with_nan)
+        lc2 = LabelledCandidates(candidates=[c1, c1, c1], labels=labels_with_nan.copy())
+        # np.array_equal treats NaN as equal to NaN
+        assert lc1 == lc2
+
+    def test_equality_with_non_labeled_candidates_object(self):
+        """Test that comparing with non-LabelledCandidates returns False."""
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE)
+        lc = LabelledCandidates(candidates=[c1], labels=np.array([0.5]))
+        assert lc != "not a labeled candidates"
+        assert lc != [c1]
+        assert lc is not None
+
+    def test_unhashable(self):
+        """Test that LabelledCandidates objects are unhashable."""
+        c = Candidate(data="ATCG", modality=Modality.SEQUENCE)
+        lc = LabelledCandidates(candidates=[c], labels=np.array([0.5]))
+        with pytest.raises(TypeError):
+            hash(lc)
+
+    def test_cannot_use_in_set(self):
+        """Test that LabelledCandidates objects cannot be added to sets."""
+        c = Candidate(data="ATCG", modality=Modality.SEQUENCE)
+        lc1 = LabelledCandidates(candidates=[c], labels=np.array([0.5]))
+        lc2 = LabelledCandidates(candidates=[c], labels=np.array([1.5]))
+        with pytest.raises(TypeError):
+            {lc1, lc2}
+
+    def test_remove_works_with_numpy_arrays_in_candidates(self):
+        """Test that remove() works correctly after fixing equality (the original bug)."""
+        # This was the original failing case that motivated the fix
+        c1 = Candidate(
+            data="ATCG", modality=Modality.SEQUENCE, features={"arr": np.array([1, 2, 3])}
+        )
+        c2 = Candidate(
+            data="GCTA", modality=Modality.SEQUENCE, features={"arr": np.array([4, 5, 6])}
+        )
+        c3 = Candidate(
+            data="TTTT", modality=Modality.SEQUENCE, features={"arr": np.array([7, 8, 9])}
+        )
+
+        lc = LabelledCandidates(candidates=[c1, c2, c3], labels=np.array([0.1, 0.5, 0.9]))
+
+        # This should not raise ValueError anymore
+        lc.remove([c2])
+
+        assert len(lc) == 2
+        assert c1 in lc.candidates
+        assert c3 in lc.candidates
+        assert c2 not in lc.candidates
+        np.testing.assert_array_equal(lc.labels, np.array([0.1, 0.9]))
+
+    def test_remove_with_image_data_candidates(self):
+        """Test remove() with candidates containing numpy array data (IMAGE modality)."""
+        img1 = np.random.rand(3, 32, 32).astype(np.float32)
+        img2 = np.random.rand(3, 32, 32).astype(np.float32)
+        img3 = np.random.rand(3, 32, 32).astype(np.float32)
+
+        c1 = Candidate(data=img1, modality=Modality.IMAGE)
+        c2 = Candidate(data=img2, modality=Modality.IMAGE)
+        c3 = Candidate(data=img3, modality=Modality.IMAGE)
+
+        lc = LabelledCandidates(candidates=[c1, c2, c3], labels=np.array([0.1, 0.5, 0.9]))
+
+        # Remove using identity (the actual object)
+        lc.remove([c2])
+
+        assert len(lc) == 2
+        assert c1 in lc.candidates
+        assert c3 in lc.candidates
+        np.testing.assert_array_equal(lc.labels, np.array([0.1, 0.9]))
+
+    def test_equality_after_operations(self):
+        """Test equality is preserved through various operations."""
+        c1 = Candidate(data="ATCG", modality=Modality.SEQUENCE, features={"x": np.array([1])})
+        c2 = Candidate(data="GCTA", modality=Modality.SEQUENCE, features={"x": np.array([2])})
+
+        lc1 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+        lc2 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
+
+        # Should be equal initially
+        assert lc1 == lc2
+
+        # After shuffle with same seed, should still be comparable
+        lc1_shuffled = lc1.shuffle(seed=42)
+        lc2_shuffled = lc2.shuffle(seed=42)
+        assert lc1_shuffled == lc2_shuffled  # Same shuffle seed produces equal results
