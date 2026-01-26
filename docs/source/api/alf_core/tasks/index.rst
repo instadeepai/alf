@@ -7,7 +7,7 @@ splits, and the ``ZeroShotTask`` evaluates pre-trained models without additional
 inherit from ``BaseTask`` which provides the common interface.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    Base Task <base_task/index>
    Design Task <design_task/index>

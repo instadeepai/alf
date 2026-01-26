@@ -7,7 +7,7 @@ contains functions for computing prediction accuracy and uncertainty calibration
 tasks during execution.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    Metrics <metrics/index>
    Task State Logger <task_state_logger/index>

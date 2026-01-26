@@ -7,7 +7,7 @@ distributes newly acquired data into existing splits, and provides labels for ca
 original dataset (used by the oracle in offline settings).
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    Base Dataset <base_dataset/index>
    Splitting Utils <splitting_utils/index>

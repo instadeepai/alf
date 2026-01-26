@@ -8,7 +8,7 @@ acquisition functions for scoring candidates, search strategies for defining can
 metrics for evaluating optimizer performance.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    Optimizer <optimizer/index>
    Acquisition Function <acquisition_function/index>

@@ -6,7 +6,7 @@ labelled data, predictions, results, and task state. They provide type-safe cont
 data between components and tracking experiment progress.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    Candidate <candidate/index>
    Labelled Candidates <labelled_candidates/index>
