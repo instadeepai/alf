@@ -47,7 +47,7 @@ This README is organized into the following sections:
 
 The `BaseDataset` class manages data loading, splitting, and querying. It handles:
 
-- **Data Loading**: Loads raw labeled data through the abstract `load_dataset()` method
+- **Data Loading**: Loads raw labelled data through the abstract `load_dataset()` method
 - **Data Splitting**: Splits data into train, validation, test, and candidate_pool sets
 - **Split Updates**: Distributes newly acquired data into existing data splits
 - **Querying**: Provides labels for candidates from the original dataset (used by the
@@ -55,7 +55,7 @@ The `BaseDataset` class manages data loading, splitting, and querying. It handle
 
 **Key Methods:**
 - `load_dataset()`: Every child class needs to implement how to load the dataset and
-  return it as `LabeledCamdidates`
+  return it as `LabelledCamdidates`
 - `_split_dataset()`: Splits the dataset based on the split config, which specifies the
   ratio of data points in train/val/test/candidate_pool sets and the splitting method
   (random or low_vs_high)
@@ -72,8 +72,8 @@ the framework. Models can serve multiple roles depending on the context:
 - **Generator Model**: Wrapped by `GeneratorSearch` to sample candidate sequences from the model
 
 **Key Abstract Methods:**
-- `featurise()`: Converts inputs (candidates or labeled data) into features suitable for the model
-- `train()`: Trains the model on labeled training and validation data
+- `featurise()`: Converts inputs (candidates or labelled data) into features suitable for the model
+- `train()`: Trains the model on labelled training and validation data
 - `predict()`: Generates predictions (means and uncertainties) for candidate sequences
 - `sample()`: Samples new candidate sequences from the model (used for generative search strategies)
 
@@ -96,7 +96,7 @@ the framework. Models can serve multiple roles depending on the context:
 The surrogate approximates the expensive experimental evaluation. It wraps a `BaseModel`
 and provides:
 
-- **Training**: Fits the model on labeled training data
+- **Training**: Fits the model on labelled training data
 - **Prediction**: Makes predictions on candidate sequences
 - **Metrics**: Tracks training metrics and performance
 

@@ -20,7 +20,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions, Results
+from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
+from alf_tools.utils.constants import PROTEIN_ALPHABET
 from torch.utils.data import DataLoader, TensorDataset
 
 from alf_tools.utils.constants import PROTEIN_ALPHABET
@@ -203,29 +204,29 @@ class CNNModel(BaseModel):
 
         return one_hot
 
-    def featurise(self, inputs: Union[LabeledCandidates, list[Candidate]]) -> torch.Tensor:
+    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> torch.Tensor:
         """Convert inputs to one-hot encoded tensors.
 
         Args:
-            inputs: Either LabeledCandidates or list of Candidates to featurise.
+            inputs: Either LabelledCandidates or list of Candidates to featurise.
 
         Returns:
             A one-hot encoded tensor of shape (batch_size, alphabet_size, seq_length).
 
         Raises:
-            ValueError: If the input is not LabeledCandidates or list of Candidates.
+            ValueError: If the input is not LabelledCandidates or list of Candidates.
         """
-        if isinstance(inputs, LabeledCandidates):
+        if isinstance(inputs, LabelledCandidates):
             sequences = inputs.data
         elif isinstance(inputs, list) and all(isinstance(c, Candidate) for c in inputs):
             sequences = [c.data for c in inputs]
         else:
-            raise ValueError("Input must be LabeledCandidates or list of Candidates")
+            raise ValueError("Input must be LabelledCandidates or list of Candidates")
 
         return self._one_hot_encode(sequences)
 
-    def _prepare_data_loader(self, data: LabeledCandidates, shuffle: bool = False) -> DataLoader:
-        """Prepare a DataLoader from LabeledCandidates.
+    def _prepare_data_loader(self, data: LabelledCandidates, shuffle: bool = False) -> DataLoader:
+        """Prepare a DataLoader from LabelledCandidates.
 
         Args:
             data: Data containing sequences and oracle values.
@@ -372,8 +373,8 @@ class CNNModel(BaseModel):
 
     def train(
         self,
-        train_data: LabeledCandidates,
-        val_data: LabeledCandidates | None = None,
+        train_data: LabelledCandidates,
+        val_data: LabelledCandidates | None = None,
     ) -> None:
         """Train the CNN model.
 

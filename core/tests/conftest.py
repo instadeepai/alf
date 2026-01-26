@@ -18,7 +18,7 @@ from typing import Any, List, Literal, Union
 
 import numpy as np
 import pytest
-from alf_core.dataclasses import Candidate, LabeledCandidates, Predictions, TaskState
+from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions, TaskState
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.model.base_model import BaseModel
 from alf_core.optimizer.acquisition_function import AcquisitionFunction
@@ -181,14 +181,14 @@ class DummyModel(BaseModel):
         labels = self.rng.randn(len(candidate_points))
         return Predictions(means=labels)
 
-    def featurise(self, inputs: Union[LabeledCandidates, List[Candidate]]) -> Any:
+    def featurise(self, inputs: Union[LabelledCandidates, List[Candidate]]) -> Any:
         """Dummy model does not perform featurisation."""
         pass
 
     def train(
         self,
-        train_data: LabeledCandidates,
-        val_data: LabeledCandidates,
+        train_data: LabelledCandidates,
+        val_data: LabelledCandidates,
     ) -> None:
         """Dummy model does not perform any actual training but updates the random seed."""
         self.rng = np.random.RandomState(self.seed + 1)
@@ -210,11 +210,11 @@ class DummyDataset(BaseDataset):
         super().__init__(config)
         self.setup()
 
-    def load_dataset(self) -> LabeledCandidates:
+    def load_dataset(self) -> LabelledCandidates:
         """Generate dummy dataset with random sequences and labels.
 
         Returns:
-            LabeledCandidates with dummy data
+            LabelledCandidates with dummy data
         """
         candidates = []
         labels = []
@@ -229,7 +229,7 @@ class DummyDataset(BaseDataset):
             candidates.append(Candidate(data=dummy_sequence, modality=self.modality))
             labels.append(dummy_label)
 
-        return LabeledCandidates(candidates=candidates, labels=np.array(labels))
+        return LabelledCandidates(candidates=candidates, labels=np.array(labels))
 
 
 class DummyAcquisitionFunction(AcquisitionFunction):
@@ -240,14 +240,16 @@ class DummyAcquisitionFunction(AcquisitionFunction):
         self.seed = seed
         self.rng = np.random.RandomState(seed)
 
-    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Generate random acquisition values for the predictions.
+    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabelledCandidates:
+        """Generate random acquisition values for the candidates.
 
         Args:
-            predictions: Predictions from the surrogate model.
-            state: Task state.
+            search_candidates: List of Candidate objects to score.
+            state: Current task state containing the dataset and surrogate model.
 
         Returns:
-            Acquisition values.
+            LabelledCandidates with random acquisition values.
         """
-        return self.rng.randn(len(predictions))
+        predictions = state.surrogate.predict(search_candidates)
+        acquisition_values = self.rng.randn(len(predictions.means))
+        return LabelledCandidates(candidates=search_candidates, labels=acquisition_values)

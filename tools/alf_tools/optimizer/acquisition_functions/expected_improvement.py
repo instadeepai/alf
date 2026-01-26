@@ -12,30 +12,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import numpy as np
-from alf_core import AcquisitionFunction, Predictions, TaskState
+from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, TaskState
 from scipy.stats import norm
 
 
 class ExpectedImprovement(AcquisitionFunction):
-    """Expected improvement acquisition function."""
+    """Expected improvement acquisition function.
 
-    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Computes acquisition values for candidates based on surrogate predictions.
+    The Expected Improvement acquisition value is given by:
+    EI = (μ - best_f) * Φ(z) + σ * φ(z), where μ is the mean prediction,
+    σ is the standard deviation, best_f is the best observed value,
+    z is (μ - best_f) / σ, and Φ and φ are the CDF and PDF of the
+    standard normal distribution.
+    Higher EI values indicate more improvement over the best observed value.
+    This is a maximising acquisition function.
+    """
+
+    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabelledCandidates:
+        """Compute Expected Improvement acquisition values for unlabelled candidates.
 
         Args:
-            predictions: The predictions from the surrogate model.
-            state: The task state containing the dataset and surrogate model.
-
-        Returns:
-            The acquisition values for the candidates.
+            search_candidates: List of unlabelled candidates to score.
+            state: The task state containing the current datasets and surrogate model.
 
         Raises:
             ValueError: If `empirical_dist` or `variances` is not found in predictions.
+
+        Returns:
+            LabelledCandidates with Expected Improvement acquisition values.
         """
+        predictions = state.surrogate.predict(search_candidates)
         best_f = state.dataset.train_dataset.labels.max()
         if predictions.empirical_dist is not None:
-            return np.mean(np.maximum(predictions.empirical_dist - best_f, 0), -1)
+            acquisition_values = np.mean(np.maximum(predictions.empirical_dist - best_f, 0), -1)
         elif predictions.variances is not None:
             mu = predictions.means
             sigma = np.sqrt(predictions.variances)
@@ -44,9 +55,10 @@ class ExpectedImprovement(AcquisitionFunction):
 
             z = (mu - best_f) / sigma
             ei = (mu - best_f) * norm.cdf(z) + sigma * norm.pdf(z)
-            return np.maximum(ei, 0.0)
+            acquisition_values = np.maximum(ei, 0.0)
         else:
             raise ValueError(
                 "Expected either `empirical_dist` or `variances` in predictions, "
                 "but neither was found. Cannot compute expected improvement."
             )
+        return LabelledCandidates(candidates=search_candidates, labels=acquisition_values)

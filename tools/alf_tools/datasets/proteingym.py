@@ -19,7 +19,7 @@ from typing import Literal
 
 import numpy as np
 import pandas as pd
-from alf_core import BaseDataset, Candidate, LabeledCandidates
+from alf_core import BaseDataset, Candidate, LabelledCandidates
 from alf_core.dataset.base_dataset import BaseDatasetConfig
 from huggingface_hub import hf_hub_download
 
@@ -68,9 +68,9 @@ class ProteinGym(BaseDataset):
             f"dms_name={self.config.dms_name})"
         )
 
-    def load_dataset(self) -> LabeledCandidates:
+    def load_dataset(self) -> LabelledCandidates:
         """Load ProteinGym dataset from local file or download from HF if not present.
-        Process dataset and return as labeled candidates.
+        Process dataset and return as labelled candidates.
 
         Returns:
             Labeled candidates with ProteinGym data.
@@ -98,7 +98,7 @@ class ProteinGym(BaseDataset):
             logger.info("ProteinGym dataset downloaded successfully.")
 
         df = pd.read_csv(filepath)
-        dataset = LabeledCandidates(candidates=[], labels=np.array([]))
+        dataset = LabelledCandidates(candidates=[], labels=np.array([]))
         for _, row in df.iterrows():
             data = row["mutated_sequence"]
             label = row["DMS_score"]
@@ -119,7 +119,7 @@ class ProteinGym(BaseDataset):
 
         return dataset
 
-    def _split_dataset(self) -> dict[str, LabeledCandidates]:
+    def _split_dataset(self) -> dict[str, LabelledCandidates]:
         """Split dataset into train, validation, test and candidate pool splits.
 
         Returns:
@@ -130,7 +130,7 @@ class ProteinGym(BaseDataset):
         else:
             return super()._split_dataset()
 
-    def _split_cross_validation(self) -> dict[str, LabeledCandidates]:
+    def _split_cross_validation(self) -> dict[str, LabelledCandidates]:
         """Split dataset into cross-validation folds.
 
         Returns:
@@ -153,8 +153,8 @@ class ProteinGym(BaseDataset):
 
         # Shuffle dataset
         shuffled_dataset = self._raw_dataset.shuffle(self.config.seed)
-        train_and_validation_dataset = LabeledCandidates(candidates=[], labels=[])
-        test_and_candidate_pool_dataset = LabeledCandidates(candidates=[], labels=[])
+        train_and_validation_dataset = LabelledCandidates(candidates=[], labels=[])
+        test_and_candidate_pool_dataset = LabelledCandidates(candidates=[], labels=[])
 
         # Split dataset into train/test sets depending on cross-validation fold
         cv_type = f"{self.config.cross_validation_type}_fold_id"
@@ -166,10 +166,10 @@ class ProteinGym(BaseDataset):
                 train_and_validation_dataset.append([candidate], [label])
 
         # Split train/validation and test/candidate pool sets
-        train_dataset = LabeledCandidates(*train_and_validation_dataset[:train_size])
-        validation_dataset = LabeledCandidates(*train_and_validation_dataset[train_size:])
-        test_dataset = LabeledCandidates(*test_and_candidate_pool_dataset[:test_size])
-        candidate_pool_dataset = LabeledCandidates(
+        train_dataset = LabelledCandidates(*train_and_validation_dataset[:train_size])
+        validation_dataset = LabelledCandidates(*train_and_validation_dataset[train_size:])
+        test_dataset = LabelledCandidates(*test_and_candidate_pool_dataset[:test_size])
+        candidate_pool_dataset = LabelledCandidates(
             *test_and_candidate_pool_dataset[test_size : test_size + candidate_pool_size]
         )
 

@@ -12,12 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import numpy as np
-from alf_core import AcquisitionFunction, Predictions, TaskState
+from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, TaskState
 
 
 class UCB(AcquisitionFunction):
-    """Upper Confidence Bound acquisition function."""
+    """Upper Confidence Bound acquisition function.
+
+    The UCB acquisition value is given by: UCB = μ + ασ, where μ is the mean prediction,
+    σ is the standard deviation, and α is the exploration parameter.
+    Higher α values lead to more exploration, while lower α values lead to more exploitation.
+    This is a maximising acquisition function.
+    """
 
     def __init__(self, alpha: float):
         """Initialize UCB with exploration parameter alpha.
@@ -27,24 +34,26 @@ class UCB(AcquisitionFunction):
         """
         self.alpha = alpha
 
-    def _get_acquisition_values(self, predictions: Predictions, state: TaskState) -> np.ndarray:
-        """Computes acquisition values for candidates based on surrogate predictions.
+    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabelledCandidates:
+        """Compute Upper Confidence Bound (UCB) acquisition values for unlabelled candidates.
 
         Args:
-            predictions: The predictions from the surrogate model.
-            state: The task state containing the dataset and surrogate model.
-
-        Returns:
-            The acquisition values for the candidates.
+            search_candidates: List of unlabelled candidates to score.
+            state: The task state containing the current datasets and surrogate model.
 
         Raises:
             ValueError: If `variances` is not found in predictions.
+
+        Returns:
+            LabelledCandidates with UCB acquisition values.
         """
+        predictions = state.surrogate.predict(search_candidates)
         if predictions.variances is not None:
             sigma = np.sqrt(predictions.variances)
             mu = predictions.means
-            return mu + self.alpha * sigma
+            acquisition_values = mu + self.alpha * sigma
         else:
             raise ValueError(
                 "Expected `variances` in predictions, but was not found. Cannot compute UCB."
             )
+        return LabelledCandidates(candidates=search_candidates, labels=acquisition_values)

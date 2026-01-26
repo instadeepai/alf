@@ -11,8 +11,8 @@ requires-python = ">=3.12"
 dependencies = [
     "alf_core",
     "requests>=2.25.0",
-    "huggingface_hub==0.27.0"
-
+    "huggingface_hub==0.27.0",
+    "jaxtyping>=0.3.5",
 ]
 
 [tool.setuptools.packages.find]
@@ -32,17 +32,19 @@ dev = [
 [project.optional-dependencies]
 torch_cpu = [
     "torch>=1.9.0",
+    "gpytorch>=1.9.0",
 ]
 torch_gpu = [
    "torch>=1.9.0",
+   "gpytorch>=1.9.0",
 ]
 
 [tool.uv.sources]
+alf_core = { path = "../core", editable = true }
 torch = [
-  { index = "pytorch-cpu", extra = "torch_cpu" },
-  { index = "pytorch-gpu", extra = "torch_gpu" },
+    { index = "pytorch-cpu", extra = "torch_cpu" },
+    { index = "pytorch-gpu", extra = "torch_gpu" },
 ]
-alf_core = {path = "../core", editable = true}
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
