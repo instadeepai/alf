@@ -25,4 +25,4 @@ Contents
    :maxdepth: 2
 
    Core <api/alf_core/index>
-   Tools <api/alf_tools/modules>
+   Tools <api/alf_tools/index>
