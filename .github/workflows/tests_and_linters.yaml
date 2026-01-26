@@ -27,7 +27,7 @@ jobs:
 
       - name: Lint
         run: |
-          cd core && uv sync --extra torch_cpu
+          cd core && uv sync
           uv run --no-sync pre-commit run --all-files --verbose
 
   tests:
@@ -58,7 +58,7 @@ jobs:
         - name: Run tests (core) 🧪
           run: |
             cd core
-            uv sync --extra torch_cpu
+            uv sync
             uv run --no-sync pytest --verbose --cov-report xml:coverage-core.xml \
                             --cov-report term-missing \
                             --junitxml=pytest-core.xml \
@@ -67,7 +67,7 @@ jobs:
         - name: Run tests (tools) 🧪
           run: |
             cd tools
-            uv sync --extra torch_cpu
+            uv sync
             uv run --no-sync pytest --verbose --cov-report xml:coverage-tools.xml \
                             --cov-report term-missing \
                             --junitxml=pytest-tools.xml \
