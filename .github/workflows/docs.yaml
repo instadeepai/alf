@@ -33,7 +33,7 @@ jobs:
       - name: Build docs
         run: |
           cd docs
-          make html
+          uv run make html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
