@@ -23,7 +23,6 @@ Contents
 
 .. toctree::
    :maxdepth: 1
-   :caption: API
 
-   Core <api/alf_core/modules>
+   Core <api/alf_core/index>
    Tools <api/alf_tools/modules>
