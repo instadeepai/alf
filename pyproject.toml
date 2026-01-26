@@ -10,24 +10,22 @@ dependencies = [
     "alf_tutorials",
 ]
 
-[project.optional-dependencies]
-torch_gpu = []  # Marker extra to enable GPU-accelerated PyTorch
-
 # Path sources for local packages
 [tool.uv.sources]
 alf_core = { path = "core", editable = true }
 alf_tools = { path = "tools", editable = true }
 alf_tutorials = { path = "tutorials", editable = true }
-torch = [
-  { index = "pytorch-gpu", marker = "extra == 'torch_gpu' and (sys_platform == 'linux' or sys_platform == 'win32')" },
-]
+torch = { index = "pytorch-cpu" }  # Default: CPU version for broader compatibility
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [[tool.uv.index]]
 name = "pytorch-gpu"
 url = "https://download.pytorch.org/whl/cu121"
 explicit = true
-
-[tool.uv]
 
 # Pyright/Pylance configuration for type checking and imports
 # This is needed because the project uses editable installs (development mode)
