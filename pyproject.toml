@@ -11,14 +11,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-torch_cpu = [
-    "torch",
-    "alf_tools[torch_cpu]",
-]
-torch_gpu = [
-    "torch",
-    "alf_tools[torch_gpu]",
-]
+torch_gpu = []  # Marker extra to enable GPU-accelerated PyTorch
 
 # Path sources for local packages
 [tool.uv.sources]
@@ -26,14 +19,8 @@ alf_core = { path = "core", editable = true }
 alf_tools = { path = "tools", editable = true }
 alf_tutorials = { path = "tutorials", editable = true }
 torch = [
-  { index = "pytorch-cpu", extra = "torch_cpu" },
-  { index = "pytorch-gpu", extra = "torch_gpu" },
+  { index = "pytorch-gpu", marker = "extra == 'torch_gpu' and (sys_platform == 'linux' or sys_platform == 'win32')" },
 ]
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
 
 [[tool.uv.index]]
 name = "pytorch-gpu"
@@ -41,12 +28,6 @@ url = "https://download.pytorch.org/whl/cu121"
 explicit = true
 
 [tool.uv]
-conflicts = [
-  [
-    { extra = "torch_cpu" },
-    { extra = "torch_gpu" },
-  ],
-]
 
 # Pyright/Pylance configuration for type checking and imports
 # This is needed because the project uses editable installs (development mode)
