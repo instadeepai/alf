@@ -22,6 +22,14 @@ torch_gpu = [
     "alf_tutorials[torch_gpu]",
 ]
 
+[dependency-groups]
+docs = [
+    "sphinx>=7.0.0",
+    "furo>=2023.0.0",
+    "myst-parser>=2.0.0",
+    "sphinx-autodoc-typehints>=1.24.0",
+]
+
 [tool.uv.workspace]
 members = ["core", "tools", "tutorials"]
 
