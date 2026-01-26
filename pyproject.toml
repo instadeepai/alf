@@ -12,32 +12,31 @@ dependencies = [
 
 [project.optional-dependencies]
 torch_cpu = [
-    "torch",
+    "alf_core[torch_cpu]",
     "alf_tools[torch_cpu]",
+    "alf_tutorials[torch_cpu]",
 ]
 torch_gpu = [
-    "torch",
+    "alf_core[torch_gpu]",
     "alf_tools[torch_gpu]",
+    "alf_tutorials[torch_gpu]",
 ]
 
-# Path sources for local packages
+[tool.uv.workspace]
+members = ["core", "tools", "tutorials"]
+
+# Workspace sources for local packages
 [tool.uv.sources]
-alf_core = { path = "core", editable = true }
-alf_tools = { path = "tools", editable = true }
-alf_tutorials = { path = "tutorials", editable = true }
-torch = [
-  { index = "pytorch-cpu", extra = "torch_cpu" },
-  { index = "pytorch-gpu", extra = "torch_gpu" },
-]
+alf_core = { workspace = true }
+alf_tools = { workspace = true }
+alf_tutorials = { workspace = true }
+# Default to CPU index for torch when building from root
+# For GPU, users should build from individual package directories or override with --index-url
+torch = { index = "pytorch-cpu" }
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
-explicit = true
-
-[[tool.uv.index]]
-name = "pytorch-gpu"
-url = "https://download.pytorch.org/whl/cu121"
 explicit = true
 
 [tool.uv]
