@@ -31,8 +31,14 @@ dev = [
     "pre-commit>=4.1.0",
 ]
 
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
 [tool.uv.sources]
 alf_core = { path = "../core", editable = true }
+torch = { index = "pytorch-cpu" }
 
 [tool.uv]
 default-groups = [
