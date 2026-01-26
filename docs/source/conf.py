@@ -19,18 +19,9 @@
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
-
-import os
-import sys
-
-sys.path.insert(0, os.path.abspath("../.."))          # repo root
-sys.path.insert(0, os.path.abspath("../../core"))     # so "import alf_core" works
-sys.path.insert(0, os.path.abspath("../../tools"))    # so "import alf_tools" works
-
-project = 'ALF'
-copyright = '2026, Shikha Surana, Paul Duckworth, Conor Finlay, Christoph Brunken, Jack Simons'
-author = 'Shikha Surana, Paul Duckworth, Conor Finlay, Christoph Brunken, Jack Simons'
-release = '0.1'
+project = "ALF"
+copyright = "2026, InstaDeep"  # noqa: A001
+author = "InstaDeep"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -56,3 +47,7 @@ exclude_patterns = []
 html_theme = "furo"
 html_static_path = ['_static']
 html_baseurl = "https://instadeep.github.io/alf/"
+highlight_language = "python"
+pygments_style = "sphinx"
+
+add_function_parentheses = False
