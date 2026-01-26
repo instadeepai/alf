@@ -26,7 +26,6 @@ dev = [
     "flake8>=3.9.0",
     "mypy>=0.910",
     "pre-commit>=4.1.0",
-    "alf_tools[dev]",  # Include tools' dev dependencies for comprehensive testing
 ]
 
 [tool.uv.sources]
