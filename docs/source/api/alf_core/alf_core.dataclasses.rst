@@ -12,10 +12,10 @@ alf\_core.dataclasses.candidate module
    :show-inheritance:
    :undoc-members:
 
-alf\_core.dataclasses.labeled\_candidates module
+alf\_core.dataclasses.labelled\_candidates module
 ------------------------------------------------
 
-.. automodule:: alf_core.dataclasses.labeled_candidates
+.. automodule:: alf_core.dataclasses.labelled_candidates
    :members:
    :show-inheritance:
    :undoc-members:
