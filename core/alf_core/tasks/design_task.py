@@ -95,8 +95,8 @@ class DesignTask(BaseTask):
         for round_i in range(1, self.num_acq_rounds + 1):
             state.round_metrics = {"round": round_i}
             acquired_candidates, state = optimizer.ask(state)
-            labeled_candidates, state = oracle.evaluate(acquired_candidates, state)
-            state.update(labeled_candidates)
+            labelled_candidates, state = oracle.evaluate(acquired_candidates, state)
+            state.update(labelled_candidates)
             state = optimizer.tell(state=state)
 
             state = self.evaluate(state=state)

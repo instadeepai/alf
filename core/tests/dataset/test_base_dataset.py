@@ -20,7 +20,7 @@ import tempfile
 import numpy as np
 import pandas as pd
 import pytest
-from alf_core.dataclasses import Candidate, LabeledCandidates
+from alf_core.dataclasses import Candidate, LabelledCandidates
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from pydantic import ValidationError
@@ -189,7 +189,7 @@ class TestBaseDatasetProperties:
         dataset = dummy_dataset_factory(num_samples=100)
         train = dataset.train_dataset
 
-        assert isinstance(train, LabeledCandidates)
+        assert isinstance(train, LabelledCandidates)
         assert len(train) == 48
 
     def test_validation_dataset_property(self, dummy_dataset_factory):
@@ -197,7 +197,7 @@ class TestBaseDatasetProperties:
         dataset = dummy_dataset_factory(num_samples=100)
         validation = dataset.validation_dataset
 
-        assert isinstance(validation, LabeledCandidates)
+        assert isinstance(validation, LabelledCandidates)
         assert len(validation) == 12
 
     def test_test_dataset_property(self, dummy_dataset_factory):
@@ -205,7 +205,7 @@ class TestBaseDatasetProperties:
         dataset = dummy_dataset_factory(num_samples=100)
         test = dataset.test_dataset
 
-        assert isinstance(test, LabeledCandidates)
+        assert isinstance(test, LabelledCandidates)
         assert len(test) == 20
 
     def test_candidate_pool_property(self, dummy_dataset_factory):
@@ -219,7 +219,7 @@ class TestBaseDatasetProperties:
         )
         pool = dataset.candidate_pool
 
-        assert isinstance(pool, LabeledCandidates)
+        assert isinstance(pool, LabelledCandidates)
         # When no candidate_pool specified, it gets the remainder
         # train+val = 60 (45 train, 15 val), test = 20, pool = 100 - 60 - 20 = 20
         assert len(pool) == 20
@@ -230,7 +230,7 @@ class TestBaseDatasetProperties:
         # Create a custom dataset that doesn't auto-setup
         class NoSetupDataset(BaseDataset):
             def load_dataset(self):
-                return LabeledCandidates(
+                return LabelledCandidates(
                     candidates=[
                         Candidate(data=f"seq_{i}", modality="sequence") for i in range(100)
                     ],
@@ -272,7 +272,7 @@ class TestBaseDatasetUpdateSplits:
 
         # Acquire some candidates from the pool
         num_acquired = 5
-        acquired_candidates = LabeledCandidates(*dataset.candidate_pool[:num_acquired])
+        acquired_candidates = LabelledCandidates(*dataset.candidate_pool[:num_acquired])
 
         # Update splits
         dataset.update_splits(acquired_candidates)
@@ -298,7 +298,7 @@ class TestBaseDatasetUpdateSplits:
         )
 
         # Acquire 10 candidates
-        acquired_candidates = LabeledCandidates(*dataset.candidate_pool[:10])
+        acquired_candidates = LabelledCandidates(*dataset.candidate_pool[:10])
         initial_val_size = len(dataset.validation_dataset)
 
         dataset.update_splits(acquired_candidates)
@@ -322,7 +322,7 @@ class TestBaseDatasetQuery:
         # Query their labels
         result = dataset.query(candidates_to_query)
 
-        assert isinstance(result, LabeledCandidates)
+        assert isinstance(result, LabelledCandidates)
         assert len(result) == 5
         assert np.array_equal(result.candidates, candidates_to_query)
 

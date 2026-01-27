@@ -15,7 +15,7 @@
 # This file makes alf_core a Python package
 from alf_core.dataclasses import (
     Candidate,
-    LabeledCandidates,
+    LabelledCandidates,
     Modality,
     Predictions,
     Results,

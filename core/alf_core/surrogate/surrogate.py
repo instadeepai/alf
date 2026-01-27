@@ -16,7 +16,7 @@
 from typing import Union
 
 import numpy as np
-from alf_core.dataclasses import Candidate, LabeledCandidates, Predictions
+from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
 from alf_core.model.base_model import BaseModel
 
 
@@ -35,8 +35,8 @@ class Surrogate:
 
     def fit(
         self,
-        train_data: LabeledCandidates,
-        val_data: LabeledCandidates,
+        train_data: LabelledCandidates,
+        val_data: LabelledCandidates,
     ) -> None:
         """Fit the surrogate model on training and validation data.
 

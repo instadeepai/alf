@@ -10,35 +10,12 @@ dependencies = [
     "alf_tutorials",
 ]
 
-[project.optional-dependencies]
-torch_cpu = [
-    "torch",
-    "alf_tools[torch_cpu]",
-]
-torch_gpu = [
-    "torch",
-    "alf_tools[torch_gpu]",
-]
-
-[dependency-groups]
-dev = [
-    "pytest>=6.2.0",
-    "pytest-cov>=2.12.0",
-    "black>=21.0.0",
-    "flake8>=3.9.0",
-    "mypy>=0.910",
-    "pre-commit>=4.1.0",
-]
-
 # Path sources for local packages
 [tool.uv.sources]
 alf_core = { path = "core", editable = true }
 alf_tools = { path = "tools", editable = true }
 alf_tutorials = { path = "tutorials", editable = true }
-torch = [
-  { index = "pytorch-cpu", extra = "torch_cpu" },
-  { index = "pytorch-gpu", extra = "torch_gpu" },
-]
+torch = { index = "pytorch-cpu" }  # Default: CPU version for broader compatibility
 
 [[tool.uv.index]]
 name = "pytorch-cpu"
@@ -49,17 +26,6 @@ explicit = true
 name = "pytorch-gpu"
 url = "https://download.pytorch.org/whl/cu121"
 explicit = true
-
-[tool.uv]
-conflicts = [
-  [
-    { extra = "torch_cpu" },
-    { extra = "torch_gpu" },
-  ],
-]
-default-groups = [
-  "dev",
-]
 
 # Pyright/Pylance configuration for type checking and imports
 # This is needed because the project uses editable installs (development mode)
@@ -80,9 +46,18 @@ include = ["core", "tools", "tutorials"]
 root = "."
 extraPaths = ["core", "tools", "tutorials"]
 
-[tool.mypy]
-# Allow jaxtyping annotations with string literals
-disable_error_code = ["name-defined", "valid-type"]
+[dependency-groups]
+dev = [
+    "pytest>=6.2.0",
+    "pytest-cov>=2.12.0",
+    "black>=21.0.0",
+    "flake8>=3.9.0",
+    "mypy>=0.910",
+    "pre-commit>=4.1.0",
+]
+
+[tool.uv]
+default-groups = ["dev"]
 
 [tool.setuptools]
 packages = []  # No Python packages at root level - just a meta-package
