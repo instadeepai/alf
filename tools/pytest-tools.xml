@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="6" failures="0" skipped="0" tests="22" time="21.084" timestamp="2026-01-27T10:52:48.111876+01:00" hostname="Akashs-MBP"><testcase classname="tests.datasets.test_gfp.TestGFPDataset" name="test_dataset_initialization" time="0.703" /><testcase classname="tests.datasets.test_gfp.TestGFPDataset" name="test_dataset_split_sizes" time="0.664" /><testcase classname="tests.datasets.test_gfp.TestGFPDataset" name="test_dataset_split_consistency" time="0.742" /><testcase classname="tests.datasets.test_gfp.TestGFPDataset" name="test_dataset_label_statistics" time="0.688" /><testcase classname="tests.datasets.test_gfp.TestGFPDataset" name="test_dataset_data_types" time="0.669" /><testcase classname="tests.datasets.test_gfp.TestGFPDataset" name="test_dataset_no_empty_splits" time="0.662" /><testcase classname="tests.datasets.test_proteingym.TestProteinGymDataset" name="test_dataset_initialization_singles" time="0.001"><error message="failed on setup with &quot;ValueError: HF token must be set as environment variable&quot;">@pytest.fixture
+    def proteingym_dataset_singles():
+        """Create a ProteinGym singles dataset fixture for testing.
+
+        Returns:
+            A ProteinGym singles dataset.
+        """
+        config = ProteinGymConfig(
+            name="proteingym",
+            modality="sequence",
+            seed=51505,
+            train_ratio=0.6,
+            validation_frac=0.2,
+            test_ratio=0.2,
+            split_type="random",
+            dms_name="IF1_ECOLI_Kelsic_2016",
+            dms_type="singles",
+        )
+&gt;       return ProteinGym(config)
+               ^^^^^^^^^^^^^^^^^^
+
+tools/tests/datasets/test_proteingym.py:39:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tools/alf_tools/datasets/proteingym.py:60: in __init__
+    self.setup()
+core/alf_core/dataset/base_dataset.py:230: in setup
+    self._raw_dataset = self.load_dataset()
+                        ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = ProteinGym(name=proteingym, modality=Modality.SEQUENCE, seed=51505, split_ratio={'train': 0.6, 'validation_frac': 0.2, 'test': 0.2}, dms_name=IF1_ECOLI_Kelsic_2016)
+
+    def load_dataset(self) -&gt; LabelledCandidates:
+        """Load ProteinGym dataset from local file or download from HF if not present.
+        Process dataset and return as labelled candidates.
+
+        Returns:
+            Labeled candidates with ProteinGym data.
+
+        Raises:
+            ValueError: If HF token is not set as environment variable.
+        """
+        if os.environ.get("HF_TOKEN") is None:
+&gt;           raise ValueError("HF token must be set as environment variable")
+E           ValueError: HF token must be set as environment variable
+
+tools/alf_tools/datasets/proteingym.py:81: ValueError</error></testcase><testcase classname="tests.datasets.test_proteingym.TestProteinGymDataset" name="test_dataset_initialization_multiples" time="0.001"><error message="failed on setup with &quot;ValueError: HF token must be set as environment variable&quot;">@pytest.fixture
+    def proteingym_dataset_multiples():
+        """Create a ProteinGym multiples dataset fixture for testing.
+
+        Returns:
+            A ProteinGym multiples dataset.
+        """
+        config = ProteinGymConfig(
+            name="proteingym",
+            modality="sequence",
+            seed=51505,
+            train_ratio=0.6,
+            validation_frac=0.2,
+            test_ratio=0.2,
+            split_type="random",
+            dms_name="CAPSD_AAV2S_Sinai_2021",
+            dms_type="multiples",
+        )
+&gt;       return ProteinGym(config)
+               ^^^^^^^^^^^^^^^^^^
+
+tools/tests/datasets/test_proteingym.py:60:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tools/alf_tools/datasets/proteingym.py:60: in __init__
+    self.setup()
+core/alf_core/dataset/base_dataset.py:230: in setup
+    self._raw_dataset = self.load_dataset()
+                        ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = ProteinGym(name=proteingym, modality=Modality.SEQUENCE, seed=51505, split_ratio={'train': 0.6, 'validation_frac': 0.2, 'test': 0.2}, dms_name=CAPSD_AAV2S_Sinai_2021)
+
+    def load_dataset(self) -&gt; LabelledCandidates:
+        """Load ProteinGym dataset from local file or download from HF if not present.
+        Process dataset and return as labelled candidates.
+
+        Returns:
+            Labeled candidates with ProteinGym data.
+
+        Raises:
+            ValueError: If HF token is not set as environment variable.
+        """
+        if os.environ.get("HF_TOKEN") is None:
+&gt;           raise ValueError("HF token must be set as environment variable")
+E           ValueError: HF token must be set as environment variable
+
+tools/alf_tools/datasets/proteingym.py:81: ValueError</error></testcase><testcase classname="tests.datasets.test_proteingym.TestProteinGymDataset" name="test_cross_validation_singles_split_sizes" time="0.001"><error message="failed on setup with &quot;ValueError: HF token must be set as environment variable&quot;">@pytest.fixture
+    def proteingym_dataset_cv_singles():
+        """Create a ProteinGym cross-validation singles dataset fixture for testing.
+
+        Returns:
+            A ProteinGym cross-validation singles dataset.
+        """
+        config = ProteinGymConfig(
+            name="proteingym",
+            modality="sequence",
+            seed=51505,
+            train_ratio=0.7827,
+            validation_frac=0.0,
+            test_ratio=0.2173,
+            split_type="random",
+            dms_name="IF1_ECOLI_Kelsic_2016",
+            dms_type="singles",
+            cross_validation=True,
+            cross_validation_type="random",
+            cross_validation_fold=0,
+        )
+&gt;       return ProteinGym(config)
+               ^^^^^^^^^^^^^^^^^^
+
+tools/tests/datasets/test_proteingym.py:84:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tools/alf_tools/datasets/proteingym.py:60: in __init__
+    self.setup()
+core/alf_core/dataset/base_dataset.py:230: in setup
+    self._raw_dataset = self.load_dataset()
+                        ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = ProteinGym(name=proteingym, modality=Modality.SEQUENCE, seed=51505, split_ratio={'train': 0.7827, 'validation_frac': 0.0, 'test': 0.2173}, dms_name=IF1_ECOLI_Kelsic_2016)
+
+    def load_dataset(self) -&gt; LabelledCandidates:
+        """Load ProteinGym dataset from local file or download from HF if not present.
+        Process dataset and return as labelled candidates.
+
+        Returns:
+            Labeled candidates with ProteinGym data.
+
+        Raises:
+            ValueError: If HF token is not set as environment variable.
+        """
+        if os.environ.get("HF_TOKEN") is None:
+&gt;           raise ValueError("HF token must be set as environment variable")
+E           ValueError: HF token must be set as environment variable
+
+tools/alf_tools/datasets/proteingym.py:81: ValueError</error></testcase><testcase classname="tests.datasets.test_proteingym.TestProteinGymDataset" name="test_cross_validation_singles_label_statistics" time="0.001"><error message="failed on setup with &quot;ValueError: HF token must be set as environment variable&quot;">@pytest.fixture
+    def proteingym_dataset_cv_singles():
+        """Create a ProteinGym cross-validation singles dataset fixture for testing.
+
+        Returns:
+            A ProteinGym cross-validation singles dataset.
+        """
+        config = ProteinGymConfig(
+            name="proteingym",
+            modality="sequence",
+            seed=51505,
+            train_ratio=0.7827,
+            validation_frac=0.0,
+            test_ratio=0.2173,
+            split_type="random",
+            dms_name="IF1_ECOLI_Kelsic_2016",
+            dms_type="singles",
+            cross_validation=True,
+            cross_validation_type="random",
+            cross_validation_fold=0,
+        )
+&gt;       return ProteinGym(config)
+               ^^^^^^^^^^^^^^^^^^
+
+tools/tests/datasets/test_proteingym.py:84:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tools/alf_tools/datasets/proteingym.py:60: in __init__
+    self.setup()
+core/alf_core/dataset/base_dataset.py:230: in setup
+    self._raw_dataset = self.load_dataset()
+                        ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = ProteinGym(name=proteingym, modality=Modality.SEQUENCE, seed=51505, split_ratio={'train': 0.7827, 'validation_frac': 0.0, 'test': 0.2173}, dms_name=IF1_ECOLI_Kelsic_2016)
+
+    def load_dataset(self) -&gt; LabelledCandidates:
+        """Load ProteinGym dataset from local file or download from HF if not present.
+        Process dataset and return as labelled candidates.
+
+        Returns:
+            Labeled candidates with ProteinGym data.
+
+        Raises:
+            ValueError: If HF token is not set as environment variable.
+        """
+        if os.environ.get("HF_TOKEN") is None:
+&gt;           raise ValueError("HF token must be set as environment variable")
+E           ValueError: HF token must be set as environment variable
+
+tools/alf_tools/datasets/proteingym.py:81: ValueError</error></testcase><testcase classname="tests.datasets.test_proteingym.TestProteinGymDataset" name="test_cross_validation_multiples_split_sizes" time="0.001"><error message="failed on setup with &quot;ValueError: HF token must be set as environment variable&quot;">@pytest.fixture
+    def proteingym_dataset_cv_multiples():
+        """Create a ProteinGym cross-validation multiples dataset fixture for testing.
+
+        Returns:
+            A ProteinGym cross-validation multiples dataset.
+        """
+        config = ProteinGymConfig(
+            name="proteingym",
+            modality="sequence",
+            seed=51505,
+            train_ratio=0.79968,
+            validation_frac=0.0,
+            test_ratio=0.20032,
+            split_type="random",
+            dms_name="CAPSD_AAV2S_Sinai_2021",
+            dms_type="multiples",
+            cross_validation=True,
+            cross_validation_type="random",
+            cross_validation_fold=0,
+        )
+&gt;       return ProteinGym(config)
+               ^^^^^^^^^^^^^^^^^^
+
+tools/tests/datasets/test_proteingym.py:108:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tools/alf_tools/datasets/proteingym.py:60: in __init__
+    self.setup()
+core/alf_core/dataset/base_dataset.py:230: in setup
+    self._raw_dataset = self.load_dataset()
+                        ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = ProteinGym(name=proteingym, modality=Modality.SEQUENCE, seed=51505, split_ratio={'train': 0.79968, 'validation_frac': 0.0, 'test': 0.20032}, dms_name=CAPSD_AAV2S_Sinai_2021)
+
+    def load_dataset(self) -&gt; LabelledCandidates:
+        """Load ProteinGym dataset from local file or download from HF if not present.
+        Process dataset and return as labelled candidates.
+
+        Returns:
+            Labeled candidates with ProteinGym data.
+
+        Raises:
+            ValueError: If HF token is not set as environment variable.
+        """
+        if os.environ.get("HF_TOKEN") is None:
+&gt;           raise ValueError("HF token must be set as environment variable")
+E           ValueError: HF token must be set as environment variable
+
+tools/alf_tools/datasets/proteingym.py:81: ValueError</error></testcase><testcase classname="tests.datasets.test_proteingym.TestProteinGymDataset" name="test_cross_validation_multiples_label_statistics" time="0.001"><error message="failed on setup with &quot;ValueError: HF token must be set as environment variable&quot;">@pytest.fixture
+    def proteingym_dataset_cv_multiples():
+        """Create a ProteinGym cross-validation multiples dataset fixture for testing.
+
+        Returns:
+            A ProteinGym cross-validation multiples dataset.
+        """
+        config = ProteinGymConfig(
+            name="proteingym",
+            modality="sequence",
+            seed=51505,
+            train_ratio=0.79968,
+            validation_frac=0.0,
+            test_ratio=0.20032,
+            split_type="random",
+            dms_name="CAPSD_AAV2S_Sinai_2021",
+            dms_type="multiples",
+            cross_validation=True,
+            cross_validation_type="random",
+            cross_validation_fold=0,
+        )
+&gt;       return ProteinGym(config)
+               ^^^^^^^^^^^^^^^^^^
+
+tools/tests/datasets/test_proteingym.py:108:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tools/alf_tools/datasets/proteingym.py:60: in __init__
+    self.setup()
+core/alf_core/dataset/base_dataset.py:230: in setup
+    self._raw_dataset = self.load_dataset()
+                        ^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = ProteinGym(name=proteingym, modality=Modality.SEQUENCE, seed=51505, split_ratio={'train': 0.79968, 'validation_frac': 0.0, 'test': 0.20032}, dms_name=CAPSD_AAV2S_Sinai_2021)
+
+    def load_dataset(self) -&gt; LabelledCandidates:
+        """Load ProteinGym dataset from local file or download from HF if not present.
+        Process dataset and return as labelled candidates.
+
+        Returns:
+            Labeled candidates with ProteinGym data.
+
+        Raises:
+            ValueError: If HF token is not set as environment variable.
+        """
+        if os.environ.get("HF_TOKEN") is None:
+&gt;           raise ValueError("HF token must be set as environment variable")
+E           ValueError: HF token must be set as environment variable
+
+tools/alf_tools/datasets/proteingym.py:81: ValueError</error></testcase><testcase classname="tests.e2e_experiments.test_design_gfp_random_surrogate.TestDesignGFPRandomSurrogate" name="test_design_gfp_random_surrogate_experiment" time="0.803" /><testcase classname="tests.e2e_experiments.test_supervised_gfp_cnn_surrogate.TestSupervised" name="test_supervised_gfp_cnn_experiment" time="10.270" /><testcase classname="tests.e2e_experiments.test_zeroshot_gfp_random_surrogate.TestZeroShotGFPRandomSurrogate" name="test_zeroshot_gfp_random_surrogate_experiment" time="0.765" /><testcase classname="tests.models.test_cnn.TestCNNModel" name="test_train_and_predict" time="0.016" /><testcase classname="tests.models.test_cnn.TestCNNModel" name="test_train_with_validation" time="0.014" /><testcase classname="tests.models.test_cnn.TestCNNModel" name="test_predict_before_train_raises_error" time="0.002" /><testcase classname="tests.models.test_cnn.TestCNNModel" name="test_one_hot_encoding" time="0.005" /><testcase classname="tests.models.test_cnn.TestCNNModel" name="test_different_sequence_lengths_fails" time="0.010" /><testcase classname="tests.models.test_cnn.TestCNNModel" name="test_model_parameters_update" time="0.018" /><testcase classname="tests.models.test_cnn.TestCNNModel" name="test_reproducibility_with_seed" time="0.028" /></testsuite></testsuites>

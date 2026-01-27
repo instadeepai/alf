@@ -27,7 +27,7 @@ jobs:
 
       - name: Lint
         run: |
-          cd core && uv sync
+          uv sync
           uv run --no-sync pre-commit run --all-files --verbose
 
   tests:
@@ -55,22 +55,21 @@ jobs:
         - name: Install uv
           uses: astral-sh/setup-uv@v6
 
+        - name: Sync dependencies
+          run: uv sync
+
         - name: Run tests (core) 🧪
           run: |
-            cd core
-            uv sync
-            uv run --no-sync pytest --verbose --cov-report xml:coverage-core.xml \
+            uv run --no-sync pytest core --verbose --cov-report xml:core/coverage-core.xml \
                             --cov-report term-missing \
-                            --junitxml=pytest-core.xml \
+                            --junitxml=core/pytest-core.xml \
                             --cov=alf_core
 
         - name: Run tests (tools) 🧪
           run: |
-            cd tools
-            uv sync
-            uv run --no-sync pytest --verbose --cov-report xml:coverage-tools.xml \
+            uv run --no-sync pytest tools --verbose --cov-report xml:tools/coverage-tools.xml \
                             --cov-report term-missing \
-                            --junitxml=pytest-tools.xml \
+                            --junitxml=tools/pytest-tools.xml \
                             --cov=alf_tools
 
         - name: Pytest coverage comment (core) 💬

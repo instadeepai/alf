@@ -18,21 +18,6 @@ dependencies = [
 [tool.setuptools]
 packages = []  # No Python packages, just notebooks
 
-[dependency-groups]
-dev = [
-    "pytest>=6.2.0",
-    "pytest-cov>=2.12.0",
-    "black>=21.0.0",
-    "flake8>=3.9.0",
-    "mypy>=0.910",
-    "pre-commit>=4.1.0",
-]
-
 [tool.uv.sources]
 alf_core = {path = "../core", editable = true}
 alf_tools = {path = "../tools", editable = true}
-
-[tool.uv]
-default-groups = [
-  "dev",
-]

@@ -32,7 +32,7 @@ function switch_to_gpu() {
     # Then override with GPU version
     echo "Step 2: Overriding with PyTorch GPU packages..."
     uv pip install --index-url https://download.pytorch.org/whl/cu121 \
-        torch torchvision torchaudio
+        torch torchvision
 
     echo "✅ Done! PyTorch GPU version installed."
     echo "Note: This is a temporary override. Running 'uv sync' will revert to the pyproject.toml configuration (CPU)."
