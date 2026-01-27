@@ -79,7 +79,7 @@ task.run(state=state, task_state_loggers=[TerminalTaskStateLogger()], optimizer=
 alf/
 ├── core/                  # Core framework
 │   ├── alf_core/          # Core package
-│   │   ├── dataclasses/   # Data structures (Candidate, LabeledCandidates, etc.)
+│   │   ├── dataclasses/   # Data structures (Candidate, LabelledCandidates, etc.)
 │   │   ├── dataset/       # Dataset base classes and utilities
 │   │   ├── model/         # Model base classes
 │   │   ├── optimizer/     # Optimizer, acquisition functions, search strategies

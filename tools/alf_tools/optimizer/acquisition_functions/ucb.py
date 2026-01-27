@@ -14,7 +14,7 @@
 
 
 import numpy as np
-from alf_core import AcquisitionFunction, Candidate, LabeledCandidates, TaskState
+from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, TaskState
 
 
 class UCB(AcquisitionFunction):
@@ -34,7 +34,7 @@ class UCB(AcquisitionFunction):
         """
         self.alpha = alpha
 
-    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
+    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabelledCandidates:
         """Compute Upper Confidence Bound (UCB) acquisition values for unlabelled candidates.
 
         Args:
@@ -45,7 +45,7 @@ class UCB(AcquisitionFunction):
             ValueError: If `variances` is not found in predictions.
 
         Returns:
-            LabeledCandidates with UCB acquisition values.
+            LabelledCandidates with UCB acquisition values.
         """
         predictions = state.surrogate.predict(search_candidates)
         if predictions.variances is not None:
@@ -56,4 +56,4 @@ class UCB(AcquisitionFunction):
             raise ValueError(
                 "Expected `variances` in predictions, but was not found. Cannot compute UCB."
             )
-        return LabeledCandidates(candidates=search_candidates, labels=acquisition_values)
+        return LabelledCandidates(candidates=search_candidates, labels=acquisition_values)

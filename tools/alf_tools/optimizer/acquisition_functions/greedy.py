@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from alf_core import AcquisitionFunction, Candidate, LabeledCandidates, TaskState
+from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, TaskState
 
 
 class Greedy(AcquisitionFunction):
@@ -24,7 +24,7 @@ class Greedy(AcquisitionFunction):
     This is a maximising acquisition function.
     """
 
-    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
+    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabelledCandidates:
         """Compute greedy acquisition values for unlabelled candidates.
 
         Args:
@@ -32,8 +32,8 @@ class Greedy(AcquisitionFunction):
             state: The task state containing the current datasets and surrogate model.
 
         Returns:
-            LabeledCandidates with Greedy acquisition values.
+            LabelledCandidates with Greedy acquisition values.
         """
         predictions = state.surrogate.predict(search_candidates)
         acquisition_values = predictions.means
-        return LabeledCandidates(candidates=search_candidates, labels=acquisition_values)
+        return LabelledCandidates(candidates=search_candidates, labels=acquisition_values)

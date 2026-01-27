@@ -13,12 +13,12 @@
 # limitations under the License.
 
 
-from alf_core.dataclasses import LabeledCandidates
+from alf_core.dataclasses import LabelledCandidates
 
 
 def compute_recall(
-    init_candidate_pool: LabeledCandidates,
-    acquired_candidates: LabeledCandidates,
+    init_candidate_pool: LabelledCandidates,
+    acquired_candidates: LabelledCandidates,
     top_percentile: float = 0.1,
     top_n: int = 100,
 ) -> dict[str, float]:
@@ -63,7 +63,7 @@ def compute_recall(
 
 
 def compute_regret(
-    init_candidate_pool: LabeledCandidates, acquired_candidates: LabeledCandidates
+    init_candidate_pool: LabelledCandidates, acquired_candidates: LabelledCandidates
 ) -> dict[str, float]:
     """Compute regret of acquired candidates relative to the best possible candidate.
 

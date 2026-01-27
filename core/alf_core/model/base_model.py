@@ -17,7 +17,7 @@ import abc
 from typing import Any, Union
 
 import numpy as np
-from alf_core.dataclasses import Candidate, LabeledCandidates, Predictions
+from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
 
 
 class BaseModel(abc.ABC):
@@ -41,8 +41,8 @@ class BaseModel(abc.ABC):
     @abc.abstractmethod
     def train(
         self,
-        train_data: LabeledCandidates,
-        val_data: LabeledCandidates,
+        train_data: LabelledCandidates,
+        val_data: LabelledCandidates,
     ) -> None:
         """Train the model on the provided training and validation data.
 

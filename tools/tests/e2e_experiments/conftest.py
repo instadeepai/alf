@@ -16,7 +16,7 @@ from typing import Any, List, Union
 
 import numpy as np
 import pytest
-from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions
+from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
 
 
 @pytest.fixture
@@ -43,7 +43,7 @@ class RandomModel(BaseModel):
         self.seed = seed
         self.rng = np.random.RandomState(seed)
 
-    def featurise(self, inputs: Union[LabeledCandidates, List[Candidate]]) -> Any:
+    def featurise(self, inputs: Union[LabelledCandidates, List[Candidate]]) -> Any:
         """Featurise the input data, this is no-op for this model.
 
         Args:
@@ -56,8 +56,8 @@ class RandomModel(BaseModel):
 
     def train(
         self,
-        train_data: LabeledCandidates,
-        val_data: LabeledCandidates,
+        train_data: LabelledCandidates,
+        val_data: LabelledCandidates,
     ) -> None:
         """Train the model, this is no-op for this model.
 

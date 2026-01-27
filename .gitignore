@@ -131,6 +131,7 @@ dmypy.json
 *.swp
 *.swo
 *~
+.cursor/
 
 # macOS
 .DS_Store
@@ -141,3 +142,9 @@ dmypy.json
 # Results
 data/
 results/
+
+# Test meta-files
+tools/pytest-tools.xml
+tools/coverage-tools.xml
+core/pytest-tools.xml
+core/coverage-tools.xml

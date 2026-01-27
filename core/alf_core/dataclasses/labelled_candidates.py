@@ -21,8 +21,8 @@ import pandas as pd
 from alf_core.dataclasses.candidate import Candidate
 
 
-@dataclass
-class LabeledCandidates:
+@dataclass(eq=False, unsafe_hash=False)
+class LabelledCandidates:
     """A collection of candidates paired with their labels.
 
     Attributes:
@@ -54,7 +54,7 @@ class LabeledCandidates:
     def __getitem__(
         self, index: Union[int, slice, np.ndarray]
     ) -> tuple[list[Candidate], np.ndarray]:
-        """Make LabeledCandidates subscriptable.
+        """Make LabelledCandidates subscriptable.
 
         Args:
             index: Integer index or slice to select candidates and labels.
@@ -81,22 +81,22 @@ class LabeledCandidates:
 
     def append(
         self,
-        candidates: Union[list[Candidate], "LabeledCandidates"],
+        candidates: Union[list[Candidate], "LabelledCandidates"],
         labels: np.ndarray | None = None,
     ) -> None:
         """Append candidates and labels to this collection.
 
         Args:
-            candidates: Either a list of Candidate objects or another LabeledCandidates
+            candidates: Either a list of Candidate objects or another LabelledCandidates
                 object. If a list is provided, labels must also be provided.
             labels: Optional numpy array of labels. Required if candidates is a list,
-                ignored if candidates is a LabeledCandidates object.
+                ignored if candidates is a LabelledCandidates object.
 
         Raises:
             AssertionError: If candidates is a list and labels is None, or if the
                 length of candidates and labels don't match.
         """
-        if isinstance(candidates, LabeledCandidates):
+        if isinstance(candidates, LabelledCandidates):
             self.candidates.extend(candidates.candidates)
             self.labels = np.concatenate((self.labels, candidates.labels), axis=0)
         else:
@@ -106,23 +106,23 @@ class LabeledCandidates:
             self.candidates.extend(candidates)
             self.labels = np.concatenate((self.labels, labels), axis=0)
 
-    def shuffle(self, seed: int) -> "LabeledCandidates":
-        """Create a new LabeledCandidates object with shuffled candidates and labels.
+    def shuffle(self, seed: int) -> "LabelledCandidates":
+        """Create a new LabelledCandidates object with shuffled candidates and labels.
 
         Args:
             seed: Random seed for reproducibility of the shuffle.
 
         Returns:
-            A new LabeledCandidates object with the same candidates and labels,
+            A new LabelledCandidates object with the same candidates and labels,
             but in a randomly shuffled order.
         """
         shuffled_indices = np.random.RandomState(seed).permutation(len(self.candidates))
-        return LabeledCandidates(
+        return LabelledCandidates(
             candidates=[self.candidates[i] for i in shuffled_indices],
             labels=self.labels[shuffled_indices],
         )
 
-    def sort(self, ascending: bool = True) -> "LabeledCandidates":
+    def sort(self, ascending: bool = True) -> "LabelledCandidates":
         """Sort the candidates and labels by label values.
 
         Args:
@@ -131,40 +131,42 @@ class LabeledCandidates:
                 Defaults to True.
 
         Returns:
-            A new LabeledCandidates object with candidates and labels sorted
+            A new LabelledCandidates object with candidates and labels sorted
             by label values.
         """
         sorted_indices = np.argsort(self.labels)
         if not ascending:
             sorted_indices = sorted_indices[::-1]
-        return LabeledCandidates(
+        return LabelledCandidates(
             candidates=[self.candidates[i] for i in sorted_indices],
             labels=self.labels[sorted_indices],
         )
 
-    def remove(self, candidates: Union[list[Candidate], "LabeledCandidates"]) -> None:
+    def remove(self, candidates: Union[list[Candidate], "LabelledCandidates"]) -> None:
         """Remove specified candidates and their corresponding labels from this collection.
 
+        Uses identity-based comparison (same object instance) for removal.
         Candidates not present in the collection are silently ignored.
 
         Args:
-            candidates: Either a list of Candidate objects or a LabeledCandidates
+            candidates: Either a list of Candidate objects or a LabelledCandidates
                 object containing the candidates to remove.
         """
-        if isinstance(candidates, LabeledCandidates):
+        if isinstance(candidates, LabelledCandidates):
             candidates = candidates.candidates
 
-        # Filter to only remove candidates that are actually present in the collection
-        candidates_to_remove = [c for c in candidates if c in self.candidates]
-        if not candidates_to_remove:
-            return
+        # Build set of object IDs to remove for O(1) lookup
+        ids_to_remove = {id(c) for c in candidates}
 
-        indices_to_remove = [self.candidates.index(cand) for cand in candidates_to_remove]
-        self.labels = np.delete(self.labels, indices_to_remove)
-        self.candidates = [cand for cand in self.candidates if cand not in candidates_to_remove]
+        # Find indices to keep (single pass)
+        indices_to_keep = [i for i, c in enumerate(self.candidates) if id(c) not in ids_to_remove]
+
+        # Update candidates and labels
+        self.candidates = [self.candidates[i] for i in indices_to_keep]
+        self.labels = self.labels[indices_to_keep]
 
     def to_dataframe(self) -> pd.DataFrame:
-        """Convert the labeled candidates to a pandas DataFrame.
+        """Convert the labelled candidates to a pandas DataFrame.
 
         Returns:
             A DataFrame with columns:
@@ -179,20 +181,20 @@ class LabeledCandidates:
         ]
         return pd.DataFrame.from_records(rows)
 
-    def get_top_k(self, k: int) -> "LabeledCandidates":
+    def get_top_k(self, k: int) -> "LabelledCandidates":
         """Return the top k candidates based on their label values.
 
         Args:
             k: Number of top candidates to select.
 
         Returns:
-            New LabeledCandidates object containing the top k candidates sorted
+            New LabelledCandidates object containing the top k candidates sorted
             by label values (highest first).
         """
         top_k_indices = self.labels.argsort()[::-1][:k]
         top_k_candidates = [self.candidates[i] for i in top_k_indices]
         top_k_labels = self.labels[top_k_indices]
-        return LabeledCandidates(candidates=top_k_candidates, labels=top_k_labels)
+        return LabelledCandidates(candidates=top_k_candidates, labels=top_k_labels)
 
     def __iter__(self):
         """Iterate over candidates and labels, yielding (candidate, label) tuples.
@@ -202,3 +204,23 @@ class LabeledCandidates:
         """
         for candidate, label in zip(self.candidates, self.labels):
             yield candidate, label
+
+    def __eq__(self, other: object) -> bool:
+        """Compare two LabelledCandidates objects for equality.
+
+        Handles numpy array labels correctly.
+
+        Args:
+            other: The object to compare with.
+
+        Returns:
+            True if the labeled candidates are equal, False otherwise.
+        """
+        if not isinstance(other, LabelledCandidates):
+            return False
+
+        return self.candidates == other.candidates and np.array_equal(
+            self.labels, other.labels, equal_nan=True
+        )
+
+    __hash__ = None  # type: ignore[assignment]
