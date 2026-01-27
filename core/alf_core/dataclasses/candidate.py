@@ -85,7 +85,7 @@ class Candidate:
             # Once implemented, add test cases to test_candidate.py
             raise ValueError(f"Unsupported modality: {self.modality}")
 
-    def to_dataframe_format(self) -> Union[str, np.ndarray, Any]:
+    def to_dataframe(self) -> Union[str, np.ndarray, Any]:
         """Return the appropriate format for DataFrame representation.
 
         Returns:
