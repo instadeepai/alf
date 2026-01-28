@@ -17,18 +17,6 @@ alf_tools = { path = "tools", editable = true }
 alf_tutorials = { path = "tutorials", editable = true }
 torch = { index = "pytorch-cpu" }  # Default: CPU version for broader compatibility
 
-[tool.uv.workspace]
-members = ["core", "tools", "tutorials"]
-
-# Workspace sources for local packages
-[tool.uv.sources]
-alf_core = { workspace = true }
-alf_tools = { workspace = true }
-alf_tutorials = { workspace = true }
-# Default to CPU index for torch when building from root
-# For GPU, users should build from individual package directories or override with --index-url
-torch = { index = "pytorch-cpu" }
-
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
