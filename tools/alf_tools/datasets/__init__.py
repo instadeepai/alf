@@ -12,5 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from alf_tools.datasets.botorch_test_functions import BoTorchSyntheticDataset
 from alf_tools.datasets.gfp import GFP
 from alf_tools.datasets.proteingym import ProteinGym

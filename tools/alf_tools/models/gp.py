@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Callable, Literal, TypeAlias, Union
+from typing import Any, Callable, Literal, TypeAlias, Union, cast
 
 import gpytorch
 import numpy as np
 import torch
-from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions, Results
+from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
 from alf_tools.models.model_utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
@@ -122,8 +122,8 @@ class ExactGPModel(gpytorch.models.ExactGP):
 
     def __init__(
         self,
-        train_x: Float[torch.Tensor, "n_samples n_features"],
-        train_y: Float[torch.Tensor, "n_samples"],
+        train_x: Float[torch.Tensor, " n_samples n_features"],
+        train_y: Float[torch.Tensor, " n_samples"],
         likelihood: gpytorch.likelihoods.GaussianLikelihood,
         kernel_type: KernelTypes = "rbf",
         matern_nu: float = 2.5,
@@ -323,11 +323,11 @@ class GPModelTrainer(BaseModel):
             )
         return self.featurizer_config.custom_featurizer(sequences)
 
-    def featurise(self, inputs: Union[LabeledCandidates, list[Candidate]]) -> torch.Tensor:
+    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> torch.Tensor:
         """Convert inputs to feature tensors.
 
         Args:
-            inputs: Either LabeledCandidates or list of Candidates to featurize.
+            inputs: Either LabelledCandidates or list of Candidates to featurize.
 
         Returns:
             Feature tensor of shape (batch_size, num_features).
@@ -412,7 +412,7 @@ class GPModelTrainer(BaseModel):
             outputscale_prior=self.model_config.outputscale_prior,
         )
 
-        return gp_model.to(self.device)
+        return cast(ExactGPModel, gp_model.to(self.device))
 
     def _optimize_hyperparameters(
         self,
@@ -512,8 +512,8 @@ class GPModelTrainer(BaseModel):
 
     def train(
         self,
-        train_data: LabeledCandidates,
-        val_data: LabeledCandidates | None = None,
+        train_data: LabelledCandidates,
+        val_data: LabelledCandidates | None = None,
     ) -> None:
         """Train the GP model by optimizing hyperparameters.
 
