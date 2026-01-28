@@ -2,7 +2,7 @@ name: Build and Deploy Sphinx Docs
 
 on:
   push:
-    branches: ["main", "sphinx-docs"]
+    branches: ["main", "docs"]
   workflow_dispatch:
 
 permissions:
