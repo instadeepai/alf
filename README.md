@@ -21,32 +21,25 @@ intelligent candidate selection (data acquisition), model adaptation, and evalua
 
 ## 📦 Installation
 
-### Prerequisites
-
-- Python 3.12 or higher
-- [uv](https://github.com/astral-sh/uv) (recommended) or pip
-
-### Install from source
-
-This library can be installed with pip from this private GitHub repository. See below for details.
-
-This repository contains two packages, `alf_core` and `alf_tools`. The former contains the task runners which allow you to run different experiments, and the latter contains implementations of specific models, datasets, and optimisation functions. Depending on your use case, you can use the following commands to install the specific packages.
+### Quick Install
 
 ```bash
 # Install the core package
 pip install git+https://github.com/instadeepai/alf.git#subdirectory=core
 
-# Install the tools package
+# Install the tools package (includes PyTorch)
 pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 ```
 
-To authenticate, we recommend to set up a `.netrc` file in your home directory with a GitHub personal access token:
+**Authentication:** Set up a `.netrc` file in your home directory with your GitHub personal access token:
 
 ```
 machine github.com login <USERNAME> password <TOKEN>
 ```
 
-The tool `pip` will automatically make use of these credentials for authentication. For more information on creating personal access tokens, see [this](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
+For more information on creating personal access tokens, see [GitHub's documentation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
+
+📖 **For detailed installation instructions, including development setup and GPU configuration, see [INSTALLATION.md](docs/INSTALLATION.md)**.
 
 
 ## 🚀 Quick Start
@@ -118,9 +111,15 @@ Explore the tutorials to learn how to use ALF:
 ### Setup Development Environment
 
 ```bash
-# Install with development dependencies
-uv sync --extra cpu --group dev
+# Clone the repository
+git clone https://github.com/instadeepai/alf.git
+cd alf
+
+# Install all packages with development dependencies
+uv sync
 ```
+
+For GPU support, see the [GPU Configuration](docs/INSTALLATION.md#gpu-support-optional) section in the installation guide.
 
 ### Run Tests
 
