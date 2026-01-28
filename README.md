@@ -48,6 +48,36 @@ machine github.com login <USERNAME> password <TOKEN>
 
 The tool `pip` will automatically make use of these credentials for authentication. For more information on creating personal access tokens, see [this](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
 
+## 📖 Documentation
+
+Full API documentation is available at **[instadeepai.github.io/alf](https://instadeepai.github.io/alf/)**
+
+### Building Documentation Locally
+
+To build and view the documentation on your local machine:
+
+1. Install documentation dependencies:
+   ```bash
+   uv sync --group docs
+   ```
+
+2. Build the HTML documentation:
+   ```bash
+   cd docs
+   make html
+   ```
+
+3. Open the documentation in your browser:
+   ```bash
+   # macOS
+   open build/html/index.html
+
+   # Linux
+   xdg-open build/html/index.html
+
+   # Windows
+   start build/html/index.html
+   ```
 
 ## 🚀 Quick Start
 
@@ -96,13 +126,6 @@ alf/
 ├── tutorials/             # Tutorials and example scripts
 └── docs/                  # Documentation
 ```
-
-## 📖 Documentation
-
-For further details, see the following documentation:
-- **[ALF Core](core/README.md)** - Comprehensive guide to all
-  core components and their interactions
-- **[ALF Tools](tools/README.md)** - Description of all the datasets, models, and optimisation algorithms available (TBA - this link does not work for now)
 
 ## 🎓 Tutorials
 

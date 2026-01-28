@@ -6,12 +6,6 @@ model is trained on the current training data, the optimizer selects promising c
 evaluates them, and the newly labelled candidates are added to the training set. This iterative process
 continues for a specified number of acquisition rounds.
 
-Module
-------
-
-alf_core.tasks.design_task
----------------------------
-
 .. automodule:: alf_core.tasks.design_task
    :members:
    :show-inheritance:

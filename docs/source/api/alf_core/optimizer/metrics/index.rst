@@ -5,12 +5,6 @@ The ``metrics`` module provides evaluation metrics for the optimizer's performan
 metrics for measuring the quality of candidate selection and the efficiency of the active learning
 process.
 
-Module
-------
-
-alf_core.optimizer.metrics
----------------------------
-
 .. automodule:: alf_core.optimizer.metrics
    :members:
    :show-inheritance:

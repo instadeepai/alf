@@ -6,12 +6,6 @@ for evaluation. Search strategies can operate on predefined datasets (``DatasetS
 new candidates using models (``GeneratorSearch``), or apply mutations to existing sequences
 (``MutationSearch``).
 
-Module
-------
-
-alf_core.optimizer.search
---------------------------
-
 .. automodule:: alf_core.optimizer.search
    :members:
    :show-inheritance:

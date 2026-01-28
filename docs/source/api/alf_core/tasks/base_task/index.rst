@@ -5,12 +5,6 @@ The ``BaseTask`` class is an abstract base class that defines the common interfa
 in the framework. It provides the basic structure for setting up experiments, running tasks, and
 managing task state.
 
-Module
-------
-
-alf_core.tasks.base_task
--------------------------
-
 .. automodule:: alf_core.tasks.base_task
    :members:
    :show-inheritance:

@@ -6,12 +6,6 @@ the framework. It manages data loading through the abstract ``load_dataset()`` m
 into train/validation/test/candidate_pool sets, updates splits with newly acquired candidates, and
 provides labels for candidates from the original dataset (used by the oracle in offline settings).
 
-Module
-------
-
-alf_core.dataset.base_dataset
-------------------------------
-
 .. automodule:: alf_core.dataset.base_dataset
    :members:
    :show-inheritance:

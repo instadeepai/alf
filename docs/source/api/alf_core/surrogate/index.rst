@@ -6,12 +6,6 @@ provides training functionality to fit the model on labelled training data and p
 to make predictions on candidate sequences. The surrogate is a key component in active learning,
 enabling efficient exploration by reducing the need for costly experimental evaluations.
 
-Module
-------
-
-alf_core.surrogate.surrogate
------------------------------
-
 .. automodule:: alf_core.surrogate.surrogate
    :members:
    :show-inheritance:
