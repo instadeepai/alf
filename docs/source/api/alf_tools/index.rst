@@ -6,6 +6,8 @@ for use with the ALF framework. This includes example datasets (GFP, ProteinGym)
 (CNN, PyRosetta), acquisition functions (UCB, EI, Thompson Sampling, Greedy), search strategies, and
 utility functions.
 
+For installation instructions and quick start examples, see the `Tools README <https://github.com/instadeepai/alf/blob/main/tools/README.md>`_.
+
 .. toctree::
    :maxdepth: 1
 
