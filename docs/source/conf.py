@@ -36,6 +36,14 @@ extensions = [
 ]
 autosummary_generate = True
 
+# Mock imports for modules that require external dependencies
+# This allows documentation to be built without installing heavy dependencies like PyRosetta
+autodoc_mock_imports = [
+    "pyrosetta",
+    "pyrosetta.rosetta",
+    "pyrosetta.rosetta.core.pose",
+]
+
 templates_path = ['_templates']
 exclude_patterns = []
 default_role = "code"
