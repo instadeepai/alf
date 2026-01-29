@@ -15,7 +15,7 @@
 import numpy as np
 import pytest
 import torch
-from alf_core import Candidate, LabeledCandidates
+from alf_core import Candidate, LabelledCandidates
 from alf_tools.models.gp import (
     FeaturizerConfig,
     GPModelConfig,
@@ -29,13 +29,13 @@ def sample_sinusoidal_data():
     """Sample data from a sinusoidal function.
 
     Returns:
-        LabeledCandidates with sinusoidal training data.
+        LabelledCandidates with sinusoidal training data.
     """
     x = np.linspace(0, 10, 100)
     y = np.sin(x) + np.random.randn(100) * 0.1
     candidates = [Candidate(data=x, modality="tabular") for x in x]
     labels = np.array(y)
-    return LabeledCandidates(candidates, labels)
+    return LabelledCandidates(candidates, labels)
 
 
 @pytest.fixture
@@ -43,13 +43,13 @@ def val_sinusoidal_data():
     """Sample data from a sinusoidal function.
 
     Returns:
-        LabeledCandidates with sinusoidal validation data.
+        LabelledCandidates with sinusoidal validation data.
     """
     x = np.linspace(1, 10, 10)
     y = np.sin(x) + np.random.randn(10) * 0.1
     candidates = [Candidate(data=x, modality="tabular") for x in x]
     labels = np.array(y)
-    return LabeledCandidates(candidates, labels)
+    return LabelledCandidates(candidates, labels)
 
 
 @pytest.fixture
@@ -57,12 +57,12 @@ def sample_data():
     """Create sample training data.
 
     Returns:
-        A LabeledCandidates object containing the training data.
+        A LabelledCandidates object containing the training data.
     """
     sequences = ["ACDEFGHIKLMNPQRSTVWY"] * 10  # Simple repeated sequence
     candidates = [Candidate(data=seq, modality="sequence") for seq in sequences]
     labels = np.random.randn(10) * 0.5 + 1.0
-    return LabeledCandidates(candidates, labels)
+    return LabelledCandidates(candidates, labels)
 
 
 @pytest.fixture
@@ -138,7 +138,7 @@ class TestGPModel:
         """Test training with validation data."""
         val_sequences = ["ACDEFGHIKLMNPQRSTVWY"] * 3
         val_candidates = [Candidate(data=seq, modality="sequence") for seq in val_sequences]
-        val_data = LabeledCandidates(val_candidates, np.random.randn(3))
+        val_data = LabelledCandidates(val_candidates, np.random.randn(3))
 
         gp_model.train(sample_data, val_data=val_data)
 

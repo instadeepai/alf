@@ -185,7 +185,7 @@ The diversity penalty is implemented through a custom `__call__` method:
 1. **Standard Path** (`diversity_penalty == 0.0`):
    - Computes predictions once
    - Computes acquisition values directly
-   - Returns LabeledCandidates with standard acquisition values
+   - Returns LabelledCandidates with standard acquisition values
 
 2. **Diversity Path** (`diversity_penalty > 0.0`):
    - Computes predictions once (they don't change within a batch)

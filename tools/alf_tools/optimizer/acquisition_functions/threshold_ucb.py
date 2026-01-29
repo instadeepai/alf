@@ -15,7 +15,7 @@
 from typing import Optional
 
 import numpy as np
-from alf_core import AcquisitionFunction, Candidate, LabeledCandidates, Predictions, TaskState
+from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, Predictions, TaskState
 from scipy.stats import norm
 
 
@@ -234,7 +234,7 @@ class ThresholdUCB(AcquisitionFunction):
             state: Current task state containing the dataset and surrogate model
 
         Returns:
-            LabeledCandidates with acquisition values (batch diversity already
+            LabelledCandidates with acquisition values (batch diversity already
             considered if diversity_penalty > 0)
         """
         # Reset batch tracking
@@ -245,7 +245,7 @@ class ThresholdUCB(AcquisitionFunction):
         if self.diversity_penalty == 0.0:
             predictions = state.surrogate.predict(search_candidates)
             acquisition_values = self._get_acquisition_values(predictions, state)
-            return LabeledCandidates(search_candidates, acquisition_values)
+            return LabelledCandidates(search_candidates, acquisition_values)
 
         # With diversity penalty, use iterative selection
         # Get predictions once (they don't change within a batch)
@@ -289,4 +289,4 @@ class ThresholdUCB(AcquisitionFunction):
             # Assign decreasing values based on selection order
             final_values[idx] = len(selected_indices) - i + np.max(base_acquisition_values)
 
-        return LabeledCandidates(search_candidates, final_values)
+        return LabelledCandidates(search_candidates, final_values)
