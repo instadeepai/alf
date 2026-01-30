@@ -198,12 +198,10 @@ uv run pre-commit run --all-files
 
 **Style guidelines:**
 - Follow PEP 8 conventions (enforced by ruff)
-- Use type hints for function signatures in code contributions
-- Write clear, descriptive docstrings (Google style) for code contributions
+- Use type hints for function signatures
+- Write clear, descriptive docstrings (Google style)
 - Keep functions focused and modular
 - Add comments for complex logic
-
-**Note:** Tutorial notebooks are exempt from docstring style requirements. Focus on clear explanations in markdown cells instead.
 
 ### Pull Request Process
 
