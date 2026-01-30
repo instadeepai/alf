@@ -139,11 +139,11 @@ End-to-end guides for running active learning experiments:
 
 Learn how to extend ALF's base classes for custom implementations:
 
-- **[Extending Models](tutorials/extending/extending_models.ipynb)** - Create custom models for oracle/surrogate/generator roles
-- **[Extending Datasets](tutorials/extending/extending_datasets.ipynb)** - Add custom data sources
-- **[Extending Search Functions](tutorials/extending/extending_search_functions.ipynb)** - Implement custom search strategies
-- **[Extending Acquisition Functions](tutorials/extending/extending_acquisition_functions.ipynb)** - Create custom acquisition strategies
-- **[Understanding Model Roles](tutorials/extending/model_roles.ipynb)** - Oracle, Surrogate, and Generator patterns
+- **[Models](tutorials/extending_base_classes/models.ipynb)** - Create custom models for oracle/surrogate/generator roles
+- **[Datasets](tutorials/extending_base_classes/datasets.ipynb)** - Add custom data sources
+- **[Search Functions](tutorials/extending_base_classes/search_functions.ipynb)** - Implement custom search strategies
+- **[Acquisition Functions](tutorials/extending_base_classes/acquisition_functions.ipynb)** - Create custom acquisition strategies
+- **[Model Roles](tutorials/extending_base_classes/model_roles.ipynb)** - Oracle, Surrogate, and Generator patterns
 
 
 ## 🛠️ Development
@@ -186,7 +186,7 @@ uv run pre-commit run --all-files
 We welcome contributions! To get started:
 
 1. Read our **[Contributing Guide](docs/CONTRIBUTING.md)** for development setup and guidelines
-2. Check out the **[Extension Tutorials](tutorials/extending/)** to learn how to extend ALF's base classes
+2. Check out the **[Extension Tutorials](tutorials/extending_base_classes/)** to learn how to extend ALF's base classes
 
 For questions or discussions, please open an issue.
 

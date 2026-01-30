@@ -66,10 +66,10 @@ ALF is designed to be extensible. You can create custom implementations of core 
 
 | Component | Base Class | Key Methods | Tutorial |
 |-----------|------------|-------------|----------|
-| **Models** | `BaseModel` | `featurise()`, `train()`, `predict()`, `sample()` | [Extending Models](../tutorials/extending/extending_models.ipynb) |
-| **Datasets** | `BaseDataset` | `load_dataset()`, `query()` | [Extending Datasets](../tutorials/extending/extending_datasets.ipynb) |
-| **Search Functions** | `BaseSearch` | `__call__()` | [Extending Search Functions](../tutorials/extending/extending_search_functions.ipynb) |
-| **Acquisition Functions** | `AcquisitionFunction` | `__call__()` | [Extending Acquisition Functions](../tutorials/extending/extending_acquisition_functions.ipynb) |
+| **Models** | `BaseModel` | `featurise()`, `train()`, `predict()`, `sample()` | [Models](../tutorials/extending_base_classes/models.ipynb) |
+| **Datasets** | `BaseDataset` | `load_dataset()`, `query()` | [Datasets](../tutorials/extending_base_classes/datasets.ipynb) |
+| **Search Functions** | `BaseSearch` | `__call__()` | [Search Functions](../tutorials/extending_base_classes/search_functions.ipynb) |
+| **Acquisition Functions** | `AcquisitionFunction` | `__call__()` | [Acquisition Functions](../tutorials/extending_base_classes/acquisition_functions.ipynb) |
 
 ### Quick Start: Extending a Component
 
@@ -111,7 +111,7 @@ Models in ALF can serve three distinct roles depending on how they're used in th
 - **Required methods:** `sample()`
 - **Example use case:** Using a generative model to propose new molecular structures
 
-For detailed examples of implementing models for each role, see the [Model Roles Tutorial](../tutorials/extending/model_roles.ipynb).
+For detailed examples of implementing models for each role, see the [Model Roles Tutorial](../tutorials/extending_base_classes/model_roles.ipynb).
 
 ## Code Contribution Workflow
 
@@ -288,6 +288,6 @@ If you encounter issues not covered here:
 - **Tutorial Notebooks:**
   - [Offline Design Tutorial](../tutorials/experiments/offline_design_tutorial.ipynb)
   - [Online Design Tutorial](../tutorials/experiments/online_design_tutorial.ipynb)
-  - [Extension Tutorials](../tutorials/extending/)
+  - [Extension Tutorials](../tutorials/extending_base_classes/)
 
 Thank you for contributing to ALF! Your contributions help make active learning more accessible and powerful for everyone.
