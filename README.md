@@ -100,7 +100,7 @@ task.run(state=state, task_state_loggers=[TerminalTaskStateLogger()], optimizer=
 
 ```
 alf/
-├── core/                  # Core framework
+├── core/                  # Core framework (see core/README.md)
 │   ├── alf_core/          # Core package
 │   │   ├── dataclasses/   # Data structures (Candidate, LabelledCandidates, etc.)
 │   │   ├── dataset/       # Dataset base classes and utilities
@@ -111,7 +111,7 @@ alf/
 │   │   ├── tasks/         # Task implementations (Design, Supervised, ZeroShot)
 │   │   └── utils/         # Utilities (metrics, logging)
 │   └── tests/             # Core framework tests
-├── tools/                 # Example implementations and tools
+├── tools/                 # Example implementations and tools (see tools/README.md)
 │   └── alf_tools/         # Tools package
 │       ├── datasets/      # Example datasets (e.g., GFP)
 │       ├── models/        # Example models (CNN, Random)
@@ -119,6 +119,10 @@ alf/
 ├── tutorials/             # Tutorials and example scripts
 └── docs/                  # Documentation
 ```
+
+**Package Documentation:**
+- [Core Framework](core/README.md) - Base classes and task implementations
+- [Tools Package](tools/README.md) - Ready-to-use datasets, models, and acquisition functions
 
 ## 🎓 Tutorials
 
