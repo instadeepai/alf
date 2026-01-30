@@ -115,53 +115,6 @@ For detailed examples of implementing models for each role, see the [Model Roles
 
 ## Code Contribution Workflow
 
-### Branch Naming Conventions
-
-Use descriptive branch names with prefixes:
-
-- `feat/` - New features (e.g., `feat/add-uncertainty-sampling`)
-- `fix/` - Bug fixes (e.g., `fix/acquisition-function-nan`)
-- `docs/` - Documentation updates (e.g., `docs/update-api-reference`)
-- `refactor/` - Code refactoring (e.g., `refactor/simplify-dataset-loading`)
-- `test/` - Test additions/updates (e.g., `test/add-model-integration-tests`)
-- `perf/` - Performance improvements (e.g., `perf/optimize-batch-prediction`)
-
-### Commit Message Format
-
-This project uses [Conventional Commits](https://www.conventionalcommits.org/). Each commit message must follow this format:
-
-```
-<type>: <description>
-
-[optional body]
-
-[optional footer]
-```
-
-**Allowed types:**
-- `feat` - New feature
-- `fix` - Bug fix
-- `docs` - Documentation changes
-- `style` - Code style changes (formatting, no logic change)
-- `refactor` - Code refactoring
-- `perf` - Performance improvements
-- `test` - Adding or updating tests
-- `build` - Build system changes
-- `ci` - CI/CD changes
-- `chore` - Other changes (dependencies, configs)
-- `revert` - Revert a previous commit
-
-**Examples:**
-```bash
-feat: add Thompson sampling acquisition function
-
-fix: handle NaN values in surrogate predictions
-
-docs: update extending models tutorial with edge cases
-
-test: add unit tests for dataset splitting logic
-```
-
 ### Testing Requirements
 
 All contributions must include appropriate tests:
