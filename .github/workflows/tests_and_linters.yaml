@@ -89,3 +89,27 @@ jobs:
             unique-id-for-comment: coverage-tools
             pytest-xml-coverage-path: tools/coverage-tools.xml
             junitxml-path: tools/pytest-tools.xml
+
+        - name: Update core coverage badge 🏷️
+          if: github.ref == 'refs/heads/main'
+          uses: schneegans/dynamic-badges-action@v1.7.0
+          with:
+            auth: ${{ secrets.GIST_SECRET }}
+            gistID: 114eb5680493468e40f5a528c08f1888
+            filename: alf-core-coverage.json
+            label: core coverage
+            message: ${{ steps.coverageCommentCore.outputs.coverage }}
+            color: ${{ steps.coverageCommentCore.outputs.color }}
+            namedLogo: python
+
+        - name: Update tools coverage badge 🏷️
+          if: github.ref == 'refs/heads/main'
+          uses: schneegans/dynamic-badges-action@v1.7.0
+          with:
+            auth: ${{ secrets.GIST_SECRET }}
+            gistID: 25ce4b64d5b9cda177203366146f5bf0
+            filename: alf-tools-coverage.json
+            label: tools coverage
+            message: ${{ steps.coverageCommentTools.outputs.coverage }}
+            color: ${{ steps.coverageCommentTools.outputs.color }}
+            namedLogo: python
