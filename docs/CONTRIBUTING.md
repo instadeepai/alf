@@ -60,6 +60,44 @@ uv run pre-commit run --all-files
 uv run pre-commit run
 ```
 
+### Understanding ALF Packages
+
+ALF is organized into two packages to balance flexibility and usability:
+
+#### alf-core (`core/alf_core/`)
+
+The framework backbone containing:
+- **Abstract base classes**: `BaseModel`, `BaseDataset`, `AcquisitionFunction`, `BaseSearch`
+- **Core data structures**: `Candidate`, `LabelledCandidates`, `Predictions`, `TaskState`
+- **Task implementations**: `DesignTask`, `SupervisedTask`, `ZeroShotTask`
+- **Wrappers**: `Oracle`, `Surrogate`, `Optimizer`
+- **Utilities**: Metrics, logging, splitting utilities
+
+**Minimal dependencies** by design to keep the framework lightweight and easy to integrate into existing systems.
+
+#### alf-tools (`tools/alf_tools/`)
+
+Ready-to-use implementations and examples:
+- **Datasets**: GFP, ProteinGym
+- **Models**: CNNModel (with uncertainty quantification), PyRosetta
+- **Acquisition functions**: UCB, Thompson Sampling, Greedy, Expected Improvement
+- **Search strategies**: SingleMutantSearch
+
+**Includes heavier dependencies** (PyTorch, etc.) needed for concrete implementations.
+
+#### Contributing Guidelines
+
+**When adding new implementations:**
+- ✅ Add to `alf-tools` for general-purpose implementations (new models, datasets, acquisition functions)
+- ✅ Modify `alf-core` only for framework enhancements (new base classes, core utilities, task types)
+- ✅ Keep alf-core dependencies minimal - propose heavy dependencies only if critical to the framework
+
+**Examples:**
+- Adding a new transformer model → Add to `tools/alf_tools/models/`
+- Adding a new task type → Modify `core/alf_core/tasks/`
+- Adding a new acquisition function → Add to `tools/alf_tools/optimizer/acquisition_functions/`
+- Adding a new base class → Modify `core/alf_core/`
+
 ## Extending ALF Components
 
 ALF is designed to be extensible. You can create custom implementations of core components by extending base classes. Below is a quick reference of extension points:

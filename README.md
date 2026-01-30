@@ -19,6 +19,16 @@ intelligent candidate selection (data acquisition), model adaptation, and evalua
 - **Offline and Online Evaluation**: Dataset-based and model-based optimization scenarios
 - **Evaluation Metrics**: Metrics for prediction accuracy and uncertainty calibration
 
+## 📦 Package Architecture
+
+ALF is split into two packages:
+
+**alf-core** - Lightweight framework with base classes, core data structures, and minimal dependencies (numpy, pandas, scipy). Use for custom implementations or when integrating into existing systems.
+
+**alf-tools** - Ready-to-use datasets, models, and acquisition functions with heavier dependencies (PyTorch). Depends on alf-core. Use for quick start and prototyping.
+
+Install only what you need: `alf-core` for minimal dependencies, or `alf-tools` (includes alf-core) for batteries-included implementations.
+
 ## 📦 Installation
 
 ### Quick Install
