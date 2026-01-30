@@ -266,7 +266,7 @@ class BaseDataset(abc.ABC):
             ValueError: If any candidate's data is not found in the dataset.
         """
         assert self._raw_dataset is not None, "Dataset must be loaded before querying"
-        indices = [self._raw_dataset.data.index(cand.data) for cand in candidates]
+        indices = [self._raw_dataset.candidates.index(cand) for cand in candidates]
         labels = self._raw_dataset.labels[indices]
         return LabelledCandidates(candidates=candidates, labels=labels)
 
