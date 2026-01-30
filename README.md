@@ -43,7 +43,9 @@ For more information on creating personal access tokens, see [GitHub's documenta
 
 ## 📖 Documentation
 
-Full API documentation is available at **[instadeepai.github.io/alf](https://instadeepai.github.io/alf/)**
+- 📖 **[Full Documentation](https://instadeepai.github.io/alf/)** - Complete API reference
+- 🛠️ **[Contributing Guide](docs/CONTRIBUTING.md)** - How to extend ALF and contribute code
+- 📥 **[Installation Guide](docs/INSTALLATION.md)** - Detailed installation instructions
 
 ### Building Documentation Locally
 
@@ -122,11 +124,22 @@ alf/
 
 ## 🎓 Tutorials
 
-Explore the tutorials to learn how to use ALF:
+### Experiment Tutorials
 
-- **[Offline Design Tutorial](tutorials/offline_design_tutorial.ipynb)** - Complete guide
-  to running offline design experiments
-- **[Example Scripts](tutorials/experiments/)** - Ready-to-run examples for all task types
+End-to-end guides for running active learning experiments:
+
+- **[Offline Design Tutorial](tutorials/experiments/offline_design_tutorial.ipynb)** - Dataset-based optimization
+- **[Online Design Tutorial](tutorials/experiments/online_design_tutorial.ipynb)** - Model-based optimization
+
+### Extension Tutorials
+
+Learn how to extend ALF's base classes for custom implementations:
+
+- **[Extending Models](tutorials/extending/extending_models.ipynb)** - Create custom models for oracle/surrogate/generator roles
+- **[Extending Datasets](tutorials/extending/extending_datasets.ipynb)** - Add custom data sources
+- **[Extending Search Functions](tutorials/extending/extending_search_functions.ipynb)** - Implement custom search strategies
+- **[Extending Acquisition Functions](tutorials/extending/extending_acquisition_functions.ipynb)** - Create custom acquisition strategies
+- **[Understanding Model Roles](tutorials/extending/model_roles.ipynb)** - Oracle, Surrogate, and Generator patterns
 
 
 ## 🛠️ Development
@@ -166,12 +179,12 @@ uv run pre-commit run --all-files
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+We welcome contributions! To get started:
 
-1. Create a feature branch (`git checkout -b feature/amazing-feature`)
-2. Commit your changes (`git commit -m 'Add some amazing feature'`)
-3. Push to the branch (`git push origin feature/amazing-feature`)
-4. Open a Pull Request
+1. Read our **[Contributing Guide](docs/CONTRIBUTING.md)** for development setup and guidelines
+2. Check out the **[Extension Tutorials](tutorials/extending/)** to learn how to extend ALF's base classes
+
+For questions or discussions, please open an issue.
 
 ## 📄 License
 
