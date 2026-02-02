@@ -23,7 +23,7 @@ import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
 from torch.utils.data import DataLoader, TensorDataset
 
-from alf_tools.models.model_utils import (
+from alf_tools.models import (
     create_char_to_idx_mapping,
     get_device,
     one_hot_encode,

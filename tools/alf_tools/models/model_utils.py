@@ -17,7 +17,7 @@
 from typing import Union
 
 import torch
-from alf_core import Candidate, LabeledCandidates
+from alf_core import Candidate, LabelledCandidates
 
 
 def create_char_to_idx_mapping(alphabet: str) -> dict[str, int]:
@@ -46,11 +46,11 @@ def get_device(device: str | None = None) -> torch.device:
     return torch.device(device)
 
 
-def extract_sequences_from_inputs(inputs: Union[LabeledCandidates, list[Candidate]]) -> list[str]:
+def extract_sequences_from_inputs(inputs: Union[LabelledCandidates, list[Candidate]]) -> list[str]:
     """Extract sequences from model inputs.
 
     Args:
-        inputs: Either LabeledCandidates or list of Candidates.
+        inputs: Either LabelledCandidates or list of Candidates.
 
     Returns:
         List of sequences as strings.
@@ -58,12 +58,12 @@ def extract_sequences_from_inputs(inputs: Union[LabeledCandidates, list[Candidat
     Raises:
         ValueError: If input type is not supported.
     """
-    if isinstance(inputs, LabeledCandidates):
+    if isinstance(inputs, LabelledCandidates):
         return inputs.data
     elif isinstance(inputs, list) and all(isinstance(c, Candidate) for c in inputs):
         return [c.data for c in inputs]
     else:
-        raise ValueError("Input must be LabeledCandidates or list of Candidates")
+        raise ValueError("Input must be LabelledCandidates or list of Candidates")
 
 
 def one_hot_encode(

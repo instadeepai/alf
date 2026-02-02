@@ -17,8 +17,8 @@
 import numpy as np
 import pytest
 import torch
-from alf_core import Candidate, LabeledCandidates
-from alf_tools.models.model_utils import (
+from alf_core import Candidate, LabelledCandidates
+from alf_tools.models import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
     get_device,
@@ -61,10 +61,10 @@ class TestModelUtils:
         assert device.type == "cpu"
 
     def test_extract_sequences_from_labeled_candidates(self):
-        """Test extracting sequences from LabeledCandidates."""
+        """Test extracting sequences from LabelledCandidates."""
         sequences = ["AAA", "BBB", "CCC"]
         candidates = [Candidate(data=seq, modality="sequence") for seq in sequences]
-        labeled = LabeledCandidates(candidates, np.array([1.0, 2.0, 3.0]))
+        labeled = LabelledCandidates(candidates, np.array([1.0, 2.0, 3.0]))
 
         extracted = extract_sequences_from_inputs(labeled)
 
