@@ -23,7 +23,7 @@ from typing import Annotated, Literal, Self, Union
 
 import numpy as np
 from alf_core.dataclasses.candidate import Modality
-from alf_core.dataclasses.labeled_candidates import Candidate, LabeledCandidates
+from alf_core.dataclasses.labelled_candidates import Candidate, LabelledCandidates
 from alf_core.dataset.splitting_utils import split_dataset
 from pydantic import BaseModel, Field, model_validator
 
@@ -88,11 +88,11 @@ class BaseDataset(abc.ABC):
             "test": config.test_ratio,
         }
         self.metadata: dict | None = None
-        self._raw_dataset: LabeledCandidates | None = None
-        self.splits: dict[str, LabeledCandidates] = {}
+        self._raw_dataset: LabelledCandidates | None = None
+        self.splits: dict[str, LabelledCandidates] = {}
 
     @abc.abstractmethod
-    def load_dataset(self) -> LabeledCandidates:
+    def load_dataset(self) -> LabelledCandidates:
         """Load the raw dataset.
 
         This method must be implemented by subclasses to load data from their
@@ -112,7 +112,7 @@ class BaseDataset(abc.ABC):
         pass
 
     @property
-    def train_dataset(self) -> LabeledCandidates:
+    def train_dataset(self) -> LabelledCandidates:
         """Get the training dataset split.
 
         Returns:
@@ -125,7 +125,7 @@ class BaseDataset(abc.ABC):
         return self.splits["train"]
 
     @property
-    def test_dataset(self) -> LabeledCandidates:
+    def test_dataset(self) -> LabelledCandidates:
         """Get the test dataset split.
 
         Returns:
@@ -138,7 +138,7 @@ class BaseDataset(abc.ABC):
         return self.splits["test"]
 
     @property
-    def validation_dataset(self) -> LabeledCandidates:
+    def validation_dataset(self) -> LabelledCandidates:
         """Get the validation dataset split.
 
         Returns:
@@ -153,7 +153,7 @@ class BaseDataset(abc.ABC):
         return self.splits["validation"]
 
     @property
-    def candidate_pool(self) -> LabeledCandidates:
+    def candidate_pool(self) -> LabelledCandidates:
         """Get the candidate pool split.
 
         Returns:
@@ -182,7 +182,7 @@ class BaseDataset(abc.ABC):
             f"candidate_pool_size={len(self.candidate_pool)})"
         )
 
-    def _split_dataset(self) -> dict[str, LabeledCandidates]:
+    def _split_dataset(self) -> dict[str, LabelledCandidates]:
         """Split the raw dataset into train, validation, test, and candidate pool.
 
         Note, that the candidate pool size is everything that is not in the train, validation,
@@ -191,7 +191,7 @@ class BaseDataset(abc.ABC):
 
         Returns:
             Dictionary with keys "train", "validation", "test", and "candidate_pool",
-            each containing a LabeledCandidates object.
+            each containing a LabelledCandidates object.
 
         Raises:
             AssertionError: If dataset hasn't been loaded yet.
@@ -231,7 +231,7 @@ class BaseDataset(abc.ABC):
         self.splits = self._split_dataset()
         self.set_metadata()
 
-    def update_splits(self, acquired_candidates: LabeledCandidates) -> None:
+    def update_splits(self, acquired_candidates: LabelledCandidates) -> None:
         """Update dataset splits with newly acquired candidates.
 
         Removes acquired candidates from the candidate pool and distributes them
@@ -247,12 +247,12 @@ class BaseDataset(abc.ABC):
         num_val = floor(len(acquired_candidates) * self.split_ratio["validation_frac"])
         shuffled_acquired_candidates = acquired_candidates.shuffle(self.config.seed)
         # Add num_val candidates to validation split and the rest to train split
-        self.splits["train"].append(LabeledCandidates(*shuffled_acquired_candidates[:-num_val]))
+        self.splits["train"].append(LabelledCandidates(*shuffled_acquired_candidates[:-num_val]))
         self.splits["validation"].append(
-            LabeledCandidates(*shuffled_acquired_candidates[-num_val:])
+            LabelledCandidates(*shuffled_acquired_candidates[-num_val:])
         )
 
-    def query(self, candidates: list[Candidate]) -> LabeledCandidates:
+    def query(self, candidates: list[Candidate]) -> LabelledCandidates:
         """Query labels for the given candidates from the raw dataset.
 
         Args:
@@ -266,9 +266,9 @@ class BaseDataset(abc.ABC):
             ValueError: If any candidate's data is not found in the dataset.
         """
         assert self._raw_dataset is not None, "Dataset must be loaded before querying"
-        indices = [self._raw_dataset.data.index(cand.data) for cand in candidates]
+        indices = [self._raw_dataset.candidates.index(cand) for cand in candidates]
         labels = self._raw_dataset.labels[indices]
-        return LabeledCandidates(candidates=candidates, labels=labels)
+        return LabelledCandidates(candidates=candidates, labels=labels)
 
     def get_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Get summary metrics for all dataset splits.

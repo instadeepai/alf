@@ -19,30 +19,6 @@ dependencies = [
 where = ["."]
 include = ["alf_core*"]
 
-[dependency-groups]
-dev = [
-    "pytest>=6.2.0",
-    "pytest-cov>=2.12.0",
-    "black>=21.0.0",
-    "flake8>=3.9.0",
-    "mypy>=0.910",
-    "pre-commit>=4.1.0",
-]
-
-[project.optional-dependencies]
-torch_cpu = [
-    "torch>=1.9.0",
-]
-torch_gpu = [
-   "torch>=1.9.0",
-]
-
-[tool.uv.sources]
-torch = [
-  { index = "pytorch-cpu", extra = "torch_cpu" },
-  { index = "pytorch-gpu", extra = "torch_gpu" },
-]
-
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
@@ -53,13 +29,7 @@ name = "pytorch-gpu"
 url = "https://download.pytorch.org/whl/cu121"
 explicit = true
 
-[tool.uv]
-conflicts = [
-  [
-    { extra = "torch_cpu" },
-    { extra = "torch_gpu" },
-  ],
-]
-default-groups = [
-  "dev",
-]
+# For testing pytorch-cpu is enough. If it's otherwise, replace the index
+# with "pytorch-gpu"
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }

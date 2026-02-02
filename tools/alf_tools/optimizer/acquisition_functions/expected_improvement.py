@@ -14,7 +14,7 @@
 
 
 import numpy as np
-from alf_core import AcquisitionFunction, Candidate, LabeledCandidates, TaskState
+from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, TaskState
 from scipy.stats import norm
 
 
@@ -30,7 +30,7 @@ class ExpectedImprovement(AcquisitionFunction):
     This is a maximising acquisition function.
     """
 
-    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabeledCandidates:
+    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabelledCandidates:
         """Compute Expected Improvement acquisition values for unlabelled candidates.
 
         Args:
@@ -41,7 +41,7 @@ class ExpectedImprovement(AcquisitionFunction):
             ValueError: If `empirical_dist` or `variances` is not found in predictions.
 
         Returns:
-            LabeledCandidates with Expected Improvement acquisition values.
+            LabelledCandidates with Expected Improvement acquisition values.
         """
         predictions = state.surrogate.predict(search_candidates)
         best_f = state.dataset.train_dataset.labels.max()
@@ -61,4 +61,4 @@ class ExpectedImprovement(AcquisitionFunction):
                 "Expected either `empirical_dist` or `variances` in predictions, "
                 "but neither was found. Cannot compute expected improvement."
             )
-        return LabeledCandidates(candidates=search_candidates, labels=acquisition_values)
+        return LabelledCandidates(candidates=search_candidates, labels=acquisition_values)

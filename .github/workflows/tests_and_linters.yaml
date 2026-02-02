@@ -27,7 +27,7 @@ jobs:
 
       - name: Lint
         run: |
-          cd core && uv sync --extra torch_cpu
+          uv sync
           uv run --no-sync pre-commit run --all-files --verbose
 
   tests:
@@ -55,22 +55,21 @@ jobs:
         - name: Install uv
           uses: astral-sh/setup-uv@v6
 
+        - name: Sync dependencies
+          run: uv sync
+
         - name: Run tests (core) 🧪
           run: |
-            cd core
-            uv sync --extra torch_cpu
-            uv run --no-sync pytest --verbose --cov-report xml:coverage-core.xml \
+            uv run --no-sync pytest core --verbose --cov-report xml:core/coverage-core.xml \
                             --cov-report term-missing \
-                            --junitxml=pytest-core.xml \
+                            --junitxml=core/pytest-core.xml \
                             --cov=alf_core
 
         - name: Run tests (tools) 🧪
           run: |
-            cd tools
-            uv sync --extra torch_cpu
-            uv run --no-sync pytest --verbose --cov-report xml:coverage-tools.xml \
+            uv run --no-sync pytest tools --verbose --cov-report xml:tools/coverage-tools.xml \
                             --cov-report term-missing \
-                            --junitxml=pytest-tools.xml \
+                            --junitxml=tools/pytest-tools.xml \
                             --cov=alf_tools
 
         - name: Pytest coverage comment (core) 💬
@@ -90,3 +89,27 @@ jobs:
             unique-id-for-comment: coverage-tools
             pytest-xml-coverage-path: tools/coverage-tools.xml
             junitxml-path: tools/pytest-tools.xml
+
+        - name: Update core coverage badge 🏷️
+          if: github.ref == 'refs/heads/main'
+          uses: schneegans/dynamic-badges-action@v1.7.0
+          with:
+            auth: ${{ secrets.GIST_SECRET }}
+            gistID: 114eb5680493468e40f5a528c08f1888
+            filename: alf-core-coverage.json
+            label: core coverage
+            message: ${{ steps.coverageCommentCore.outputs.coverage }}
+            color: ${{ steps.coverageCommentCore.outputs.color }}
+            namedLogo: python
+
+        - name: Update tools coverage badge 🏷️
+          if: github.ref == 'refs/heads/main'
+          uses: schneegans/dynamic-badges-action@v1.7.0
+          with:
+            auth: ${{ secrets.GIST_SECRET }}
+            gistID: 25ce4b64d5b9cda177203366146f5bf0
+            filename: alf-tools-coverage.json
+            label: tools coverage
+            message: ${{ steps.coverageCommentTools.outputs.coverage }}
+            color: ${{ steps.coverageCommentTools.outputs.color }}
+            namedLogo: python

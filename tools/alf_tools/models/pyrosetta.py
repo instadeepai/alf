@@ -17,7 +17,8 @@ import time
 from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
-from alf_core import BaseModel, Candidate, LabeledCandidates, Predictions
+from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
+
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 logger = logging.getLogger("alf-tools")
@@ -176,7 +177,7 @@ class PyRosetta(BaseModel):
         score = self.score_function(pose)
         return -score
 
-    def featurise(self, inputs: Union[LabeledCandidates, List[Candidate]]) -> Any:
+    def featurise(self, inputs: Union[LabelledCandidates, List[Candidate]]) -> Any:
         """Featurisation is not implemented for this model.
 
         Raises:
@@ -186,8 +187,8 @@ class PyRosetta(BaseModel):
 
     def train(
         self,
-        train_data: LabeledCandidates,
-        val_data: LabeledCandidates | None = None,
+        train_data: LabelledCandidates,
+        val_data: LabelledCandidates | None = None,
     ) -> None:
         """Training is not implemented for this model.
 
