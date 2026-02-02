@@ -3,7 +3,8 @@
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
-[![Coverage](https://img.shields.io/badge/coverage-check%20CI-orange)](https://github.com/instadeepai/alf/actions)
+[![Core Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/surana01/114eb5680493468e40f5a528c08f1888/raw/alf-core-coverage.json)](https://github.com/instadeepai/alf/tree/main/core)
+[![Tools Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/surana01/25ce4b64d5b9cda177203366146f5bf0/raw/alf-tools-coverage.json)](https://github.com/instadeepai/alf/tree/main/tools)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 [![Tests and Linters 🧪](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml/badge.svg?branch=main)](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml)
 
@@ -21,33 +22,56 @@ intelligent candidate selection (data acquisition), model adaptation, and evalua
 
 ## 📦 Installation
 
-### Prerequisites
-
-- Python 3.12 or higher
-- [uv](https://github.com/astral-sh/uv) (recommended) or pip
-
-### Install from source
-
-This library can be installed with pip from this private GitHub repository. See below for details.
-
-This repository contains two packages, `alf_core` and `alf_tools`. The former contains the task runners which allow you to run different experiments, and the latter contains implementations of specific models, datasets, and optimisation functions. Depending on your use case, you can use the following commands to install the specific packages.
+### Quick Install
 
 ```bash
 # Install the core package
 pip install git+https://github.com/instadeepai/alf.git#subdirectory=core
 
-# Install the tools package
+# Install the tools package (includes PyTorch)
 pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 ```
 
-To authenticate, we recommend to set up a `.netrc` file in your home directory with a GitHub personal access token:
+**Authentication:** Set up a `.netrc` file in your home directory with your GitHub personal access token:
 
 ```
 machine github.com login <USERNAME> password <TOKEN>
 ```
 
-The tool `pip` will automatically make use of these credentials for authentication. For more information on creating personal access tokens, see [this](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
+For more information on creating personal access tokens, see [GitHub's documentation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
 
+📖 **For detailed installation instructions, including development setup and GPU configuration, see [INSTALLATION.md](docs/INSTALLATION.md)**.
+
+## 📖 Documentation
+
+Full API documentation is available at **[instadeepai.github.io/alf](https://instadeepai.github.io/alf/)**
+
+### Building Documentation Locally
+
+To build and view the documentation on your local machine:
+
+1. Install documentation dependencies:
+   ```bash
+   uv sync --group docs
+   ```
+
+2. Build the HTML documentation:
+   ```bash
+   cd docs
+   make html
+   ```
+
+3. Open the documentation in your browser:
+   ```bash
+   # macOS
+   open build/html/index.html
+
+   # Linux
+   xdg-open build/html/index.html
+
+   # Windows
+   start build/html/index.html
+   ```
 
 ## 🚀 Quick Start
 
@@ -77,7 +101,7 @@ task.run(state=state, task_state_loggers=[TerminalTaskStateLogger()], optimizer=
 
 ```
 alf/
-├── core/                  # Core framework
+├── core/                  # Core framework (see core/README.md)
 │   ├── alf_core/          # Core package
 │   │   ├── dataclasses/   # Data structures (Candidate, LabelledCandidates, etc.)
 │   │   ├── dataset/       # Dataset base classes and utilities
@@ -88,7 +112,7 @@ alf/
 │   │   ├── tasks/         # Task implementations (Design, Supervised, ZeroShot)
 │   │   └── utils/         # Utilities (metrics, logging)
 │   └── tests/             # Core framework tests
-├── tools/                 # Example implementations and tools
+├── tools/                 # Example implementations and tools (see tools/README.md)
 │   └── alf_tools/         # Tools package
 │       ├── datasets/      # Example datasets (e.g., GFP)
 │       ├── models/        # Example models (CNN, Random)
@@ -97,12 +121,9 @@ alf/
 └── docs/                  # Documentation
 ```
 
-## 📖 Documentation
-
-For further details, see the following documentation:
-- **[ALF Core](core/README.md)** - Comprehensive guide to all
-  core components and their interactions
-- **[ALF Tools](tools/README.md)** - Description of all the datasets, models, and optimisation algorithms available (TBA - this link does not work for now)
+**Package Documentation:**
+- [Core Framework](core/README.md) - Base classes and task implementations
+- [Tools Package](tools/README.md) - Ready-to-use datasets, models, and acquisition functions
 
 ## 🎓 Tutorials
 
@@ -118,9 +139,15 @@ Explore the tutorials to learn how to use ALF:
 ### Setup Development Environment
 
 ```bash
-# Install with development dependencies
-uv sync --extra cpu --group dev
+# Clone the repository
+git clone https://github.com/instadeepai/alf.git
+cd alf
+
+# Install all packages with development dependencies
+uv sync
 ```
+
+For GPU support, see the [GPU Configuration](docs/INSTALLATION.md#gpu-support-optional) section in the installation guide.
 
 ### Run Tests
 
