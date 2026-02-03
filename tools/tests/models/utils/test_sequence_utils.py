@@ -12,23 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for model utility functions."""
+"""Tests for sequence utility functions."""
 
 import numpy as np
 import pytest
-import torch
 from alf_core import Candidate, LabelledCandidates
-from alf_tools.models import (
+from alf_tools.models.utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
-    get_device,
     one_hot_encode,
 )
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 
-class TestModelUtils:
-    """Test suite for model utility functions."""
+class TestSequenceUtils:
+    """Test suite for sequence utility functions."""
 
     def test_create_char_to_idx_mapping(self):
         """Test character to index mapping creation."""
@@ -46,19 +44,6 @@ class TestModelUtils:
 
         assert len(mapping) == 20
         assert all(char in mapping for char in PROTEIN_ALPHABET)
-
-    def test_get_device_auto(self):
-        """Test automatic device selection."""
-        device = get_device(None)
-
-        assert isinstance(device, torch.device)
-        assert device.type in ["cpu", "cuda"]
-
-    def test_get_device_explicit_cpu(self):
-        """Test explicit CPU device."""
-        device = get_device("cpu")
-
-        assert device.type == "cpu"
 
     def test_extract_sequences_from_labeled_candidates(self):
         """Test extracting sequences from LabelledCandidates."""

@@ -12,18 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
-from alf_tools.models.utils import (
+from alf_tools.models.utils.sequence_utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
-    get_device,
     one_hot_encode,
 )
+from alf_tools.models.utils.torch_utils import get_device
 
 __all__ = [
-    "CNNModel",
-    "CNNModelConfig",
-    "CNNTrainConfig",
     "create_char_to_idx_mapping",
     "extract_sequences_from_inputs",
     "get_device",
