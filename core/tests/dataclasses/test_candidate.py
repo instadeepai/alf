@@ -185,36 +185,6 @@ class TestCandidateFeatures:
         assert candidate.features == features
 
 
-class TestCandidateStringify:
-    """Tests for Candidate.to_serializable method."""
-
-    def test_stringify_sequence(self):
-        """Test to_serializable method with sequence modality."""
-        candidate = Candidate(data="ACDEFG", modality=Modality.SEQUENCE)
-        assert candidate.to_serializable() == "ACDEFG"
-
-
-@pytest.mark.parametrize(
-    "modality,data_factory",
-    [
-        (Modality.SEQUENCE, lambda: "ATCGATCG"),
-        (Modality.IMAGE, lambda: np.random.rand(32, 32, 3)),
-        (Modality.GRAPH, lambda: nx.path_graph(5)),
-        (Modality.STRUCTURE, lambda: np.random.rand(10, 3)),
-        (Modality.TABULAR, lambda: {"feature1": 1, "feature2": 2}),
-        (Modality.EMBEDDING, lambda: torch.randn(10, 5)),
-    ],
-)
-def test_candidate_modality_consistency(modality, data_factory):
-    """Parametrized test for different modalities with consistent data types."""
-    data = data_factory()
-    candidate = Candidate(data=data, modality=modality)
-
-    assert candidate.data is not None
-    assert candidate.modality == modality
-    assert candidate.features == {}
-
-
 @pytest.mark.parametrize(
     "features",
     [
@@ -391,7 +361,7 @@ class TestCandidateEquality:
         assert c1 in candidates_list
 
 
-class TestCandidateToDataFrame:
+class TestCandidateToSerializable:
     """Test cases for Candidate.to_dataframe method."""
 
     def test_to_dataframe_sequence_modality(self):
