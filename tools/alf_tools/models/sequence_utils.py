@@ -32,20 +32,6 @@ def create_char_to_idx_mapping(alphabet: str) -> dict[str, int]:
     return {char: idx for idx, char in enumerate(alphabet)}
 
 
-def get_device(device: str | None = None) -> torch.device:
-    """Get the appropriate torch device.
-
-    Args:
-        device: Device specification ('cuda', 'cpu', or None for auto-detect).
-
-    Returns:
-        torch.device object.
-    """
-    if device is None:
-        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    return torch.device(device)
-
-
 def extract_sequences_from_inputs(inputs: Union[LabelledCandidates, list[Candidate]]) -> list[str]:
     """Extract sequences from model inputs.
 
