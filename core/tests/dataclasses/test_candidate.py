@@ -362,7 +362,7 @@ class TestCandidateEquality:
 
 
 class TestCandidateToSerializable:
-    """Test cases for Candidate.to_dataframe method."""
+    """Test cases for Candidate.to_serializable method."""
 
     def test_to_dataframe_sequence_modality(self):
         """Test to_dataframe with sequence modality returns stringified data."""
