@@ -364,8 +364,8 @@ class TestCandidateEquality:
 class TestCandidateToSerializable:
     """Test cases for Candidate.to_serializable method."""
 
-    def test_to_dataframe_sequence_modality(self):
-        """Test to_dataframe with sequence modality returns stringified data."""
+    def test_to_serializable_sequence_modality(self):
+        """Test to_serializable with sequence modality returns stringified data."""
         seq_data = "MKTFFVAGLVLLLTICSASG"
         candidate = Candidate(data=seq_data, modality=Modality.SEQUENCE)
         result = candidate.to_serializable()
@@ -373,16 +373,16 @@ class TestCandidateToSerializable:
         assert isinstance(result, str)
         assert result == seq_data
 
-    def test_to_dataframe_sequence_empty_string(self):
-        """Test to_dataframe with empty sequence."""
+    def test_to_serializable_sequence_empty_string(self):
+        """Test to_serializable with empty sequence."""
         candidate = Candidate(data="", modality=Modality.SEQUENCE)
         result = candidate.to_serializable()
 
         assert isinstance(result, str)
         assert result == ""  # noqa: PLC1901
 
-    def test_to_dataframe_tabular_dict(self):
-        """Test to_dataframe with tabular modality (dict) returns raw data."""
+    def test_to_serializable_tabular_dict(self):
+        """Test to_serializable with tabular modality (dict) returns raw data."""
         tabular_data = {"age": 32, "height": 178, "weight": 70}
         candidate = Candidate(data=tabular_data, modality=Modality.TABULAR)
         result = candidate.to_serializable()
@@ -391,8 +391,8 @@ class TestCandidateToSerializable:
         assert result == tabular_data
         assert result["age"] == 32
 
-    def test_to_dataframe_tabular_pandas_series(self):
-        """Test to_dataframe with tabular modality (pandas Series) returns raw data."""
+    def test_to_serializable_tabular_pandas_series(self):
+        """Test to_serializable with tabular modality (pandas Series) returns raw data."""
         tabular_data = pd.Series({"age": 32, "height": 178, "weight": 70})
         candidate = Candidate(data=tabular_data, modality=Modality.TABULAR)
         result = candidate.to_serializable()
@@ -401,8 +401,8 @@ class TestCandidateToSerializable:
         assert result.equals(tabular_data)
         assert result["age"] == 32
 
-    def test_to_dataframe_tabular_numpy_array(self):
-        """Test to_dataframe with tabular modality (numpy array) returns raw data."""
+    def test_to_serializable_tabular_numpy_array(self):
+        """Test to_serializable with tabular modality (numpy array) returns raw data."""
         tabular_data = np.array([1, 2, 3, 4, 5])
         candidate = Candidate(data=tabular_data, modality=Modality.TABULAR)
         result = candidate.to_serializable()
@@ -410,8 +410,8 @@ class TestCandidateToSerializable:
         assert isinstance(result, np.ndarray)
         assert np.array_equal(result, tabular_data)
 
-    def test_to_dataframe_image_modality_numpy(self):
-        """Test to_dataframe with image modality returns raw numpy array data."""
+    def test_to_serializable_image_modality_numpy(self):
+        """Test to_serializable with image modality returns raw numpy array data."""
         img_data = np.random.rand(3, 64, 64).astype(np.float32)
         candidate = Candidate(data=img_data, modality=Modality.IMAGE)
         result = candidate.to_serializable()
@@ -420,8 +420,8 @@ class TestCandidateToSerializable:
         assert np.array_equal(result, img_data)
         assert result.shape == (3, 64, 64)
 
-    def test_to_dataframe_image_modality_torch(self):
-        """Test to_dataframe with image modality converts torch tensor to numpy array."""
+    def test_to_serializable_image_modality_torch(self):
+        """Test to_serializable with image modality converts torch tensor to numpy array."""
         img_data = torch.randn(3, 64, 64, dtype=torch.float32)
         candidate = Candidate(data=img_data, modality=Modality.IMAGE)
         result = candidate.to_serializable()
@@ -430,16 +430,16 @@ class TestCandidateToSerializable:
         assert np.array_equal(result, img_data.cpu().numpy())
         assert result.shape == (3, 64, 64)
 
-    def test_to_dataframe_graph_modality(self):
-        """Test to_dataframe with graph modality raises NotImplementedError."""
+    def test_to_serializable_graph_modality(self):
+        """Test to_serializable with graph modality raises NotImplementedError."""
         graph_data = nx.erdos_renyi_graph(n=10, p=0.3)
         candidate = Candidate(data=graph_data, modality=Modality.GRAPH)
 
         with pytest.raises(NotImplementedError, match="Graph datatype not supported yet"):
             candidate.to_serializable()
 
-    def test_to_dataframe_structure_modality(self):
-        """Test to_dataframe with structure modality returns raw structure data."""
+    def test_to_serializable_structure_modality(self):
+        """Test to_serializable with structure modality returns raw structure data."""
         coords = np.random.rand(50, 3)
         candidate = Candidate(data=coords, modality=Modality.STRUCTURE)
         result = candidate.to_serializable()
@@ -448,8 +448,8 @@ class TestCandidateToSerializable:
         assert np.array_equal(result, coords)
         assert result.shape == (50, 3)
 
-    def test_to_dataframe_embedding_modality(self):
-        """Test to_dataframe with embedding modality returns raw embedding data."""
+    def test_to_serializable_embedding_modality(self):
+        """Test to_serializable with embedding modality returns raw embedding data."""
         embedding_data = torch.randn(16, 128)
         candidate = Candidate(data=embedding_data, modality=Modality.EMBEDDING)
         result = candidate.to_serializable()
@@ -458,8 +458,8 @@ class TestCandidateToSerializable:
         assert torch.equal(torch.asarray(result), embedding_data)
         assert result.shape == (16, 128)
 
-    def test_to_dataframe_preserves_features(self):
-        """Test that to_dataframe doesn't modify candidate features."""
+    def test_to_serializable_preserves_features(self):
+        """Test that to_serializable doesn't modify candidate features."""
         features = {"key": "value", "number": 42}
         candidate = Candidate(data="ACDEFG", modality=Modality.SEQUENCE, features=features)
         result = candidate.to_serializable()
@@ -467,8 +467,8 @@ class TestCandidateToSerializable:
         assert result == "ACDEFG"
         assert candidate.features == features
 
-    def test_to_dataframe_none_data(self):
-        """Test to_dataframe with None data for non-sequence modality."""
+    def test_to_serializable_none_data(self):
+        """Test to_serializable with None data for non-sequence modality."""
         candidate = Candidate(data=None, modality=Modality.IMAGE)
         result = candidate.to_serializable()
 
@@ -486,8 +486,8 @@ class TestCandidateToSerializable:
         (Modality.EMBEDDING, lambda: torch.randn(10, 5), np.ndarray),
     ],
 )
-def test_to_dataframe_modality_types(modality, data_factory, expected_type):
-    """Parametrized test for to_dataframe with different modalities."""
+def test_to_serializable_modality_types(modality, data_factory, expected_type):
+    """Parametrized test for to_serializable with different modalities."""
     data = data_factory()
     candidate = Candidate(data=data, modality=modality)
     result = candidate.to_serializable()
