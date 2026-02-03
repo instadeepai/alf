@@ -114,7 +114,7 @@ def tensor_to_candidates(
         >>> print(len(candidates))
         2
     """
-    X_numpy = X.cpu().numpy()
+    X_numpy = X.detach().cpu().numpy()
     candidates = [Candidate(data=x, modality=modality, features=features) for x in X_numpy]
     return candidates
 
@@ -155,9 +155,10 @@ def predictions_to_posterior(
     if device is None:
         device = torch.device("cpu")
 
-    # Convert to tensors
-    mean = torch.from_numpy(predictions.means).float().to(device)
-    variance = torch.from_numpy(predictions.variances).float().to(device)
+    # Convert to tensors - detach to avoid gradient issues since predictions
+    # come from a model that doesn't maintain torch gradient flow
+    mean = torch.from_numpy(predictions.means).float().to(device).detach()
+    variance = torch.from_numpy(predictions.variances).float().to(device).detach()
 
     # Ensure proper shape: (n, 1) for single-output GP
     if mean.dim() == 1:
@@ -167,7 +168,9 @@ def predictions_to_posterior(
 
     # Create diagonal covariance matrix
     # Shape: (n, n) where n is the number of points
-    covar = torch.diag_embed(variance.squeeze(-1))
+    # Use clamp to ensure positive variance for numerical stability
+    variance_clamped = torch.clamp(variance, min=1e-6)
+    covar = torch.diag_embed(variance_clamped.squeeze(-1))
 
     # Create multivariate normal distribution
     mvn = MultivariateNormal(mean.squeeze(-1), covar)

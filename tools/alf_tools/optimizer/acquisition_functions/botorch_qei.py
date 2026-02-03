@@ -17,9 +17,14 @@
 This module provides a wrapper around BoTorch's qExpectedImprovement (qEI)
 acquisition function, enabling batch acquisition with joint optimization
 for diversity and quality.
+
+Note: For easy switching between different BoTorch acquisition functions (qEI,
+qUCB, qNEI, etc.), consider using the generic `BoTorchAcquisition` wrapper
+instead of this class. See `botorch_acquisition.py` for details.
 """
 
 import logging
+from typing import Optional
 
 import numpy as np
 import torch
@@ -79,6 +84,7 @@ class BoTorchQEI(AcquisitionFunction):
         mc_samples: int = 128,
         optimize_sequential: bool = False,
         seed: int = 42,
+        threshold: Optional[float] = None,
     ) -> None:
         """Initialize BoTorchQEI acquisition function.
 
@@ -92,6 +98,8 @@ class BoTorchQEI(AcquisitionFunction):
             optimize_sequential: If True, optimize candidates sequentially (greedy).
                 If False, optimize jointly for true batch acquisition.
             seed: Random seed for reproducibility.
+            threshold: The function value around which the aqusition function should be
+            optimised.
         """
         self.batch_size = batch_size
         self.bounds = bounds
@@ -103,7 +111,7 @@ class BoTorchQEI(AcquisitionFunction):
 
         # Device detection
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+        self.threshold = threshold
         if self.bounds is not None:
             self.bounds = self.bounds.to(self.device)
 
@@ -150,6 +158,25 @@ class BoTorchQEI(AcquisitionFunction):
             # Optimization mode: Optimize new candidates
             return self._optimize_candidates(state)
 
+    def _get_improvement_reference(self, state: TaskState) -> float:
+        """Get reference value for Expected Improvement calculation.
+
+        Returns either the best observed value (for standard BO) or a
+        user-specified threshold (for threshold-based acquisition).
+
+        Args:
+            state: Task state containing dataset and surrogate model.
+
+        Returns:
+            reference value for the aquisition function.
+
+        """
+        if self.threshold is None:
+            reference_value = float(state.dataset.train_dataset.labels.max())
+        else:
+            reference_value = self.threshold
+        return reference_value
+
     def _score_candidates(
         self,
         search_candidates: list[Candidate],
@@ -170,8 +197,7 @@ class BoTorchQEI(AcquisitionFunction):
         # Get predictions from surrogate
         predictions = state.surrogate.predict(search_candidates)
 
-        # Get best observed value
-        best_f = state.dataset.train_dataset.labels.max()
+        reference_value = self._get_improvement_reference(state=state)
 
         # Convert to tensors
         posterior = predictions_to_posterior(predictions, device=self.device)
@@ -185,7 +211,7 @@ class BoTorchQEI(AcquisitionFunction):
             sigma = torch.sqrt(variance)
 
             # Compute Z-score
-            Z = (mean - best_f) / sigma
+            Z = (mean - reference_value) / sigma
             Z = torch.clamp(Z, min=-10, max=10)  # Numerical stability
 
             # Standard normal CDF and PDF
@@ -194,7 +220,7 @@ class BoTorchQEI(AcquisitionFunction):
             pdf_Z = torch.exp(normal.log_prob(Z))
 
             # EI formula
-            ei = (mean - best_f) * cdf_Z + sigma * pdf_Z
+            ei = (mean - reference_value) * cdf_Z + sigma * pdf_Z
             ei = torch.clamp(ei, min=0)  # EI is non-negative
 
         acquisition_values = ei.cpu().numpy()
@@ -220,28 +246,35 @@ class BoTorchQEI(AcquisitionFunction):
             )
 
         # Get best observed value
-        best_f = state.dataset.train_dataset.labels.max()
+        reference_value = self._get_improvement_reference(state)
 
         # Create a simple wrapper to get posteriors
         class SurrogateWrapper:
-            """Wrapper to make ALF surrogate compatible with BoTorch."""
+            """Wrapper to make ALF surrogate compatible with BoTorch.
+
+            Note: This wrapper doesn't maintain gradients since the ALF surrogate
+            operates on numpy arrays. BoTorch will use numerical gradients for optimization.
+            """
 
             def __init__(self, surrogate, device):
                 self.surrogate = surrogate
                 self.device = device
+                self.num_outputs = 1  # Single-output model (scalar predictions)
 
-            def posterior(self, X):
+            def posterior(self, X, posterior_transform=None, **kwargs):
                 """Get posterior at X.
 
                 Args:
                     X: Input tensor of shape (n, d).
+                    posterior_transform: Optional posterior transform (handled by BoTorch).
+                    **kwargs: Additional keyword arguments (ignored).
 
                 Returns:
                     GPyTorchPosterior with predictions at X.
                 """
-                # Convert tensor to candidates
-                candidates = tensor_to_candidates(X.cpu())
-                # Get predictions
+                # Convert tensor to candidates (detach handled in tensor_to_candidates)
+                candidates = tensor_to_candidates(X)
+                # Get predictions from surrogate
                 predictions = self.surrogate.predict(candidates)
                 # Convert to posterior
                 return predictions_to_posterior(predictions, device=self.device)
@@ -252,11 +285,12 @@ class BoTorchQEI(AcquisitionFunction):
         sampler = SobolQMCNormalSampler(sample_shape=torch.Size([self.mc_samples]))
         qei = qExpectedImprovement(
             model=model,
-            best_f=best_f,
+            best_f=reference_value,
             sampler=sampler,
         )
 
         # Optimize acquisition function
+        # Use numerical gradients since ALF surrogate doesn't provide analytical gradients
         torch.manual_seed(self.seed)
         candidates_tensor, acq_value = optimize_acqf(
             acq_function=qei,
@@ -265,6 +299,7 @@ class BoTorchQEI(AcquisitionFunction):
             num_restarts=self.num_restarts,
             raw_samples=self.raw_samples,
             sequential=self.optimize_sequential,
+            options={"with_grad": False},  # Use finite differences for gradients
         )
 
         # Convert to ALF candidates

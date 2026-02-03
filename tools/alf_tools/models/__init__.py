@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from alf_tools.models.botorch_gp_models import BoTorchGPModel
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.gp import (
     FeaturizerConfig,
@@ -19,3 +20,14 @@ from alf_tools.models.gp import (
     GPModelTrainer,
     GPTrainConfig,
 )
+
+__all__ = [
+    "BoTorchGPModel",
+    "CNNModel",
+    "CNNModelConfig",
+    "CNNTrainConfig",
+    "FeaturizerConfig",
+    "GPModelConfig",
+    "GPModelTrainer",
+    "GPTrainConfig",
+]
