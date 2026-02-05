@@ -170,18 +170,15 @@ class LabelledCandidates:
 
         Returns:
             A DataFrame with columns:
-            - "data": The stringified data of each candidate
+            - "data": The formatted data of each candidate
             - "label": The label value for each candidate
             - Additional columns for any features present in the candidates
         """
-        rows = []
-        for cand, label in zip(self.candidates, self.labels):
-            d = {"data": cand.stringify(), "label": label}
-            if cand.features is not None and isinstance(cand.features, dict):
-                for k, v in cand.features.items():
-                    d[k] = v
-            rows.append(d)
-
+        rows = [
+            {"data": cand.to_serializable(), "label": label}
+            | (cand.features if isinstance(cand.features, dict) else {})
+            for cand, label in zip(self.candidates, self.labels)
+        ]
         return pd.DataFrame.from_records(rows)
 
     def get_top_k(self, k: int) -> "LabelledCandidates":
