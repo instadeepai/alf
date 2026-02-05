@@ -12,7 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Common utilities for model implementations."""
+"""Sequence processing utilities for ALF model implementations.
+
+This module provides utilities for processing biological sequences (e.g., DNA, RNA, proteins)
+in machine learning models. It handles common tasks like alphabet mapping, sequence extraction
+from ALF data structures, and one-hot encoding.
+
+Key Functionality:
+    - Character-to-index mapping creation for sequence alphabets
+    - Sequence extraction from ALF Candidate and LabelledCandidates objects
+    - One-hot encoding of sequences with configurable output shape
+
+Note:
+    All sequences in a batch must have the same length for one-hot encoding.
+    Characters not present in the alphabet will raise a ValueError.
+"""
 
 from typing import Union
 
