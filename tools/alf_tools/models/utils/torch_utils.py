@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
-from alf_tools.models.utils import (
-    create_char_to_idx_mapping,
-    extract_sequences_from_inputs,
-    get_device,
-    one_hot_encode,
-)
+"""Common utilities for torch based model implementations."""
 
-__all__ = [
-    "CNNModel",
-    "CNNModelConfig",
-    "CNNTrainConfig",
-    "create_char_to_idx_mapping",
-    "extract_sequences_from_inputs",
-    "get_device",
-    "one_hot_encode",
-]
+import torch
+
+
+def get_device(device: str | None = None) -> torch.device:
+    """Get the appropriate torch device.
+
+    Args:
+        device: Device specification ('cuda', 'cpu', or None for auto-detect).
+
+    Returns:
+        torch.device object.
+    """
+    if device is None:
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    return torch.device(device)

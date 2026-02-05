@@ -12,20 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
-from alf_tools.models.utils import (
-    create_char_to_idx_mapping,
-    extract_sequences_from_inputs,
-    get_device,
-    one_hot_encode,
-)
+"""Tests for torch utility functions."""
 
-__all__ = [
-    "CNNModel",
-    "CNNModelConfig",
-    "CNNTrainConfig",
-    "create_char_to_idx_mapping",
-    "extract_sequences_from_inputs",
-    "get_device",
-    "one_hot_encode",
-]
+import torch
+from alf_tools.models.utils import get_device
+
+
+class TestTorchUtils:
+    """Test suite for torch utility functions."""
+
+    def test_get_device_auto(self):
+        """Test automatic device selection."""
+        device = get_device(None)
+
+        assert isinstance(device, torch.device)
+        assert device.type in ["cpu", "cuda"]
+
+    def test_get_device_explicit_cpu(self):
+        """Test explicit CPU device."""
+        device = get_device("cpu")
+
+        assert device.type == "cpu"
