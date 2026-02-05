@@ -308,6 +308,56 @@ class TestBaseDatasetUpdateSplits:
         actual_new_val = len(dataset.validation_dataset) - initial_val_size
         assert actual_new_val == expected_new_val
 
+    def test_update_splits_with_zero_validation_fraction(self, dummy_dataset_factory):
+        """Test that when validation_frac=0, all acquired candidates go to train."""
+        # Create dataset with validation_frac = 0
+        dataset = dummy_dataset_factory(
+            train_ratio=0.5,
+            validation_frac=0.0,
+            test_ratio=0.25,
+            split_type="random",
+            num_samples=100,
+        )
+
+        # Get initial sizes
+        initial_train_size = len(dataset.train_dataset)
+        initial_val_size = len(dataset.validation_dataset)
+
+        # Acquire 10 candidates
+        acquired_candidates = LabelledCandidates(*dataset.candidate_pool[:10])
+
+        # Update splits
+        dataset.update_splits(acquired_candidates)
+
+        # Assert all 10 went to train, none to validation
+        assert len(dataset.train_dataset) == initial_train_size + 10
+        assert len(dataset.validation_dataset) == initial_val_size
+
+    def test_update_splits_with_full_validation_fraction(self, dummy_dataset_factory):
+        """Test that when validation_frac=1.0, all acquired candidates go to validation."""
+        # Create dataset with validation_frac = 1.0
+        dataset = dummy_dataset_factory(
+            train_ratio=0.5,
+            validation_frac=1.0,
+            test_ratio=0.25,
+            split_type="random",
+            num_samples=100,
+        )
+
+        # Get initial sizes
+        initial_train_size = len(dataset.train_dataset)
+        initial_val_size = len(dataset.validation_dataset)
+
+        # Acquire 10 candidates
+        acquired_candidates = LabelledCandidates(*dataset.candidate_pool[:10])
+
+        # Update splits
+        dataset.update_splits(acquired_candidates)
+
+        # Assert all 10 went to validation, none to train
+        assert len(dataset.train_dataset) == initial_train_size
+        assert len(dataset.validation_dataset) == initial_val_size + 10
+
 
 class TestBaseDatasetQuery:
     """Tests for querying labels for candidates."""
