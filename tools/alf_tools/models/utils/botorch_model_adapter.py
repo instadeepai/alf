@@ -223,7 +223,7 @@ class BoTorchModelAdapter(Model):
         """
         # If native BoTorch model, use its num_outputs
         if self._is_botorch_model:
-            return int(self._wrapped_model.num_outputs)  # type: ignore[union-attr]
+            return int(self._wrapped_model.num_outputs)  # type: ignore[union-attr, no-any-return]
 
         # For ALF BaseModel, assume single output (most common case)
         # Multi-output models would need special handling

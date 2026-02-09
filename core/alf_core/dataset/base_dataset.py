@@ -245,11 +245,12 @@ class BaseDataset(abc.ABC):
 
         # Split the acquired candidates into train and validation splits based on the split ratio
         num_val = floor(len(acquired_candidates) * self.split_ratio["validation_frac"])
+        num_train = len(acquired_candidates) - num_val
         shuffled_acquired_candidates = acquired_candidates.shuffle(self.config.seed)
         # Add num_val candidates to validation split and the rest to train split
-        self.splits["train"].append(LabelledCandidates(*shuffled_acquired_candidates[:-num_val]))
+        self.splits["train"].append(LabelledCandidates(*shuffled_acquired_candidates[:num_train]))
         self.splits["validation"].append(
-            LabelledCandidates(*shuffled_acquired_candidates[-num_val:])
+            LabelledCandidates(*shuffled_acquired_candidates[num_train:])
         )
 
     def query(self, candidates: list[Candidate]) -> LabelledCandidates:
@@ -266,7 +267,7 @@ class BaseDataset(abc.ABC):
             ValueError: If any candidate's data is not found in the dataset.
         """
         assert self._raw_dataset is not None, "Dataset must be loaded before querying"
-        indices = [self._raw_dataset.data.index(cand.data) for cand in candidates]
+        indices = [self._raw_dataset.candidates.index(cand) for cand in candidates]
         labels = self._raw_dataset.labels[indices]
         return LabelledCandidates(candidates=candidates, labels=labels)
 

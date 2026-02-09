@@ -21,8 +21,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
-from alf_tools.utils.constants import PROTEIN_ALPHABET
 from torch.utils.data import DataLoader, TensorDataset
+
+from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 logger = logging.getLogger("alf-tools")
 
