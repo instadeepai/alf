@@ -15,21 +15,19 @@
 from alf_tools.optimizer.acquisition_functions.botorch_acquisition import (
     BoTorchAcquisition,
 )
-from alf_tools.optimizer.acquisition_functions.botorch_qei import BoTorchQEI
+from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
 from alf_tools.optimizer.acquisition_functions.expected_improvement import (
     ExpectedImprovement,
 )
 from alf_tools.optimizer.acquisition_functions.greedy import Greedy
 from alf_tools.optimizer.acquisition_functions.thompson_sampling import ThompsonSampling
-from alf_tools.optimizer.acquisition_functions.threshold_ucb import ThresholdUCB
 from alf_tools.optimizer.acquisition_functions.ucb import UCB
 
 __all__ = [
     "BoTorchAcquisition",
-    "BoTorchQEI",
+    "BoTorchMCSampler",
     "ExpectedImprovement",
     "Greedy",
     "ThompsonSampling",
-    "ThresholdUCB",
     "UCB",
 ]

@@ -24,11 +24,11 @@ from typing import Literal, Optional
 import numpy as np
 import torch
 from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, TaskState
-from alf_tools.optimizer.search.botorch_search_functions import BoTorchMCSampler
+from alf_tools.models.utils.botorch_model_adapter import BoTorchModelAdapter
+from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
 from alf_tools.utils.botorch_utils import (
     candidates_to_tensor,
     get_bounds_tensor,
-    predictions_to_posterior,
     tensor_to_candidates,
 )
 from botorch.acquisition.monte_carlo import (
@@ -37,6 +37,7 @@ from botorch.acquisition.monte_carlo import (
     qUpperConfidenceBound,
 )
 from botorch.optim import optimize_acqf
+from jaxtyping import Float
 
 logger = logging.getLogger("alf-tools")
 
@@ -59,8 +60,9 @@ class BoTorchAcquisition(AcquisitionFunction):
     - **qKG** (qKnowledgeGradient): More sophisticated but expensive
 
     Example - Switching acquisition functions:
-        >>> from alf_tools.optimizer.acquisition_functions import BoTorchAcquisition
-        >>> from alf_tools.optimizer.search import ContinuousSearch, BoTorchMCSampler
+        >>> from alf_tools.optimizer.acquisition_functions import BoTorchAcquisition,
+        BoTorchMCSampler
+        >>> from alf_tools.optimizer.search import ContinuousSearch
         >>>
         >>> # Create sampler configuration
         >>> sampler = BoTorchMCSampler(sampler_type="sobol", num_samples=512)
@@ -146,8 +148,8 @@ class BoTorchAcquisition(AcquisitionFunction):
 
         # Set up sampler
         if sampler is None:
-            # Default: Sobol QMC with 512 samples
-            self.sampler_config = BoTorchMCSampler(sampler_type="sobol", num_samples=512)
+            # Default: Sobol QMC with 512 samples and fixed seed for reproducibility
+            self.sampler_config = BoTorchMCSampler(sampler_type="sobol", num_samples=512, seed=0)
         else:
             self.sampler_config = sampler
 
@@ -162,7 +164,8 @@ class BoTorchAcquisition(AcquisitionFunction):
         """Create the specific BoTorch acquisition function.
 
         Args:
-            model: BoTorch model or wrapped GP model.
+            model: Model with a posterior() method compatible with BoTorch.
+                Can be a native BoTorch model or a wrapper around an ALF model.
             best_f: Best observed value so far.
             X_baseline: Baseline points for qKG (optional).
 
@@ -258,36 +261,46 @@ class BoTorchAcquisition(AcquisitionFunction):
 
         Returns:
             Candidates with acquisition scores.
+
+        Raises:
+            ValueError: If batch_size(q) is greater than the length of candidates.
+            ValueError: If total candidates is not a multiple of batch_size(q).
         """
         logger.info(f"Scoring {len(candidates)} candidates with {self.acquisition_type}")
-
-        # Get predictions
-        predictions = state.surrogate.predict(candidates)
-
-        # Convert to posterior
-        posterior = predictions_to_posterior(predictions)
 
         # Get training data for qNEI
         X_baseline = None
         if self.acquisition_type == "qNEI":
             X_baseline = candidates_to_tensor(state.dataset.train_dataset.candidates)
 
-        # Create acquisition function with mock model that returns our posterior
-        class MockModel:
-            def posterior(self, X):
-                return posterior
-
-        mock_model = MockModel()
-        acq_fn = self._create_acquisition_function(mock_model, best_f, X_baseline)
+        # Use BoTorchModelAdapter to wrap the surrogate model
+        # The adapter handles conversion between ALF's BaseModel interface and
+        # BoTorch's Model interface
+        adapter = BoTorchModelAdapter(state.surrogate.model)
+        acq_fn = self._create_acquisition_function(adapter, best_f, X_baseline)
 
         # Evaluate acquisition function
+        # For discrete scoring, evaluate each candidate independently
         X = candidates_to_tensor(candidates)
+
+        if self.batch_size > X.shape[0]:
+            raise ValueError("batch_size(q) greater than the length of candidates")
+
+        if self.batch_size > 1 and X.shape[0] % self.batch_size != 0:
+            raise ValueError(
+                "Total candidates is not a multiple of batch_size(q).",
+                f"total candidates= {X.shape[0]}, q-batch (q) = {self.batch_size}",
+            )
+
+        # Convert the input to a format of (b, q, d) where b is the t-batch
+        X = X.reshape((-1, self.batch_size, X.shape[1]))
+
         with torch.no_grad():
-            acq_values = acq_fn(X.unsqueeze(1)).squeeze(-1)  # Shape: (n,)
+            acq_val: Float[torch.Tensor, " b"] = acq_fn(X)
 
         return LabelledCandidates(
             candidates=candidates,
-            labels=acq_values.cpu().numpy(),
+            labels=np.array(acq_val),
         )
 
     def _optimize_continuous(
@@ -324,19 +337,16 @@ class BoTorchAcquisition(AcquisitionFunction):
         if self.acquisition_type == "qNEI":
             X_baseline = candidates_to_tensor(state.dataset.train_dataset.candidates)
 
-        # Create acquisition function with surrogate model
-        # We need to wrap the surrogate to work with BoTorch
-        class WrappedModel:
-            def __init__(self, surrogate):
-                self.surrogate = surrogate
+        # For continuous optimization, prefer native BoTorch models for gradient support
+        # Check if the model has a native BoTorch model (e.g., BoTorchGPModel.model)
+        if hasattr(state.surrogate.model, "model") and state.surrogate.model.model is not None:
+            # Use the native BoTorch model directly (has proper gradients for optimization)
+            model = state.surrogate.model.model
+        else:
+            # Fall back to adapter for ALF models (uses numerical gradients)
+            model = BoTorchModelAdapter(state.surrogate.model)
 
-            def posterior(self, X):
-                candidates = tensor_to_candidates(X)
-                predictions = self.surrogate.predict(candidates)
-                return predictions_to_posterior(predictions)
-
-        wrapped_model = WrappedModel(state.surrogate)
-        acq_fn = self._create_acquisition_function(wrapped_model, best_f, X_baseline)
+        acq_fn = self._create_acquisition_function(model, best_f, X_baseline)
 
         # Optimize acquisition function
         candidates_tensor, acq_value = optimize_acqf(
@@ -353,7 +363,16 @@ class BoTorchAcquisition(AcquisitionFunction):
         candidates = tensor_to_candidates(candidates_tensor)
 
         # Create acquisition scores (use the optimized value)
-        scores = np.full(len(candidates), acq_value.item())
+        # Handle both scalar and tensor acquisition values (sequential vs joint optimization)
+        if isinstance(acq_value, torch.Tensor) and acq_value.numel() > 1:
+            # Sequential optimization returns per-candidate values
+            scores = acq_value.cpu().numpy()
+        else:
+            # Joint optimization returns single value for the batch
+            acq_scalar = (
+                acq_value.item() if isinstance(acq_value, torch.Tensor) else float(acq_value)
+            )
+            scores = np.full(len(candidates), acq_scalar)
 
         return LabelledCandidates(
             candidates=candidates,

@@ -18,15 +18,8 @@ This module provides search functions designed to work with BoTorch acquisition
 functions that can directly optimize candidates in continuous spaces.
 """
 
-from typing import Literal, Optional
-
-import torch
 from alf_core import Candidate, TaskState
 from alf_core.optimizer.search import BaseSearch
-from botorch.sampling.normal import IIDNormalSampler, SobolQMCNormalSampler
-
-# Type for supported MC sampler types
-MCSamplerType = Literal["sobol", "iid"]
 
 
 class ContinuousSearch(BaseSearch):
@@ -42,11 +35,14 @@ class ContinuousSearch(BaseSearch):
 
     Example:
         >>> from alf_tools.optimizer.search import ContinuousSearch
-        >>> from alf_tools.optimizer.acquisition_functions import BoTorchQEI
+        >>> from alf_tools.optimizer.acquisition_functions import BoTorchAcquisition
         >>> from alf_core import Optimizer
         >>>
         >>> optimizer = Optimizer(
-        ...     acquisition_fn=BoTorchQEI(bounds=[[0, 1], [0, 1]]),
+        ...     acquisition_fn=BoTorchAcquisition(
+        ...         acquisition_type="qEI",
+        ...         bounds=[[0, 1], [0, 1]]
+        ...     ),
         ...     search_fn=ContinuousSearch()
         ... )
     """
@@ -74,108 +70,3 @@ class ContinuousSearch(BaseSearch):
             Empty dictionary (no search-specific metrics for continuous optimization).
         """
         return {}
-
-
-class BoTorchMCSampler:
-    """Wrapper for BoTorch Monte Carlo samplers.
-
-    This class provides a unified interface to BoTorch's MC samplers, which are
-    used by acquisition functions to approximate expectations via Monte Carlo.
-
-    Different samplers offer different trade-offs:
-    - **Sobol QMC**: Quasi-Monte Carlo with better coverage (recommended)
-    - **IID**: Independent sampling (faster but less efficient)
-
-    The sampler is not a search function itself - it's a configuration object
-    that gets passed to BoTorch acquisition functions to control how they
-    approximate the acquisition value.
-
-    Example:
-        >>> from alf_tools.optimizer.search import BoTorchMCSampler
-        >>> from alf_tools.optimizer.acquisition_functions import BoTorchAcquisition
-        >>>
-        >>> # Create Sobol QMC sampler
-        >>> sampler = BoTorchMCSampler(sampler_type="sobol", num_samples=512)
-        >>>
-        >>> # Pass to acquisition function
-        >>> acq_fn = BoTorchAcquisition(
-        ...     acquisition_type="qEI",
-        ...     sampler=sampler.get_sampler(),
-        ...     bounds=[[0, 1], [0, 1]]
-        ... )
-
-    Args:
-        sampler_type: Type of sampler to use. Options:
-            - "sobol": Sobol QMC sampler (better coverage, recommended)
-            - "iid": Independent sampling (faster)
-        num_samples: Number of MC samples to draw. More samples = more accurate
-            but slower. Typical values: 256-512 for Sobol, 1024+ for IID.
-        seed: Random seed for reproducibility. If None, uses random seed.
-
-    Raises:
-        ValueError: If sampler_type is not 'sobol' or 'iid', or if num_samples
-            is not positive.
-    """
-
-    def __init__(
-        self,
-        sampler_type: MCSamplerType = "sobol",
-        num_samples: int = 512,
-        seed: Optional[int] = None,
-    ):
-        """Initialize MC sampler configuration.
-
-        Raises:
-            ValueError: If sampler_type is not valid or num_samples is not positive.
-        """
-        self.sampler_type = sampler_type
-        self.num_samples = num_samples
-        self.seed = seed
-
-        # Validate inputs
-        if sampler_type not in ["sobol", "iid"]:
-            raise ValueError(f"Invalid sampler_type: {sampler_type}. Must be 'sobol' or 'iid'")
-        if num_samples <= 0:
-            raise ValueError(f"num_samples must be positive, got {num_samples}")
-
-    def get_sampler(self, batch_shape: Optional[tuple] = None):
-        """Create and return the configured BoTorch sampler.
-
-        Args:
-            batch_shape: Optional batch shape for the sampler. If None, uses
-                torch.Size([]).
-
-        Returns:
-            A BoTorch sampler instance (SobolQMCNormalSampler or IIDNormalSampler).
-
-        Raises:
-            ValueError: If sampler_type is unknown.
-
-        Example:
-            >>> sampler_config = BoTorchMCSampler("sobol", 512)
-            >>> sampler = sampler_config.get_sampler()
-            >>> # Use with BoTorch acquisition function
-        """
-        if self.sampler_type == "sobol":
-            return SobolQMCNormalSampler(
-                sample_shape=torch.Size([self.num_samples]),
-                seed=self.seed,
-            )
-        elif self.sampler_type == "iid":
-            return IIDNormalSampler(
-                sample_shape=torch.Size([self.num_samples]),
-                seed=self.seed,
-            )
-        else:
-            raise ValueError(f"Unknown sampler type: {self.sampler_type}")
-
-    def __repr__(self) -> str:
-        """String representation of the sampler configuration.
-
-        Returns:
-            String describing the sampler configuration.
-        """
-        return (
-            f"BoTorchMCSampler(type={self.sampler_type}, "
-            f"num_samples={self.num_samples}, seed={self.seed})"
-        )

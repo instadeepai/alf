@@ -33,7 +33,9 @@ from alf_tools.models.model_utils import get_device
 from alf_tools.utils.botorch_utils import candidates_to_tensor
 from botorch.fit import fit_gpytorch_mll
 from botorch.models import SingleTaskGP
+from botorch.optim.fit import fit_gpytorch_mll_torch
 from gpytorch.mlls import ExactMarginalLogLikelihood
+from torch.optim import Adam
 
 logger = logging.getLogger("alf-tools")
 
@@ -72,15 +74,6 @@ class BoTorchGPModel(BaseModel):
         >>> predictions = model.predict(candidates)
         >>> print(f"Mean predictions: {predictions.means}")
 
-    Args:
-        normalize_inputs: Whether to normalize inputs to [0, 1]. Default: True.
-            If your data is already normalized, set to False.
-        standardize_outputs: Whether to standardize outputs (zero mean, unit variance).
-            Default: True. BoTorch handles this automatically with Standardize transform.
-        num_iterations: Number of optimization iterations for MLL. Default: 100.
-        learning_rate: Learning rate for Adam optimizer. Default: 0.1.
-        device: Device to run on ('cpu' or 'cuda'). If None, auto-detects.
-        dtype: Data type for tensors. Default: torch.float32.
     """
 
     def __init__(
@@ -89,16 +82,48 @@ class BoTorchGPModel(BaseModel):
         standardize_outputs: bool = True,
         num_iterations: int = 100,
         learning_rate: float = 0.1,
+        optimizer: str = "scipy",
+        max_attempts: int = 5,
         device: Optional[str] = None,
         dtype: torch.dtype = torch.float32,
     ):
-        """Initialize BoTorch GP model."""
+        """Initialize BoTorch GP model.
+
+        Args:
+            normalize_inputs: Whether to normalize inputs to [0, 1]. Default: True.
+                If your data is already normalized, set to False.
+            standardize_outputs: Whether to standardize outputs (zero mean, unit variance).
+                Default: True. BoTorch handles this automatically with Standardize transform.
+            num_iterations: Number of optimization iterations for MLL. Default: 100.
+                For scipy optimizer: controls 'maxiter' in L-BFGS-B.
+                For torch optimizer: controls step_limit.
+            learning_rate: Learning rate for Adam optimizer. Default: 0.1.
+                Only used if optimizer='torch'. Ignored for scipy optimizer.
+            optimizer: Optimization backend to use. Default: 'scipy'.
+                - 'scipy': Uses L-BFGS-B (faster, better for small-medium datasets)
+                - 'torch': Uses Adam (more flexible, better for large datasets)
+            max_attempts: Maximum number of fitting attempts. Default: 5.
+                If fitting fails (e.g., due to numerical issues), it will retry
+                up to max_attempts times with different initializations.
+            device: Device to run on ('cpu' or 'cuda'). If None, auto-detects.
+            dtype: Data type for tensors. Default: torch.float32.
+
+        Raises:
+            ValueError: If optimizer is not 'scipy' or 'torch'.
+            RuntimeError: If device cannot be determined or is unavailable.
+            Exception: If model fitting fails after max_attempts.
+        """
         super().__init__()
         self.normalize_inputs = normalize_inputs
         self.standardize_outputs = standardize_outputs
         self.num_iterations = num_iterations
         self.learning_rate = learning_rate
+        self.optimizer = optimizer
+        self.max_attempts = max_attempts
         self.dtype = dtype
+
+        if optimizer not in ["scipy", "torch"]:
+            raise ValueError(f"optimizer must be 'scipy' or 'torch', got {optimizer}")
 
         # Device setup
         if device is None:
@@ -179,10 +204,34 @@ class BoTorchGPModel(BaseModel):
         mll = ExactMarginalLogLikelihood(self.model.likelihood, self.model)
 
         # Fit model using BoTorch's fit_gpytorch_mll
-        # This uses L-BFGS-B by default, which is more efficient than Adam
         try:
-            fit_gpytorch_mll(mll)
-            logger.info("Successfully trained BoTorch GP model")
+            if self.optimizer == "scipy":
+                # Use L-BFGS-B optimizer with scipy
+                fit_gpytorch_mll(
+                    mll,
+                    optimizer_kwargs={"options": {"maxiter": self.num_iterations}},
+                    max_attempts=self.max_attempts,
+                )
+                logger.info(
+                    f"Successfully trained BoTorch GP model using scipy L-BFGS-B "
+                    f"(maxiter={self.num_iterations}, max_attempts={self.max_attempts})"
+                )
+            else:  # torch
+                # Use torch Adam optimizer
+                fit_gpytorch_mll(
+                    mll,
+                    optimizer=fit_gpytorch_mll_torch,
+                    optimizer_kwargs={
+                        "step_limit": self.num_iterations,
+                        "optimizer": lambda params: Adam(params, lr=self.learning_rate),
+                    },
+                    max_attempts=self.max_attempts,
+                )
+                logger.info(
+                    f"Successfully trained BoTorch GP model using torch Adam "
+                    f"(step_limit={self.num_iterations}, lr={self.learning_rate}, "
+                    f"max_attempts={self.max_attempts})"
+                )
 
             # Record final loss
             self.model.eval()
