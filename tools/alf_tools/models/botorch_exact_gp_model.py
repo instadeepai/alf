@@ -29,13 +29,14 @@ from typing import Any, Optional, Union
 import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
-from alf_tools.models.model_utils import get_device
-from alf_tools.utils.botorch_utils import candidates_to_tensor
 from botorch.fit import fit_gpytorch_mll
 from botorch.models import SingleTaskGP
 from botorch.optim.fit import fit_gpytorch_mll_torch
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from torch.optim import Adam
+
+from alf_tools.models.utils.torch_utils import get_device
+from alf_tools.utils.botorch_utils import candidates_to_tensor
 
 logger = logging.getLogger("alf-tools")
 
