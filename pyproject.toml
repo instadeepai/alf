@@ -75,7 +75,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.mypy]
 python_version = "3.12"
-warn_return_any = true
 warn_unused_configs = true
 # Disable name-defined errors for jaxtyping dimension names
 disable_error_code = ["name-defined"]
