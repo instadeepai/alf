@@ -105,11 +105,11 @@ class Candidate:
 
         # Handle numpy arrays
         if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):
-            return bool(np.array_equal(a, b, equal_nan=True))
+            return np.array_equal(a, b, equal_nan=True)
 
         # Handle torch tensors
         if HAS_TORCH and isinstance(a, torch.Tensor) and isinstance(b, torch.Tensor):
-            return bool(torch.equal(a, b))
+            return torch.equal(a, b)
 
         # Handle dict (for features)
         if isinstance(a, dict) and isinstance(b, dict):
