@@ -59,7 +59,7 @@ def extract_sequences_from_inputs(inputs: Union[LabelledCandidates, list[Candida
         ValueError: If input type is not supported.
     """
     if isinstance(inputs, LabelledCandidates):
-        return inputs.data  # type: ignore[return-value]
+        return inputs.data
     elif isinstance(inputs, list) and all(isinstance(c, Candidate) for c in inputs):
         return [c.data for c in inputs]
     else:
