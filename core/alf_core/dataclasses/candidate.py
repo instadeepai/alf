@@ -15,16 +15,20 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Union
+from typing import TYPE_CHECKING, Any, Optional, TypeAlias, Union
 
 import numpy as np
 
-try:
+if TYPE_CHECKING:
     import torch
 
-    HAS_TORCH = True
-except ImportError:
-    HAS_TORCH = False
+    DataFrameCompatible: TypeAlias = Union[
+        str, int, float, bool, dict, list, tuple, np.ndarray, torch.Tensor
+    ]
+else:
+    DataFrameCompatible: TypeAlias = Union[
+        str, int, float, bool, dict, list, tuple, np.ndarray, Any
+    ]
 
 
 class Modality(Enum):
@@ -75,22 +79,6 @@ class Candidate:
             A string representation showing the candidate's data, modality, and features.
         """
         return f"Candidate(data={self.data}, modality={self.modality}, features={self.features})"
-
-    def stringify(self) -> str:
-        """Convert the candidate data to a string representation.
-
-        Returns:
-            The string representation of the candidate's data.
-
-        Raises:
-            ValueError: If the modality is not "sequence" (other modalities not yet supported).
-        """
-        if self.modality == Modality.SEQUENCE:
-            return self.data
-        else:
-            # TODO: Implement stringification for other modalities
-            # Once implemented, add test cases to test_candidate.py
-            raise ValueError(f"Unsupported modality: {self.modality}")
 
     def _safe_equal(self, a: Any, b: Any) -> bool:
         """Compare two values, handling numpy arrays and nested structures.
@@ -161,21 +149,88 @@ class Candidate:
 
     __hash__ = None  # type: ignore[assignment]
 
-    def to_dataframe(self) -> Union[str, np.ndarray, Any]:
-        """Return the appropriate format for DataFrame representation.
+    def to_serializable(self) -> Optional[DataFrameCompatible]:
+        """Convert candidate data to a format suitable for pandas DataFrame storage.
+
+        This method transforms the candidate's data into a format that can be efficiently
+        stored in a pandas DataFrame column. The conversion strategy varies by modality:
+
+        - SEQUENCE: Returns stringified data for efficient string storage
+        - TABULAR: Validates and returns data (scalar, dict, numpy array, pandas Series,
+          list, tuple, or torch tensor). Torch tensors are converted to numpy arrays.
+        - IMAGE: Converts torch tensors to numpy arrays; other types to numpy arrays
+        - STRUCTURE: Converts torch tensors to numpy arrays; other types to numpy arrays
+        - EMBEDDING: Converts torch tensors to numpy arrays; other types to numpy arrays
+        - GRAPH: Not yet supported (raises NotImplementedError)
 
         Returns:
-            The candidate data formatted for inclusion in a pandas DataFrame.
-            - SEQUENCE: Returns stringified data
-            - TABULAR: Returns raw numpy array data
-            - Other modalities: Returns raw data as fallback
+            DataFrameCompatible: The candidate data in a DataFrame-compatible format.
+                Common types include str, dict, np.ndarray, pd.Series, or torch.Tensor.
 
+        Raises:
+            NotImplementedError: If modality is GRAPH (not yet supported).
+            ValueError: If modality is unknown or not recognized.
+            TypeError: If TABULAR modality data is not a supported DataFrame-compatible type.
+
+        Examples:
+            >>> # Sequence modality
+            >>> candidate = Candidate(data="ACDEFG", modality=Modality.SEQUENCE)
+            >>> candidate.to_serializable()
+            'ACDEFG'
+
+            >>> # Image modality with numpy array
+            >>> img = np.random.rand(3, 64, 64)
+            >>> candidate = Candidate(data=img, modality=Modality.IMAGE)
+            >>> result = candidate.to_serializable()
+            >>> isinstance(result, np.ndarray)
+            True
+
+            >>> # Tabular modality
+            >>> candidate = Candidate(data={"age": 32, "height": 178}, modality=Modality.TABULAR)
+            >>> candidate.to_serializable()
+            {'age': 32, 'height': 178}
         """
+        # Handle None data
+        if self.data is None:
+            return None
         if self.modality == Modality.SEQUENCE:
-            return self.stringify()
+            return str(self.data)  # Efficient string storage
+
         elif self.modality == Modality.TABULAR:
-            return self.data
-        else:
-            # For other modalities (IMAGE, GRAPH, STRUCTURE, EMBEDDING),
-            # return raw data as fallback
-            return self.data
+            # Validate and return tabular data
+            # Acceptable types: scalar values, dict, numpy arrays, pandas Series, lists/tuples
+            if isinstance(self.data, (str, int, float, bool, dict, np.ndarray, list, tuple)):
+                return self.data
+
+            # Check for pandas Series (without requiring pandas import)
+            if hasattr(self.data, "__class__") and self.data.__class__.__name__ == "Series":
+                return self.data
+
+            # Check for torch tensor - convert to numpy
+            if HAS_TORCH and isinstance(self.data, torch.Tensor):
+                return self.data.cpu().numpy()
+
+            # If we reach here, the type is not supported
+            raise TypeError(
+                f"TABULAR modality data must be a scalar (str, int, float, bool), "
+                f"dict, numpy array, pandas Series, list, or tuple. "
+                f"Got: {type(self.data).__name__}"
+            )
+
+        elif self.modality in (Modality.IMAGE, Modality.STRUCTURE, Modality.EMBEDDING):
+            # Convert arrays/tensors to compact format
+            if HAS_TORCH and isinstance(self.data, torch.Tensor):
+                return self.data.cpu().numpy()
+            elif isinstance(self.data, np.ndarray):
+                return self.data
+            else:
+                raise TypeError(
+                    f"IMAGE, STRUCTURE and EMBEDDING modality data must be a  "
+                    f" numpy array or torch tensor. "
+                    f"Got: {type(self.data).__name__}"
+                )
+
+        elif self.modality == Modality.GRAPH:
+            raise NotImplementedError("Graph datatype not supported yet")
+
+        raise ValueError(f"Unknown modality: {self.modality}")

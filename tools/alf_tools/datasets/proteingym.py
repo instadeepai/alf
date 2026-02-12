@@ -21,8 +21,9 @@ import numpy as np
 import pandas as pd
 from alf_core import BaseDataset, Candidate, LabelledCandidates
 from alf_core.dataset.base_dataset import BaseDatasetConfig
-from alf_tools.utils.constants import HF_DATASETS_REPOSITORY_NAME
 from huggingface_hub import hf_hub_download
+
+from alf_tools.utils.constants import HF_DATASETS_REPOSITORY_NAME
 
 logger = logging.getLogger("alf-tools")
 

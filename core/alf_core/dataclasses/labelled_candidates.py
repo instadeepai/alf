@@ -175,7 +175,7 @@ class LabelledCandidates:
             - Additional columns for any features present in the candidates
         """
         rows = [
-            {"data": cand.to_dataframe(), "label": label}
+            {"data": cand.to_serializable(), "label": label}
             | (cand.features if isinstance(cand.features, dict) else {})
             for cand, label in zip(self.candidates, self.labels)
         ]
