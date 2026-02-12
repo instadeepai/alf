@@ -23,15 +23,16 @@ from typing import TYPE_CHECKING, Optional, Union
 
 import torch
 from alf_core.model.base_model import BaseModel
-from alf_tools.utils.botorch_utils import (
-    predictions_to_posterior,
-    tensor_to_candidates,
-)
 from botorch.models.model import Model
 from botorch.posteriors import Posterior
 from botorch.posteriors.gpytorch import GPyTorchPosterior
 from gpytorch.distributions import MultivariateNormal
 from torch import Tensor
+
+from alf_tools.utils.botorch_utils import (
+    predictions_to_posterior,
+    tensor_to_candidates,
+)
 
 if TYPE_CHECKING:
     from botorch.acquisition.objective import PosteriorTransform
