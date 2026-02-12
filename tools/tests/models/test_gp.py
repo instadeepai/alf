@@ -22,6 +22,7 @@ from alf_tools.models.gp import (
     GPModelTrainer,
     GPTrainConfig,
 )
+from alf_tools.models.utils import one_hot_encode
 
 
 @pytest.fixture
@@ -154,7 +155,9 @@ class TestGPModel:
     def test_one_hot_encoding(self, gp_model):
         """Test that one-hot encoding produces correct shape and values."""
         sequences = ["ACDE", "FGHI"]
-        encoded = gp_model._one_hot_encode(sequences)
+        encoded = one_hot_encode(
+            sequences, gp_model.char_to_idx, gp_model.alphabet_size, flatten=True
+        )
 
         # Check shape: (batch_size, alphabet_size * seq_length) when flattened
         assert encoded.shape == (2, 20 * 4)
@@ -174,7 +177,9 @@ class TestGPModel:
         )
 
         sequences = ["ACDE", "FGHI"]
-        encoded = gp_model._one_hot_encode(sequences)
+        encoded = one_hot_encode(
+            sequences, gp_model.char_to_idx, gp_model.alphabet_size, flatten=False
+        )
 
         # Check shape: (batch_size, alphabet_size, seq_length) when not flattened
         assert encoded.shape == (2, 20, 4)

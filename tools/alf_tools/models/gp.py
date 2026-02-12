@@ -24,12 +24,12 @@ import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
 from jaxtyping import Float
 
-from alf_tools.models.model_utils import (
+from alf_tools.models.utils.sequence_utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
-    get_device,
     one_hot_encode,
 )
+from alf_tools.models.utils.torch_utils import get_device
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 logger = logging.getLogger("alf-tools")
