@@ -59,7 +59,7 @@ class BoTorchGPModel(BaseModel):
 
     Example:
         >>> from alf_tools.models.botorch_gp_models import BoTorchGPModel
-        >>> from alf_tools.datasets.botorch_test_functions import BoTorchSyntheticDataset
+        >>> from alf_tools.datasets.botorch_synthetic_dataset import BoTorchSyntheticDataset
         >>>
         >>> # Create dataset
         >>> dataset = BoTorchSyntheticDataset(function_name="Branin")

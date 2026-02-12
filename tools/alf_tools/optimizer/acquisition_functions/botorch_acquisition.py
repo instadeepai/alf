@@ -288,7 +288,7 @@ class BoTorchAcquisition(AcquisitionFunction):
 
         if self.batch_size > 1 and X.shape[0] % self.batch_size != 0:
             raise ValueError(
-                "Total candidates is not a multiple of batch_size(q).",
+                "Total candidates is not a multiple of batch_size(q)."
                 f"total candidates= {X.shape[0]}, q-batch (q) = {self.batch_size}",
             )
 
@@ -297,10 +297,12 @@ class BoTorchAcquisition(AcquisitionFunction):
 
         with torch.no_grad():
             acq_val: Float[torch.Tensor, " b"] = acq_fn(X)
-
+        # Replicate scores: each candidate in a q-batch gets the same score
+        # [0.8, 0.6, 0.4] -> [0.8, 0.8, 0.6, 0.6, 0.4, 0.4]
+        scores_replicated = np.repeat(acq_val.cpu().numpy(), self.batch_size)
         return LabelledCandidates(
             candidates=candidates,
-            labels=np.array(acq_val),
+            labels=np.array(scores_replicated),
         )
 
     def _optimize_continuous(

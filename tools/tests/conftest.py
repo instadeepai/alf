@@ -40,7 +40,7 @@ from alf_core import (
 )
 from alf_core.dataclasses.task_state import TaskState
 from alf_core.model.base_model import BaseModel
-from alf_tools.datasets.botorch_test_functions import BoTorchSyntheticDataset
+from alf_tools.datasets.botorch_synthetic_dataset import BoTorchSyntheticDataset
 from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
 from alf_tools.optimizer.acquisition_functions.botorch_acquisition import BoTorchAcquisition
 from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler

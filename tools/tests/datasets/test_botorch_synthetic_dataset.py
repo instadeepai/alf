@@ -17,7 +17,7 @@
 import numpy as np
 import pytest
 from alf_core import BaseDatasetConfig, Candidate, Modality
-from alf_tools.datasets.botorch_test_functions import BoTorchSyntheticDataset
+from alf_tools.datasets.botorch_synthetic_dataset import BoTorchSyntheticDataset
 
 
 @pytest.fixture

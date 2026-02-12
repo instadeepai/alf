@@ -18,10 +18,16 @@ import numpy as np
 import pytest
 from alf_core import BaseDatasetConfig, Candidate, Modality, Surrogate
 from alf_core.dataclasses.task_state import TaskState
-from alf_tools.datasets.botorch_test_functions import BoTorchSyntheticDataset
+from alf_tools.datasets.botorch_synthetic_dataset import (
+    BoTorchSyntheticDataset,
+)
 from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
-from alf_tools.optimizer.acquisition_functions.botorch_acquisition import BoTorchAcquisition
-from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
+from alf_tools.optimizer.acquisition_functions.botorch_acquisition import (
+    BoTorchAcquisition,
+)
+from alf_tools.optimizer.acquisition_functions.botorch_samplers import (
+    BoTorchMCSampler,
+)
 
 
 @pytest.fixture
