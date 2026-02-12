@@ -66,41 +66,8 @@ docs = [
 [tool.uv]
 default-groups = ["dev"]
 
-[tool.mypy]
-# Python version to target
-python_version = "3.12"
-# Namespace packages allow packages without __init__.py
-namespace_packages = true
-# Explicit package bases to help mypy find imports
-mypy_path = "core:tools:tutorials"
-# Show error codes in output for easier debugging
-show_error_codes = true
-# Warn about unused ignores
-warn_unused_ignores = true
-# Use explicit package bases to avoid module name conflicts
-explicit_package_bases = true
-# Disable name-defined errors globally for jaxtyping annotations
-# jaxtyping uses string literals like "n_samples" in type annotations
-# which mypy interprets as undefined names
-# Also disable no-untyped-def to allow functions without complete type annotations
-disable_error_code = ["name-defined", "import-untyped", "no-untyped-def"]
-# Ignore missing imports for all third-party libraries by default
-# This prevents errors when libraries don't have type stubs
-ignore_missing_imports = false
-# Disallow untyped definitions (can be enabled later for stricter typing)
-# disallow_untyped_defs = true
-# Disallow any expressions
-# disallow_any_expr = true  # Uncomment for strictest typing
-
-# Relax type checking for test files
-[[tool.mypy.overrides]]
-module = [
-    "*.tests.*",
-    "tests.*",
-]
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-disallow_untyped_calls = false
+[tool.setuptools]
+packages = []  # No Python packages at root level - just a meta-package
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
