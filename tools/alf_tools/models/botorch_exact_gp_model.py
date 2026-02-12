@@ -320,3 +320,17 @@ class BoTorchGPModel(BaseModel):
             "BoTorchGPModel is a discriminative model and does not support "
             "sampling. For generating candidate pools, use a search function."
         )
+
+    @property
+    def botroch_model(self) -> Optional[SingleTaskGP]:
+        """Get the underlying BoTorch model.
+
+        Returns:
+            BoTorch SingleTaskGP model.
+
+        Raises:
+            RuntimeError: If model hasn't been trained yet.
+        """
+        if self.model is None:
+            raise RuntimeError("Model must be trained before getting the underlying BoTorch model")
+        return self.model  # type: ignore[return-value]

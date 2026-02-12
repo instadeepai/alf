@@ -33,6 +33,8 @@ from alf_core import (
     Candidate,
     LabelledCandidates,
     Modality,
+    Optimizer,
+    Oracle,
     Predictions,
     Surrogate,
 )
@@ -40,6 +42,9 @@ from alf_core.dataclasses.task_state import TaskState
 from alf_core.model.base_model import BaseModel
 from alf_tools.datasets.botorch_test_functions import BoTorchSyntheticDataset
 from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
+from alf_tools.optimizer.acquisition_functions.botorch_acquisition import BoTorchAcquisition
+from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
+from alf_tools.optimizer.search.botorch_search_functions import ContinuousSearch
 from botorch.models import SingleTaskGP
 
 # =============================================================================
@@ -362,6 +367,80 @@ def task_state(branin_dataset, trained_surrogate):
         ...     best_label = np.max(task_state.dataset.train_dataset.labels)
     """
     return TaskState(dataset=branin_dataset, surrogate=trained_surrogate)
+
+
+@pytest.fixture
+def gp_surrogate():
+    """Create an untrained BoTorch GP surrogate for design-task testing.
+
+    Returns:
+        Surrogate with BoTorchGPModel (untrained, reduced iterations for fast tests).
+
+    Example:
+        >>> def test_design_task(gp_surrogate, branin_dataset):
+        ...     task = DesignTask(num_acq_rounds=3, acq_batch_size=2)
+        ...     state = task.setup(dataset=branin_dataset, surrogate=gp_surrogate)
+        ...     task.run(...)  # GP will be trained by run_initial_train_round
+    """
+    return Surrogate(
+        model=BoTorchGPModel(
+            normalize_inputs=True,
+            standardize_outputs=True,
+            num_iterations=30,
+            optimizer="scipy",
+        )
+    )
+
+
+@pytest.fixture
+def qei_acquisition(branin_dataset) -> BoTorchAcquisition:
+    """Create BoTorch qEI acquisition function with bounds from Branin dataset.
+
+    Args:
+        branin_dataset: Fixture providing a Branin dataset (for bounds).
+
+    Returns:
+        BoTorchAcquisition configured for qEI with continuous optimization.
+    """
+    bounds_list = branin_dataset.bounds.tolist()
+    sampler = BoTorchMCSampler(sampler_type="sobol", num_samples=64, seed=42)
+    return BoTorchAcquisition(
+        acquisition_type="qEI",
+        batch_size=2,
+        bounds=bounds_list,
+        num_restarts=5,
+        raw_samples=128,
+        sampler=sampler,
+    )
+
+
+@pytest.fixture
+def botorch_optimizer(qei_acquisition) -> Optimizer:
+    """Create optimizer with BoTorch qEI acquisition and continuous search.
+
+    Args:
+        qei_acquisition: BoTorch qEI acquisition function fixture.
+
+    Returns:
+        Optimizer with BoTorch qEI acquisition and continuous search.
+    """
+    return Optimizer(
+        acquisition_fn=qei_acquisition,
+        search_fn=ContinuousSearch(),
+    )
+
+
+@pytest.fixture
+def branin_oracle(branin_dataset) -> Oracle:
+    """Create oracle using Branin dataset's query method for evaluation.
+
+    Args:
+        branin_dataset: Fixture providing a Branin dataset (implements query).
+
+    Returns:
+        Oracle using Branin dataset's query method for evaluation.
+    """
+    return Oracle(scorer=branin_dataset)
 
 
 # =============================================================================
