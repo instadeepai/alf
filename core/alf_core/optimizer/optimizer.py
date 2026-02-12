@@ -77,7 +77,6 @@ class Optimizer:
 
         Args:
             state: Current task state with updated dataset.
-            logger: Optional logger for recording training metrics.
 
         Returns:
             Updated state with tell_time and optimizer metrics.

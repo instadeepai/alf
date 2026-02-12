@@ -88,7 +88,6 @@ class BaseTask(abc.ABC):
 
         Args:
             state: Current task state containing dataset and surrogate.
-            round_name: Name or number identifying the current round.
 
         Returns:
             Updated task state with evaluation metrics.

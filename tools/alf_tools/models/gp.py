@@ -22,6 +22,8 @@ import gpytorch
 import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
+from jaxtyping import Float
+
 from alf_tools.models.model_utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
@@ -29,7 +31,6 @@ from alf_tools.models.model_utils import (
     one_hot_encode,
 )
 from alf_tools.utils.constants import PROTEIN_ALPHABET
-from jaxtyping import Float
 
 logger = logging.getLogger("alf-tools")
 
