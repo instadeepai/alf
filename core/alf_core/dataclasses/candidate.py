@@ -30,6 +30,13 @@ else:
         str, int, float, bool, dict, list, tuple, np.ndarray, Any
     ]
 
+try:
+    import torch
+
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+
 
 class Modality(Enum):
     """Enum for different data modalities."""
