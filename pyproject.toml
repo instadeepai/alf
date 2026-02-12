@@ -78,3 +78,5 @@ python_version = "3.12"
 warn_unused_configs = true
 # Disable name-defined errors for jaxtyping dimension names
 disable_error_code = ["name-defined"]
+# Use explicit package bases to avoid duplicate conftest.py module errors
+explicit_package_bases = true
