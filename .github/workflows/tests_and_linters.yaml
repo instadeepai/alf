@@ -26,6 +26,9 @@ jobs:
         uses: astral-sh/setup-uv@v6
 
       - name: Lint
+        env:
+          UV_LINK_MODE: copy
+          UV_CACHE_DIR: /tmp/uv-cache
         run: |
           uv sync --group dev
           uv run --no-sync pre-commit run --all-files --verbose
