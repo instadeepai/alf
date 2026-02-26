@@ -27,11 +27,11 @@ jobs:
 
       - name: Lint
         run: |
-          uv sync --group cpu
+          uv sync --group dev
           uv run --no-sync pre-commit run --all-files --verbose
 
   tests:
-      runs-on: instadeep-ci
+      runs-on: instadeep-ci-4
       env:
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       container:
