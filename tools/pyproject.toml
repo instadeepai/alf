@@ -17,6 +17,12 @@ dependencies = [
     "gpytorch>=1.9.0",
 ]
 
+[dependency-groups]
+dev = []
+
+[tool.uv]
+default-groups = ["dev"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["alf_tools*"]
