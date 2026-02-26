@@ -33,4 +33,11 @@ explicit = true
 
 [tool.uv.sources]
 alf_core = { path = "../core", editable = true }
-torch = { index = "pytorch-cpu" }
+torch = [
+  { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
+  { index = "pytorch-gpu", marker = "sys_platform == 'linux'" },
+]
+torchvision = [
+  { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
+  { index = "pytorch-gpu", marker = "sys_platform == 'linux'" },
+]
