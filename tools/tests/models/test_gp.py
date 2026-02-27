@@ -269,29 +269,6 @@ class TestGPModel:
         assert predictions.means.shape == (1,)
         assert predictions.variances.shape == (1,)
 
-    # def test_early_stopping(self, sample_data):
-    #     """Test that early stopping works."""
-    #     model_config = GPModelConfig(kernel_type="rbf", ard=False)
-    #     train_config = GPTrainConfig(
-    #         num_iterations=100,
-    #         early_stopping_patience=5,
-    #         early_stopping_delta=1e-4,
-    #         log_frequency=10,
-    #     )
-    #     featurizer_config = FeaturizerConfig(featurizer_type="one_hot", flatten_one_hot=True)
-    #     gp_model = GPModelTrainer(
-    #         model_config=model_config,
-    #         train_config=train_config,
-    #         featurizer_config=featurizer_config,
-    #         device="cpu",
-    #     )
-
-    #     gp_model.train(sample_data)
-    #     metrics = gp_model.get_training_summary_metrics()
-
-    #     # Should stop before 100 iterations
-    #     assert metrics["num_iterations"] < 100
-
     def test_reproducibility_with_seed(self, sample_data):
         """Test that training is reproducible when using the same seed."""
 
