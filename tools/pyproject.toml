@@ -37,7 +37,3 @@ torch = [
   { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
   { index = "pytorch-gpu", marker = "sys_platform == 'linux'" },
 ]
-torchvision = [
-  { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
-  { index = "pytorch-gpu", marker = "sys_platform == 'linux'" },
-]
