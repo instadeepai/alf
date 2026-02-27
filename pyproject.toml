@@ -15,6 +15,17 @@ dependencies = [
 alf_core = { path = "core", editable = true }
 alf_tools = { path = "tools", editable = true }
 alf_tutorials = { path = "tutorials", editable = true }
+torch = { index = "pytorch-cpu" }  # Default: CPU version for broader compatibility
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-gpu"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
 
 # Pyright/Pylance configuration for type checking and imports
 # This is needed because the project uses editable installs (development mode)

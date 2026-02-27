@@ -18,3 +18,18 @@ dependencies = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["alf_core*"]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-gpu"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+# For testing pytorch-cpu is enough. If it's otherwise, replace the index
+# with "pytorch-gpu"
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
