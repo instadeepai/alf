@@ -6,7 +6,7 @@ ALF
 Overview
 --------
 
-**ALF** is a Python package for performing active learning experiments to facilitate iterative optimization of design targets (e.g., proteins, molecules, materials) through intelligent candidate selection (data acquisition), model adaptation, and evaluation.
+**ALF** is an active learning framework for iterative optimization of biological and chemical design targets. It provides modular components for candidate search, surrogate modelling, and acquisition — enabling efficient discovery across expensive, high-dimensional search spaces such as protein sequences and small molecules.
 
 .. note::
 
