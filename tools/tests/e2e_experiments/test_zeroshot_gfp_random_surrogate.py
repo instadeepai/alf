@@ -17,9 +17,9 @@ import pandas as pd
 import pytest
 from alf_core import (
     BaseDatasetConfig,
-    FileTaskStateLogger,
+    FileStateLogger,
     Surrogate,
-    TerminalTaskStateLogger,
+    TerminalStateLogger,
     ZeroShotTask,
 )
 from alf_tools.datasets import GFP
@@ -93,14 +93,14 @@ class TestZeroShotGFPRandomSurrogate:
         save_path = tmp_path / "zeroshot_gfp_random_surrogate"
         save_path.mkdir()
 
-        metrics_logger = TerminalTaskStateLogger()
-        file_logger = FileTaskStateLogger(output_path=save_path)
-        task_state_loggers = [metrics_logger, file_logger]
+        metrics_logger = TerminalStateLogger()
+        file_logger = FileStateLogger(output_path=save_path)
+        state_loggers = [metrics_logger, file_logger]
 
         # Create and run the zero-shot task
         task = ZeroShotTask()
         state = task.setup(dataset=gfp_dataset, surrogate=surrogate_model)
-        task.run(state=state, task_state_loggers=task_state_loggers)
+        task.run(state=state, state_loggers=state_loggers)
 
         # Load and verify results
         metrics_file = save_path / "metrics.csv"

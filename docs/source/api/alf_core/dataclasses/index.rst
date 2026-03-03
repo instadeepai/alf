@@ -12,4 +12,4 @@ data between components and tracking experiment progress.
    Labelled Candidates <labelled_candidates/index>
    Predictions <predictions/index>
    Results <results/index>
-   Task State <task_state/index>
+   State <state/index>

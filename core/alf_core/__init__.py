@@ -19,7 +19,7 @@ from alf_core.dataclasses import (
     Modality,
     Predictions,
     Results,
-    TaskState,
+    State,
 )
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.model.base_model import BaseModel
@@ -39,8 +39,8 @@ from alf_core.tasks.base_task import BaseTask
 from alf_core.tasks.design_task import DesignTask
 from alf_core.tasks.supervised_task import SupervisedTask
 from alf_core.tasks.zeroshot_task import ZeroShotTask
-from alf_core.utils.task_state_logger import (
-    FileTaskStateLogger,
-    TaskStateLogger,
-    TerminalTaskStateLogger,
+from alf_core.utils.state_logger import (
+    FileStateLogger,
+    StateLogger,
+    TerminalStateLogger,
 )

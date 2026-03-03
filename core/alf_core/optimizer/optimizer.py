@@ -14,7 +14,7 @@
 
 import time
 
-from alf_core.dataclasses import Candidate, TaskState
+from alf_core.dataclasses import Candidate, State
 from alf_core.optimizer.acquisition_function import AcquisitionFunction
 from alf_core.optimizer.search import BaseSearch
 
@@ -42,8 +42,8 @@ class Optimizer:
 
     def ask(
         self,
-        state: TaskState,
-    ) -> tuple[list[Candidate], TaskState]:
+        state: State,
+    ) -> tuple[list[Candidate], State]:
         """Propose the next batch of candidates to evaluate.
 
         Uses the search function to generate a candidate pool, then the acquisition
@@ -68,8 +68,8 @@ class Optimizer:
 
     def tell(
         self,
-        state: TaskState,
-    ) -> TaskState:
+        state: State,
+    ) -> State:
         """Update the surrogate model with newly acquired data.
 
         Trains the surrogate model on the updated training and validation datasets,
@@ -96,7 +96,7 @@ class Optimizer:
 
     def get_metrics(
         self,
-        state: TaskState,
+        state: State,
     ) -> dict[str, float]:
         """Collect metrics from acquired candidates, surrogate, and search functions.
 
