@@ -9,9 +9,7 @@
 [![Tests and Linters 🧪](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml/badge.svg?branch=main)](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml)
 
 
-**ALF** is a Python package for performing active learning experiments to facilitate
-iterative optimization of design targets (e.g., proteins, molecules, materials) through
-intelligent candidate selection (data acquisition), model adaptation, and evaluation.
+**ALF** is an active learning framework for computational science, designed to optimize high-dimensional and combinatorially vast search spaces where data acquisition is expensive—from wet-lab experiments and physical measurements to costly simulations. ALF accelerates discovery of optimal designs (proteins, molecules, materials) through intelligent candidate selection, adaptive modeling, and efficient evaluation strategies.
 
 ## ✨ Features
 
