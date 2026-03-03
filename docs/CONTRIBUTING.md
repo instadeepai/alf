@@ -20,7 +20,7 @@ Before you begin, ensure you have:
    cd alf
    ```
 
-2. **Install dependencies:**
+2. **Create virtual environment and install dependencies:**
    ```bash
    # Install all packages with development dependencies
    uv sync
@@ -64,26 +64,10 @@ uv run pre-commit run
 
 ALF is organized into two packages to balance flexibility and usability:
 
-#### alf-core (`core/alf_core/`)
+- **alf-core** (`core/alf_core/`) - Framework backbone with base classes, core data structures, and minimal dependencies (no ML frameworks)
+- **alf-tools** (`tools/alf_tools/`) - Ready-to-use implementations (models, datasets, acquisition functions) with heavier dependencies (PyTorch)
 
-The framework backbone containing:
-- **Abstract base classes**: `BaseModel`, `BaseDataset`, `AcquisitionFunction`, `BaseSearch`
-- **Core data structures**: `Candidate`, `LabelledCandidates`, `Predictions`, `TaskState`
-- **Task implementations**: `DesignTask`, `SupervisedTask`, `ZeroShotTask`
-- **Wrappers**: `Oracle`, `Surrogate`, `Optimizer`
-- **Utilities**: Metrics, logging, splitting utilities
-
-**Minimal dependencies** by design to keep the framework lightweight and easy to integrate into existing systems.
-
-#### alf-tools (`tools/alf_tools/`)
-
-Ready-to-use implementations and examples:
-- **Datasets**: GFP, ProteinGym
-- **Models**: CNNModel (with uncertainty quantification), PyRosetta
-- **Acquisition functions**: UCB, Thompson Sampling, Greedy, Expected Improvement
-- **Search strategies**: SingleMutantSearch
-
-**Includes heavier dependencies** (PyTorch, etc.) needed for concrete implementations.
+📖 **For detailed architecture and dependency information, see [INSTALLATION.md](INSTALLATION.md#architecture)**.
 
 #### Contributing Guidelines
 
@@ -132,7 +116,7 @@ Models in ALF can serve three distinct roles depending on how they're used in th
 
 ### Oracle
 - **Purpose:** Evaluate candidates online (during the learning loop)
-- **When to use:** When you need real-time scoring of candidates
+- **When to use:** When you require ground truth feedback during the optimization loop
 - **Required methods:** `predict()`
 - **Example use case:** Using a trained model to score generated candidates
 
@@ -145,7 +129,7 @@ Models in ALF can serve three distinct roles depending on how they're used in th
 
 ### Generator
 - **Purpose:** Generate new candidate points to explore
-- **When to use:** When the search space is continuous or you want to generate novel candidates
+- **When to use:** When you want to generate new candidates to evaluate (e.g., for surrogate-based optimization in continuous spaces)
 - **Required methods:** `sample()`
 - **Example use case:** Using a generative model to propose new molecular structures
 
@@ -217,7 +201,7 @@ uv run pre-commit run --all-files
 
 4. **Commit your changes:**
    ```bash
-   git add .
+   git add <changed files>
    git commit -m "feat: add your feature description"
    ```
 

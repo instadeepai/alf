@@ -24,7 +24,7 @@ intelligent candidate selection (data acquisition), model adaptation, and evalua
 
 ALF is split into two packages:
 
-**alf-core** - Lightweight framework with base classes, core data structures, and minimal dependencies (numpy, pandas, scipy). Use for custom implementations or when integrating into existing systems.
+**alf-core** - Lightweight framework with base classes, core data structures, and minimal dependencies (numpy, pandas, scipy) - no ML framework dependencies. Use for custom implementations or when integrating into existing systems.
 
 **alf-tools** - Ready-to-use datasets, models, and acquisition functions with heavier dependencies (PyTorch). Depends on alf-core. Use for quick start and prototyping.
 
