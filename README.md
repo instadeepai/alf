@@ -163,7 +163,7 @@ Learn how to extend ALF's base classes for custom implementations:
 
 ```bash
 # Clone the repository
-git clone https://github.com/instadeepai/alf.git
+git clone git@github.com:instadeepai/alf.git
 cd alf
 
 # Install all packages with development dependencies
