@@ -15,7 +15,7 @@
 
 import abc
 
-from alf_core.dataclasses import Candidate, LabelledCandidates, TaskState
+from alf_core.dataclasses import Candidate, LabelledCandidates, State
 
 
 class AcquisitionFunction(abc.ABC):
@@ -25,7 +25,7 @@ class AcquisitionFunction(abc.ABC):
     def __call__(
         self,
         search_candidates: list[Candidate],
-        state: TaskState,
+        state: State,
     ) -> LabelledCandidates:
         """Compute acquisition values for candidates and return them as LabelledCandidates.
 

@@ -3,11 +3,11 @@ Utils
 
 Utility modules provide evaluation metrics and state logging functionality. The ``metrics`` module
 contains functions for computing prediction accuracy and uncertainty calibration metrics. The
-``task_state_logger`` module provides classes for logging and tracking the state of active learning
+``state_logger`` module provides classes for logging and tracking the state of active learning
 tasks during execution.
 
 .. toctree::
    :maxdepth: 1
 
    Metrics <metrics/index>
-   Task State Logger <task_state_logger/index>
+   State Logger <state_logger/index>

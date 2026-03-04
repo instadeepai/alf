@@ -16,7 +16,7 @@
 import abc
 from typing import Any
 
-from alf_core.dataclasses import Results, TaskState
+from alf_core.dataclasses import Results, State
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.surrogate.surrogate import Surrogate
 
@@ -49,7 +49,7 @@ class BaseTask(abc.ABC):
         self.num_acq_rounds = num_acq_rounds
         self.save_round_predictions = save_round_predictions
 
-    def setup(self, dataset: BaseDataset, surrogate: Surrogate) -> TaskState:
+    def setup(self, dataset: BaseDataset, surrogate: Surrogate) -> State:
         """Setup the task with dataset and surrogate model.
 
         Args:
@@ -59,7 +59,7 @@ class BaseTask(abc.ABC):
         Returns:
             Initialized task state with the provided dataset and surrogate.
         """
-        return TaskState(
+        return State(
             dataset=dataset,
             surrogate=surrogate,
             acq_batch_size=self.acq_batch_size,
@@ -79,8 +79,8 @@ class BaseTask(abc.ABC):
 
     def evaluate(
         self,
-        state: TaskState,
-    ) -> TaskState:
+        state: State,
+    ) -> State:
         """Evaluate the surrogate model on the test dataset and return the updated state.
 
         Computes predictions, metrics on the test set. Optionally saves
