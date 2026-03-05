@@ -28,9 +28,18 @@ explicit = true
 
 [[tool.uv.index]]
 name = "pytorch-gpu"
-url = "https://download.pytorch.org/whl/cu121"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
 [tool.uv.sources]
 alf_core = { path = "../core", editable = true }
-torch = { index = "pytorch-cpu" }
+torch = [
+  { index = "pytorch-cpu" },
+]
+[project.optional-dependencies]
+# used when pip installing with `pip install .[gpu]` to get GPU-accelerated versions of dependencies. Important
+# to pass the index URLs like "--extra-index-url https://download.pytorch.org/whl/cu121" to pip when installing
+# to ensure the GPU versions of torch and gpytorch are found.
+gpu = [
+    "torch>=2.10.0",
+]
