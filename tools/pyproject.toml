@@ -21,8 +21,16 @@ dependencies = [
 where = ["."]
 include = ["alf_tools*"]
 
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
 [tool.uv.sources]
 alf_core = { path = "../core", editable = true }
+torch = [
+  { index = "pytorch-cpu" },
+]
 
 [project.optional-dependencies]
 # Install with `pip install alf-tools[gpu] --extra-index-url https://download.pytorch.org/whl/cu128`
