@@ -34,7 +34,7 @@ explicit = true
 [tool.uv.sources]
 alf_core = { path = "../core", editable = true }
 torch = [
-  { index = "pytorch-cpu" },
+    { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
 ]
 [project.optional-dependencies]
 # used when pip installing with `pip install .[gpu]` to get GPU-accelerated versions of dependencies. Important
