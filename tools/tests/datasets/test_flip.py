@@ -23,13 +23,17 @@ import pytest
 from alf_core import Modality
 from alf_tools.datasets.flip import FLIP, FLIP_SPLITS, FLIPConfig
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_splits_zip(csv_name: str, df: pd.DataFrame) -> bytes:
-    """Build an in-memory zip file containing a single CSV."""
+    """Build an in-memory zip file containing a single CSV.
+
+    Returns:
+        Raw bytes of the zip archive.
+    """
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as zf:
         zf.writestr(csv_name, df.to_csv(index=False))
@@ -42,6 +46,9 @@ def _make_mock_df(n_train: int = 10, n_test: int = 5) -> pd.DataFrame:
     Train rows get labels 1.0 .. n_train; test rows get labels 100.0 .. 100+n_test-1.
     The 'validation' flag is set True on the last 2 train rows to verify it is
     stored as a feature but does not affect splitting.
+
+    Returns:
+        DataFrame with columns: sequence, target, set, validation.
     """
     rows = []
     for i in range(n_train):
@@ -77,7 +84,11 @@ def _make_flip_config(**overrides) -> FLIPConfig:
 
 
 def _make_flip_instance(df: pd.DataFrame, **config_overrides) -> FLIP:
-    """Create a FLIP instance with a mocked _load_split_dataframe."""
+    """Create a FLIP instance with a mocked _load_split_dataframe.
+
+    Returns:
+        Initialised FLIP dataset backed by the provided DataFrame.
+    """
     config = _make_flip_config(**config_overrides)
     with patch.object(FLIP, "_load_split_dataframe", return_value=df):
         instance = FLIP(config)
@@ -88,9 +99,14 @@ def _make_flip_instance(df: pd.DataFrame, **config_overrides) -> FLIP:
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def mock_df():
-    """Standard synthetic DataFrame: 10 train + 5 test rows."""
+    """Standard synthetic DataFrame: 10 train + 5 test rows.
+
+    Returns:
+        DataFrame with columns: sequence, target, set, validation.
+    """
     return _make_mock_df()
 
 
@@ -105,6 +121,9 @@ def flip_dataset(mock_df):
       train          = 5 - 1           = 4
       candidate_pool = 10 - 5          = 5
       test           = floor(5 * 1.0)  = 5
+
+    Returns:
+        Initialised FLIP dataset backed by the mock DataFrame.
     """
     return _make_flip_instance(mock_df)
 
@@ -113,7 +132,10 @@ def flip_dataset(mock_df):
 # Config validation
 # ---------------------------------------------------------------------------
 
+
 class TestFLIPConfig:
+    """Tests for FLIPConfig validation."""
+
     def test_invalid_split_raises(self):
         """Invalid split name should raise ValueError on construction."""
         config = _make_flip_config(flip_split="nonexistent_split")
@@ -141,7 +163,10 @@ class TestFLIPConfig:
 # Initialisation
 # ---------------------------------------------------------------------------
 
+
 class TestFLIPInitialisation:
+    """Tests for post-construction state of a FLIP instance."""
+
     def test_config_stored(self, flip_dataset):
         """Dataset and split names should be accessible via config."""
         assert flip_dataset.config.name == "flip_test"
@@ -157,7 +182,7 @@ class TestFLIPInitialisation:
         assert flip_dataset.config.seed == 42
 
     def test_repr(self, flip_dataset):
-        """repr should include dataset and split name for quick identification."""
+        """Repr should include dataset and split name for quick identification."""
         r = repr(flip_dataset)
         assert "gb1" in r
         assert "one_vs_rest" in r
@@ -167,9 +192,9 @@ class TestFLIPInitialisation:
 # Split partitioning sizes
 # ---------------------------------------------------------------------------
 
+
 class TestFLIPSplitSizes:
-    """
-    Mock data: 10 flip_train + 5 flip_test.
+    """Mock data: 10 flip_train + 5 flip_test.
     Default config: train_ratio=0.5, validation_frac=0.2, test_ratio=1.0.
 
     Expected sizes:
@@ -181,15 +206,19 @@ class TestFLIPSplitSizes:
     """
 
     def test_train_size(self, flip_dataset):
+        """Train size equals floor(10*0.5) - floor(5*0.2) = 4."""
         assert len(flip_dataset.train_dataset) == 4
 
     def test_validation_size(self, flip_dataset):
+        """Validation size equals floor(floor(10*0.5) * 0.2) = 1."""
         assert len(flip_dataset.validation_dataset) == 1
 
     def test_test_size(self, flip_dataset):
+        """Test size equals floor(5 * 1.0) = 5."""
         assert len(flip_dataset.test_dataset) == 5
 
     def test_candidate_pool_size(self, flip_dataset):
+        """Candidate pool equals remaining flip_train after train+val = 5."""
         assert len(flip_dataset.candidate_pool) == 5
 
     def test_zero_train_ratio_empties_train(self, mock_df):
@@ -223,7 +252,10 @@ class TestFLIPSplitSizes:
 # Partitioning correctness (no cross-contamination)
 # ---------------------------------------------------------------------------
 
+
 class TestFLIPSplitCorrectness:
+    """Tests that splits are mutually exclusive and draw from the correct FLIP pools."""
+
     def test_candidate_pool_contains_no_test_sequences(self, flip_dataset):
         """No sequence should appear in both candidate pool and test."""
         pool_seqs = {c.data for c in flip_dataset.candidate_pool.candidates}
@@ -246,7 +278,8 @@ class TestFLIPSplitCorrectness:
         """Candidate pool sequences should all come from the FLIP train set."""
         pool_seqs = {c.data for c in flip_dataset.candidate_pool.candidates}
         flip_train_seqs = {
-            c.data for c in flip_dataset._raw_dataset.candidates
+            c.data
+            for c in flip_dataset._raw_dataset.candidates
             if c.features and c.features["set"] == "train"
         }
         assert pool_seqs.issubset(flip_train_seqs)
@@ -255,7 +288,8 @@ class TestFLIPSplitCorrectness:
         """Test sequences should all come from the FLIP test set."""
         test_seqs = {c.data for c in flip_dataset.test_dataset.candidates}
         flip_test_seqs = {
-            c.data for c in flip_dataset._raw_dataset.candidates
+            c.data
+            for c in flip_dataset._raw_dataset.candidates
             if c.features and c.features["set"] == "test"
         }
         assert test_seqs.issubset(flip_test_seqs)
@@ -276,7 +310,8 @@ class TestFLIPSplitCorrectness:
 
     def test_flip_validation_flag_not_used_for_splitting(self, mock_df):
         """Candidates with FLIP validation=True should appear in train/validation/candidate_pool,
-        not be excluded from the pool."""
+        not be excluded from the pool.
+        """
         # With train_ratio=0, all flip_train (including validation=True rows) go to candidate_pool
         instance = _make_flip_instance(mock_df, train_ratio=0.0, validation_frac=0.0)
         # All 10 flip_train rows (including the 2 with validation=True) are in candidate_pool
@@ -287,6 +322,7 @@ class TestFLIPSplitCorrectness:
 # Label statistics
 # ---------------------------------------------------------------------------
 
+
 class TestFLIPLabelStatistics:
     """Use train_ratio=0, validation_frac=0, test_ratio=1.0 for predictable label pools.
 
@@ -296,22 +332,30 @@ class TestFLIPLabelStatistics:
 
     @pytest.fixture
     def full_pool_instance(self, mock_df):
+        """FLIP instance with train_ratio=0 so all flip_train goes to candidate_pool.
+
+        Returns:
+            Initialised FLIP dataset with predictable label pools.
+        """
         return _make_flip_instance(mock_df, train_ratio=0.0, validation_frac=0.0, test_ratio=1.0)
 
     def test_candidate_pool_label_mean(self, full_pool_instance):
+        """Candidate pool labels 1..10 should have mean 5.5."""
         assert np.mean(full_pool_instance.candidate_pool.labels) == pytest.approx(5.5)
 
     def test_test_label_mean(self, full_pool_instance):
+        """Test labels 100..104 should have mean 102.0."""
         assert np.mean(full_pool_instance.test_dataset.labels) == pytest.approx(102.0)
 
     def test_labels_are_numpy_arrays(self, flip_dataset):
+        """All split label arrays should be numpy ndarrays."""
         assert isinstance(flip_dataset.train_dataset.labels, np.ndarray)
         assert isinstance(flip_dataset.validation_dataset.labels, np.ndarray)
         assert isinstance(flip_dataset.test_dataset.labels, np.ndarray)
         assert isinstance(flip_dataset.candidate_pool.labels, np.ndarray)
 
     def test_non_empty_splits(self, flip_dataset):
-        """Validation, test, train, and candidate pool should all be non-empty with default ratios."""
+        """All splits should be non-empty with default ratios."""
         assert len(flip_dataset.train_dataset) > 0
         assert len(flip_dataset.validation_dataset) > 0
         assert len(flip_dataset.test_dataset) > 0
@@ -322,7 +366,10 @@ class TestFLIPLabelStatistics:
 # Download and zip-parsing logic
 # ---------------------------------------------------------------------------
 
+
 class TestFLIPDownload:
+    """Tests for download caching and zip-parsing behaviour."""
+
     def test_downloads_when_zip_missing(self, tmp_path):
         """Should call requests.get when splits.zip is not cached."""
         config = _make_flip_config()
@@ -340,7 +387,7 @@ class TestFLIPDownload:
             patch("alf_tools.datasets.flip.DATAPATH", tmp_path / "data"),
             patch("alf_tools.datasets.flip.requests.get", return_value=mock_response) as mock_get,
         ):
-            instance = FLIP(config)
+            FLIP(config)
 
         mock_get.assert_called_once()
         assert "gb1" in mock_get.call_args[0][0]
@@ -359,7 +406,7 @@ class TestFLIPDownload:
             patch("alf_tools.datasets.flip.DATAPATH", tmp_path / "data"),
             patch("alf_tools.datasets.flip.requests.get") as mock_get,
         ):
-            instance = FLIP(config)
+            FLIP(config)
 
         mock_get.assert_not_called()
 

@@ -90,8 +90,14 @@ class FLIPConfig(BaseDatasetConfig):
 
     @model_validator(mode="after")
     def validate_config(self) -> Self:
-        # train_ratio and test_ratio apply to separate FLIP pools (FLIP train and FLIP test),
-        # so their sum is allowed to exceed 1. Override the base class constraint.
+        """Override base class validator.
+
+        train_ratio and test_ratio apply to separate FLIP pools (FLIP train and FLIP test),
+        so their sum is allowed to exceed 1.
+
+        Returns:
+            The validated configuration instance.
+        """
         return self
 
 
@@ -116,6 +122,11 @@ class FLIP(BaseDataset):
     config: FLIPConfig  # narrows the inherited BaseDatasetConfig type
 
     def __init__(self, config: FLIPConfig):
+        """Initialise FLIP dataset, validating the split name before loading data.
+
+        Raises:
+            ValueError: If ``config.flip_split`` is not a valid active split for the dataset.
+        """
         if config.flip_split not in FLIP_SPLITS.get(config.flip_dataset, []):
             raise ValueError(
                 f"'{config.flip_split}' is not a valid active split for dataset "
@@ -125,6 +136,7 @@ class FLIP(BaseDataset):
         self.setup()
 
     def __repr__(self) -> str:
+        """Return a string representation identifying dataset and split."""
         return (
             f"FLIP(name={self.config.name}, modality={self.modality}, "
             f"seed={self.config.seed}, "
