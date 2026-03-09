@@ -20,20 +20,20 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
-from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions, TaskState
+from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions, State
 
 logger = logging.getLogger("alf-core")
 
 
-class TaskStateLogger(abc.ABC):
-    """Abstract base class for task_state_loggers to write task state information."""
+class StateLogger(abc.ABC):
+    """Abstract base class for state loggers."""
 
     @abc.abstractmethod
-    def log(self, state: TaskState, round_name: str | None = None) -> None:
+    def log(self, state: State, round_name: str | None = None) -> None:
         """Log data from the task state to the logger destination.
 
         Args:
-            state: TaskState object to log
+            state: State object to log
             round_name: Name of the current round in the task, depending on the task type
                 e.g. "initial_train_round", "supervised evaluation", "zero-shot evaluation",
                 or the round number for design tasks.
@@ -41,18 +41,18 @@ class TaskStateLogger(abc.ABC):
         pass
 
 
-class TerminalTaskStateLogger(TaskStateLogger):
+class TerminalStateLogger(StateLogger):
     """Logger that outputs metrics to the terminal."""
 
     def log(
         self,
-        state: TaskState,
+        state: State,
         round_name: str | None = None,
     ) -> None:
         """Log metrics in the task state to the terminal.
 
         Args:
-            state: TaskState object with metrics to log
+            state: State object with metrics to log
             round_name: Name of the current round in the task, depending on the task type
                 e.g. "initial_train_round", "supervised evaluation", "zero-shot evaluation",
                 or the round number for design tasks.
@@ -64,7 +64,7 @@ class TerminalTaskStateLogger(TaskStateLogger):
         logger.info("Round %s:\n%s", round_name, message)
 
 
-class FileTaskStateLogger(TaskStateLogger):
+class FileStateLogger(StateLogger):
     """Logger that saves certain components of the state to a file.
     This includes the metrics, the acquisition batch, the data splits, and the predictions.
     """
@@ -72,7 +72,7 @@ class FileTaskStateLogger(TaskStateLogger):
     def __init__(
         self, output_path: str | os.PathLike, upload_function: Callable[[Path], None] | None = None
     ):
-        """Initialize FileTaskStateLogger.
+        """Initialize FileStateLogger.
 
         Args:
             output_path: Path to the directory to save the state information to
@@ -81,7 +81,7 @@ class FileTaskStateLogger(TaskStateLogger):
         self.output_path = Path(output_path)
         self.output_path.mkdir(parents=True, exist_ok=True)
         self.upload_function = upload_function
-        logger.info("Initializing FileTaskStateLogger at %s", self.output_path)
+        logger.info("Initializing FileStateLogger at %s", self.output_path)
 
     def _log_metrics(self, metrics: dict[str, float]) -> None:
         """Log metrics to file.
@@ -127,11 +127,11 @@ class FileTaskStateLogger(TaskStateLogger):
         predictions_df = predictions.to_dataframe(candidates, targets)
         predictions_df.to_csv(self.output_path / f"{round_name}_predictions.csv", index=False)
 
-    def log(self, state: TaskState, round_name: str | None = None) -> None:
+    def log(self, state: State, round_name: str | None = None) -> None:
         """Log data from the task state to the logger destination.
 
         Args:
-            state: TaskState object to log
+            state: State object to log
             round_name: Name of the current round in the task, depending on the task type
                 e.g. "initial_train_round", "supervised evaluation", "zero-shot evaluation",
                 or the round number for design tasks.

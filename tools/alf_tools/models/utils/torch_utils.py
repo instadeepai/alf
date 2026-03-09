@@ -12,8 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_core.dataclasses.candidate import Candidate, Modality
-from alf_core.dataclasses.labelled_candidates import LabelledCandidates
-from alf_core.dataclasses.predictions import Predictions
-from alf_core.dataclasses.results import Results
-from alf_core.dataclasses.state import State
+"""Common utilities for torch based model implementations."""
+
+import torch
+
+
+def get_device(device: str | None = None) -> torch.device:
+    """Get the appropriate torch device.
+
+    Args:
+        device: Device specification ('cuda', 'cpu', or None for auto-detect).
+
+    Returns:
+        torch.device object.
+    """
+    if device is None:
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    return torch.device(device)

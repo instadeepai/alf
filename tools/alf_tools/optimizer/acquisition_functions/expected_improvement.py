@@ -14,7 +14,7 @@
 
 
 import numpy as np
-from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, TaskState
+from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
 from scipy.stats import norm
 
 
@@ -30,7 +30,7 @@ class ExpectedImprovement(AcquisitionFunction):
     This is a maximising acquisition function.
     """
 
-    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabelledCandidates:
+    def __call__(self, search_candidates: list[Candidate], state: State) -> LabelledCandidates:
         """Compute Expected Improvement acquisition values for unlabelled candidates.
 
         Args:

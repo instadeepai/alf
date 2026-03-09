@@ -88,7 +88,7 @@ To build and view the documentation on your local machine:
 ### Design Task
 
 ```python
-from alf_core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask, TerminalTaskStateLogger
+from alf_core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask, TerminalStateLogger
 from alf.tools.datasets.gfp import GFP
 from alf.tools.models.cnn import CNNModel
 from alf.tools.optimizer.acquisition_functions.greedy import Greedy
@@ -104,7 +104,7 @@ oracle = Oracle(scorer=dataset)
 # Run design task
 task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
 state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, task_state_loggers=[TerminalTaskStateLogger()], optimizer=optimizer, oracle=oracle)
+task.run(state=state, state_loggers=[TerminalStateLogger()], optimizer=optimizer, oracle=oracle)
 ```
 
 ## 📁 Project Structure

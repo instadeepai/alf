@@ -12,8 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_core.dataclasses.candidate import Candidate, Modality
-from alf_core.dataclasses.labelled_candidates import LabelledCandidates
-from alf_core.dataclasses.predictions import Predictions
-from alf_core.dataclasses.results import Results
-from alf_core.dataclasses.state import State
+from alf_tools.models.utils.sequence_utils import (
+    create_char_to_idx_mapping,
+    extract_sequences_from_inputs,
+    one_hot_encode,
+)
+from alf_tools.models.utils.torch_utils import get_device
+
+__all__ = [
+    "create_char_to_idx_mapping",
+    "extract_sequences_from_inputs",
+    "get_device",
+    "one_hot_encode",
+]

@@ -14,7 +14,7 @@
 
 from typing import List
 
-from alf_core import Candidate, SearchProtocol, TaskState
+from alf_core import Candidate, SearchProtocol, State
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 
@@ -25,17 +25,17 @@ class SingleMutantSearch(SearchProtocol):
         """Initialize the single mutant search protocol with the alphabet."""
         self.alphabet = alphabet
 
-    def __call__(self, task_state: TaskState) -> List[Candidate]:
+    def __call__(self, state: State) -> List[Candidate]:
         """Apply the search protocol to return a pool of candidates.
 
         Args:
-            task_state: The task state containing the dataset and surrogate model.
+            state: The task state containing the dataset and surrogate model.
 
         Returns:
             A list of candidates.
         """
         # TODO: Add features to the candidates
-        train_dataset = task_state.dataset.train_dataset
+        train_dataset = state.dataset.train_dataset
         best_id = train_dataset.labels.argmax()
         best_sequence = train_dataset.candidates[best_id].data
         single_mutant_pool = []

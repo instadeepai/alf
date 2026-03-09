@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from alf_core.tasks.design_task import DesignTask
-from alf_core.utils.task_state_logger import FileTaskStateLogger, TerminalTaskStateLogger
+from alf_core.utils.state_logger import FileStateLogger, TerminalStateLogger
 
 
 @pytest.fixture
@@ -79,16 +79,16 @@ class TestDesignTask:
         save_path = tmp_path / "design_dummy_surrogate"
         save_path.mkdir()
 
-        metrics_logger = TerminalTaskStateLogger()
-        file_logger = FileTaskStateLogger(output_path=save_path)
-        task_state_loggers = [metrics_logger, file_logger]
+        metrics_logger = TerminalStateLogger()
+        file_logger = FileStateLogger(output_path=save_path)
+        state_loggers = [metrics_logger, file_logger]
 
         # Create and run the design task
         task = DesignTask(num_acq_rounds=5, acq_batch_size=10)
         state = task.setup(dataset=dummy_dataset, surrogate=dummy_surrogate)
         task.run(
             state=state,
-            task_state_loggers=task_state_loggers,
+            state_loggers=state_loggers,
             optimizer=dummy_optimizer,
             oracle=oracle,
         )

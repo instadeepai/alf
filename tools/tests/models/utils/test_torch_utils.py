@@ -12,8 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_core.dataclasses.candidate import Candidate, Modality
-from alf_core.dataclasses.labelled_candidates import LabelledCandidates
-from alf_core.dataclasses.predictions import Predictions
-from alf_core.dataclasses.results import Results
-from alf_core.dataclasses.state import State
+"""Tests for torch utility functions."""
+
+import torch
+from alf_tools.models.utils import get_device
+
+
+class TestTorchUtils:
+    """Test suite for torch utility functions."""
+
+    def test_get_device_auto(self):
+        """Test automatic device selection."""
+        device = get_device(None)
+
+        assert isinstance(device, torch.device)
+        assert device.type in ["cpu", "cuda"]
+
+    def test_get_device_explicit_cpu(self):
+        """Test explicit CPU device."""
+        device = get_device("cpu")
+
+        assert device.type == "cpu"

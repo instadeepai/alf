@@ -18,7 +18,7 @@ from typing import Any, List, Literal, Union
 
 import numpy as np
 import pytest
-from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions, TaskState
+from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions, State
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.model.base_model import BaseModel
 from alf_core.optimizer.acquisition_function import AcquisitionFunction
@@ -240,7 +240,7 @@ class DummyAcquisitionFunction(AcquisitionFunction):
         self.seed = seed
         self.rng = np.random.RandomState(seed)
 
-    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabelledCandidates:
+    def __call__(self, search_candidates: list[Candidate], state: State) -> LabelledCandidates:
         """Generate random acquisition values for the candidates.
 
         Args:

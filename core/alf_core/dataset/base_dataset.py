@@ -245,11 +245,12 @@ class BaseDataset(abc.ABC):
 
         # Split the acquired candidates into train and validation splits based on the split ratio
         num_val = floor(len(acquired_candidates) * self.split_ratio["validation_frac"])
+        num_train = len(acquired_candidates) - num_val
         shuffled_acquired_candidates = acquired_candidates.shuffle(self.config.seed)
         # Add num_val candidates to validation split and the rest to train split
-        self.splits["train"].append(LabelledCandidates(*shuffled_acquired_candidates[:-num_val]))
+        self.splits["train"].append(LabelledCandidates(*shuffled_acquired_candidates[:num_train]))
         self.splits["validation"].append(
-            LabelledCandidates(*shuffled_acquired_candidates[-num_val:])
+            LabelledCandidates(*shuffled_acquired_candidates[num_train:])
         )
 
     def query(self, candidates: list[Candidate]) -> LabelledCandidates:
