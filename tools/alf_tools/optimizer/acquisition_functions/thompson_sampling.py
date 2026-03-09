@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, TaskState
+from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
 
 
 class ThompsonSampling(AcquisitionFunction):
@@ -29,7 +29,7 @@ class ThompsonSampling(AcquisitionFunction):
     This is a maximising acquisition function.
     """
 
-    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabelledCandidates:
+    def __call__(self, search_candidates: list[Candidate], state: State) -> LabelledCandidates:
         """Compute Thompson Sampling acquisition values for unlabelled candidates.
 
         Args:

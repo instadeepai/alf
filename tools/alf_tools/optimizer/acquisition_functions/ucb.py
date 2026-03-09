@@ -14,7 +14,7 @@
 
 
 import numpy as np
-from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, TaskState
+from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
 
 
 class UCB(AcquisitionFunction):
@@ -34,7 +34,7 @@ class UCB(AcquisitionFunction):
         """
         self.alpha = alpha
 
-    def __call__(self, search_candidates: list[Candidate], state: TaskState) -> LabelledCandidates:
+    def __call__(self, search_candidates: list[Candidate], state: State) -> LabelledCandidates:
         """Compute Upper Confidence Bound (UCB) acquisition values for unlabelled candidates.
 
         Args:

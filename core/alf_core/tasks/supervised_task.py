@@ -17,9 +17,9 @@ import logging
 import time
 from typing import Any
 
-from alf_core.dataclasses import TaskState
+from alf_core.dataclasses import State
 from alf_core.tasks.base_task import BaseTask
-from alf_core.utils.task_state_logger import TaskStateLogger
+from alf_core.utils.state_logger import StateLogger
 
 logger = logging.getLogger("alf-core")
 
@@ -40,8 +40,8 @@ class SupervisedTask(BaseTask):
 
     def run(  # type: ignore[override]
         self,
-        state: TaskState,
-        task_state_loggers: list[TaskStateLogger],
+        state: State,
+        state_loggers: list[StateLogger],
     ) -> None:
         """Run the supervised learning task.
 
@@ -50,7 +50,7 @@ class SupervisedTask(BaseTask):
 
         Args:
             state: Task state with dataset and surrogate model.
-            task_state_loggers: List of TaskStateLogger for recording the state.
+            state_loggers: List of StateLogger for recording the state.
         """
         logger.info("Running supervised task ...")
 
@@ -63,7 +63,7 @@ class SupervisedTask(BaseTask):
         state.round_metrics = {"tell_time": t1 - t0}
 
         state = self.evaluate(state=state)
-        for task_state_logger in task_state_loggers:
-            task_state_logger.log(state, round_name="supervised evaluation")
+        for state_logger in state_loggers:
+            state_logger.log(state, round_name="supervised evaluation")
 
         return

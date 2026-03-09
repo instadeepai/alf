@@ -15,9 +15,9 @@
 import logging
 from typing import Any
 
-from alf_core.dataclasses import TaskState
+from alf_core.dataclasses import State
 from alf_core.tasks.base_task import BaseTask
-from alf_core.utils.task_state_logger import TaskStateLogger
+from alf_core.utils.state_logger import StateLogger
 
 logger = logging.getLogger("alf-core")
 
@@ -40,8 +40,8 @@ class ZeroShotTask(BaseTask):
 
     def run(  # type: ignore[override]
         self,
-        state: TaskState,
-        task_state_loggers: list[TaskStateLogger],
+        state: State,
+        state_loggers: list[StateLogger],
     ) -> None:
         """Run the zero-shot evaluation task.
 
@@ -50,7 +50,7 @@ class ZeroShotTask(BaseTask):
 
         Args:
             state: Task state with dataset and pre-trained surrogate model.
-            task_state_loggers: List of TaskStateLogger for recording the state.
+            state_loggers: List of StateLogger for recording the state.
         """
         logger.info(
             "Zero-shot evaluation on test data with %d sequences", len(state.dataset.test_dataset)
@@ -63,5 +63,5 @@ class ZeroShotTask(BaseTask):
             "layers."
         )
 
-        for task_state_logger in task_state_loggers:
-            task_state_logger.log(state, round_name="zero-shot evaluation")
+        for state_logger in state_loggers:
+            state_logger.log(state, round_name="zero-shot evaluation")

@@ -23,7 +23,7 @@ This README is organized into the following sections:
   - Scores candidates for acquisition
 - **[7. Search Strategy (`BaseSearch`)](#7-search-strategy-basesearch)** - Defines the
   candidate pool
-- **[8. Task State (`TaskState`)](#8-task-state-taskstate)** - Tracks the state of active
+- **[8. State (`State`)](#8-state-state)** - Tracks the state of active
   learning tasks
 
 ### Task Types
@@ -157,9 +157,9 @@ Search strategies define the candidate pool available for acquisition. Types inc
 - `__call__()`: Returns the list of candidates to search over
 - `get_metrics()`: Returns search-specific metrics (e.g., recall, regret)
 
-### 8. Task State (`TaskState`)
+### 8. State (`State`)
 
-The `TaskState` dataclass tracks the complete state of an active learning task:
+The `State` dataclass tracks the complete state of an active learning task:
 
 - **Components**: Dataset, surrogate model, current round
 - **History**: Records all acquired candidates per round
@@ -167,10 +167,7 @@ The `TaskState` dataclass tracks the complete state of an active learning task:
 - **Configuration**: Acquisition batch size, number of rounds, etc.
 
 **Key Methods:**
-- `update()`: Updates state with newly acquired candidates
-- `evaluate()`: Evaluates surrogate on test set and updates metrics
-- `save()`: Persists metrics and history to disk
-- `should_terminate()`: Checks if optimization should stop
+- `update()`: Adds newly acquired candidates to history, updates dataset splits, and increments the round counter
 
 ## Task Types
 
@@ -236,7 +233,7 @@ The zero-shot task evaluates a pre-trained or untrained model without training:
 ### Design Task Flow
 1. **Setup Phase**:
    ```
-   Task.setup(dataset, surrogate) → TaskState
+   Task.setup(dataset, surrogate) → State
    ```
 
 2. **Round Loop** (for each acquisition round):
@@ -263,7 +260,7 @@ The zero-shot task evaluates a pre-trained or untrained model without training:
 ### Supervised Task Flow
 1. **Setup Phase**:
    ```
-   Task.setup(dataset, surrogate) → TaskState
+   Task.setup(dataset, surrogate) → State
    ```
 
 2. **Training Phase**:
@@ -282,7 +279,7 @@ The zero-shot task evaluates a pre-trained or untrained model without training:
 ### Zero-Shot Task Flow
 1. **Setup Phase**:
    ```
-   Task.setup(dataset, surrogate) → TaskState
+   Task.setup(dataset, surrogate) → State
    ```
 
 2. **Evaluation Phase** (no training):

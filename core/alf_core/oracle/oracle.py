@@ -17,7 +17,7 @@ import time
 from typing import Union
 
 import numpy as np
-from alf_core.dataclasses import Candidate, LabelledCandidates, TaskState
+from alf_core.dataclasses import Candidate, LabelledCandidates, State
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.model.base_model import BaseModel
 
@@ -38,8 +38,8 @@ class Oracle:
         self.scorer: BaseModel | BaseDataset = scorer
 
     def evaluate(
-        self, candidates: list[Candidate], state: TaskState
-    ) -> tuple[LabelledCandidates, TaskState]:
+        self, candidates: list[Candidate], state: State
+    ) -> tuple[LabelledCandidates, State]:
         """Evaluate candidates and return their labels.
 
         Args:

@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class TaskState:
+class State:
     """Tracks the state of a task.
 
     Attributes:
@@ -48,7 +48,7 @@ class TaskState:
     round_predictions: "Predictions" | None = None
 
     def update(self, acquired_candidates: LabelledCandidates) -> None:
-        """Update the task state with newly acquired candidates.
+        """Update the state with newly acquired candidates.
 
         Adds the acquired candidates to history and updates the dataset splits.
         Also increments the round counter.
