@@ -34,29 +34,32 @@ If you have an NVIDIA GPU and want CUDA acceleration:
 **Prerequisites:**
 - NVIDIA GPU with CUDA support
 - Linux or Windows (macOS does not support CUDA)
-- CUDA 12.1 compatible drivers
+- CUDA 12.8 compatible drivers
 
-**Switch to GPU PyTorch:**
+**Option A — Temporary override (no file changes):**
 
 ```bash
-# Install GPU version (CUDA 12.1) - temporary override
-./switch_torch.sh gpu
+# First install all dependencies (CPU torch)
+uv sync
 
-# Switch back to CPU version
-./switch_torch.sh cpu
-
-# Check current configuration
-./switch_torch.sh status
+# Then override torch with the GPU build
+uv pip install torch --index-url https://download.pytorch.org/whl/cu128
 ```
 
-**How it works:**
+`uv pip install` bypasses `pyproject.toml` sources, so this works regardless of the index configured there. To revert to CPU, just run `uv sync` again.
 
-The script installs the GPU version of PyTorch as a temporary override without modifying `pyproject.toml`:
+**Option B — Edit `tools/pyproject.toml` (persistent):**
 
-1. First runs `uv sync` to install all dependencies from `pyproject.toml` (including CPU PyTorch)
-2. Then overrides PyTorch using `uv pip install --index-url https://download.pytorch.org/whl/cu121`
+Change the torch source index:
 
-**Note:** This is a temporary override. Running `uv sync` will revert to the CPU version defined in `pyproject.toml`.
+```toml
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-gpu" },  # Change from "pytorch-cpu"
+]
+```
+
+Then run `uv sync`. Note: revert this change before committing if you want CPU as the project default.
 
 ### Verify GPU Installation
 
@@ -100,9 +103,18 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 **What each package provides:**
 
 - **`alf_core`**: Core data structures, tasks, and utilities. Does not require PyTorch.
-- **`alf_tools`**: Machine learning models (CNNModel, etc.), datasets, and acquisition functions. Requires PyTorch.
+- **`alf_tools`**: Machine learning models (CNNModel, etc.), datasets, and acquisition functions. Requires PyTorch `>=2.10.0`.
 
 Both packages install CPU-optimized PyTorch by default for broad compatibility.
+
+**GPU variant:** If your project requires GPU PyTorch, install `alf_tools` first (which will pull in the CPU build), then override torch separately:
+
+```bash
+pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
+pip install torch --index-url https://download.pytorch.org/whl/cu128
+```
+
+Attempting to install a GPU torch alongside `alf_tools` in a single step will cause an index conflict, since `alf_tools` pins torch to the CPU index.
 
 ---
 
@@ -115,7 +127,7 @@ Both packages install CPU-optimized PyTorch by default for broad compatibility.
 
 ### Tools Package (`alf_tools`)
 - **Requires PyTorch** for CNNModel and other ML components
-- Includes `torch>=1.9.0` and `gpytorch>=1.9.0` in dependencies
+- Includes `torch>=2.10.0` and `gpytorch>=1.9.0` in dependencies
 - Installs CPU-optimized PyTorch by default
 
 ### Tutorials Package (`alf_tutorials`)
@@ -126,7 +138,7 @@ Both packages install CPU-optimized PyTorch by default for broad compatibility.
 
 ## PyTorch Configuration Details
 
-ALF uses explicit PyTorch indexes in `pyproject.toml` to control which PyTorch version gets installed:
+`tools/pyproject.toml` defines two named PyTorch indexes:
 
 ```toml
 [[tool.uv.index]]
@@ -136,23 +148,17 @@ explicit = true
 
 [[tool.uv.index]]
 name = "pytorch-gpu"
-url = "https://download.pytorch.org/whl/cu121"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true
-
-[tool.uv.sources]
-torch = { index = "pytorch-cpu" }  # Default: CPU version
 ```
 
-To manually switch to GPU for development, edit `pyproject.toml`:
+The active index is selected via `[tool.uv.sources]`. CPU is the default:
 
 ```toml
 [tool.uv.sources]
-torch = { index = "pytorch-gpu" }  # Change from "pytorch-cpu"
+torch = [
+  { index = "pytorch-cpu" },
+]
 ```
 
-Then run:
-```bash
-uv sync
-```
-
-**Note:** The `switch_torch.sh` script is preferred as it avoids modifying `pyproject.toml` and uses a temporary override instead.
+Switch to `pytorch-gpu` and run `uv sync` to install the CUDA 12.8 build. See [GPU Support](#gpu-support-optional) above for the full workflow.
