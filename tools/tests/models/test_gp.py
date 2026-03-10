@@ -18,8 +18,8 @@ import torch
 from alf_core import Candidate, LabelledCandidates
 from alf_tools.models.gp import (
     FeaturizerConfig,
+    GPModel,
     GPModelConfig,
-    GPModelTrainer,
     GPTrainConfig,
 )
 from alf_tools.models.utils import one_hot_encode
@@ -76,7 +76,7 @@ def gp_model():
     model_config = GPModelConfig(kernel_type="rbf", ard=False)
     train_config = GPTrainConfig(num_iterations=200, log_frequency=5)
     featurizer_config = FeaturizerConfig(featurizer_type="one_hot", flatten_one_hot=True)
-    return GPModelTrainer(
+    return GPModel(
         name="test_gp",
         model_config=model_config,
         train_config=train_config,
@@ -99,7 +99,7 @@ def gp_model_sinusoidal():
         featurizer_type="custom",
         custom_featurizer=lambda x: torch.tensor(x, dtype=torch.float32),
     )
-    return GPModelTrainer(
+    return GPModel(
         name="test_gp_sinusoidal",
         model_config=model_config,
         train_config=train_config,
@@ -169,7 +169,7 @@ class TestGPModel:
         featurizer_config = FeaturizerConfig(featurizer_type="one_hot", flatten_one_hot=False)
         model_config = GPModelConfig(kernel_type="rbf")
         train_config = GPTrainConfig(num_iterations=5)
-        gp_model = GPModelTrainer(
+        gp_model = GPModel(
             model_config=model_config,
             train_config=train_config,
             featurizer_config=featurizer_config,
@@ -206,7 +206,7 @@ class TestGPModel:
             model_config = GPModelConfig(kernel_type=kernel_type, ard=False)
             train_config = GPTrainConfig(num_iterations=5, log_frequency=10)
             featurizer_config = FeaturizerConfig(featurizer_type="one_hot", flatten_one_hot=True)
-            gp_model = GPModelTrainer(
+            gp_model = GPModel(
                 model_config=model_config,
                 train_config=train_config,
                 featurizer_config=featurizer_config,
@@ -227,7 +227,7 @@ class TestGPModel:
         model_config = GPModelConfig(kernel_type="rbf", ard=True)
         train_config = GPTrainConfig(num_iterations=10)
         featurizer_config = FeaturizerConfig(featurizer_type="one_hot", flatten_one_hot=True)
-        gp_model = GPModelTrainer(
+        gp_model = GPModel(
             model_config=model_config,
             train_config=train_config,
             featurizer_config=featurizer_config,
@@ -255,7 +255,7 @@ class TestGPModel:
         )
         model_config = GPModelConfig(kernel_type="rbf", ard=False)
         train_config = GPTrainConfig(num_iterations=10)
-        gp_model = GPModelTrainer(
+        gp_model = GPModel(
             model_config=model_config,
             train_config=train_config,
             featurizer_config=featurizer_config,
@@ -286,7 +286,7 @@ class TestGPModel:
         featurizer_config = FeaturizerConfig(featurizer_type="one_hot", flatten_one_hot=True)
 
         set_seed(42)
-        gp_model1 = GPModelTrainer(
+        gp_model1 = GPModel(
             name="test_gp_1",
             model_config=model_config,
             train_config=train_config,
@@ -296,7 +296,7 @@ class TestGPModel:
         gp_model1.train(sample_data)
 
         set_seed(42)
-        gp_model2 = GPModelTrainer(
+        gp_model2 = GPModel(
             name="test_gp_2",
             model_config=model_config,
             train_config=train_config,
@@ -322,7 +322,7 @@ class TestGPModel:
             model_config = GPModelConfig(kernel_type="matern", matern_nu=nu, ard=False)
             train_config = GPTrainConfig(num_iterations=5)
             featurizer_config = FeaturizerConfig(featurizer_type="one_hot", flatten_one_hot=True)
-            gp_model = GPModelTrainer(
+            gp_model = GPModel(
                 model_config=model_config,
                 train_config=train_config,
                 featurizer_config=featurizer_config,
@@ -342,7 +342,7 @@ class TestGPModel:
         model_config = GPModelConfig(kernel_type="rbf", ard=False)
         train_config = GPTrainConfig(optimizer_type="adam", learning_rate=0.1, num_iterations=10)
         featurizer_config = FeaturizerConfig(featurizer_type="one_hot", flatten_one_hot=True)
-        gp_model = GPModelTrainer(
+        gp_model = GPModel(
             model_config=model_config,
             train_config=train_config,
             featurizer_config=featurizer_config,
@@ -357,7 +357,7 @@ class TestGPModel:
         model_config = GPModelConfig(kernel_type="rbf", ard=False)
         train_config = GPTrainConfig(optimizer_type="lbfgs", learning_rate=0.1, num_iterations=5)
         featurizer_config = FeaturizerConfig(featurizer_type="one_hot", flatten_one_hot=True)
-        gp_model = GPModelTrainer(
+        gp_model = GPModel(
             model_config=model_config,
             train_config=train_config,
             featurizer_config=featurizer_config,

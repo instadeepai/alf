@@ -255,7 +255,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
 
-class GPModelTrainer(BaseModel):
+class GPModel(BaseModel):
     """Gaussian Process model for sequence fitness prediction.
 
     Uses GPyTorch for efficient GP inference with flexible featurization,

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
-from alf_tools.models.gp import FeaturizerConfig, GPModelConfig, GPModelTrainer, GPTrainConfig
+from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
@@ -31,6 +31,6 @@ __all__ = [
     "one_hot_encode",
     "FeaturizerConfig",
     "GPModelConfig",
-    "GPModelTrainer",
+    "GPModel",
     "GPTrainConfig",
 ]
