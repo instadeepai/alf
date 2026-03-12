@@ -34,7 +34,7 @@ from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 logger = logging.getLogger("alf-tools")
 
-KernelTypes: TypeAlias = Literal["rbf", "matern", "linear", "polynomial", "rbf_linear"]
+KernelTypes: TypeAlias = Literal["rbf", "matern", "linear", "polynomial", "rbf_linear", "custom"]
 
 
 @dataclass
@@ -55,6 +55,9 @@ class GPModelConfig:
         noise_constraint: Constraint on the likelihood noise. If None, uses reasonable
             defaults (e.g., GreaterThan(1e-4)).
         mean_type: Type of mean function ('constant' or 'zero').
+        build_kernel_fn: Optional custom function to build the kernel. If provided,
+            it will be used instead of the default kernel construction logic. Should take
+            the same arguments as _build_kernel and return a gpytorch.kernels.Kernel.
     """
 
     kernel_type: KernelTypes = "rbf"
@@ -64,6 +67,7 @@ class GPModelConfig:
     outputscale_prior: gpytorch.priors.Prior | None = None
     noise_constraint: gpytorch.constraints.Interval | None = None
     mean_type: Literal["constant", "zero"] = "constant"
+    build_kernel_fn: Callable[..., gpytorch.kernels.Kernel] | None = None
 
 
 @dataclass
@@ -132,6 +136,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         mean_type: str = "constant",
         lengthscale_prior: gpytorch.priors.Prior | None = None,
         outputscale_prior: gpytorch.priors.Prior | None = None,
+        build_kernel_fn: Callable[..., gpytorch.kernels.Kernel] | None = None,
     ):
         """Initialize the ExactGP model.
 
@@ -145,6 +150,9 @@ class ExactGPModel(gpytorch.models.ExactGP):
             mean_type: Type of mean function.
             lengthscale_prior: Prior for kernel lengthscale.
             outputscale_prior: Prior for kernel output scale.
+            build_kernel_fn: Optional custom function to build the kernel.
+                If provided, it will be used instead of the default kernel
+                construction logic. Should return a gpytorch.kernels.Kernel.
 
         Raises:
             ValueError: If mean_type is not one of the supported types.
@@ -160,14 +168,19 @@ class ExactGPModel(gpytorch.models.ExactGP):
             raise ValueError(f"Unknown mean_type: {mean_type}")
 
         # Initialize covariance module (kernel)
-        self.covar_module = self._build_kernel(
-            kernel_type=kernel_type,
-            input_dim=train_x.shape[-1],
-            ard=ard,
-            matern_nu=matern_nu,
-            lengthscale_prior=lengthscale_prior,
-            outputscale_prior=outputscale_prior,
-        )
+        if kernel_type == "custom":
+            if build_kernel_fn is None:
+                raise ValueError("build_kernel_fn must be provided when kernel_type='custom'")
+            self.covar_module = build_kernel_fn()
+        else:
+            self.covar_module = self._build_kernel(
+                kernel_type=kernel_type,
+                input_dim=train_x.shape[-1],
+                ard=ard,
+                matern_nu=matern_nu,
+                lengthscale_prior=lengthscale_prior,
+                outputscale_prior=outputscale_prior,
+            )
 
     def _build_kernel(
         self,
@@ -411,6 +424,7 @@ class GPModel(BaseModel):
             mean_type=self.model_config.mean_type,
             lengthscale_prior=self.model_config.lengthscale_prior,
             outputscale_prior=self.model_config.outputscale_prior,
+            build_kernel_fn=self.model_config.build_kernel_fn,
         )
 
         return gp_model.to(self.device)
@@ -666,9 +680,9 @@ class GPModel(BaseModel):
         if hasattr(self.gp_model.covar_module, "outputscale"):
             hyperparams["outputscale"] = self.gp_model.covar_module.outputscale.item()
 
-        # Extract lengthscale from base kernel
-        base_kernel = self.gp_model.covar_module.base_kernel
-        if hasattr(base_kernel, "lengthscale"):
+        # Extract lengthscale from base kernel (only present for ScaleKernel wrappers)
+        base_kernel = getattr(self.gp_model.covar_module, "base_kernel", None)
+        if base_kernel is not None and getattr(base_kernel, "lengthscale", None) is not None:
             lengthscale = base_kernel.lengthscale.detach().cpu().numpy()
             # If ARD, return array; otherwise return scalar
             if lengthscale.size == 1:
