@@ -448,6 +448,15 @@ class TestCandidateToSerializable:
         assert np.array_equal(result, coords)
         assert result.shape == (50, 3)
 
+    def test_to_serializable_structure_string(self):
+        """Test to_serializable with structure modality as JSON-encoded string passes through."""
+        json_structure = '{"lattice": [[3.84, 0, 0], [0, 3.84, 0], [0, 0, 3.84]], "sites": []}'
+        candidate = Candidate(data=json_structure, modality=Modality.STRUCTURE)
+        result = candidate.to_serializable()
+
+        assert isinstance(result, str)
+        assert result == json_structure
+
     def test_to_serializable_embedding_modality(self):
         """Test to_serializable with embedding modality returns raw embedding data."""
         embedding_data = torch.randn(16, 128)

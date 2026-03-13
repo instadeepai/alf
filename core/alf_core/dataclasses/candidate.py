@@ -166,7 +166,9 @@ class Candidate:
         - TABULAR: Validates and returns data (scalar, dict, numpy array, pandas Series,
           list, tuple, or torch tensor). Torch tensors are converted to numpy arrays.
         - IMAGE: Converts torch tensors to numpy arrays; other types to numpy arrays
-        - STRUCTURE: Converts torch tensors to numpy arrays; other types to numpy arrays
+        - STRUCTURE: Converts torch tensors/arrays to numpy arrays; strings are passed
+          through as-is to support serialised representations (e.g. JSON-encoded crystal
+          structures)
         - EMBEDDING: Converts torch tensors to numpy arrays; other types to numpy arrays
         - GRAPH: Not yet supported (raises NotImplementedError)
 
@@ -191,6 +193,12 @@ class Candidate:
             >>> result = candidate.to_serializable()
             >>> isinstance(result, np.ndarray)
             True
+
+            >>> # Structure modality with JSON-encoded crystal structure
+            >>> json_str = '{"lattice": [[3.84, 0, 0], [0, 3.84, 0], [0, 0, 3.84]]}'
+            >>> candidate = Candidate(data=json_str, modality=Modality.STRUCTURE)
+            >>> candidate.to_serializable()
+            '{"lattice": [[3.84, 0, 0], [0, 3.84, 0], [0, 0, 3.84]]}'
 
             >>> # Tabular modality
             >>> candidate = Candidate(data={"age": 32, "height": 178}, modality=Modality.TABULAR)
@@ -224,9 +232,9 @@ class Candidate:
                 f"Got: {type(self.data).__name__}"
             )
 
-        elif self.modality in (Modality.IMAGE, Modality.STRUCTURE, Modality.EMBEDDING):
-            # Convert arrays/tensors to compact format; strings are passed through
-            # to support serialised representations (e.g. JSON-encoded crystal structures)
+        elif self.modality == Modality.STRUCTURE:
+            # Strings are passed through to support serialised representations
+            # (e.g. JSON-encoded crystal structures); arrays/tensors are converted to numpy
             if isinstance(self.data, str):
                 return self.data
             elif HAS_TORCH and isinstance(self.data, torch.Tensor):
@@ -235,8 +243,19 @@ class Candidate:
                 return self.data
             else:
                 raise TypeError(
-                    f"IMAGE, STRUCTURE and EMBEDDING modality data must be a "
-                    f"string, numpy array, or torch tensor. "
+                    f"STRUCTURE modality data must be a string, numpy array, or torch tensor. "
+                    f"Got: {type(self.data).__name__}"
+                )
+
+        elif self.modality in (Modality.IMAGE, Modality.EMBEDDING):
+            # Convert arrays/tensors to compact format
+            if HAS_TORCH and isinstance(self.data, torch.Tensor):
+                return self.data.cpu().numpy()
+            elif isinstance(self.data, np.ndarray):
+                return self.data
+            else:
+                raise TypeError(
+                    f"IMAGE and EMBEDDING modality data must be a numpy array or torch tensor. "
                     f"Got: {type(self.data).__name__}"
                 )
 
