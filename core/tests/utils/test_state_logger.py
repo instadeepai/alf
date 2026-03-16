@@ -73,7 +73,8 @@ class TestTerminalStateLogger:
         state.round = 4  # simulates state.round having been incremented by state.update()
         with caplog.at_level(logging.INFO, logger="alf-core"):
             logger_inst.log(state)
-        assert "3" in caplog.text
+        assert "Round 3" in caplog.text
+        assert "Round 4" not in caplog.text
 
     def test_log_iterates_metrics_not_round_metrics_object(self, caplog: Any) -> None:
         """Each metric key must appear in the log output."""
