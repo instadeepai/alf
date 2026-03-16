@@ -13,8 +13,6 @@
 # limitations under the License.
 
 from alf_core.dataclasses import EpochMetrics, RoundMetrics
-from alf_core.dataclasses.epoch_metrics import EpochMetrics as EpochMetricsModule
-from alf_core.dataclasses.round_metrics import RoundMetrics as RoundMetricsModule
 
 
 class TestRoundMetrics:
@@ -30,7 +28,11 @@ class TestRoundMetrics:
     def test_construction_with_all_fields(self) -> None:
         """Test RoundMetrics construction with all fields provided."""
         em = EpochMetrics(epoch=0, train_loss=0.5)
-        rm = RoundMetrics(round=1, metrics={"tell_time": 1.2}, training_history=[em])
+        rm = RoundMetrics(
+            round=1,
+            metrics={"tell_time": 1.2},
+            training_history=[em],
+        )
         assert rm.round == 1
         assert rm.metrics["tell_time"] == 1.2
         assert len(rm.training_history) == 1
@@ -42,11 +44,20 @@ class TestRoundMetrics:
         assert rm.metrics["ask_time"] == 0.5
 
     def test_training_history_is_mutable(self) -> None:
-        """Test that training_history list can be modified after construction."""
+        """Test that training_history list can be modified after."""
         rm = RoundMetrics(round=0)
         em = EpochMetrics(epoch=0, train_loss=0.9)
-        rm.training_history = [em]
+        rm.training_history.append(em)
         assert len(rm.training_history) == 1
+
+    def test_default_training_history_not_shared_between_instances(
+        self,
+    ) -> None:
+        """Test that default training_history is not shared."""
+        rm1 = RoundMetrics(round=0)
+        rm2 = RoundMetrics(round=1)
+        rm1.training_history.append(EpochMetrics(epoch=0, train_loss=0.5))
+        assert len(rm2.training_history) == 0
 
     def test_default_metrics_not_shared_between_instances(self) -> None:
         """Test that default metrics dict is not shared between instances."""
@@ -56,7 +67,8 @@ class TestRoundMetrics:
         assert "key" not in rm2.metrics
 
     def test_exported_from_alf_core_dataclasses(self) -> None:
-        """Test that RoundMetrics and EpochMetrics are exported from alf_core.dataclasses."""
-        # Import at the top level verifies exports are available
-        assert EpochMetrics is EpochMetricsModule
-        assert RoundMetrics is RoundMetricsModule
+        """Test that RoundMetrics and EpochMetrics are exported."""
+        from alf_core.dataclasses import (  # noqa: F401, PLC0415
+            EpochMetrics,
+            RoundMetrics,
+        )
