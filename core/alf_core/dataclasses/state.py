@@ -16,9 +16,10 @@ from __future__ import annotations
 
 import copy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from alf_core.dataclasses import LabelledCandidates
+from alf_core.dataclasses.round_metrics import RoundMetrics
 
 if TYPE_CHECKING:
     from alf_core.dataclasses import Predictions
@@ -36,7 +37,9 @@ class State:
         round: Current round number in the active learning loop.
         acq_batch_size: Number of candidates to acquire per round.
         history: List of LabelledCandidates acquired in each round.
-        round_metrics: Dictionary of metrics computed for the current round.
+        round_metrics: RoundMetrics instance holding scalar metrics and per-epoch
+            training history for the current round.
+        round_predictions: Predictions on the test set for the current round.
     """
 
     dataset: "BaseDataset"
@@ -44,7 +47,7 @@ class State:
     round: int = 0
     acq_batch_size: int = 0
     history: list = field(default_factory=list)
-    round_metrics: dict[str, Any] = field(default_factory=dict)
+    round_metrics: RoundMetrics = field(default_factory=lambda: RoundMetrics(round=0))
     round_predictions: "Predictions" | None = None
 
     def update(self, acquired_candidates: LabelledCandidates) -> None:
