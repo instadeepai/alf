@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates
+from alf_core.dataclasses.epoch_metrics import EpochMetrics
 from alf_tools.models.cnn import (
     CNNModel,
     CNNModelConfig,
@@ -137,6 +138,57 @@ class TestCNNModel:
                 break
 
         assert params_changed, "Model parameters should be updated during training"
+
+
+class TestCNNModelEpochMetrics:
+    """Tests for CNNModel.get_epoch_metrics() and per-epoch recording."""
+
+    def test_get_epoch_metrics_returns_list_of_epoch_metrics(self, cnn_model, sample_data):
+        """get_epoch_metrics() should return a list of EpochMetrics after training."""
+        cnn_model.train(sample_data)
+        epoch_metrics = cnn_model.get_epoch_metrics()
+        assert isinstance(epoch_metrics, list)
+        assert all(isinstance(em, EpochMetrics) for em in epoch_metrics)
+
+    def test_epoch_metrics_length_matches_num_epochs(self, cnn_model, sample_data):
+        """get_epoch_metrics() length must equal num_epochs."""
+        cnn_model.train(sample_data)
+        assert len(cnn_model.get_epoch_metrics()) == cnn_model.train_config.num_epochs
+
+    def test_epoch_metrics_reset_on_retrain(self, cnn_model, sample_data):
+        """Calling train() twice must reset the epoch metrics list."""
+        cnn_model.train(sample_data)
+        cnn_model.train(sample_data)
+        assert len(cnn_model.get_epoch_metrics()) == cnn_model.train_config.num_epochs
+
+    def test_epoch_metrics_train_loss_populated(self, cnn_model, sample_data):
+        """Every EpochMetrics must have a finite train_loss."""
+        cnn_model.train(sample_data)
+        for em in cnn_model.get_epoch_metrics():
+            assert np.isfinite(em.train_loss)
+
+    def test_epoch_metrics_val_fields_populated_with_val_data(self, cnn_model, sample_data):
+        """When val_data is provided, val_loss must be set on every EpochMetrics."""
+        val_candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * 3
+        val_data = LabelledCandidates(val_candidates, np.random.randn(3))
+        cnn_model.train(sample_data, val_data=val_data)
+        for em in cnn_model.get_epoch_metrics():
+            assert em.val_loss is not None
+            assert np.isfinite(em.val_loss)
+
+    def test_epoch_metrics_val_fields_none_without_val_data(self, cnn_model, sample_data):
+        """Without val_data, val_loss must be None on every EpochMetrics."""
+        cnn_model.train(sample_data)
+        for em in cnn_model.get_epoch_metrics():
+            assert em.val_loss is None
+
+    def test_get_epoch_metrics_before_train_returns_empty(self, cnn_model):
+        """get_epoch_metrics() before any training must return an empty list."""
+        assert cnn_model.get_epoch_metrics() == []
+
+
+class TestCNNModelReproducibility:
+    """Reproducibility tests, extracted for clarity."""
 
     def test_reproducibility_with_seed(self, sample_data):
         """Test that training is reproducible when using the same seed."""

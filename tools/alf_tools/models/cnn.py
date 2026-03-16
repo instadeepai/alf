@@ -21,6 +21,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
+from alf_core.dataclasses.epoch_metrics import EpochMetrics
 from torch.utils.data import DataLoader, TensorDataset
 
 from alf_tools.models.utils import (
@@ -183,6 +184,7 @@ class CNNModel(BaseModel):
 
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
+        self._epoch_metrics: list[EpochMetrics] = []
 
     def _one_hot_encode(self, sequences: list[str]) -> torch.Tensor:
         """One-hot encode sequences.
@@ -339,7 +341,7 @@ class CNNModel(BaseModel):
 
         return avg_val_loss, val_metrics
 
-    def _log_epoch_metrics(
+    def _record_epoch_metrics(
         self,
         epoch: int,
         avg_train_loss: float,
@@ -347,7 +349,7 @@ class CNNModel(BaseModel):
         avg_val_loss: float | None = None,
         val_metrics: dict | None = None,
     ) -> None:
-        """Log epoch metrics.
+        """Record epoch metrics and log at the configured frequency.
 
         Args:
             epoch: Current epoch.
@@ -356,17 +358,28 @@ class CNNModel(BaseModel):
             avg_val_loss: Average validation loss.
             val_metrics: Dictionary of validation metrics.
         """
+        em = EpochMetrics(
+            epoch=epoch,
+            train_loss=avg_train_loss,
+            val_loss=avg_val_loss,
+            train_spearman=train_metrics.get("spearman"),
+            val_spearman=val_metrics.get("spearman") if val_metrics is not None else None,
+            train_mse=train_metrics.get("mse"),
+            val_mse=val_metrics.get("mse") if val_metrics is not None else None,
+        )
+        self._epoch_metrics.append(em)
+
         if (epoch + 1) % self.train_config.log_frequency == 0:
             msg = (
                 f"Epoch {epoch + 1}/{self.train_config.num_epochs} - "
                 f"Train Loss: {avg_train_loss:.4f}"
             )
-            if "spearman" in train_metrics:
-                msg += f", Train Spearman: {train_metrics['spearman']:.4f}"
+            if em.train_spearman is not None:
+                msg += f", Train Spearman: {em.train_spearman:.4f}"
             if avg_val_loss is not None and val_metrics is not None:
                 msg += f", Val Loss: {avg_val_loss:.4f}"
-                if "spearman" in val_metrics:
-                    msg += f", Val Spearman: {val_metrics['spearman']:.4f}"
+                if em.val_spearman is not None:
+                    msg += f", Val Spearman: {em.val_spearman:.4f}"
             logger.info(msg)
 
     def train(
@@ -380,6 +393,7 @@ class CNNModel(BaseModel):
             train_data: Training data containing sequences and oracle values.
             val_data: Optional validation data.
         """
+        self._epoch_metrics = []
         logger.info(f"Training CNN with {len(train_data)} samples")
 
         # Initialize model on first call
@@ -415,7 +429,7 @@ class CNNModel(BaseModel):
             # Validate
             if val_loader is not None:
                 avg_val_loss, val_metrics = self._validate_epoch(val_loader, criterion)
-                self._log_epoch_metrics(
+                self._record_epoch_metrics(
                     epoch,
                     avg_train_loss,
                     train_metrics,
@@ -423,7 +437,7 @@ class CNNModel(BaseModel):
                     val_metrics,
                 )
             else:
-                self._log_epoch_metrics(
+                self._record_epoch_metrics(
                     epoch,
                     avg_train_loss,
                     train_metrics,
@@ -468,6 +482,14 @@ class CNNModel(BaseModel):
     def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
         """Sample candidate points from the model."""
         raise NotImplementedError("Sampling is not implemented for this model.")
+
+    def get_epoch_metrics(self) -> list[EpochMetrics]:
+        """Return per-epoch metrics from the most recent train() call.
+
+        Returns:
+            List of EpochMetrics, one per epoch trained.
+        """
+        return self._epoch_metrics
 
     def get_training_summary_metrics(
         self,
