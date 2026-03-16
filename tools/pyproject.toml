@@ -17,6 +17,11 @@ dependencies = [
     "gpytorch>=1.9.0",
 ]
 
+[project.optional-dependencies]
+tensorboard = ["tensorboard>=2.13.0"]
+mlflow = ["mlflow>=2.0.0"]
+loggers = ["tensorboard>=2.13.0", "mlflow>=2.0.0"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["alf_tools*"]
