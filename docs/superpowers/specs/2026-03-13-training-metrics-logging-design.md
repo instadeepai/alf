@@ -118,13 +118,20 @@ class StateLogger(MetricsLogger, abc.ABC):
 
 ### Implementations
 
-**`TerminalStateLogger`** — `log()` updated to iterate `state.round_metrics.metrics.items()` instead of `state.round_metrics.items()`. `log_metrics()` inherits the no-op default.
+**`TerminalStateLogger`** — `log()` updated to:
+- Iterate `state.round_metrics.metrics.items()` instead of `state.round_metrics.items()`
+- Fall back to `str(state.round_metrics.round)` when `round_name is None` (not `str(state.round)`, which is already incremented past the current round by the time `log()` is called)
+
+`log_metrics()` inherits the no-op default.
 
 **`FileStateLogger`** — `log()` updated to:
 1. Pass `state.round_metrics.metrics` (the inner dict) to the existing private `_log_metrics()` method (for `metrics.csv`)
 2. Iterate `state.round_metrics.training_history` and call `self.log_metrics()` per epoch, injecting `{"round": state.round_metrics.round}` alongside `epoch_metrics.to_metrics_dict()`
+3. Fall back to `str(state.round_metrics.round)` when `round_name is None` (same fix as `TerminalStateLogger`)
 
 `log_metrics()` is the single write path for `training_metrics.csv`. The private `_log_metrics()` method is kept as-is for `metrics.csv` and is distinct from the public `log_metrics()` ABC method.
+
+`log_metrics()` writes to `training_metrics.csv` using **append mode**: write the header only when the file does not yet exist, then write each row directly without reading the existing file. This avoids the O(n²) read-then-rewrite pattern of `_log_metrics()` (which is acceptable for the low-volume `metrics.csv` but not for per-epoch rows across many rounds).
 
 **`TensorBoardLogger`** (new, `alf_tools`) — overrides both `log()` and `log_metrics()`:
 - `log_metrics(metrics, step, namespace)` calls `writer.add_scalar(f"{namespace}/{key}", value, step)` for each key
@@ -215,11 +222,13 @@ def run(self, state, state_loggers):
 
 ```python
 def run_initial_train_round(self, state, state_loggers):
+    # Construct RoundMetrics before fit() so state is always typed, even on failure
+    state.round_metrics = RoundMetrics(round=0)
     epoch_metrics = state.surrogate.fit(
         train_data=state.dataset.train_dataset,
         val_data=state.dataset.validation_dataset,
     )
-    state.round_metrics = RoundMetrics(round=0, training_history=epoch_metrics)
+    state.round_metrics.training_history = epoch_metrics
     state = self.evaluate(state=state)
     for state_logger in state_loggers:
         state_logger.log(state, round_name="initial_train_round")
@@ -258,6 +267,10 @@ state.round_metrics.training_history = epoch_metrics  # full replacement, not ap
 state.round_metrics.metrics["tell_time"] = t1 - t0
 state.round_metrics.metrics.update(self.get_metrics(state))
 ```
+
+`training_history` is exclusively written by `tell()`. `ask()` must never modify `training_history`.
+
+**`get_training_summary_metrics()` retention:** `BaseModel.get_training_summary_metrics()` and `Surrogate.get_training_summary_metrics()` are retained in PR 1. `Optimizer.get_metrics()` continues to call `get_training_summary_metrics()` and merge final summary scalars (e.g. `surrogate/final_train_loss`) into `round_metrics.metrics`. These summary scalars coexist with the per-epoch `training_history` — they are not redundant because they represent the final-epoch summary for the `metrics.csv` round row. Consolidation or deprecation of `get_training_summary_metrics()` is deferred to PR 2.
 
 ### `BaseTask.evaluate()` (alf_core)
 
@@ -314,6 +327,7 @@ CNNModel._record_epoch_metrics()
 - `state.round_metrics` type change from `dict` to `RoundMetrics` is a breaking change. Callers accessing `state.round_metrics["key"]` must update to `state.round_metrics.metrics["key"]`. Callers calling `.update(...)` must update to `.metrics.update(...)`.
 - `Surrogate.fit()` return type changes from `None` to `list[EpochMetrics]`. Callers that ignore the return value are unaffected.
 - `MetricsLogger.log_metrics()` has a default no-op — existing `StateLogger` subclasses outside this codebase do not need to implement it unless they want step-based logging.
+- `TerminalStateLogger.log()` and `FileStateLogger.log()` must update the `round_name is None` fallback from `str(state.round)` to `str(state.round_metrics.round)`. `state.round` is incremented before `log()` is called in `DesignTask` acquisition rounds and would produce the wrong label.
 - `TerminalStateLogger.log()` must be updated to iterate `state.round_metrics.metrics.items()`.
 - `FileStateLogger.log()` must be updated to pass `state.round_metrics.metrics` to `_log_metrics()`.
 - `Optimizer.ask()`, `Optimizer.tell()`, and `BaseTask.evaluate()` all require updates to use `.metrics` on `RoundMetrics`.
