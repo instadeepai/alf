@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-try:
-    import mlflow
-except ImportError:
-    mlflow = None  # type: ignore[assignment]
-
+import mlflow
 from alf_core.dataclasses import State
 from alf_core.utils.state_logger import StateLogger
 
@@ -60,6 +56,9 @@ class MLflowLogger(StateLogger):
         """
         for em in state.round_metrics.training_history:
             mlflow.log_metrics(
-                {f"training/{k}": v for k, v in em.to_metrics_dict().items()},
+                {
+                    f"round/{state.round_metrics.round}/training_history/{k}": v
+                    for k, v in em.to_metrics_dict().items()
+                },
                 step=em.epoch,
             )
