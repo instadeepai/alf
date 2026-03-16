@@ -58,8 +58,8 @@ class TerminalStateLogger(StateLogger):
                 or the round number for design tasks.
         """
         if round_name is None:
-            round_name = str(state.round)
-        metrics = [f"{key}: {value:.3f}" for key, value in state.round_metrics.items()]
+            round_name = str(state.round_metrics.round)
+        metrics = [f"{key}: {value:.3f}" for key, value in state.round_metrics.metrics.items()]
         message = "\n".join(metrics)
         logger.info("Round %s:\n%s", round_name, message)
 
@@ -137,9 +137,9 @@ class FileStateLogger(StateLogger):
                 or the round number for design tasks.
         """
         if round_name is None:
-            round_name = "round_" + str(state.round)
+            round_name = "round_" + str(state.round_metrics.round)
 
-        self._log_metrics(state.round_metrics)
+        self._log_metrics(state.round_metrics.metrics)
 
         if state.round_predictions is not None:
             self._log_predictions(
