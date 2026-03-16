@@ -13,7 +13,9 @@
 # limitations under the License.
 
 from alf_core.dataclasses.candidate import Candidate, Modality
+from alf_core.dataclasses.epoch_metrics import EpochMetrics
 from alf_core.dataclasses.labelled_candidates import LabelledCandidates
 from alf_core.dataclasses.predictions import Predictions
 from alf_core.dataclasses.results import Results
+from alf_core.dataclasses.round_metrics import RoundMetrics
 from alf_core.dataclasses.state import State
