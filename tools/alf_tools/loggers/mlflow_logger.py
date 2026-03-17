@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from pathlib import Path
+
 import mlflow
 from alf_core.dataclasses import State
 from alf_core.utils.state_logger import StateLogger
@@ -24,8 +26,29 @@ class MLflowLogger(StateLogger):
     - ``training/<metric>`` at ``step=epoch`` for per-epoch training curves.
     - ``round/<metric>`` at ``step=round`` for per-round evaluation metrics.
 
-    Assumes an active MLflow run exists when ``log()`` is called.
+    Starts and manages its own MLflow run on construction.
     """
+
+    def __init__(self, experiment_name: str, output_path: str | None = None) -> None:
+        """Initialize the MLflowLogger.
+
+        Args:
+            experiment_name: Name of the MLflow experiment to log to. Created
+                automatically if it does not exist.
+            output_path: Optional local directory for storing MLflow logs. A
+                ``mlflow.db`` SQLite file will be created inside this directory.
+                If None, uses the default MLflow tracking URI.
+        """
+        if output_path:
+            db_path = Path(output_path).resolve() / "mlflow.db"
+            mlflow.set_tracking_uri(f"sqlite:///{db_path}")
+        mlflow.set_experiment(experiment_name)
+        self._run = mlflow.start_run()
+
+    def __del__(self) -> None:
+        """End the active MLflow run when this logger is garbage-collected."""
+        if self._run and mlflow.active_run():
+            mlflow.end_run()
 
     def log(self, state: State, round_name: str | None = None) -> None:
         """Log training history and round metrics to MLflow.
@@ -52,7 +75,9 @@ class MLflowLogger(StateLogger):
     def _log_training_history_per_round(self, state: State) -> None:
         """Write per-epoch metrics from training_history to MLflow.
 
-        Tag: ``training/<key>``, step: ``epoch_metrics.epoch``.
+        Tag: ``round/<round>/training_history/<key>``, step: ``epoch_metrics.epoch``.
+        Each round's training history is stored under its own namespace so that
+        data from different rounds never overwrites each other.
         """
         for em in state.round_metrics.training_history:
             mlflow.log_metrics(
