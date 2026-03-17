@@ -19,6 +19,7 @@ import types
 from typing import Any
 
 import pandas as pd
+import pytest
 from alf_core.dataclasses.epoch_metrics import EpochMetrics
 from alf_core.dataclasses.round_metrics import RoundMetrics
 from alf_core.utils.state_logger import FileStateLogger, TerminalStateLogger
@@ -119,6 +120,39 @@ class TestFileStateLogger:
         state = make_state_stub(round_val=1, metrics={"tell_time": 1.0}, training_history=[em])
         fl.log(state, round_name="round_1")
         df = pd.read_csv(tmp_path / "metrics.csv")
-        # No epoch-level columns should appear in metrics.csv
         assert "epoch" not in df.columns
         assert "train_loss" not in df.columns
+
+    def test_training_history_written_to_subdirectory(self, tmp_path: Any) -> None:
+        """Non-empty training_history must create training_history/round_N.csv."""
+        fl = FileStateLogger(output_path=tmp_path)
+        em = EpochMetrics(epoch=0, train_loss=0.5, val_loss=0.3)
+        state = make_state_stub(round_val=2, metrics={"tell_time": 1.0}, training_history=[em])
+        fl.log(state, round_name="round_2")
+        csv_path = tmp_path / "training_history" / "round_2.csv"
+        assert csv_path.exists()
+        df = pd.read_csv(csv_path)
+        assert "epoch" in df.columns
+        assert "train_loss" in df.columns
+        assert df.iloc[0]["train_loss"] == pytest.approx(0.5)
+
+    def test_training_history_separate_files_per_round(self, tmp_path: Any) -> None:
+        """Each round must produce its own file under training_history/."""
+        fl = FileStateLogger(output_path=tmp_path)
+        em0 = EpochMetrics(epoch=0, train_loss=0.9)
+        em1 = EpochMetrics(epoch=0, train_loss=0.7)
+        fl.log(make_state_stub(round_val=0, metrics={"t": 1.0}, training_history=[em0]))
+        fl.log(make_state_stub(round_val=1, metrics={"t": 1.0}, training_history=[em1]))
+        assert (tmp_path / "training_history" / "round_0.csv").exists()
+        assert (tmp_path / "training_history" / "round_1.csv").exists()
+        df0 = pd.read_csv(tmp_path / "training_history" / "round_0.csv")
+        df1 = pd.read_csv(tmp_path / "training_history" / "round_1.csv")
+        assert df0.iloc[0]["train_loss"] == pytest.approx(0.9)
+        assert df1.iloc[0]["train_loss"] == pytest.approx(0.7)
+
+    def test_empty_training_history_does_not_create_subdirectory(self, tmp_path: Any) -> None:
+        """If training_history is empty, the training_history/ dir must NOT be created."""
+        fl = FileStateLogger(output_path=tmp_path)
+        state = make_state_stub(round_val=1, metrics={"tell_time": 1.0})
+        fl.log(state, round_name="round_1")
+        assert not (tmp_path / "training_history").exists()

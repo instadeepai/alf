@@ -83,6 +83,25 @@ class FileStateLogger(StateLogger):
         self.upload_function = upload_function
         logger.info("Initializing FileStateLogger at %s", self.output_path)
 
+    def _log_training_history(self, training_history: list, round_num: int) -> None:
+        """Write per-epoch metrics for a single round to training_history/round_N.csv.
+
+        Creates the ``training_history/`` subdirectory on first use. Each round
+        gets its own file so column schemas never conflict across rounds.
+
+        Args:
+            training_history: List of EpochMetrics from state.round_metrics.training_history.
+            round_num: The round number, used as the filename suffix.
+        """
+        if not training_history:
+            return
+        training_history_dir = self.output_path / "training_history"
+        training_history_dir.mkdir(exist_ok=True)
+        rows = [em.to_metrics_dict() for em in training_history]
+        pd.DataFrame.from_records(rows).to_csv(
+            training_history_dir / f"round_{round_num}.csv", index=False
+        )
+
     def _log_metrics(self, metrics: dict[str, float]) -> None:
         """Log metrics to file.
 
@@ -140,6 +159,7 @@ class FileStateLogger(StateLogger):
             round_name = "round_" + str(state.round_metrics.round)
 
         self._log_metrics(state.round_metrics.metrics)
+        self._log_training_history(state.round_metrics.training_history, state.round_metrics.round)
 
         if state.round_predictions is not None:
             self._log_predictions(
