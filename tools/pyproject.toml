@@ -18,9 +18,6 @@ dependencies = [
     "mlflow>=2.0.0"
 ]
 
-[project.optional-dependencies]
-tensorboard = ["tensorboard>=2.13.0"]
-
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["alf_tools*"]

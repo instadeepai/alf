@@ -13,6 +13,5 @@
 # limitations under the License.
 
 from alf_tools.loggers.mlflow_logger import MLflowLogger
-from alf_tools.loggers.tensorboard_logger import TensorBoardLogger
 
-__all__ = ["TensorBoardLogger", "MLflowLogger"]
+__all__ = ["MLflowLogger"]
