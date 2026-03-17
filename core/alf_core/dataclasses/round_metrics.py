@@ -26,7 +26,7 @@ class RoundMetrics:
 
     ``round`` is the canonical round number — it is not duplicated inside
     ``metrics``.  ``training_history`` carries per-epoch ``EpochMetrics``
-    objects for backends that support step-based logging (MLflow).
+    objects for backends that support step-based logging (FileBasedLogging).
     File-based logging does not write ``training_history`` to disk; only
     ``metrics`` is persisted to ``metrics.csv``.
 
