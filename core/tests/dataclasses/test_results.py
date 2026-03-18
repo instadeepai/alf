@@ -21,6 +21,7 @@ from alf_core.dataclasses.results import Results
 
 @pytest.fixture
 def predictions():
+    """Return a Predictions instance with numpy array means."""
     return Predictions(means=np.array([1.0, 2.0, 3.0]))
 
 
