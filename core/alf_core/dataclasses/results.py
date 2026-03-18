@@ -34,7 +34,13 @@ class Results:
     predictions: Predictions
 
     def __post_init__(self) -> None:
-        """Validate inputs and compute metrics."""
+        """Validate inputs and compute metrics.
+
+        Raises:
+            TypeError: If targets is not a numpy array.
+        """
+        if not isinstance(self.targets, np.ndarray):
+            raise TypeError(f"targets must be a numpy array, got {type(self.targets)}")
         assert len(self.targets) == len(self.predictions.means), (
             "Targets and predictions must have the same length"
         )
