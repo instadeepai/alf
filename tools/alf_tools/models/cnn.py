@@ -369,19 +369,6 @@ class CNNModel(BaseModel):
         )
         self._epoch_metrics.append(em)
 
-        if (epoch + 1) % self.train_config.log_frequency == 0:
-            msg = (
-                f"Epoch {epoch + 1}/{self.train_config.num_epochs} - "
-                f"Train Loss: {avg_train_loss:.4f}"
-            )
-            if em.train_spearman is not None:
-                msg += f", Train Spearman: {em.train_spearman:.4f}"
-            if avg_val_loss is not None and val_metrics is not None:
-                msg += f", Val Loss: {avg_val_loss:.4f}"
-                if em.val_spearman is not None:
-                    msg += f", Val Spearman: {em.val_spearman:.4f}"
-            logger.info(msg)
-
     def train(
         self,
         train_data: LabelledCandidates,

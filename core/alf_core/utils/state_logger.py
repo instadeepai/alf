@@ -20,7 +20,7 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
-from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions, State
+from alf_core.dataclasses import Candidate, EpochMetrics, LabelledCandidates, Predictions, State
 
 logger = logging.getLogger("alf-core")
 
@@ -44,6 +44,18 @@ class StateLogger(abc.ABC):
 class TerminalStateLogger(StateLogger):
     """Logger that outputs metrics to the terminal."""
 
+    def _log_training_history(self, training_history: list[EpochMetrics]) -> None:
+        """Log per-epoch metrics for a single round to the terminal. training_history is
+        logged at DEBUG level to avoid cluttering the terminal output, which is typically
+        reserved for round-level metrics.
+
+        Args:
+            training_history: List of EpochMetrics from state.round_metrics.training_history.
+        """
+        for em in training_history:
+            metrics = [f"{k}: {v:.3f}" for k, v in em.to_metrics_dict().items()]
+            logger.debug("  Epoch %d: %s", em.epoch, ", ".join(metrics))
+
     def log(
         self,
         state: State,
@@ -62,6 +74,8 @@ class TerminalStateLogger(StateLogger):
         metrics = [f"{key}: {value:.3f}" for key, value in state.round_metrics.metrics.items()]
         message = "\n".join(metrics)
         logger.info("Round %s:\n%s", round_name, message)
+        logger.debug(f"Training history for round {round_name}:")
+        self._log_training_history(state.round_metrics.training_history)
 
 
 class FileStateLogger(StateLogger):
@@ -83,7 +97,7 @@ class FileStateLogger(StateLogger):
         self.upload_function = upload_function
         logger.info("Initializing FileStateLogger at %s", self.output_path)
 
-    def _log_training_history(self, training_history: list, round_num: int) -> None:
+    def _log_training_history(self, training_history: list[EpochMetrics], round_num: int) -> None:
         """Write per-epoch metrics for a single round to training_history/round_N.csv.
 
         Creates the ``training_history/`` subdirectory on first use. Each round
