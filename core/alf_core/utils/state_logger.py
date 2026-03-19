@@ -73,7 +73,7 @@ class TerminalStateLogger(StateLogger):
             round_name = str(state.round_metrics.round)
         metrics = [f"{key}: {value:.3f}" for key, value in state.round_metrics.metrics.items()]
         message = "\n".join(metrics)
-        logger.info("Round %s:\n%s", round_name, message)
+        logger.info(f"Round {round_name}:\n{message}")
         logger.debug(f"Training history for round {round_name}:")
         self._log_training_history(state.round_metrics.training_history)
 

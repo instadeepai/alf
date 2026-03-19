@@ -101,6 +101,6 @@ class DesignTask(BaseTask):
             state = optimizer.tell(state=state)  # populates round_metrics.training_history
             state = self.evaluate(state=state)
             for state_logger in state_loggers:
-                state_logger.log(state)  # state.round_metrics.round == round_i
+                state_logger.log(state)
 
         return
