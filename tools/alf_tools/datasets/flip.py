@@ -159,6 +159,27 @@ class FLIP(BaseDataset):
             requests.HTTPError: If the download from GitHub fails.
         """
         df = self._load_split_dataframe()
+def load_dataset(self) -> LabelledCandidates:
+    df = self._load_split_dataframe()
+
+    candidates = []
+    labels = []
+    for _, row in df.iterrows():
+        candidates.append(Candidate(
+            data=row["sequence"],
+            modality=self.modality,
+            features={
+                "set": row["set"],
+                "validation": bool(row["validation"]),
+            },
+        ))
+        labels.append(row["target"])
+
+    return LabelledCandidates(
+        candidates=candidates,
+        labels=np.array(labels),
+    )
+
 
         labelled_candidates = LabelledCandidates(candidates=[], labels=np.array([]))
         for _, row in df.iterrows():
