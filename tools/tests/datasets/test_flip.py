@@ -137,11 +137,10 @@ class TestFLIPConfig:
     """Tests for FLIPConfig validation."""
 
     def test_invalid_split_raises(self):
-        """Invalid split name should raise ValueError on construction."""
-        config = _make_flip_config(flip_split="nonexistent_split")
-        with pytest.raises(ValueError, match="not a valid active split"):
-            with patch.object(FLIP, "_load_split_dataframe", return_value=_make_mock_df()):
-                FLIP(config)
+        """Invalid split name for the chosen dataset should raise at config construction."""
+        # "des_mut" is a valid aav split but not valid for gb1 — caught by validate_config
+        with pytest.raises(Exception, match="not a valid active split"):
+            _make_flip_config(flip_split="des_mut")
 
     def test_valid_splits_accepted(self):
         """All documented active splits should be accepted without error."""
@@ -379,6 +378,7 @@ class TestFLIPDownload:
         mock_response = MagicMock()
         mock_response.raise_for_status = MagicMock()
         mock_response.content = zip_bytes
+        mock_response.iter_content.return_value = [zip_bytes]
 
         data_path = tmp_path / "data" / "FLIP" / "gb1"
         data_path.mkdir(parents=True)

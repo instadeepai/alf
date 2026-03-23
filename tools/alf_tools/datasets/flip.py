@@ -53,6 +53,8 @@ _SPLIT_FILE_MAP: dict[tuple[str, str], str] = {
     ("meltome", "mixed"): "mixed_split",
 }
 
+_EXPECTED_COLUMNS = {"sequence", "target", "set", "validation"}
+
 
 class FLIPConfig(BaseDatasetConfig):
     """Configuration for FLIP benchmark datasets.
@@ -86,18 +88,26 @@ class FLIPConfig(BaseDatasetConfig):
 
     flip_dataset: FLIP_DATASETS
     flip_split: str
-    split_type: Literal["random", "low_vs_high"] = "random"
 
     @model_validator(mode="after")
     def validate_config(self) -> Self:
         """Override base class validator.
 
         train_ratio and test_ratio apply to separate FLIP pools (FLIP train and FLIP test),
-        so their sum is allowed to exceed 1.
+        so their sum is allowed to exceed 1. Also validates that flip_split is a valid
+        active split for the chosen flip_dataset.
 
         Returns:
             The validated configuration instance.
+
+        Raises:
+            ValueError: If ``flip_split`` is not a valid active split for ``flip_dataset``.
         """
+        if self.flip_split not in FLIP_SPLITS.get(self.flip_dataset, []):
+            raise ValueError(
+                f"'{self.flip_split}' is not a valid active split for dataset "
+                f"'{self.flip_dataset}'. Valid splits: {FLIP_SPLITS[self.flip_dataset]}"
+            )
         return self
 
 
@@ -122,16 +132,7 @@ class FLIP(BaseDataset):
     config: FLIPConfig  # narrows the inherited BaseDatasetConfig type
 
     def __init__(self, config: FLIPConfig):
-        """Initialise FLIP dataset, validating the split name before loading data.
-
-        Raises:
-            ValueError: If ``config.flip_split`` is not a valid active split for the dataset.
-        """
-        if config.flip_split not in FLIP_SPLITS.get(config.flip_dataset, []):
-            raise ValueError(
-                f"'{config.flip_split}' is not a valid active split for dataset "
-                f"'{config.flip_dataset}'. Valid splits: {FLIP_SPLITS[config.flip_dataset]}"
-            )
+        """Initialise FLIP dataset."""
         super().__init__(config)
         self.setup()
 
@@ -159,41 +160,26 @@ class FLIP(BaseDataset):
             requests.HTTPError: If the download from GitHub fails.
         """
         df = self._load_split_dataframe()
-def load_dataset(self) -> LabelledCandidates:
-    df = self._load_split_dataframe()
 
-    candidates = []
-    labels = []
-    for _, row in df.iterrows():
-        candidates.append(Candidate(
-            data=row["sequence"],
-            modality=self.modality,
-            features={
-                "set": row["set"],
-                "validation": bool(row["validation"]),
-            },
-        ))
-        labels.append(row["target"])
-
-    return LabelledCandidates(
-        candidates=candidates,
-        labels=np.array(labels),
-    )
-
-
-        labelled_candidates = LabelledCandidates(candidates=[], labels=np.array([]))
+        candidates = []
+        labels = []
         for _, row in df.iterrows():
-            candidate = Candidate(
-                data=row["sequence"],
-                modality=self.modality,
-                features={
-                    "set": row["set"],
-                    "validation": bool(row["validation"]),
-                },
+            candidates.append(
+                Candidate(
+                    data=row["sequence"],
+                    modality=self.modality,
+                    features={
+                        "set": row["set"],
+                        "validation": bool(row["validation"]),
+                    },
+                )
             )
-            labelled_candidates.append([candidate], np.array([row["target"]]))
+            labels.append(row["target"])
 
-        return labelled_candidates
+        return LabelledCandidates(
+            candidates=candidates,
+            labels=np.array(labels),
+        )
 
     def _split_dataset(self) -> dict[str, LabelledCandidates]:
         """Split the raw dataset into train, validation, candidate_pool, and test.
@@ -268,6 +254,7 @@ def load_dataset(self) -> LabelledCandidates:
 
         Raises:
             FileNotFoundError: If split CSV not found inside the zip archive.
+            ValueError: If the loaded CSV is missing expected columns.
             requests.HTTPError: If the GitHub download fails.
         """
         zip_path = DATAPATH / "FLIP" / self.config.flip_dataset / "splits.zip"
@@ -276,10 +263,11 @@ def load_dataset(self) -> LabelledCandidates:
             zip_path.parent.mkdir(parents=True, exist_ok=True)
             url = f"{FLIP_GITHUB_BASE}/{self.config.flip_dataset}/splits.zip"
             logger.info(f"Downloading FLIP splits for '{self.config.flip_dataset}' from {url}")
-            response = requests.get(url)
+            response = requests.get(url, stream=True, timeout=300)
             response.raise_for_status()
             with open(zip_path, "wb") as f:
-                f.write(response.content)
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
             logger.info("Download complete.")
 
         file_stem = _SPLIT_FILE_MAP.get(
@@ -297,5 +285,12 @@ def load_dataset(self) -> LabelledCandidates:
                 )
             with zf.open(match) as csv_file:
                 df = pd.read_csv(io.BytesIO(csv_file.read()))
+
+        missing = _EXPECTED_COLUMNS - set(df.columns)
+        if missing:
+            raise ValueError(
+                f"FLIP CSV '{csv_name}' is missing expected columns: {missing}. "
+                f"Found: {set(df.columns)}"
+            )
 
         return df
