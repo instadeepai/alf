@@ -26,7 +26,7 @@ def predictions():
 
 
 class TestResultsNumpyTypeValidation:
-    """Test that Results rejects non-numpy arrays for targets."""
+    """Test that Results rejects non-numpy arrays for targets and non-Predictions for predictions."""
 
     def test_torch_targets_raises_type_error(self, predictions):
         """Test that torch tensor targets raises TypeError."""
@@ -39,6 +39,12 @@ class TestResultsNumpyTypeValidation:
         targets = np.array([1.0, 2.0, 3.0])
         results = Results(targets=targets, predictions=predictions)
         assert isinstance(results.targets, np.ndarray)
+
+    def test_non_predictions_raises_type_error(self):
+        """Test that a non-Predictions object for predictions raises TypeError."""
+        targets = np.array([1.0, 2.0, 3.0])
+        with pytest.raises(TypeError, match="predictions must be a Predictions instance"):
+            Results(targets=targets, predictions="not_a_predictions_object")
 
 
 class TestResultsValidation:
