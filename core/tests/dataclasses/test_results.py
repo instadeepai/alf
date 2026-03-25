@@ -26,7 +26,7 @@ def predictions():
 
 
 class TestResultsNumpyTypeValidation:
-    """Test that Results rejects non-numpy arrays for targets and non-Predictions for predictions."""
+    """Test that Results rejects non-numpy arrays for targets & non-Predictions for predictions."""
 
     def test_torch_targets_raises_type_error(self, predictions):
         """Test that torch tensor targets raises TypeError."""
