@@ -42,7 +42,9 @@ class Results:
         if not isinstance(self.targets, np.ndarray):
             raise TypeError(f"targets must be a numpy array, got {type(self.targets)}")
         if not isinstance(self.predictions, Predictions):
-            raise TypeError(f"predictions must be a Predictions instance, got {type(self.predictions)}")
+            raise TypeError(
+                f"predictions must be a Predictions instance, got {type(self.predictions)}"
+            )
         assert len(self.targets) == len(self.predictions.means), (
             "Targets and predictions must have the same length"
         )
