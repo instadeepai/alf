@@ -18,8 +18,10 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 from alf_core.dataclasses.candidate import Candidate
+from beartype import beartype
 
 
+@beartype
 @dataclass
 class Predictions:
     """A data class for storing and managing predictions from a model.
@@ -38,27 +40,18 @@ class Predictions:
     empirical_dist: np.ndarray | None = None
 
     def __post_init__(self) -> None:
-        """Validate that predictions arrays are numpy arrays with consistent lengths.
+        """Validate prediction arrays have consistent lengths.
 
         Raises:
-            TypeError: If means, variances, or empirical_dist are not numpy arrays.
             AssertionError: If means is empty, or if variances or empirical_dist
                 don't match the length of means.
         """
-        if not isinstance(self.means, np.ndarray):
-            raise TypeError(f"means must be a numpy array, got {type(self.means)}")
         assert len(self.means) > 0, "Means must have at least one prediction"
         if self.variances is not None:
-            if not isinstance(self.variances, np.ndarray):
-                raise TypeError(f"variances must be a numpy array, got {type(self.variances)}")
             assert len(self.variances) == len(self.means), (
                 "Variances must have the same length as means"
             )
         if self.empirical_dist is not None:
-            if not isinstance(self.empirical_dist, np.ndarray):
-                raise TypeError(
-                    f"empirical_dist must be a numpy array, got {type(self.empirical_dist)}"
-                )
             assert len(self.empirical_dist) == len(self.means), (
                 "Empirical dist must have the same length as means"
             )

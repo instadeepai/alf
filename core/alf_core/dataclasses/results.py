@@ -19,8 +19,10 @@ from typing import Union
 import numpy as np
 from alf_core.dataclasses.predictions import Predictions
 from alf_core.utils.metrics import metric_registry
+from beartype import beartype
 
 
+@beartype
 @dataclass
 class Results:
     """Computes metrics based on the predictions and targets.
@@ -37,14 +39,8 @@ class Results:
         """Validate inputs and compute metrics.
 
         Raises:
-            TypeError: If targets is not a numpy array or predictions is not a Predictions instance.
+            AssertionError: If targets and predictions have different lengths.
         """
-        if not isinstance(self.targets, np.ndarray):
-            raise TypeError(f"targets must be a numpy array, got {type(self.targets)}")
-        if not isinstance(self.predictions, Predictions):
-            raise TypeError(
-                f"predictions must be a Predictions instance, got {type(self.predictions)}"
-            )
         assert len(self.targets) == len(self.predictions.means), (
             "Targets and predictions must have the same length"
         )

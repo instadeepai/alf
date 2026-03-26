@@ -17,6 +17,7 @@ import pytest
 import torch
 from alf_core.dataclasses.predictions import Predictions
 from alf_core.dataclasses.results import Results
+from beartype.roar import BeartypeCallHintParamViolation
 
 
 @pytest.fixture
@@ -29,9 +30,9 @@ class TestResultsNumpyTypeValidation:
     """Test that Results rejects non-numpy arrays for targets & non-Predictions for predictions."""
 
     def test_torch_targets_raises_type_error(self, predictions):
-        """Test that torch tensor targets raises TypeError."""
+        """Test that torch tensor targets raises BeartypeCallHintParamViolation."""
         targets = torch.tensor([1.0, 2.0, 3.0])
-        with pytest.raises(TypeError, match="targets must be a numpy array"):
+        with pytest.raises(BeartypeCallHintParamViolation):
             Results(targets=targets, predictions=predictions)
 
     def test_numpy_targets_accepted(self, predictions):
@@ -41,9 +42,9 @@ class TestResultsNumpyTypeValidation:
         assert isinstance(results.targets, np.ndarray)
 
     def test_non_predictions_raises_type_error(self):
-        """Test that a non-Predictions object for predictions raises TypeError."""
+        """Test non-Predictions object for predictions raises BeartypeCallHintParamViolation."""
         targets = np.array([1.0, 2.0, 3.0])
-        with pytest.raises(TypeError, match="predictions must be a Predictions instance"):
+        with pytest.raises(BeartypeCallHintParamViolation):
             Results(targets=targets, predictions="not_a_predictions_object")
 
 

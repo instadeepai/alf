@@ -19,8 +19,10 @@ from typing import Any, Union
 import numpy as np
 import pandas as pd
 from alf_core.dataclasses.candidate import Candidate
+from beartype import beartype
 
 
+@beartype
 @dataclass(eq=False, unsafe_hash=False)
 class LabelledCandidates:
     """A collection of candidates paired with their labels.
@@ -63,7 +65,7 @@ class LabelledCandidates:
             The candidates and labels at the specified index or slice.
         """
         if isinstance(index, int):
-            return ([self.candidates[index]], [self.labels[index]])
+            return ([self.candidates[index]], self.labels[index : index + 1])
         elif isinstance(index, np.ndarray):
             return ([self.candidates[i] for i in index], self.labels[index])
         else:
