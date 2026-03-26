@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to ALF (Active Learning Framework)!
 
-ALF's mission is to accelerate scientific discovery in domains where exploration is constrained by expensive data acquisition—wet-lab experiments, computational simulations, or physical measurements—and search spaces are high-dimensional or combinatorially vast. By contributing to ALF, you're helping researchers across computational biology, materials science, and chemistry optimize their experimental campaigns more efficiently.
+ALF's mission is to maximise information gained from multiple rounds of experimentation, applying active learning and Bayesian experimental design to accelerate scientific discovery. ALF targets domains where exploration is constrained by expensive data acquisition—wet-lab experiments, computational simulations, or physical measurements—and search spaces are high-dimensional or combinatorially vast. By contributing to ALF, you're helping researchers across computational biology, materials science, and chemistry optimize their experimental campaigns more efficiently.
 
 This guide will help you get started with extending the framework and contributing code.
 
@@ -14,6 +14,7 @@ Before you begin, ensure you have:
 
 - **Python 3.10+** installed on your system
 - **Git** for version control
+- **SSH key** configured for GitHub ([guide](https://docs.github.com/en/authentication/connecting-to-github-with-ssh))
 - **uv** package manager ([installation guide](https://github.com/astral-sh/uv))
 
 ### Development Environment Setup
@@ -73,7 +74,7 @@ ALF is organized into two packages to balance flexibility and usability:
 
 📖 **For detailed architecture and dependency information, see [INSTALLATION.md](INSTALLATION.md#architecture)**.
 
-#### Contributing Guidelines
+## Contributing Guidelines
 
 **When adding new implementations:**
 - ✅ Add to `alf-tools` for general-purpose implementations (new models, datasets, acquisition functions)
@@ -88,7 +89,7 @@ ALF is organized into two packages to balance flexibility and usability:
 
 ## Extending ALF Components
 
-ALF is designed to be extensible. You can create custom implementations of core components by extending base classes. Below is a quick reference of extension points:
+ALF is designed to be extendable. You can create custom implementations of core components by extending base classes. Below is a quick reference of extension points:
 
 | Component | Base Class | Key Methods | Tutorial |
 |-----------|------------|-------------|----------|
@@ -119,23 +120,23 @@ tools/alf_tools/
 Models in ALF can serve three distinct roles depending on how they're used in the active learning loop:
 
 ### Oracle
-- **Purpose:** Evaluate candidates online (during the learning loop)
+- **Purpose:** Evaluate candidates by providing ground truth scores
 - **When to use:** When you require ground truth feedback during the optimization loop
 - **Required methods:** `predict()`
-- **Example use case:** Using a trained model to score generated candidates
+- **Example use case:** Using a trained model, such as ESM-2, to score newly generated candidates
 
 ### Surrogate
-- **Purpose:** Approximate expensive evaluation functions
-- **When to use:** When direct evaluation is too costly and you need a fast approximation
+- **Purpose:** A cheap-to-evaluate probabilistic approximation of the true objective function, used to predict values (and uncertainty) where the function hasn't been evaluated
+- **When to use:** When evaluating the true objective function is expensive, slow, or limited, so you require a cheaper model to guide where to sample next
 - **Required methods:** `train()`, `predict()`
 - **Optional methods:** `get_training_summary_metrics()`
-- **Example use case:** Training a neural network to approximate expensive simulations
+- **Example use case:** Training a Gaussian Process (GP) to approximate expensive wet-lab or computational experiments
 
 ### Generator
-- **Purpose:** Generate new candidate points to explore
-- **When to use:** When you want to generate new candidates to evaluate (e.g., for surrogate-based optimization in continuous spaces)
+- **Purpose:** Propose new candidates to evaluate and explore a large combinatorial search space
+- **When to use:** When you want to generate new candidates to evaluate under your surrogate model
 - **Required methods:** `sample()`
-- **Example use case:** Using a generative model to propose new molecular structures
+- **Example use case:** Using a variational autoencoder to propose new protein sequences
 
 For detailed examples of implementing models for each role, see the [Model Roles Tutorial](../tutorials/extending_base_classes/model_roles.ipynb).
 
@@ -184,6 +185,8 @@ uv run pre-commit run --all-files
 
 ### Pull Request Process
 
+Before starting work on a new feature or bug fix, **tag a repo maintainer in the relevant issue** to discuss the approach and confirm it aligns with the project direction. This avoids duplicate effort and ensures your PR will be accepted.
+
 1. **Create a feature branch:**
    ```bash
    git checkout -b feat/your-feature-name
@@ -228,6 +231,10 @@ uv run pre-commit run --all-files
    - Respond to reviewer comments
    - Make requested changes
    - Push updates to the same branch
+
+### AI-Assisted PR Reviews
+
+ALF uses [Claude Code](https://claude.ai/code) for AI-assisted pull request reviews. When you open a PR, Claude will automatically review your changes and leave inline comments. You are encouraged to respond to and address these comments as you would with any human reviewer.
 
 ### PR Review Checklist
 
@@ -287,6 +294,18 @@ Check the error message for specific type issues and add appropriate annotations
 uv sync
 ```
 
+#### Issue: Switching to GPU PyTorch
+**Solution:** There are two options — see [GPU Support in INSTALLATION.md](INSTALLATION.md#gpu-support-optional) for full prerequisites and verification steps.
+
+**Option A — Temporary override (no file changes):**
+```bash
+uv sync
+uv pip install torch --index-url https://download.pytorch.org/whl/cu128 --reinstall
+```
+To revert to CPU, run `uv sync` again.
+
+**Option B — Persistent change:** Edit the torch source index in `tools/pyproject.toml` from `pytorch-cpu` to `pytorch-gpu`, then run `uv sync`. Revert before committing.
+
 #### Issue: Tests fail with "ModuleNotFoundError"
 **Solution:** Ensure you're in the correct directory and have installed the package:
 ```bash
@@ -311,6 +330,7 @@ If you encounter issues not covered here:
 
 - **Architecture Overview:** See [core/README.md](../core/README.md) for detailed framework design
 - **API Documentation:** [https://instadeepai.github.io/alf/](https://instadeepai.github.io/alf/)
+- **Understanding ALF Packages:** See [Package Architecture](../README.md#-package-architecture)
 - **Tutorial Notebooks:**
   - [Offline Design Tutorial](../tutorials/experiments/offline_design_tutorial.ipynb)
   - [Online Design Tutorial](../tutorials/experiments/online_design_tutorial.ipynb)
