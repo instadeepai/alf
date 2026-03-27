@@ -279,6 +279,8 @@ class FLIP(BaseDataset):
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
             logger.info("Download complete.")
+        else:
+            logger.debug("Using cached splits.zip at %s", zip_path)
 
         file_stem = _SPLIT_FILE_MAP.get(
             (self.config.flip_dataset, self.config.flip_split),
