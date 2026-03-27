@@ -59,17 +59,17 @@ _EXPECTED_COLUMNS = {"sequence", "target", "set", "validation"}
 class FLIPConfig(BaseDatasetConfig):
     """Configuration for FLIP benchmark datasets.
 
-    ``train_ratio`` controls what fraction of the FLIP train sequences form the
-    initial labelled training set. ``validation_frac`` is applied to that portion
-    to carve out a validation set (same as ``BaseDataset``). The remaining FLIP
-    train sequences become the candidate pool (capped at ``max_candidate_pool``).
-    ``test_ratio`` controls what fraction of the FLIP test sequences form the
-    evaluation set. ``split_type`` defaults to ``"random"`` and need not be set.
+    `train_ratio` controls what fraction of the FLIP train sequences form the
+    initial labelled training set. `validation_frac` is applied to that portion
+    to carve out a validation set (same as `BaseDataset`). The remaining FLIP
+    train sequences become the candidate pool (capped at `max_candidate_pool`).
+    `test_ratio` controls what fraction of the FLIP test sequences form the
+    evaluation set. `split_type` defaults to `"random"` and need not be set.
 
     Attributes:
-        flip_dataset: Name of the FLIP dataset (e.g. ``"gb1"``, ``"aav"``).
-        flip_split: Name of the split within the dataset (e.g. ``"one_vs_rest"``).
-            Must be an active (green-status) split. See ``FLIP_SPLITS`` for valid options.
+        flip_dataset: Name of the FLIP dataset (e.g. `"gb1"`, `"aav"`).
+        flip_split: Name of the split within the dataset (e.g. `"one_vs_rest"`).
+            Must be an active (green-status) split. See `FLIP_SPLITS` for valid options.
 
     Example::
 
@@ -101,7 +101,7 @@ class FLIPConfig(BaseDatasetConfig):
             The validated configuration instance.
 
         Raises:
-            ValueError: If ``flip_split`` is not a valid active split for ``flip_dataset``.
+            ValueError: If `flip_split` is not a valid active split for `flip_dataset`.
         """
         if self.flip_split not in FLIP_SPLITS.get(self.flip_dataset, []):
             raise ValueError(
