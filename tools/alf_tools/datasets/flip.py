@@ -206,6 +206,10 @@ class FLIP(BaseDataset):
             else:
                 flip_test.append([candidate], np.array([label]))
 
+        logger.debug(
+            "FLIP pools — train: %d, test: %d", len(flip_train), len(flip_test)
+        )
+
         # Shuffle FLIP train for reproducible random splitting
         flip_train = flip_train.shuffle(self.config.seed)
 
@@ -235,6 +239,11 @@ class FLIP(BaseDataset):
         test = LabelledCandidates(
             candidates=flip_test.candidates[:test_size],
             labels=flip_test.labels[:test_size],
+        )
+
+        logger.debug(
+            "Split sizes — train: %d, validation: %d, candidate_pool: %d, test: %d",
+            len(train), len(validation), len(candidate_pool), len(test),
         )
 
         self.init_candidate_pool = copy.deepcopy(candidate_pool)
