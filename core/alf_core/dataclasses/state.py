@@ -12,18 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import annotations
-
 import copy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from alf_core.dataclasses import LabelledCandidates
-
-if TYPE_CHECKING:
-    from alf_core.dataclasses import Predictions
-    from alf_core.dataset.base_dataset import BaseDataset
-    from alf_core.surrogate.surrogate import Surrogate
+from alf_core.dataclasses.predictions import Predictions
+from alf_core.dataset.base_dataset import BaseDataset
+from alf_core.surrogate.surrogate import Surrogate
 
 
 @dataclass
@@ -39,13 +35,13 @@ class State:
         round_metrics: Dictionary of metrics computed for the current round.
     """
 
-    dataset: "BaseDataset"
-    surrogate: "Surrogate"
+    dataset: BaseDataset
+    surrogate: Surrogate
     round: int = 0
     acq_batch_size: int = 0
     history: list = field(default_factory=list)
     round_metrics: dict[str, Any] = field(default_factory=dict)
-    round_predictions: "Predictions" | None = None
+    round_predictions: Predictions | None = None
 
     def update(self, acquired_candidates: LabelledCandidates) -> None:
         """Update the state with newly acquired candidates.
