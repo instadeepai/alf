@@ -19,10 +19,8 @@ from typing import Union
 import numpy as np
 from alf_core.dataclasses.predictions import Predictions
 from alf_core.utils.metrics import metric_registry
-from beartype import beartype
 
 
-@beartype
 @dataclass
 class Results:
     """Computes metrics based on the predictions and targets.

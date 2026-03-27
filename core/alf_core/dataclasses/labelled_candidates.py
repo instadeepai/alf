@@ -19,10 +19,8 @@ from typing import Any, Union
 import numpy as np
 import pandas as pd
 from alf_core.dataclasses.candidate import Candidate
-from beartype import beartype
 
 
-@beartype
 @dataclass(eq=False, unsafe_hash=False)
 class LabelledCandidates:
     """A collection of candidates paired with their labels.

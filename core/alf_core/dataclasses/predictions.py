@@ -18,10 +18,8 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 from alf_core.dataclasses.candidate import Candidate
-from beartype import beartype
 
 
-@beartype
 @dataclass
 class Predictions:
     """A data class for storing and managing predictions from a model.
