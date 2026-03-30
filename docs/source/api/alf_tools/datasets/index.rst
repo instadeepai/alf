@@ -10,3 +10,4 @@ experimental data for protein engineering tasks.
 
    GFP Dataset <gfp/index>
    ProteinGym Dataset <proteingym/index>
+   FLIP Dataset <flip/index>
