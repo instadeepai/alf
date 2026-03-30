@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# ruff: noqa: E402
+import beartype.claw
+
+beartype.claw.beartype_this_package()
+
 from alf_core.dataclasses.candidate import Candidate, Modality
 from alf_core.dataclasses.labelled_candidates import LabelledCandidates
 from alf_core.dataclasses.predictions import Predictions
