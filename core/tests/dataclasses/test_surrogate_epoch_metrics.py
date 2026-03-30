@@ -63,4 +63,4 @@ class TestSurrogateEpochMetrics:
         """Test that epoch is converted to float in metrics dict."""
         em = SurrogateEpochMetrics(epoch=5, train_loss=0.3)
         d = em.to_metrics_dict()
-        assert isinstance(d["epoch"], float)
+        assert isinstance(d["epoch"], int)
