@@ -358,14 +358,21 @@ class CNNModel(BaseModel):
             avg_val_loss: Average validation loss.
             val_metrics: Dictionary of validation metrics.
         """
+        additional: dict[str, float] = {}
+        if (v := train_metrics.get("spearman")) is not None:
+            additional["train_spearman"] = v
+        if (v := train_metrics.get("mse")) is not None:
+            additional["train_mse"] = v
+        if val_metrics is not None:
+            if (v := val_metrics.get("spearman")) is not None:
+                additional["val_spearman"] = v
+            if (v := val_metrics.get("mse")) is not None:
+                additional["val_mse"] = v
         em = SurrogateEpochMetrics(
             epoch=epoch,
             train_loss=avg_train_loss,
             val_loss=avg_val_loss,
-            train_spearman=train_metrics.get("spearman"),
-            val_spearman=val_metrics.get("spearman") if val_metrics is not None else None,
-            train_mse=train_metrics.get("mse"),
-            val_mse=val_metrics.get("mse") if val_metrics is not None else None,
+            additional_metrics=additional,
         )
         self._epoch_metrics.append(em)
 
