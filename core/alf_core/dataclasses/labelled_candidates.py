@@ -63,7 +63,7 @@ class LabelledCandidates:
             The candidates and labels at the specified index or slice.
         """
         if isinstance(index, int):
-            return ([self.candidates[index]], self.labels[index : index + 1])
+            return ([self.candidates[index]], np.array([self.labels[index]]))
         elif isinstance(index, np.ndarray):
             return ([self.candidates[i] for i in index], self.labels[index])
         else:
