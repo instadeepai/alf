@@ -87,6 +87,24 @@ class Candidate:
         """
         return f"Candidate(data={self.data}, modality={self.modality}, features={self.features})"
 
+    def _convert_data_to_npy(self, accepted_description: str) -> np.ndarray:
+        """Convert data to a numpy array if it is a torch tensor or numpy array.
+
+        Args:
+            accepted_description: Description of accepted types, used in the TypeError message.
+
+        Returns:
+            numpy array representation of the data.
+
+        Raises:
+            TypeError: If data is neither a numpy array nor a torch tensor.
+        """
+        if HAS_TORCH and isinstance(self.data, torch.Tensor):
+            return self.data.cpu().numpy()
+        if isinstance(self.data, np.ndarray):
+            return self.data
+        raise TypeError(f"{accepted_description} Got: {type(self.data).__name__}")
+
     def _safe_equal(self, a: Any, b: Any) -> bool:
         """Compare two values, handling numpy arrays and nested structures.
 
@@ -237,27 +255,15 @@ class Candidate:
             # (e.g. JSON-encoded crystal structures); arrays/tensors are converted to numpy
             if isinstance(self.data, str):
                 return self.data
-            elif HAS_TORCH and isinstance(self.data, torch.Tensor):
-                return self.data.cpu().numpy()
-            elif isinstance(self.data, np.ndarray):
-                return self.data
-            else:
-                raise TypeError(
-                    f"STRUCTURE modality data must be a string, numpy array, or torch tensor. "
-                    f"Got: {type(self.data).__name__}"
-                )
+            return self._convert_data_to_npy(
+                "STRUCTURE modality data must be a string, numpy array, or torch tensor."
+            )
 
         elif self.modality in (Modality.IMAGE, Modality.EMBEDDING):
             # Convert arrays/tensors to compact format
-            if HAS_TORCH and isinstance(self.data, torch.Tensor):
-                return self.data.cpu().numpy()
-            elif isinstance(self.data, np.ndarray):
-                return self.data
-            else:
-                raise TypeError(
-                    f"IMAGE and EMBEDDING modality data must be a numpy array or torch tensor. "
-                    f"Got: {type(self.data).__name__}"
-                )
+            return self._convert_data_to_npy(
+                "IMAGE and EMBEDDING modality data must be a numpy array or torch tensor."
+            )
 
         elif self.modality == Modality.GRAPH:
             raise NotImplementedError("Graph datatype not supported yet")
