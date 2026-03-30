@@ -17,7 +17,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from alf_core.dataclasses.epoch_metrics import EpochMetrics
+from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 
 
 @dataclass
@@ -25,7 +25,7 @@ class RoundMetrics:
     """All metrics for a single acquisition round.
 
     ``round`` is the canonical round number — it is not duplicated inside
-    ``metrics``.  ``training_history`` carries per-epoch ``EpochMetrics``
+    ``metrics``.  ``training_history`` carries per-epoch ``SurrogateEpochMetrics``
     objects for backends that support step-based logging
 
     Attributes:
@@ -39,4 +39,4 @@ class RoundMetrics:
 
     round: int
     metrics: dict[str, Any] = field(default_factory=dict)
-    training_history: list[EpochMetrics] = field(default_factory=list)
+    training_history: list[SurrogateEpochMetrics] = field(default_factory=list)

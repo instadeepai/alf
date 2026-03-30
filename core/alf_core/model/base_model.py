@@ -22,7 +22,7 @@ import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
 
 if TYPE_CHECKING:
-    from alf_core.dataclasses.epoch_metrics import EpochMetrics
+    from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 
 
 class BaseModel(abc.ABC):
@@ -82,11 +82,11 @@ class BaseModel(abc.ABC):
         """
         pass
 
-    def get_epoch_metrics(self) -> list[EpochMetrics]:
+    def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
         """Return per-epoch training metrics from the most recent train() call.
 
         Returns:
-            List of EpochMetrics, one per epoch trained. Returns an empty list
+            List of SurrogateEpochMetrics, one per epoch trained. Returns an empty list
             by default; subclasses that record per-epoch metrics should override.
         """
         return []

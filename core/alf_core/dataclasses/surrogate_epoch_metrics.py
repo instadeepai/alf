@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class EpochMetrics:
+class SurrogateEpochMetrics:
     """Per-epoch training metrics for a surrogate model.
 
     Explicit fields provide discoverability for the standard CNN metrics.

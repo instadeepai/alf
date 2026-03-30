@@ -12,22 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_core.dataclasses.epoch_metrics import EpochMetrics
+from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 
 
-class TestEpochMetrics:
-    """Test suite for EpochMetrics dataclass."""
+class TestSurrogateEpochMetrics:
+    """Test suite for SurrogateEpochMetrics dataclass."""
 
     def test_to_metrics_dict_required_fields_always_present(self) -> None:
         """Test that required fields are always present in metrics dict."""
-        em = EpochMetrics(epoch=3, train_loss=0.5)
+        em = SurrogateEpochMetrics(epoch=3, train_loss=0.5)
         d = em.to_metrics_dict()
         assert d["epoch"] == 3.0
         assert d["train_loss"] == 0.5
 
     def test_to_metrics_dict_none_fields_excluded(self) -> None:
         """Test that None fields are excluded from metrics dict."""
-        em = EpochMetrics(epoch=1, train_loss=0.8)
+        em = SurrogateEpochMetrics(epoch=1, train_loss=0.8)
         d = em.to_metrics_dict()
         assert "val_loss" not in d
         assert "train_spearman" not in d
@@ -37,7 +37,7 @@ class TestEpochMetrics:
 
     def test_to_metrics_dict_optional_fields_included_when_set(self) -> None:
         """Test that optional fields are included when set."""
-        em = EpochMetrics(
+        em = SurrogateEpochMetrics(
             epoch=2,
             train_loss=0.4,
             val_loss=0.6,
@@ -55,12 +55,12 @@ class TestEpochMetrics:
 
     def test_to_metrics_dict_extra_keys_merged(self) -> None:
         """Test that extra metrics are merged into the dict."""
-        em = EpochMetrics(epoch=1, train_loss=0.5, extra={"custom_metric": 42.0})
+        em = SurrogateEpochMetrics(epoch=1, train_loss=0.5, extra={"custom_metric": 42.0})
         d = em.to_metrics_dict()
         assert d["custom_metric"] == 42.0
 
     def test_epoch_field_converted_to_float(self) -> None:
         """Test that epoch is converted to float in metrics dict."""
-        em = EpochMetrics(epoch=5, train_loss=0.3)
+        em = SurrogateEpochMetrics(epoch=5, train_loss=0.3)
         d = em.to_metrics_dict()
         assert isinstance(d["epoch"], float)

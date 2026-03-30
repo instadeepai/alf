@@ -20,7 +20,13 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
-from alf_core.dataclasses import Candidate, EpochMetrics, LabelledCandidates, Predictions, State
+from alf_core.dataclasses import (
+    Candidate,
+    LabelledCandidates,
+    Predictions,
+    State,
+    SurrogateEpochMetrics,
+)
 
 logger = logging.getLogger("alf-core")
 
@@ -32,8 +38,8 @@ class StateLogger(abc.ABC):
     :meth:`_log_training_history` to capture per-epoch training metrics.
 
     Per-epoch metrics are available as ``state.round_metrics.training_history``,
-    a ``list[EpochMetrics]`` populated by the surrogate's
-    ``get_epoch_metrics()`` after each training round.  ``EpochMetrics``
+    a ``list[SurrogateEpochMetrics]`` populated by the surrogate's
+    ``get_epoch_metrics()`` after each training round.  ``SurrogateEpochMetrics``
     carries standard CNN fields (``train_loss``, ``val_loss``,
     ``train_spearman``, ``val_spearman``, ``train_mse``, ``val_mse``) plus an
     ``extra`` dict for model-specific metrics.  The list is empty when the
@@ -45,7 +51,7 @@ class StateLogger(abc.ABC):
         """Log data from the task state to the logger destination.
 
         ``state.round_metrics.training_history`` contains a
-        ``list[EpochMetrics]`` with per-epoch training metrics for this round.
+        ``list[SurrogateEpochMetrics]`` with per-epoch training metrics for this round.
         Override :meth:`_log_training_history` to capture them.
 
         Args:
@@ -57,21 +63,21 @@ class StateLogger(abc.ABC):
         pass
 
     def _log_training_history(
-        self, training_history: list[EpochMetrics], round_num: int | None = None
+        self, training_history: list[SurrogateEpochMetrics], round_num: int | None = None
     ) -> None:
         """Optionally log per-epoch training metrics for the current round.
 
         This is a no-op by default. Override in a subclass to capture
-        ``EpochMetrics`` from ``state.round_metrics.training_history``.
+        ``SurrogateEpochMetrics`` from ``state.round_metrics.training_history``.
 
-        ``EpochMetrics`` fields: ``epoch``, ``train_loss``, ``val_loss``,
+        ``SurrogateEpochMetrics`` fields: ``epoch``, ``train_loss``, ``val_loss``,
         ``train_spearman``, ``val_spearman``, ``train_mse``, ``val_mse``, and
         ``extra`` (a dict for model-specific metrics). Use
         ``epoch_metrics.to_metrics_dict()`` to get a flat ``dict[str, float]``
         with ``None`` fields omitted.
 
         Args:
-            training_history: List of EpochMetrics from
+            training_history: List of SurrogateEpochMetrics from
                 state.round_metrics.training_history. May be empty if the
                 surrogate does not override get_epoch_metrics().
             round_num: The round number. Available for subclasses that need it
@@ -83,14 +89,15 @@ class TerminalStateLogger(StateLogger):
     """Logger that outputs metrics to the terminal."""
 
     def _log_training_history(
-        self, training_history: list[EpochMetrics], round_num: int | None = None
+        self, training_history: list[SurrogateEpochMetrics], round_num: int | None = None
     ) -> None:
         """Log per-epoch metrics for a single round to the terminal. training_history is
         logged at DEBUG level to avoid cluttering the terminal output, which is typically
         reserved for round-level metrics.
 
         Args:
-            training_history: List of EpochMetrics from state.round_metrics.training_history.
+            training_history: List of SurrogateEpochMetrics from
+                state.round_metrics.training_history.
             round_num: Unused; present for signature compatibility with the base class.
         """
         for epoch_metrics in training_history:
@@ -139,7 +146,7 @@ class FileStateLogger(StateLogger):
         logger.info("Initializing FileStateLogger at %s", self.output_path)
 
     def _log_training_history(
-        self, training_history: list[EpochMetrics], round_num: int | None = None
+        self, training_history: list[SurrogateEpochMetrics], round_num: int | None = None
     ) -> None:
         """Write per-epoch metrics for a single round to training_history/round_N.csv.
 
@@ -147,12 +154,15 @@ class FileStateLogger(StateLogger):
         gets its own file so column schemas never conflict across rounds.
 
         Args:
-            training_history: List of EpochMetrics from state.round_metrics.training_history.
+            training_history: List of SurrogateEpochMetrics from
+                state.round_metrics.training_history.
             round_num: The round number, used as the filename suffix.
 
         Raises:
             ValueError: If round_num is None, since it's needed to name the output file.
         """
+        if not training_history:
+            return
         if round_num is None:
             raise ValueError(
                 "round_num must be provided to log training history in FileStateLogger"

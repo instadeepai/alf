@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_core.dataclasses import EpochMetrics, RoundMetrics
+from alf_core.dataclasses import RoundMetrics, SurrogateEpochMetrics
 
 
 class TestRoundMetrics:
@@ -27,7 +27,7 @@ class TestRoundMetrics:
 
     def test_construction_with_all_fields(self) -> None:
         """Test RoundMetrics construction with all fields provided."""
-        em = EpochMetrics(epoch=0, train_loss=0.5)
+        em = SurrogateEpochMetrics(epoch=0, train_loss=0.5)
         rm = RoundMetrics(
             round=1,
             metrics={"tell_time": 1.2},
@@ -46,7 +46,7 @@ class TestRoundMetrics:
     def test_training_history_is_mutable(self) -> None:
         """Test that training_history list can be modified after."""
         rm = RoundMetrics(round=0)
-        em = EpochMetrics(epoch=0, train_loss=0.9)
+        em = SurrogateEpochMetrics(epoch=0, train_loss=0.9)
         rm.training_history.append(em)
         assert len(rm.training_history) == 1
 
@@ -56,7 +56,7 @@ class TestRoundMetrics:
         """Test that default training_history is not shared."""
         rm1 = RoundMetrics(round=0)
         rm2 = RoundMetrics(round=1)
-        rm1.training_history.append(EpochMetrics(epoch=0, train_loss=0.5))
+        rm1.training_history.append(SurrogateEpochMetrics(epoch=0, train_loss=0.5))
         assert len(rm2.training_history) == 0
 
     def test_default_metrics_not_shared_between_instances(self) -> None:
@@ -67,8 +67,8 @@ class TestRoundMetrics:
         assert "key" not in rm2.metrics
 
     def test_exported_from_alf_core_dataclasses(self) -> None:
-        """Test that RoundMetrics and EpochMetrics are exported."""
+        """Test that RoundMetrics and SurrogateEpochMetrics are exported."""
         from alf_core.dataclasses import (  # noqa: F401, PLC0415
-            EpochMetrics,
             RoundMetrics,
+            SurrogateEpochMetrics,
         )

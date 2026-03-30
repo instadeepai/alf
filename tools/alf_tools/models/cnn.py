@@ -21,7 +21,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
-from alf_core.dataclasses.epoch_metrics import EpochMetrics
+from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from torch.utils.data import DataLoader, TensorDataset
 
 from alf_tools.models.utils import (
@@ -184,7 +184,7 @@ class CNNModel(BaseModel):
 
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
-        self._epoch_metrics: list[EpochMetrics] = []
+        self._epoch_metrics: list[SurrogateEpochMetrics] = []
 
     def _one_hot_encode(self, sequences: list[str]) -> torch.Tensor:
         """One-hot encode sequences.
@@ -358,7 +358,7 @@ class CNNModel(BaseModel):
             avg_val_loss: Average validation loss.
             val_metrics: Dictionary of validation metrics.
         """
-        em = EpochMetrics(
+        em = SurrogateEpochMetrics(
             epoch=epoch,
             train_loss=avg_train_loss,
             val_loss=avg_val_loss,
@@ -470,11 +470,11 @@ class CNNModel(BaseModel):
         """Sample candidate points from the model."""
         raise NotImplementedError("Sampling is not implemented for this model.")
 
-    def get_epoch_metrics(self) -> list[EpochMetrics]:
+    def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
         """Return per-epoch metrics from the most recent train() call.
 
         Returns:
-            List of EpochMetrics, one per epoch trained.
+            List of SurrogateEpochMetrics, one per epoch trained.
         """
         return self._epoch_metrics
 
