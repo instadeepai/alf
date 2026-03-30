@@ -16,6 +16,7 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 ### Datasets
 - **GFP** - Green Fluorescent Protein fitness dataset
 - **ProteinGym** - Protein sequence datasets from ProteinGym benchmark
+- **FLIP** - Fitness Landscape Inference for Proteins benchmark (AAV, GB1, Meltome, SCL, SAV)
 
 ### Models
 - **CNNModel** - Convolutional neural network for sequence modeling with uncertainty quantification
