@@ -360,14 +360,14 @@ class CNNModel(BaseModel):
         """
         additional: dict[str, float] = {}
         if (v := train_metrics.get("spearman")) is not None:
-            additional["train_spearman"] = v
+            additional["train_spearman"] = float(v)
         if (v := train_metrics.get("mse")) is not None:
-            additional["train_mse"] = v
+            additional["train_mse"] = float(v)
         if val_metrics is not None:
             if (v := val_metrics.get("spearman")) is not None:
-                additional["val_spearman"] = v
+                additional["val_spearman"] = float(v)
             if (v := val_metrics.get("mse")) is not None:
-                additional["val_mse"] = v
+                additional["val_mse"] = float(v)
         epoch_metrics = SurrogateEpochMetrics(
             epoch=epoch,
             train_loss=avg_train_loss,
