@@ -93,3 +93,4 @@ preview = true
 [lint.per-file-ignores]
 "__init__.py" = ["F401", "D104"]
 "tests/*" = ["DOC"]
+"tutorials/extending_base_classes/*" = ["DOC", "D107", "D101", "D102"]
