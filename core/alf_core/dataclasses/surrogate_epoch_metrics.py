@@ -38,7 +38,7 @@ class SurrogateEpochMetrics:
     val_loss: float | None = None
     additional_metrics: dict[str, float] = field(default_factory=dict)
 
-    def to_metrics_dict(self) -> dict[str, float]:
+    def to_metrics_dict(self) -> dict[str, int | float]:
         """Return a flat dict of non-None metric values merged with additional_metrics.
 
         Returns:
