@@ -368,13 +368,13 @@ class CNNModel(BaseModel):
                 additional["val_spearman"] = v
             if (v := val_metrics.get("mse")) is not None:
                 additional["val_mse"] = v
-        em = SurrogateEpochMetrics(
+        epoch_metrics = SurrogateEpochMetrics(
             epoch=epoch,
             train_loss=avg_train_loss,
             val_loss=avg_val_loss,
             additional_metrics=additional,
         )
-        self._epoch_metrics.append(em)
+        self._epoch_metrics.append(epoch_metrics)
 
     def train(
         self,

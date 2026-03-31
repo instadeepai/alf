@@ -37,21 +37,21 @@ class StateLogger(abc.ABC):
     Subclasses must implement :meth:`log`. They may also override
     :meth:`_log_training_history` to capture per-epoch training metrics.
 
-    Per-epoch metrics are available as ``state.round_metrics.training_history``,
-    a ``list[SurrogateEpochMetrics]`` populated by the surrogate's
-    ``get_epoch_metrics()`` after each training round.  ``SurrogateEpochMetrics``
-    carries standard CNN fields (``train_loss``, ``val_loss``,
-    ``train_spearman``, ``val_spearman``, ``train_mse``, ``val_mse``) plus an
-    ``extra`` dict for model-specific metrics.  The list is empty when the
-    surrogate does not override ``get_epoch_metrics()``.
+    Per-epoch metrics are available as `state.round_metrics.training_history`,
+    a `list[SurrogateEpochMetrics]` populated by the surrogate's
+    `get_epoch_metrics()` after each training round.  `SurrogateEpochMetrics`
+    carries standard CNN fields (`train_loss`, `val_loss`,
+    `train_spearman`, `val_spearman`, `train_mse`, `val_mse`) plus an
+    `extra` dict for model-specific metrics.  The list is empty when the
+    surrogate does not override `get_epoch_metrics()`.
     """
 
     @abc.abstractmethod
     def log(self, state: State, round_name: str | None = None) -> None:
         """Log data from the task state to the logger destination.
 
-        ``state.round_metrics.training_history`` contains a
-        ``list[SurrogateEpochMetrics]`` with per-epoch training metrics for this round.
+        `state.round_metrics.training_history` contains a
+        `list[SurrogateEpochMetrics]` with per-epoch training metrics for this round.
         Override :meth:`_log_training_history` to capture them.
 
         Args:
@@ -68,13 +68,13 @@ class StateLogger(abc.ABC):
         """Optionally log per-epoch training metrics for the current round.
 
         This is a no-op by default. Override in a subclass to capture
-        ``SurrogateEpochMetrics`` from ``state.round_metrics.training_history``.
+        `SurrogateEpochMetrics` from `state.round_metrics.training_history`.
 
-        ``SurrogateEpochMetrics`` fields: ``epoch``, ``train_loss``, ``val_loss``,
-        ``train_spearman``, ``val_spearman``, ``train_mse``, ``val_mse``, and
-        ``extra`` (a dict for model-specific metrics). Use
-        ``epoch_metrics.to_metrics_dict()`` to get a flat ``dict[str, float]``
-        with ``None`` fields omitted.
+        `SurrogateEpochMetrics` fields: `epoch`, `train_loss`, `val_loss`,
+        `train_spearman`, `val_spearman`, `train_mse`, `val_mse`, and
+        `extra` (a dict for model-specific metrics). Use
+        `epoch_metrics.to_metrics_dict()` to get a flat `dict[str, float]`
+        with `None` fields omitted.
 
         Args:
             training_history: List of SurrogateEpochMetrics from
@@ -150,7 +150,7 @@ class FileStateLogger(StateLogger):
     ) -> None:
         """Write per-epoch metrics for a single round to training_history/round_N.csv.
 
-        Creates the ``training_history/`` subdirectory on first use. Each round
+        Creates the `training_history/` subdirectory on first use. Each round
         gets its own file so column schemas never conflict across rounds.
 
         Args:
