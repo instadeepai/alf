@@ -129,7 +129,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         self,
         train_x: Float[torch.Tensor, "n_samples n_features"],
         train_y: Float[torch.Tensor, "n_samples"],
-        likelihood: gpytorch.likelihoods.GaussianLikelihood,
+        likelihood: gpytorch.likelihoods.Likelihood,
         kernel_type: KernelTypes = "rbf",
         matern_nu: float = 2.5,
         ard: bool = True,
@@ -581,7 +581,7 @@ class GPModel(BaseModel):
             f"final_train_{k}": v for k, v in train_results.metrics.items()
         })
 
-        logger.info(f"Training completewith metrics: {self.training_metrics}")
+        logger.info(f"Training complete with metrics: {self.training_metrics}")
 
         # Evaluate on validation data if provided
         if val_data is not None and len(val_data) > 0:
