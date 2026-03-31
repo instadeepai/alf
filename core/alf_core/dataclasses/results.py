@@ -34,7 +34,11 @@ class Results:
     predictions: Predictions
 
     def __post_init__(self) -> None:
-        """Validate inputs and compute metrics."""
+        """Validate inputs and compute metrics.
+
+        Raises:
+            AssertionError: If targets and predictions have different lengths.
+        """
         assert len(self.targets) == len(self.predictions.means), (
             "Targets and predictions must have the same length"
         )
