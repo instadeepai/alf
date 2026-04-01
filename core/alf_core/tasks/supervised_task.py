@@ -18,6 +18,7 @@ import time
 from typing import Any
 
 from alf_core.dataclasses import State
+from alf_core.dataclasses.round_metrics import RoundMetrics
 from alf_core.tasks.base_task import BaseTask
 from alf_core.utils.state_logger import StateLogger
 
@@ -55,12 +56,16 @@ class SupervisedTask(BaseTask):
         logger.info("Running supervised task ...")
 
         t0 = time.perf_counter()
-        state.surrogate.fit(
+        epoch_metrics = state.surrogate.fit(
             train_data=state.dataset.train_dataset,
             val_data=state.dataset.validation_dataset,
         )
         t1 = time.perf_counter()
-        state.round_metrics = {"tell_time": t1 - t0}
+        state.round_metrics = RoundMetrics(
+            round=state.round,
+            metrics={"tell_time": t1 - t0},
+            training_history=epoch_metrics,
+        )
 
         state = self.evaluate(state=state)
         for state_logger in state_loggers:

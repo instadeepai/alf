@@ -16,6 +16,7 @@ import logging
 from typing import Any
 
 from alf_core.dataclasses import State
+from alf_core.dataclasses.round_metrics import RoundMetrics
 from alf_core.optimizer.optimizer import Optimizer
 from alf_core.oracle.oracle import Oracle
 from alf_core.tasks.base_task import BaseTask
@@ -49,12 +50,14 @@ class DesignTask(BaseTask):
             Updated state with surrogate fine-tuned on the train and validation sets.
         """
         logger.info("Running initial round of surrogate model fine-tuning on the train dataset ...")
-        state.surrogate.fit(
+        # Construct RoundMetrics before fit() so state is always typed, even on failure
+        state.round_metrics = RoundMetrics(round=0)
+        epoch_metrics = state.surrogate.fit(
             train_data=state.dataset.train_dataset,
             val_data=state.dataset.validation_dataset,
         )
-        state.round_metrics = {"round": 0}
-        self.evaluate(state=state)
+        state.round_metrics.training_history = epoch_metrics
+        state = self.evaluate(state=state)
         for state_logger in state_loggers:
             state_logger.log(state, round_name="initial_train_round")
         return state
@@ -91,12 +94,11 @@ class DesignTask(BaseTask):
             state = self.run_initial_train_round(state, state_loggers)
 
         for round_i in range(1, self.num_acq_rounds + 1):
-            state.round_metrics = {"round": round_i}
+            state.round_metrics = RoundMetrics(round=round_i)
             acquired_candidates, state = optimizer.ask(state)
             labelled_candidates, state = oracle.evaluate(acquired_candidates, state)
-            state.update(labelled_candidates)
-            state = optimizer.tell(state=state)
-
+            state.update(labelled_candidates)  # increments state.round to round_i + 1
+            state = optimizer.tell(state=state)  # populates round_metrics.training_history
             state = self.evaluate(state=state)
             for state_logger in state_loggers:
                 state_logger.log(state)

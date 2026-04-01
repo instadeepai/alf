@@ -13,11 +13,16 @@
 # limitations under the License.
 
 
+from __future__ import annotations
+
 import abc
-from typing import Any, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
+
+if TYPE_CHECKING:
+    from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 
 
 class BaseModel(abc.ABC):
@@ -76,6 +81,15 @@ class BaseModel(abc.ABC):
             List of sampled candidate points.
         """
         pass
+
+    def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
+        """Return per-epoch training metrics from the most recent train() call.
+
+        Returns:
+            List of SurrogateEpochMetrics, one per epoch trained. Returns an empty list
+            by default; subclasses that record per-epoch metrics should override.
+        """
+        return []
 
     def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Get summary metrics from the most recent training run.

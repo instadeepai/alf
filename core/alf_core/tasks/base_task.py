@@ -100,10 +100,10 @@ class BaseTask(abc.ABC):
             results = Results(predictions=predictions, targets=state.dataset.test_dataset.labels)
 
             state.round_predictions = predictions
-            state.round_metrics.update({
+            state.round_metrics.metrics.update({
                 f"surrogate/test_{key}": value for key, value in results.metrics.items()
             })
 
         dataset_metrics = state.dataset.get_metrics()
-        state.round_metrics.update({f"dataset/{k}": v for k, v in dataset_metrics.items()})
+        state.round_metrics.metrics.update({f"dataset/{k}": v for k, v in dataset_metrics.items()})
         return state
