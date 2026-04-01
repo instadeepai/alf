@@ -59,7 +59,7 @@ class Oracle:
                 candidates=candidates, labels=self.scorer.predict(candidates).means
             )
         t1 = time.perf_counter()
-        state.round_metrics.update({"oracle_time": t1 - t0})
+        state.round_metrics.metrics.update({"oracle_time": t1 - t0})
         return evaluated_candidates, state
 
     def get_metrics(self) -> dict[str, Union[float, int, np.number]]:

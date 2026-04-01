@@ -21,4 +21,6 @@ from alf_core.dataclasses.candidate import Candidate, Modality
 from alf_core.dataclasses.labelled_candidates import LabelledCandidates
 from alf_core.dataclasses.predictions import Predictions
 from alf_core.dataclasses.results import Results
+from alf_core.dataclasses.round_metrics import RoundMetrics
 from alf_core.dataclasses.state import State
+from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
