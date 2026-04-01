@@ -20,8 +20,8 @@ class SurrogateEpochMetrics:
     """Per-epoch training metrics for a surrogate model.
 
     Explicit fields cover the standard required metrics.
-    The ``additional_metrics`` dict holds model-specific metrics (e.g. spearman,
-    mse) and any other optional values.  ``None`` values are excluded when
+    The `additional_metrics` dict holds model-specific metrics (e.g. spearman,
+    mse) and any other optional values.  `None` values are excluded when
     converting to a flat dict, so backends only receive metrics that were
     actually computed.
 
@@ -29,8 +29,8 @@ class SurrogateEpochMetrics:
         epoch: Zero-based epoch index.
         train_loss: Training loss for this epoch.
         val_loss: Validation loss, or None if no validation data was provided.
-        additional_metrics: Model-specific metrics (e.g. ``train_spearman``,
-            ``val_spearman``, ``train_mse``, ``val_mse``) passed through to backends.
+        additional_metrics: Model-specific metrics (e.g. `train_spearman`,
+            `val_spearman`, `train_mse`, `val_mse`) passed through to backends.
     """
 
     epoch: int
@@ -42,8 +42,8 @@ class SurrogateEpochMetrics:
         """Return a flat dict of non-None metric values merged with additional_metrics.
 
         Returns:
-            Flat dict with ``epoch`` (as float), ``train_loss``, any non-None
-            optional fields, and all entries from ``additional_metrics``.
+            Flat dict with `epoch` (as float), `train_loss`, any non-None
+            optional fields, and all entries from `additional_metrics`.
         """
         result: dict[str, int | float] = {
             "epoch": self.epoch,

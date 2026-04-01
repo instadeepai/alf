@@ -24,8 +24,8 @@ from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 class RoundMetrics:
     """All metrics for a single acquisition round.
 
-    ``round`` is the canonical round number — it is not duplicated inside
-    ``metrics``.  ``training_history`` carries per-epoch ``SurrogateEpochMetrics``
+    `round` is the canonical round number — it is not duplicated inside
+    `metrics`.  `training_history` carries per-epoch `SurrogateEpochMetrics`
     objects for backends that support step-based logging
 
     Attributes:
@@ -34,7 +34,7 @@ class RoundMetrics:
             surrogate/test_spearman, dataset/num_train).
         training_history: Per-epoch metrics recorded during surrogate training
             in this round.  Empty list when no training occurred (e.g. zero-shot
-            tasks) or before ``Surrogate.fit()`` has been called.
+            tasks) or before `Surrogate.fit()` has been called.
     """
 
     round: int
