@@ -129,7 +129,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         self,
         train_x: Float[torch.Tensor, "n_samples n_features"],
         train_y: Float[torch.Tensor, "n_samples"],
-        likelihood: gpytorch.likelihoods.Likelihood,
+        likelihood: gpytorch.likelihoods.GaussianLikelihood,
         kernel_type: KernelTypes = "rbf",
         matern_nu: float = 2.5,
         ard: bool = True,
