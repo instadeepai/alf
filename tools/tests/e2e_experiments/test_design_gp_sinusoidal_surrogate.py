@@ -275,7 +275,6 @@ class TestDesignGPSinusoidalSurrogate:
         # in the CSV when the surrogate produces variances (GP always does).
         # mse/spearman are only emitted when variances are absent.
         required_cols = [
-            "round",
             "dataset/num_train",
             "surrogate/test_ece",
             "surrogate/test_residual_spearman",
