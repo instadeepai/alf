@@ -22,6 +22,7 @@ import gpytorch
 import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
+from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from jaxtyping import Float
 
 from alf_tools.models.utils.sequence_utils import (
@@ -317,6 +318,7 @@ class GPModel(BaseModel):
 
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
+        self._epoch_metrics: list[SurrogateEpochMetrics] = []
 
     def _apply_custom_featurizer(self, sequences: list[str]) -> torch.Tensor:
         """Apply custom featurization function.
@@ -498,11 +500,14 @@ class GPModel(BaseModel):
 
             losses.append(loss_value)
 
-            # Logging
-            if (i + 1) % self.train_config.log_frequency == 0:
-                logger.info(
-                    f"Iteration {i + 1}/{self.train_config.num_iterations} - Loss: {loss_value:.4f}"
+            # Record per-iteration metrics
+            self._epoch_metrics.append(
+                SurrogateEpochMetrics(
+                    epoch=i,
+                    train_loss=loss_value,
+                    additional_metrics={"mll": -loss_value},
                 )
+            )
 
             # Early stopping
             if self.train_config.early_stopping_patience is not None:
@@ -540,6 +545,7 @@ class GPModel(BaseModel):
             For exact GPs, all training data is used for predictions. Validation
             data is only used for logging validation metrics during training.
         """
+        self._epoch_metrics = []
         logger.info(f"Training GP with {len(train_data)} samples")
 
         # Featurize training data
@@ -653,6 +659,16 @@ class GPModel(BaseModel):
             - training_iterations: Number of iterations completed
         """
         return self.training_metrics
+
+    def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
+        """Return per-epoch training metrics recorded during hyperparameter optimization.
+
+        Returns:
+            list[SurrogateEpochMetrics]: List of metrics for each epoch, including training
+            loss and any additional metrics.The length of the list corresponds to the number
+            of training iterations completed.
+        """
+        return self._epoch_metrics
 
     def get_hyperparameters(self) -> dict[str, Any]:
         """Get current GP hyperparameters.
