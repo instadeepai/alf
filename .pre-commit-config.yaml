@@ -61,6 +61,11 @@ repos:
           ]
 
 
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.8.1
+    hooks:
+      - id: nbstripout
+
   - repo: https://github.com/Lucas-C/pre-commit-hooks
     rev: v1.4.0
     hooks:
