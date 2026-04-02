@@ -45,19 +45,25 @@ class TestResultsNumpyTypeValidation:
         """Test that torch tensor targets raises BeartypeCallHintParamViolation."""
         targets = torch.tensor([1.0, 2.0, 3.0])
         with pytest.raises(BeartypeCallHintParamViolation):
-            Results(targets=targets, predictions=predictions)
+            Results(targets=targets, predictions=predictions, problem_type=ProblemType.REGRESSION)
 
     def test_numpy_targets_accepted(self, predictions):
         """Test that numpy array targets are accepted."""
         targets = np.array([1.0, 2.0, 3.0])
-        results = Results(targets=targets, predictions=predictions)
+        results = Results(
+            targets=targets, predictions=predictions, problem_type=ProblemType.REGRESSION
+        )
         assert isinstance(results.targets, np.ndarray)
 
     def test_non_predictions_raises_type_error(self):
         """Test non-Predictions object for predictions raises BeartypeCallHintParamViolation."""
         targets = np.array([1.0, 2.0, 3.0])
         with pytest.raises(BeartypeCallHintParamViolation):
-            Results(targets=targets, predictions="not_a_predictions_object")
+            Results(
+                targets=targets,
+                predictions="not_a_predictions_object",
+                problem_type=ProblemType.REGRESSION,
+            )
 
 
 class TestResultsValidation:
@@ -67,12 +73,22 @@ class TestResultsValidation:
         """Test that mismatched targets and predictions lengths raises AssertionError."""
         targets = np.array([1.0, 2.0])  # length 2 vs predictions length 3
         with pytest.raises(AssertionError, match="same length"):
-            Results(targets=targets, predictions=predictions)
+            Results(targets=targets, predictions=predictions, problem_type=ProblemType.REGRESSION)
+
+    def test_mismatched_lengths_raises_2d(self):
+        """Test length mismatch is also caught for 2D classification means."""
+        probs = binary_probs(4)
+        targets = np.array([0, 1, 0])  # wrong length
+        preds = Predictions(means=probs)
+        with pytest.raises(AssertionError):
+            Results(targets=targets, predictions=preds, problem_type=ProblemType.BINARY)
 
     def test_results_computes_metrics(self, predictions):
         """Test that Results computes metrics on valid inputs."""
         targets = np.array([1.0, 2.0, 3.0])
-        results = Results(targets=targets, predictions=predictions)
+        results = Results(
+            targets=targets, predictions=predictions, problem_type=ProblemType.REGRESSION
+        )
         assert isinstance(results.metrics, dict)
         assert len(results.metrics) > 0
 
@@ -81,6 +97,7 @@ class TestResultsRegressionRouting:
     """Regression routing computes the correct metrics."""
 
     def test_regression_metrics_computed(self):
+        """Test that regression metrics (mse, spearman) are computed for REGRESSION."""
         preds = Predictions(means=np.array([1.0, 2.0, 3.0]))
         results = Results(
             targets=np.array([1.1, 1.9, 3.1]),
@@ -91,6 +108,7 @@ class TestResultsRegressionRouting:
         assert "spearman" in results.metrics
 
     def test_regression_problem_type_stored(self):
+        """Test that the problem type is stored correctly on the Results instance."""
         preds = Predictions(means=np.array([1.0, 2.0]))
         results = Results(
             targets=np.array([1.0, 2.0]), predictions=preds, problem_type=ProblemType.REGRESSION
@@ -98,6 +116,7 @@ class TestResultsRegressionRouting:
         assert results.problem_type == ProblemType.REGRESSION
 
     def test_regression_no_classification_metrics(self):
+        """Test that classification metrics are absent for REGRESSION."""
         preds = Predictions(means=np.array([1.0, 2.0, 3.0]))
         results = Results(
             targets=np.array([1.0, 2.0, 3.0]),
@@ -112,6 +131,7 @@ class TestResultsBinaryRouting:
     """Results correctly routes to classification metrics for BINARY."""
 
     def test_classification_metrics_computed(self):
+        """Test that all classification metrics are computed for BINARY."""
         probs = binary_probs()
         targets = np.array([0, 1, 0, 1])
         preds = Predictions(means=probs)
@@ -123,6 +143,7 @@ class TestResultsBinaryRouting:
         assert "auc_roc" in results.metrics
 
     def test_no_regression_metrics(self):
+        """Test that regression metrics are absent for BINARY."""
         probs = binary_probs()
         targets = np.array([0, 1, 0, 1])
         preds = Predictions(means=probs)
@@ -131,6 +152,7 @@ class TestResultsBinaryRouting:
         assert "spearman" not in results.metrics
 
     def test_perfect_predictions(self):
+        """Test that accuracy is 1.0 for perfect binary predictions."""
         probs = np.array([[0.9, 0.1], [0.1, 0.9], [0.9, 0.1], [0.1, 0.9]])
         targets = np.array([0, 1, 0, 1])
         preds = Predictions(means=probs)
@@ -142,6 +164,7 @@ class TestResultsMulticlassRouting:
     """Results correctly routes to classification metrics for MULTICLASS."""
 
     def test_classification_metrics_computed(self):
+        """Test that classification metrics are computed for MULTICLASS."""
         probs = multiclass_probs()
         targets = np.array([0, 1, 2])
         preds = Predictions(means=probs)
@@ -150,26 +173,9 @@ class TestResultsMulticlassRouting:
         assert "auc_roc" in results.metrics
 
     def test_perfect_multiclass(self):
+        """Test that accuracy is 1.0 for perfect multiclass predictions."""
         probs = multiclass_probs()
         targets = np.array([0, 1, 2])
         preds = Predictions(means=probs)
         results = Results(targets=targets, predictions=preds, problem_type=ProblemType.MULTICLASS)
         assert results.metrics["accuracy"] == pytest.approx(1.0)
-
-
-class TestResultsLengthAssertion:
-    """Shape validation works for both 1D (regression) and 2D (classification) means."""
-
-    def test_2d_means_length_check_passes(self):
-        probs = binary_probs(4)
-        targets = np.array([0, 1, 0, 1])
-        preds = Predictions(means=probs)
-        results = Results(targets=targets, predictions=preds, problem_type=ProblemType.BINARY)
-        assert len(results.metrics) > 0
-
-    def test_length_mismatch_raises(self):
-        probs = binary_probs(4)
-        targets = np.array([0, 1, 0])  # wrong length
-        preds = Predictions(means=probs)
-        with pytest.raises(AssertionError):
-            Results(targets=targets, predictions=preds, problem_type=ProblemType.BINARY)

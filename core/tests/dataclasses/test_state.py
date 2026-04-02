@@ -22,16 +22,31 @@ from alf_core.enums import ProblemType
 
 
 def _make_minimal_dataset(problem_type: ProblemType) -> BaseDataset:
+    """Create a minimal dataset with a single candidate for the given problem type.
+
+    Returns:
+        A set-up BaseDataset instance configured with the given problem type.
+    """
+
     class MinimalDataset(BaseDataset):
         def load_dataset(self):
+            """Load a single-candidate dataset.
+
+            Returns:
+                A LabelledCandidates with one sequence candidate.
+            """
             return LabelledCandidates(
                 candidates=[Candidate(data="ACGT", modality=Modality.SEQUENCE)],
                 labels=np.array([0.0]),
             )
 
     config = BaseDatasetConfig(
-        name="test", modality=Modality.SEQUENCE, seed=0,
-        train_ratio=0.5, validation_frac=0.0, test_ratio=0.5,
+        name="test",
+        modality=Modality.SEQUENCE,
+        seed=0,
+        train_ratio=0.5,
+        validation_frac=0.0,
+        test_ratio=0.5,
         problem_type=problem_type,
     )
     dataset = MinimalDataset(config)
@@ -42,17 +57,20 @@ def _make_minimal_dataset(problem_type: ProblemType) -> BaseDataset:
 class TestStateProblemTypeProperty:
     """State.problem_type delegates to dataset.config.problem_type."""
 
-    def test_binary_problem_type(self):
+    def test_binary_problem_type(self, dummy_surrogate):
+        """Test that State.problem_type returns BINARY when dataset is configured as such."""
         dataset = _make_minimal_dataset(ProblemType.BINARY)
-        state = State(dataset=dataset, surrogate=None)  # type: ignore[arg-type]
+        state = State(dataset=dataset, surrogate=dummy_surrogate)
         assert state.problem_type == ProblemType.BINARY
 
-    def test_regression_problem_type(self):
+    def test_regression_problem_type(self, dummy_surrogate):
+        """Test that State.problem_type returns REGRESSION when dataset is configured as such."""
         dataset = _make_minimal_dataset(ProblemType.REGRESSION)
-        state = State(dataset=dataset, surrogate=None)  # type: ignore[arg-type]
+        state = State(dataset=dataset, surrogate=dummy_surrogate)
         assert state.problem_type == ProblemType.REGRESSION
 
-    def test_multiclass_problem_type(self):
+    def test_multiclass_problem_type(self, dummy_surrogate):
+        """Test that State.problem_type returns MULTICLASS when dataset is configured as such."""
         dataset = _make_minimal_dataset(ProblemType.MULTICLASS)
-        state = State(dataset=dataset, surrogate=None)  # type: ignore[arg-type]
+        state = State(dataset=dataset, surrogate=dummy_surrogate)
         assert state.problem_type == ProblemType.MULTICLASS

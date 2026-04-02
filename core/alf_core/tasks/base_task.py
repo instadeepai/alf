@@ -97,7 +97,11 @@ class BaseTask(abc.ABC):
         """
         if len(state.dataset.test_dataset) > 0:
             predictions = state.surrogate.predict(state.dataset.test_dataset.candidates)
-            results = Results(predictions=predictions, targets=state.dataset.test_dataset.labels, problem_type=state.problem_type)
+            results = Results(
+                predictions=predictions,
+                targets=state.dataset.test_dataset.labels,
+                problem_type=state.problem_type,
+            )
 
             state.round_predictions = predictions
             state.round_metrics.metrics.update({

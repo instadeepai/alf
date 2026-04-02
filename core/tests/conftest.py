@@ -16,12 +16,11 @@
 
 from typing import Any, List, Literal, Union
 
-from alf_core.enums import ProblemType
-
 import numpy as np
 import pytest
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions, State
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
+from alf_core.enums import ProblemType
 from alf_core.model.base_model import BaseModel
 from alf_core.optimizer.acquisition_function import AcquisitionFunction
 from alf_core.optimizer.optimizer import Optimizer

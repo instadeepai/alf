@@ -30,6 +30,7 @@ class TestClassificationMetricRegistry:
     """Tests for the classification metric registry."""
 
     def test_all_metrics_registered(self):
+        """Test that all expected metrics are present in the registry."""
         names = set(classification_metric_registry.metrics.keys())
         assert {"accuracy", "f1", "precision", "recall", "auc_roc"}.issubset(names)
 
@@ -38,24 +39,28 @@ class TestAccuracy:
     """Tests for accuracy metric."""
 
     def test_perfect_binary(self):
+        """Test accuracy is 1.0 for perfect binary predictions."""
         probs = np.array([[0.1, 0.9], [0.8, 0.2], [0.3, 0.7]])
         targets = np.array([1, 0, 1])
         result = accuracy(probs, targets)
         assert result == {"accuracy": 1.0}
 
     def test_partial_binary(self):
+        """Test accuracy is 0.5 when half the predictions are correct."""
         probs = np.array([[0.1, 0.9], [0.1, 0.9]])
         targets = np.array([1, 0])
         result = accuracy(probs, targets)
         assert result == {"accuracy": 0.5}
 
     def test_perfect_multiclass(self):
+        """Test accuracy is 1.0 for perfect multiclass predictions."""
         probs = np.array([[0.8, 0.1, 0.1], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]])
         targets = np.array([0, 1, 2])
         result = accuracy(probs, targets)
         assert result == {"accuracy": 1.0}
 
     def test_returns_dict(self):
+        """Test that accuracy returns a dict with a float value."""
         probs = np.array([[0.6, 0.4], [0.4, 0.6]])
         targets = np.array([0, 1])
         result = accuracy(probs, targets)
@@ -68,12 +73,14 @@ class TestF1:
     """Tests for F1 metric."""
 
     def test_perfect_binary(self):
+        """Test F1 is 1.0 for perfect binary predictions."""
         probs = np.array([[0.9, 0.1], [0.1, 0.9]])
         targets = np.array([0, 1])
         result = f1(probs, targets)
         assert result["f1"] == pytest.approx(1.0)
 
     def test_zero_division_does_not_raise(self):
+        """Test that zero_division=0 prevents errors when a class is never predicted."""
         # All predicted as class 0 — recall for class 1 is 0, zero_division=0
         probs = np.array([[0.9, 0.1], [0.9, 0.1], [0.9, 0.1]])
         targets = np.array([0, 0, 1])
@@ -82,6 +89,7 @@ class TestF1:
         assert 0.0 <= result["f1"] <= 1.0
 
     def test_multiclass_macro(self):
+        """Test F1 macro average is 1.0 for perfect multiclass predictions."""
         probs = np.array([[0.8, 0.1, 0.1], [0.1, 0.8, 0.1], [0.1, 0.1, 0.8]])
         targets = np.array([0, 1, 2])
         result = f1(probs, targets)
@@ -92,18 +100,21 @@ class TestPrecision:
     """Tests for precision metric."""
 
     def test_perfect(self):
+        """Test precision is 1.0 for perfect predictions."""
         probs = np.array([[0.9, 0.1], [0.1, 0.9]])
         targets = np.array([0, 1])
         result = precision(probs, targets)
         assert result["precision"] == pytest.approx(1.0)
 
     def test_zero_division_does_not_raise(self):
+        """Test that zero_division=0 prevents errors when a class is never predicted."""
         probs = np.array([[0.9, 0.1], [0.9, 0.1]])
         targets = np.array([0, 1])
         result = precision(probs, targets)
         assert "precision" in result
 
     def test_returns_float(self):
+        """Test that precision returns a float value."""
         probs = np.array([[0.6, 0.4], [0.4, 0.6]])
         targets = np.array([0, 1])
         assert isinstance(precision(probs, targets)["precision"], float)
@@ -113,18 +124,21 @@ class TestRecall:
     """Tests for recall metric."""
 
     def test_perfect(self):
+        """Test recall is 1.0 for perfect predictions."""
         probs = np.array([[0.9, 0.1], [0.1, 0.9]])
         targets = np.array([0, 1])
         result = recall(probs, targets)
         assert result["recall"] == pytest.approx(1.0)
 
     def test_zero_division_does_not_raise(self):
+        """Test that zero_division=0 prevents errors when a class has no true positives."""
         probs = np.array([[0.9, 0.1], [0.9, 0.1]])
         targets = np.array([0, 0])
         result = recall(probs, targets)
         assert "recall" in result
 
     def test_returns_float(self):
+        """Test that recall returns a float value."""
         probs = np.array([[0.6, 0.4], [0.4, 0.6]])
         targets = np.array([0, 1])
         assert isinstance(recall(probs, targets)["recall"], float)
@@ -134,12 +148,14 @@ class TestAucRoc:
     """Tests for AUC-ROC metric."""
 
     def test_perfect_binary(self):
+        """Test AUC-ROC is 1.0 for perfect binary predictions."""
         probs = np.array([[0.9, 0.1], [0.1, 0.9], [0.8, 0.2], [0.2, 0.8]])
         targets = np.array([0, 1, 0, 1])
         result = auc_roc(probs, targets)
         assert result["auc_roc"] == pytest.approx(1.0)
 
     def test_binary_uses_positive_class_probs(self):
+        """Test that the binary branch is taken when probs has 2 columns."""
         # Verify binary branch is taken (probs.shape[1] == 2)
         probs = np.array([[0.7, 0.3], [0.3, 0.7]])
         targets = np.array([0, 1])
@@ -148,6 +164,7 @@ class TestAucRoc:
         assert 0.0 <= result["auc_roc"] <= 1.0
 
     def test_multiclass_ovr(self):
+        """Test that AUC-ROC uses one-vs-rest for multiclass inputs."""
         probs = np.array([
             [0.8, 0.1, 0.1],
             [0.1, 0.8, 0.1],
@@ -160,6 +177,7 @@ class TestAucRoc:
         assert 0.0 <= result["auc_roc"] <= 1.0
 
     def test_returns_float(self):
+        """Test that AUC-ROC returns a float value."""
         probs = np.array([[0.6, 0.4], [0.4, 0.6]])
         targets = np.array([0, 1])
         assert isinstance(auc_roc(probs, targets)["auc_roc"], float)
@@ -169,18 +187,21 @@ class TestClassificationMetricInputValidation:
     """Tests for input validation in the classification_metric decorator."""
 
     def test_1d_probs_raises(self):
+        """Test that 1D probability arrays are rejected."""
         probs = np.array([0.1, 0.9])
         targets = np.array([1])
         with pytest.raises(AssertionError, match="2D"):
             accuracy(probs, targets)
 
     def test_empty_input_raises(self):
+        """Test that empty inputs are rejected."""
         probs = np.empty((0, 2))
         targets = np.empty(0)
         with pytest.raises(AssertionError, match="Empty"):
             accuracy(probs, targets)
 
     def test_batch_size_mismatch_raises(self):
+        """Test that mismatched batch sizes between probs and targets are rejected."""
         probs = np.array([[0.6, 0.4], [0.4, 0.6]])
         targets = np.array([0])
         with pytest.raises(AssertionError, match="batch size mismatch"):

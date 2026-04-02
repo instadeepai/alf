@@ -228,9 +228,15 @@ class TestPredictionsToDataframeClassification:
     """Predictions.to_dataframe() expands 2D means into prob_class_N columns."""
 
     def _make_candidates(self, n: int):
+        """Create n dummy sequence candidates.
+
+        Returns:
+            List of n Candidate objects with sequence modality.
+        """
         return [Candidate(data=f"SEQ{i}", modality=Modality.SEQUENCE) for i in range(n)]
 
     def test_binary_columns(self):
+        """Test that binary 2D means produce prob_class_0 and prob_class_1 columns."""
         probs = np.array([[0.8, 0.2], [0.3, 0.7], [0.9, 0.1], [0.2, 0.8]])
         targets = np.array([0.0, 1.0, 0.0, 1.0])
         preds = Predictions(means=probs)
@@ -241,6 +247,7 @@ class TestPredictionsToDataframeClassification:
         assert "variance" not in df.columns
 
     def test_multiclass_columns(self):
+        """Test that multiclass 2D means produce one prob_class_N column per class."""
         probs = np.array([[0.7, 0.2, 0.1], [0.1, 0.7, 0.2], [0.1, 0.2, 0.7]])
         targets = np.array([0.0, 1.0, 2.0])
         preds = Predictions(means=probs)
@@ -250,6 +257,7 @@ class TestPredictionsToDataframeClassification:
         assert "prob_class_2" in df.columns
 
     def test_regression_columns_unchanged(self):
+        """Test that 1D regression means still produce mean and variance columns."""
         means = np.array([1.0, 2.0, 3.0])
         targets = np.array([1.1, 1.9, 3.1])
         preds = Predictions(means=means)
@@ -259,6 +267,7 @@ class TestPredictionsToDataframeClassification:
         assert "prob_class_0" not in df.columns
 
     def test_prob_values_correct(self):
+        """Test that probability values are correctly mapped to their columns."""
         probs = np.array([[0.3, 0.7], [0.8, 0.2]])
         targets = np.array([1.0, 0.0])
         preds = Predictions(means=probs)
