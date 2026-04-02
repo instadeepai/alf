@@ -14,8 +14,10 @@
 
 import numpy as np
 import pytest
+import torch
 from alf_core.dataclasses.candidate import Candidate, Modality
 from alf_core.dataclasses.predictions import Predictions
+from beartype.roar import BeartypeCallHintParamViolation
 
 
 class TestPredictionsInitialization:
@@ -69,6 +71,30 @@ class TestPredictionsInitialization:
         np.testing.assert_array_equal(predictions.means, means)
         np.testing.assert_array_equal(predictions.variances, variances)
         np.testing.assert_array_equal(predictions.empirical_dist, empirical_dist)
+
+
+class TestPredictionsNumpyTypeValidation:
+    """Test cases for numpy type validation in Predictions."""
+
+    def test_torch_means_raises_type_error(self):
+        """Test that torch tensor means raises BeartypeCallHintParamViolation."""
+        means = torch.tensor([1.0, 2.0, 3.0])
+        with pytest.raises(BeartypeCallHintParamViolation):
+            Predictions(means=means)
+
+    def test_torch_variances_raises_type_error(self):
+        """Test that torch tensor variances raises BeartypeCallHintParamViolation."""
+        means = np.array([1.0, 2.0, 3.0])
+        variances = torch.tensor([0.1, 0.2, 0.3])
+        with pytest.raises(BeartypeCallHintParamViolation):
+            Predictions(means=means, variances=variances)
+
+    def test_torch_empirical_dist_raises_type_error(self):
+        """Test that torch tensor empirical_dist raises BeartypeCallHintParamViolation."""
+        means = np.array([1.0, 2.0, 3.0])
+        empirical_dist = torch.randn(3, 2)
+        with pytest.raises(BeartypeCallHintParamViolation):
+            Predictions(means=means, empirical_dist=empirical_dist)
 
 
 class TestPredictionsValidation:

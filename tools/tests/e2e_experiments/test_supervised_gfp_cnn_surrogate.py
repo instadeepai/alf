@@ -156,6 +156,13 @@ class TestSupervised:
         # Test dataset metrics
         self._assert_dataset_metrics(metrics, expected_metrics["dataset"])
 
+        # Assert training_history was populated for the supervised round
+        num_epochs = surrogate_model.model.train_config.num_epochs
+        assert len(state.round_metrics.training_history) == num_epochs, (
+            f"Expected {num_epochs} epoch entries in training_history, "
+            f"got {len(state.round_metrics.training_history)}"
+        )
+
     def _assert_surrogate_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert surrogate model performance metrics."""
         for metric_name, expected_value in expected.items():

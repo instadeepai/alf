@@ -16,8 +16,10 @@
 
 import numpy as np
 import pytest
+import torch
 from alf_core.dataclasses import Predictions, Results
 from alf_core.enums import ProblemType
+from beartype.roar import BeartypeCallHintParamViolation
 
 
 def binary_probs(n: int = 4) -> np.ndarray:
@@ -30,23 +32,78 @@ def multiclass_probs(n: int = 3) -> np.ndarray:
     return np.array([[0.7, 0.2, 0.1], [0.1, 0.7, 0.2], [0.1, 0.2, 0.7]][:n])
 
 
+@pytest.fixture
+def predictions():
+    """Return a Predictions instance with numpy array means."""
+    return Predictions(means=np.array([1.0, 2.0, 3.0]))
+
+
+class TestResultsNumpyTypeValidation:
+    """Test that Results rejects non-numpy arrays for targets & non-Predictions for predictions."""
+
+    def test_torch_targets_raises_type_error(self, predictions):
+        """Test that torch tensor targets raises BeartypeCallHintParamViolation."""
+        targets = torch.tensor([1.0, 2.0, 3.0])
+        with pytest.raises(BeartypeCallHintParamViolation):
+            Results(targets=targets, predictions=predictions)
+
+    def test_numpy_targets_accepted(self, predictions):
+        """Test that numpy array targets are accepted."""
+        targets = np.array([1.0, 2.0, 3.0])
+        results = Results(targets=targets, predictions=predictions)
+        assert isinstance(results.targets, np.ndarray)
+
+    def test_non_predictions_raises_type_error(self):
+        """Test non-Predictions object for predictions raises BeartypeCallHintParamViolation."""
+        targets = np.array([1.0, 2.0, 3.0])
+        with pytest.raises(BeartypeCallHintParamViolation):
+            Results(targets=targets, predictions="not_a_predictions_object")
+
+
+class TestResultsValidation:
+    """Test cases for Results validation."""
+
+    def test_mismatched_lengths_raises(self, predictions):
+        """Test that mismatched targets and predictions lengths raises AssertionError."""
+        targets = np.array([1.0, 2.0])  # length 2 vs predictions length 3
+        with pytest.raises(AssertionError, match="same length"):
+            Results(targets=targets, predictions=predictions)
+
+    def test_results_computes_metrics(self, predictions):
+        """Test that Results computes metrics on valid inputs."""
+        targets = np.array([1.0, 2.0, 3.0])
+        results = Results(targets=targets, predictions=predictions)
+        assert isinstance(results.metrics, dict)
+        assert len(results.metrics) > 0
+
+
 class TestResultsRegressionRouting:
     """Regression routing computes the correct metrics."""
 
     def test_regression_metrics_computed(self):
         preds = Predictions(means=np.array([1.0, 2.0, 3.0]))
-        results = Results(targets=np.array([1.1, 1.9, 3.1]), predictions=preds, problem_type=ProblemType.REGRESSION)
+        results = Results(
+            targets=np.array([1.1, 1.9, 3.1]),
+            predictions=preds,
+            problem_type=ProblemType.REGRESSION,
+        )
         assert "mse" in results.metrics
         assert "spearman" in results.metrics
 
     def test_regression_problem_type_stored(self):
         preds = Predictions(means=np.array([1.0, 2.0]))
-        results = Results(targets=np.array([1.0, 2.0]), predictions=preds, problem_type=ProblemType.REGRESSION)
+        results = Results(
+            targets=np.array([1.0, 2.0]), predictions=preds, problem_type=ProblemType.REGRESSION
+        )
         assert results.problem_type == ProblemType.REGRESSION
 
     def test_regression_no_classification_metrics(self):
         preds = Predictions(means=np.array([1.0, 2.0, 3.0]))
-        results = Results(targets=np.array([1.0, 2.0, 3.0]), predictions=preds, problem_type=ProblemType.REGRESSION)
+        results = Results(
+            targets=np.array([1.0, 2.0, 3.0]),
+            predictions=preds,
+            problem_type=ProblemType.REGRESSION,
+        )
         assert "accuracy" not in results.metrics
         assert "f1" not in results.metrics
 

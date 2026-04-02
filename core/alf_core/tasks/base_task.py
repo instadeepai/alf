@@ -88,7 +88,6 @@ class BaseTask(abc.ABC):
 
         Args:
             state: Current task state containing dataset and surrogate.
-            round_name: Name or number identifying the current round.
 
         Returns:
             Updated task state with evaluation metrics.
@@ -101,10 +100,10 @@ class BaseTask(abc.ABC):
             results = Results(predictions=predictions, targets=state.dataset.test_dataset.labels, problem_type=state.problem_type)
 
             state.round_predictions = predictions
-            state.round_metrics.update({
+            state.round_metrics.metrics.update({
                 f"surrogate/test_{key}": value for key, value in results.metrics.items()
             })
 
         dataset_metrics = state.dataset.get_metrics()
-        state.round_metrics.update({f"dataset/{k}": v for k, v in dataset_metrics.items()})
+        state.round_metrics.metrics.update({f"dataset/{k}": v for k, v in dataset_metrics.items()})
         return state

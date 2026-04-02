@@ -37,7 +37,11 @@ class Results:
     problem_type: ProblemType
 
     def __post_init__(self) -> None:
-        """Validate inputs and compute metrics."""
+        """Validate inputs and compute metrics.
+
+        Raises:
+            AssertionError: If targets and predictions have different lengths.
+        """
         assert self.targets.shape[0] == self.predictions.means.shape[0], (
             "Targets and predictions must have the same length"
         )

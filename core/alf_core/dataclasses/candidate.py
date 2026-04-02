@@ -31,7 +31,7 @@ else:
     ]
 
 try:
-    import torch  # type: ignore[no-redef]
+    import torch
 
     HAS_TORCH = True
 except ImportError:
@@ -60,7 +60,7 @@ class Candidate:
     """
 
     data: Any
-    modality: Modality
+    modality: Modality | str
     features: dict | None = None
 
     def __post_init__(self) -> None:

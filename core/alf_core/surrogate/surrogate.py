@@ -17,6 +17,7 @@ from typing import Union
 
 import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
+from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.enums import ProblemType
 from alf_core.model.base_model import BaseModel
 
@@ -39,15 +40,20 @@ class Surrogate:
         train_data: LabelledCandidates,
         val_data: LabelledCandidates,
         problem_type: ProblemType,
-    ) -> None:
+    ) -> list[SurrogateEpochMetrics]:
         """Fit the surrogate model on training and validation data.
 
         Args:
             train_data: Labeled candidates for training.
             val_data: Labeled candidates for validation.
             problem_type: Type of problem (regression, binary, or multiclass).
+
+        Returns:
+            List of SurrogateEpochMetrics, one per epoch trained. Empty if the
+            underlying model does not track per-epoch metrics.
         """
         self.model.train(train_data, val_data, problem_type=problem_type)
+        return self.model.get_epoch_metrics()
 
     def predict(self, candidates: list[Candidate]) -> Predictions:
         """Predict scores for the given candidates.
