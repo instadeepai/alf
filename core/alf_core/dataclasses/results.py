@@ -18,7 +18,8 @@ from typing import Union
 
 import numpy as np
 from alf_core.dataclasses.predictions import Predictions
-from alf_core.utils.metrics import metric_registry
+from alf_core.enums import ProblemType
+from alf_core.utils.metrics import classification_metric_registry, metric_registry
 
 
 @dataclass
@@ -28,14 +29,16 @@ class Results:
     Attributes:
         targets: A numpy array of ground truth target values.
         predictions: A Predictions object containing model predictions.
+        problem_type: Type of problem determining which metrics are computed.
     """
 
     targets: np.ndarray
     predictions: Predictions
+    problem_type: ProblemType
 
     def __post_init__(self) -> None:
         """Validate inputs and compute metrics."""
-        assert len(self.targets) == len(self.predictions.means), (
+        assert self.targets.shape[0] == self.predictions.means.shape[0], (
             "Targets and predictions must have the same length"
         )
         self.metrics = self.compute_metrics()
@@ -43,19 +46,27 @@ class Results:
     def compute_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Compute evaluation metrics based on predictions and targets.
 
+        For regression, routes to the variance-aware regression registry.
+        For classification (binary or multiclass), routes to the classification
+        metric registry using the probability array stored in ``predictions.means``.
+
         Returns:
-            A dictionary of metric names to their computed values. The metrics
-            depend on whether variances are available.
+            A dictionary of metric names to their computed values.
         """
         metrics: dict[str, Union[float, int, np.number]] = {}
-        metrics_dict = (
-            metric_registry.get_metrics_not_requiring_variance()
-            if self.predictions.variances is None
-            else metric_registry.get_metrics_requiring_variance()
-        )
-        for _, metric_fn in metrics_dict.items():
-            metrics.update(
-                metric_fn(self.predictions.means, self.predictions.variances, self.targets)
+
+        if self.problem_type == ProblemType.REGRESSION:
+            metrics_dict = (
+                metric_registry.get_metrics_not_requiring_variance()
+                if self.predictions.variances is None
+                else metric_registry.get_metrics_requiring_variance()
             )
+            for _, metric_fn in metrics_dict.items():
+                metrics.update(
+                    metric_fn(self.predictions.means, self.predictions.variances, self.targets)
+                )
+        else:
+            for _, metric_fn in classification_metric_registry.metrics.items():
+                metrics.update(metric_fn(self.predictions.means, self.targets))
 
         return metrics

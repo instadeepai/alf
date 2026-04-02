@@ -81,13 +81,17 @@ class Predictions:
             and ensemble predictions.
         """
         predictions_list = []
+        is_classification = self.means.ndim == 2
+
         for i in range(len(self.means)):
-            record_i = {
-                "sequence": candidates[i].data,
-                "mean": self.means[i],
-                "variance": self.variances[i] if self.variances is not None else 0,
-                "targets": targets[i],
-            }
+            record_i: dict = {"sequence": candidates[i].data, "targets": targets[i]}
+
+            if is_classification:
+                for cls_idx in range(self.means.shape[1]):
+                    record_i[f"prob_class_{cls_idx}"] = self.means[i, cls_idx]
+            else:
+                record_i["mean"] = self.means[i]
+                record_i["variance"] = self.variances[i] if self.variances is not None else 0
 
             if self.empirical_dist is not None:
                 for j in range(self.empirical_dist.shape[1]):

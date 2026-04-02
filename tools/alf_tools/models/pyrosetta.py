@@ -189,6 +189,7 @@ class PyRosetta(BaseModel):
         self,
         train_data: LabelledCandidates,
         val_data: LabelledCandidates | None = None,
+        **kwargs: Any,
     ) -> None:
         """Training is not implemented for this model.
 

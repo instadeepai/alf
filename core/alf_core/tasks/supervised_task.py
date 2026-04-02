@@ -58,6 +58,7 @@ class SupervisedTask(BaseTask):
         state.surrogate.fit(
             train_data=state.dataset.train_dataset,
             val_data=state.dataset.validation_dataset,
+            problem_type=state.problem_type,
         )
         t1 = time.perf_counter()
         state.round_metrics = {"tell_time": t1 - t0}

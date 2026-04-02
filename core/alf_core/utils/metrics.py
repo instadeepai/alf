@@ -18,6 +18,13 @@ from typing import Any, Callable, Union
 
 import numpy as np
 from scipy.stats import norm, pearsonr, spearmanr
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 
 
 def check_inputs(means: np.ndarray, targets: np.ndarray) -> None:
@@ -94,8 +101,9 @@ class MetricRegistry:
         return {name: fn for name, fn in self.metrics.items() if not self.variance_required[name]}
 
 
-# Create the global registry instance
+# Create the global registry instances
 metric_registry = MetricRegistry()
+classification_metric_registry = MetricRegistry()
 
 
 def requires_variance(metric_fn: Callable) -> Callable:
@@ -154,6 +162,34 @@ def no_variance_required(metric_fn: Callable) -> Callable:
 
     # Register the metric without variance requirement
     metric_registry.register(metric_fn.__name__, wrapper, requires_variance=False)
+    return wrapper
+
+
+def classification_metric(metric_fn: Callable) -> Callable:
+    """Decorator to register a classification metric.
+
+    Automatically registers the metric in the classification registry and applies
+    basic input validation. The decorated function receives ``(probs, targets)``
+    where ``probs`` has shape ``(n_samples, num_classes)`` and ``targets`` has
+    shape ``(n_samples,)``.
+
+    Args:
+        metric_fn: The metric function to decorate.
+
+    Returns:
+        Wrapped metric function with validation and registration.
+    """
+
+    @wraps(metric_fn)
+    def wrapper(probs: np.ndarray, targets: np.ndarray) -> Any:
+        assert probs.ndim == 2, f"probs must be 2D, got shape {probs.shape}"
+        assert len(probs) != 0, "Empty input arrays"
+        assert probs.shape[0] == targets.shape[0], (
+            f"probs and targets batch size mismatch: {probs.shape[0]} vs {targets.shape[0]}"
+        )
+        return metric_fn(probs, targets)
+
+    classification_metric_registry.register(metric_fn.__name__, wrapper, requires_variance=False)
     return wrapper
 
 
@@ -678,3 +714,87 @@ def regret_ucb_alpha_sweep(
 
         regret_alpha_list.update(regret_alpha)
     return regret_alpha_list
+
+
+# ---------------------------------------------------------------------------
+# Classification metrics
+# ---------------------------------------------------------------------------
+
+
+@classification_metric
+def accuracy(probs: np.ndarray, targets: np.ndarray) -> dict[str, float]:
+    """Compute classification accuracy.
+
+    Args:
+        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
+        targets: Array of shape (n_samples,). Integer class labels.
+
+    Returns:
+        {"accuracy": accuracy float}
+    """
+    preds = np.argmax(probs, axis=1)
+    return {"accuracy": float(accuracy_score(targets, preds))}
+
+
+@classification_metric
+def f1(probs: np.ndarray, targets: np.ndarray) -> dict[str, float]:
+    """Compute macro-averaged F1 score.
+
+    Args:
+        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
+        targets: Array of shape (n_samples,). Integer class labels.
+
+    Returns:
+        {"f1": macro F1 float}
+    """
+    preds = np.argmax(probs, axis=1)
+    return {"f1": float(f1_score(targets, preds, average="macro", zero_division=0))}
+
+
+@classification_metric
+def precision(probs: np.ndarray, targets: np.ndarray) -> dict[str, float]:
+    """Compute macro-averaged precision.
+
+    Args:
+        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
+        targets: Array of shape (n_samples,). Integer class labels.
+
+    Returns:
+        {"precision": macro precision float}
+    """
+    preds = np.argmax(probs, axis=1)
+    return {"precision": float(precision_score(targets, preds, average="macro", zero_division=0))}
+
+
+@classification_metric
+def recall(probs: np.ndarray, targets: np.ndarray) -> dict[str, float]:
+    """Compute macro-averaged recall.
+
+    Args:
+        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
+        targets: Array of shape (n_samples,). Integer class labels.
+
+    Returns:
+        {"recall": macro recall float}
+    """
+    preds = np.argmax(probs, axis=1)
+    return {"recall": float(recall_score(targets, preds, average="macro", zero_division=0))}
+
+
+@classification_metric
+def auc_roc(probs: np.ndarray, targets: np.ndarray) -> dict[str, float]:
+    """Compute Area Under the ROC Curve (AUC-ROC).
+
+    For binary classification, uses the positive-class probabilities.
+    For multiclass, uses one-vs-rest averaging.
+
+    Args:
+        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
+        targets: Array of shape (n_samples,). Integer class labels.
+
+    Returns:
+        {"auc_roc": AUC-ROC float}
+    """
+    if probs.shape[1] == 2:
+        return {"auc_roc": float(roc_auc_score(targets, probs[:, 1]))}
+    return {"auc_roc": float(roc_auc_score(targets, probs, multi_class="ovr"))}

@@ -23,6 +23,7 @@ from alf_core.dataclasses import LabelledCandidates
 if TYPE_CHECKING:
     from alf_core.dataclasses import Predictions
     from alf_core.dataset.base_dataset import BaseDataset
+    from alf_core.enums import ProblemType
     from alf_core.surrogate.surrogate import Surrogate
 
 
@@ -46,6 +47,15 @@ class State:
     history: list = field(default_factory=list)
     round_metrics: dict[str, Any] = field(default_factory=dict)
     round_predictions: "Predictions" | None = None
+
+    @property
+    def problem_type(self) -> "ProblemType":
+        """The problem type, as declared in the dataset configuration.
+
+        Returns:
+            ProblemType enum value from the dataset config.
+        """
+        return self.dataset.config.problem_type
 
     def update(self, acquired_candidates: LabelledCandidates) -> None:
         """Update the state with newly acquired candidates.

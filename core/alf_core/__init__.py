@@ -18,6 +18,7 @@ from alf_core.dataclasses import (
     LabelledCandidates,
     Modality,
     Predictions,
+    ProblemType,
     Results,
     State,
 )

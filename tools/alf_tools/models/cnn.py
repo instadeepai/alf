@@ -21,6 +21,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
+from alf_core.enums import ProblemType
 from torch.utils.data import DataLoader, TensorDataset
 
 from alf_tools.models.utils import (
@@ -43,6 +44,8 @@ class CNNModelConfig:
         num_conv_layers: Number of convolutional layers.
         fc_hidden_dim: Dimension of fully connected hidden layers.
         dropout: Dropout rate.
+        num_classes: Number of classes for classification tasks (always the actual
+            class count, e.g. 2 for binary). Ignored for regression. Defaults to 2.
     """
 
     num_filters: int = 128
@@ -50,6 +53,7 @@ class CNNModelConfig:
     num_conv_layers: int = 3
     fc_hidden_dim: int = 256
     dropout: float = 0.3
+    num_classes: int = 2
 
 
 @dataclass
@@ -70,10 +74,10 @@ class CNNTrainConfig:
 
 
 class SequenceCNN(nn.Module):
-    """Simple 1D CNN for sequence regression.
+    """Simple 1D CNN for sequence prediction.
 
     Architecture:
-    - One-hot encoding → Conv1D layers → Fully connected → Scalar output
+    - One-hot encoding → Conv1D layers → Fully connected → output
     """
 
     def __init__(
@@ -85,6 +89,7 @@ class SequenceCNN(nn.Module):
         num_conv_layers: int = 3,
         fc_hidden_dim: int = 256,
         dropout: float = 0.3,
+        output_neurons: int = 1,
     ):
         """Initialize the SequenceCNN model.
 
@@ -96,8 +101,11 @@ class SequenceCNN(nn.Module):
             num_conv_layers: Number of convolutional layers.
             fc_hidden_dim: Dimension of fully connected hidden layers.
             dropout: Dropout probability.
+            output_neurons: Number of output neurons. Use 1 for regression and
+                binary classification; use num_classes for multiclass.
         """
         super().__init__()
+        self._output_neurons = output_neurons
 
         # Convolutional layers
         conv_layers = []
@@ -125,7 +133,7 @@ class SequenceCNN(nn.Module):
             nn.Linear(fc_hidden_dim, fc_hidden_dim // 2),
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(fc_hidden_dim // 2, 1),
+            nn.Linear(fc_hidden_dim // 2, output_neurons),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -135,12 +143,15 @@ class SequenceCNN(nn.Module):
             x: One-hot encoded sequences (batch_size, alphabet_size, seq_length).
 
         Returns:
-            Fitness predictions (batch_size,).
+            Logits of shape (batch_size,) when output_neurons==1, else
+            (batch_size, output_neurons).
         """
         x = self.conv_block(x)
         x = x.view(x.size(0), -1)
         x = self.fc_layers(x)
-        return x.squeeze(-1)
+        if self._output_neurons == 1:
+            return x.squeeze(-1)
+        return x
 
 
 class CNNModel(BaseModel):
@@ -180,6 +191,9 @@ class CNNModel(BaseModel):
         # Model initialized on first fit
         self.model: SequenceCNN | None = None
         self.seq_length: int | None = None
+
+        # Problem type — set at train() time from kwargs
+        self._problem_type: ProblemType = ProblemType.REGRESSION
 
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
@@ -232,7 +246,8 @@ class CNNModel(BaseModel):
             DataLoader for the data.
         """
         x = self.featurise(data).to(self.device)
-        y = torch.tensor(data.labels, dtype=torch.float32).to(self.device)
+        label_dtype = torch.long if self._problem_type == ProblemType.MULTICLASS else torch.float32
+        y = torch.tensor(data.labels, dtype=label_dtype).to(self.device)
         dataset = TensorDataset(x, y)
         return DataLoader(
             dataset,
@@ -280,17 +295,18 @@ class CNNModel(BaseModel):
         train_preds = np.concatenate(train_predictions_all)
         train_targets = np.concatenate(train_targets_all)
 
-        # Use Predictions to compute all metrics
-        train_predictions_obj = Predictions(means=train_preds, variances=None)
-        # Handle case where dataset is too small for correlation metrics
-        if len(train_preds) >= 2:
+        # Regression: compute regression metrics from logits == predictions
+        # Classification: skip (logits are not probabilities; metrics computed at eval time)
+        if self._problem_type == ProblemType.REGRESSION and len(train_preds) >= 2:
+            train_predictions_obj = Predictions(means=train_preds, variances=None)
             train_metrics = Results(
-                predictions=train_predictions_obj, targets=train_targets
+                predictions=train_predictions_obj, targets=train_targets, problem_type=ProblemType.REGRESSION
             ).metrics
-        else:
-            # Only compute MSE for very small datasets
-            mse = np.mean((train_preds - train_targets) ** 2)
+        elif self._problem_type == ProblemType.REGRESSION:
+            mse = float(np.mean((train_preds - train_targets) ** 2))
             train_metrics = {"mse": mse}
+        else:
+            train_metrics = {}
 
         return avg_train_loss, train_metrics
 
@@ -327,15 +343,16 @@ class CNNModel(BaseModel):
         val_preds = np.concatenate(val_predictions_all)
         val_targets = np.concatenate(val_targets_all)
 
-        # Use Predictions to compute all metrics
-        val_predictions_obj = Predictions(means=val_preds, variances=None)
-        # Handle case where dataset is too small for correlation metrics
-        if len(val_preds) >= 2:
-            val_metrics = Results(predictions=val_predictions_obj, targets=val_targets).metrics
-        else:
-            # Only compute MSE for very small datasets
-            mse = np.mean((val_preds - val_targets) ** 2)
+        # Regression: compute regression metrics from logits == predictions
+        # Classification: skip (logits are not probabilities; metrics computed at eval time)
+        if self._problem_type == ProblemType.REGRESSION and len(val_preds) >= 2:
+            val_predictions_obj = Predictions(means=val_preds, variances=None)
+            val_metrics = Results(predictions=val_predictions_obj, targets=val_targets, problem_type=ProblemType.REGRESSION).metrics
+        elif self._problem_type == ProblemType.REGRESSION:
+            mse = float(np.mean((val_preds - val_targets) ** 2))
             val_metrics = {"mse": mse}
+        else:
+            val_metrics = {}
 
         return avg_val_loss, val_metrics
 
@@ -373,17 +390,28 @@ class CNNModel(BaseModel):
         self,
         train_data: LabelledCandidates,
         val_data: LabelledCandidates | None = None,
+        **kwargs: Any,
     ) -> None:
         """Train the CNN model.
 
         Args:
             train_data: Training data containing sequences and oracle values.
             val_data: Optional validation data.
+            **kwargs: Additional keyword arguments. Recognises ``problem_type``
+                (``ProblemType``) to configure loss, label dtype, and output layer.
         """
-        logger.info(f"Training CNN with {len(train_data)} samples")
+        self._problem_type = kwargs.get("problem_type", ProblemType.REGRESSION)
+        logger.info(
+            f"Training CNN with {len(train_data)} samples (problem_type={self._problem_type})"
+        )
 
-        # Initialize model on first call
-        if self.model is None:
+        # Determine output neurons: 1 for regression/binary, num_classes for multiclass
+        output_neurons = (
+            self.model_config.num_classes if self._problem_type == ProblemType.MULTICLASS else 1
+        )
+
+        # Initialize model on first call or when output shape changes
+        if self.model is None or self.model._output_neurons != output_neurons:
             self.seq_length = len(train_data.data[0])
             self.model = SequenceCNN(
                 seq_length=self.seq_length,
@@ -393,9 +421,12 @@ class CNNModel(BaseModel):
                 num_conv_layers=self.model_config.num_conv_layers,
                 fc_hidden_dim=self.model_config.fc_hidden_dim,
                 dropout=self.model_config.dropout,
+                output_neurons=output_neurons,
             ).to(self.device)
-            total_params = sum(p.numel() for p in self.model.parameters())
-            logger.info(f"CNN initialized with {total_params:,} parameters")
+
+        assert self.model is not None  # guaranteed by the block above
+        total_params = sum(p.numel() for p in self.model.parameters())
+        logger.info(f"CNN initialized with {total_params:,} parameters")
 
         # Prepare data loaders
         train_loader = self._prepare_data_loader(train_data, shuffle=True)
@@ -405,7 +436,12 @@ class CNNModel(BaseModel):
 
         # Setup training
         optimizer = optim.Adam(self.model.parameters(), lr=self.train_config.learning_rate)
-        criterion = nn.MSELoss()
+        if self._problem_type == ProblemType.REGRESSION:
+            criterion: nn.Module = nn.MSELoss()
+        elif self._problem_type == ProblemType.BINARY:
+            criterion = nn.BCEWithLogitsLoss()
+        else:
+            criterion = nn.CrossEntropyLoss()
 
         # Training loop
         for epoch in range(self.train_config.num_epochs):
@@ -444,15 +480,21 @@ class CNNModel(BaseModel):
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Make predictions for candidates.
 
+        For regression, returns raw scalar predictions.
+        For binary classification, returns class probabilities of shape
+        ``(n_samples, 2)`` via sigmoid on the single output neuron.
+        For multiclass, returns softmax probabilities of shape
+        ``(n_samples, num_classes)``.
+
         Args:
-            candidate_points: List of candidates to predict fitness for.
+            candidate_points: List of candidates to predict for.
 
         Returns:
-            Predictions containing predicted fitness values.
+            Predictions containing means of shape (n_samples,) for regression
+            or (n_samples, num_classes) for classification.
 
         Raises:
-            RuntimeError: If the model is not trained.
-            ValueError: If the input is not a list of candidates.
+            RuntimeError: If the model has not been trained yet.
         """
         if self.model is None:
             raise RuntimeError("Model not trained. Call fit() first.")
@@ -461,9 +503,19 @@ class CNNModel(BaseModel):
         x = self.featurise(candidate_points).to(self.device)
 
         with torch.no_grad():
-            predictions = self.model(x).cpu().numpy()
+            logits = self.model(x)
 
-        return Predictions(means=predictions)
+        if self._problem_type == ProblemType.REGRESSION:
+            return Predictions(means=logits.cpu().numpy())
+
+        if self._problem_type == ProblemType.BINARY:
+            pos_prob = torch.sigmoid(logits).cpu().numpy()  # (n,)
+            probs = np.stack([1.0 - pos_prob, pos_prob], axis=1)  # (n, 2)
+            return Predictions(means=probs)
+
+        # MULTICLASS
+        probs = torch.softmax(logits, dim=-1).cpu().numpy()  # (n, num_classes)
+        return Predictions(means=probs)
 
     def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
         """Sample candidate points from the model."""

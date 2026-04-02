@@ -43,12 +43,14 @@ class BaseModel(abc.ABC):
         self,
         train_data: LabelledCandidates,
         val_data: LabelledCandidates,
+        **kwargs: Any,
     ) -> None:
         """Train the model on the provided training and validation data.
 
         Args:
             train_data: Labeled candidates for training.
             val_data: Labeled candidates for validation.
+            **kwargs: Additional keyword arguments (e.g. ``problem_type``).
         """
         pass
 

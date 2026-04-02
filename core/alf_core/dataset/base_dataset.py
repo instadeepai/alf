@@ -25,6 +25,7 @@ import numpy as np
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataclasses.labelled_candidates import Candidate, LabelledCandidates
 from alf_core.dataset.splitting_utils import split_dataset
+from alf_core.enums import ProblemType
 from pydantic import BaseModel, Field, model_validator
 
 FloatBetweenZeroAndOne = Annotated[float, Field(ge=0, le=1)]
@@ -52,21 +53,28 @@ class BaseDatasetConfig(BaseModel):
     train_ratio: FloatBetweenZeroAndOne
     validation_frac: FloatBetweenZeroAndOne
     test_ratio: FloatBetweenZeroAndOne
-    split_type: Literal["random", "low_vs_high"] = "random"
+    split_type: Literal["random", "low_vs_high", "stratified"] = "random"
+    problem_type: ProblemType
     max_candidate_pool: int | None = None
 
     @model_validator(mode="after")
     def validate_config(self) -> Self:
-        """Validate that train and test ratios don't exceed 1.
+        """Validate dataset configuration.
 
         Returns:
             The validated configuration instance.
 
         Raises:
             ValueError: If train_ratio + test_ratio exceeds 1.
+            ValueError: If split_type is "stratified" with a REGRESSION problem_type.
         """
         if self.train_ratio + self.test_ratio > 1:
             raise ValueError("train_ratio + test_ratio must be <= 1")
+        if self.split_type == "stratified" and self.problem_type == ProblemType.REGRESSION:
+            raise ValueError(
+                "split_type='stratified' requires a classification problem_type "
+                "(BINARY or MULTICLASS), not REGRESSION."
+            )
         return self
 
 

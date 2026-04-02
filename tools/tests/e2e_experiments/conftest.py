@@ -58,12 +58,14 @@ class RandomModel(BaseModel):
         self,
         train_data: LabelledCandidates,
         val_data: LabelledCandidates,
+        **kwargs: Any,
     ) -> None:
         """Train the model, this is no-op for this model.
 
         Args:
             train_data: The training data.
             val_data: The validation data.
+            **kwargs: Additional keyword arguments (e.g. ``problem_type``).
         """
         pass
 

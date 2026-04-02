@@ -17,6 +17,7 @@ from typing import Union
 
 import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
+from alf_core.enums import ProblemType
 from alf_core.model.base_model import BaseModel
 
 
@@ -37,14 +38,16 @@ class Surrogate:
         self,
         train_data: LabelledCandidates,
         val_data: LabelledCandidates,
+        problem_type: ProblemType,
     ) -> None:
         """Fit the surrogate model on training and validation data.
 
         Args:
             train_data: Labeled candidates for training.
             val_data: Labeled candidates for validation.
+            problem_type: Type of problem (regression, binary, or multiclass).
         """
-        self.model.train(train_data, val_data)
+        self.model.train(train_data, val_data, problem_type=problem_type)
 
     def predict(self, candidates: list[Candidate]) -> Predictions:
         """Predict scores for the given candidates.

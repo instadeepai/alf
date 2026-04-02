@@ -29,7 +29,7 @@ def split_dataset(
     """Split dataset into train, validation, test, and candidate pool.
 
     Args:
-        split_type: Type of split to perform ("random" or "low_vs_high").
+        split_type: Type of split to perform ("random", "low_vs_high", or "stratified").
         dataset: Dataset to split.
         train_size: Number of samples for training set.
         validation_size: Number of samples for validation set.
@@ -41,7 +41,7 @@ def split_dataset(
         Dictionary with keys "train", "validation", "test", and "candidate_pool".
 
     Raises:
-        ValueError: If split_type is not "random" or "low_vs_high".
+        ValueError: If split_type is not "random", "low_vs_high", or "stratified".
     """
     if split_type == "random":
         return split_random(
@@ -49,6 +49,10 @@ def split_dataset(
         )
     elif split_type == "low_vs_high":
         return split_low_vs_high(
+            dataset, train_size, validation_size, test_size, candidate_pool_size, seed
+        )
+    elif split_type == "stratified":
+        return split_stratified(
             dataset, train_size, validation_size, test_size, candidate_pool_size, seed
         )
     else:
@@ -151,4 +155,66 @@ def split_low_vs_high(
         "candidate_pool": LabelledCandidates(
             *shuffled_high[test_size : test_size + candidate_pool_size]
         ),
+    }
+
+
+def split_stratified(
+    dataset: LabelledCandidates,
+    train_size: int,
+    validation_size: int,
+    test_size: int,
+    candidate_pool_size: int,
+    seed: int,
+) -> dict[str, LabelledCandidates]:
+    """Split dataset preserving class proportions across all splits.
+
+    For each class in the dataset, samples are proportionally distributed
+    across train, validation, test, and candidate pool splits. Within each
+    class the samples are randomly shuffled before assignment.
+
+    Args:
+        dataset: Dataset to split. Labels must be integer class indices.
+        train_size: Total number of samples for training set.
+        validation_size: Total number of samples for validation set.
+        test_size: Total number of samples for test set.
+        candidate_pool_size: Total number of samples for candidate pool.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        Dictionary with keys "train", "validation", "test", and "candidate_pool".
+    """
+    labels = dataset.labels.astype(int)
+    n = len(labels)
+    rng = np.random.RandomState(seed)
+
+    classes = np.unique(labels)
+    split_indices: dict[str, list[int]] = {
+        "train": [],
+        "validation": [],
+        "test": [],
+        "candidate_pool": [],
+    }
+
+    for cls in classes:
+        cls_idx = np.where(labels == cls)[0]
+        cls_idx = rng.permutation(cls_idx)
+        frac = len(cls_idx) / n
+
+        n_train = round(frac * train_size)
+        n_val = round(frac * validation_size)
+        n_test = round(frac * test_size)
+        n_pool = round(frac * candidate_pool_size)
+
+        i = 0
+        split_indices["train"].extend(cls_idx[i : i + n_train].tolist())
+        i += n_train
+        split_indices["validation"].extend(cls_idx[i : i + n_val].tolist())
+        i += n_val
+        split_indices["test"].extend(cls_idx[i : i + n_test].tolist())
+        i += n_test
+        split_indices["candidate_pool"].extend(cls_idx[i : i + n_pool].tolist())
+
+    return {
+        key: LabelledCandidates(*dataset[np.array(indices)])
+        for key, indices in split_indices.items()
     }

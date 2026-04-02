@@ -12,9 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_core.dataclasses.candidate import Candidate, Modality
-from alf_core.dataclasses.labelled_candidates import LabelledCandidates
-from alf_core.dataclasses.predictions import Predictions
-from alf_core.dataclasses.results import Results
-from alf_core.dataclasses.state import State
-from alf_core.enums import ProblemType
+from enum import Enum
+
+
+class ProblemType(str, Enum):
+    """Enum for the type of machine learning problem.
+
+    Attributes:
+        REGRESSION: Continuous output prediction.
+        BINARY: Binary classification (two classes).
+        MULTICLASS: Multi-class classification (three or more classes).
+    """
+
+    REGRESSION = "regression"
+    BINARY = "binary"
+    MULTICLASS = "multiclass"

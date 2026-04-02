@@ -44,6 +44,7 @@ def gfp_dataset():
         validation_frac=0.2,
         test_ratio=0.2,
         split_type="random",
+        problem_type="regression",
     )
     return GFP(config)
 

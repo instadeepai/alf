@@ -196,3 +196,46 @@ class TestPredictionsToDataFrame:
         # Check that no ensemble columns exist
         ensemble_cols = [col for col in df.columns if col.startswith("ensemble_pred_")]
         assert len(ensemble_cols) == 0
+
+
+class TestPredictionsToDataframeClassification:
+    """Predictions.to_dataframe() expands 2D means into prob_class_N columns."""
+
+    def _make_candidates(self, n: int):
+        return [Candidate(data=f"SEQ{i}", modality=Modality.SEQUENCE) for i in range(n)]
+
+    def test_binary_columns(self):
+        probs = np.array([[0.8, 0.2], [0.3, 0.7], [0.9, 0.1], [0.2, 0.8]])
+        targets = np.array([0.0, 1.0, 0.0, 1.0])
+        preds = Predictions(means=probs)
+        df = preds.to_dataframe(self._make_candidates(4), targets)
+        assert "prob_class_0" in df.columns
+        assert "prob_class_1" in df.columns
+        assert "mean" not in df.columns
+        assert "variance" not in df.columns
+
+    def test_multiclass_columns(self):
+        probs = np.array([[0.7, 0.2, 0.1], [0.1, 0.7, 0.2], [0.1, 0.2, 0.7]])
+        targets = np.array([0.0, 1.0, 2.0])
+        preds = Predictions(means=probs)
+        df = preds.to_dataframe(self._make_candidates(3), targets)
+        assert "prob_class_0" in df.columns
+        assert "prob_class_1" in df.columns
+        assert "prob_class_2" in df.columns
+
+    def test_regression_columns_unchanged(self):
+        means = np.array([1.0, 2.0, 3.0])
+        targets = np.array([1.1, 1.9, 3.1])
+        preds = Predictions(means=means)
+        df = preds.to_dataframe(self._make_candidates(3), targets)
+        assert "mean" in df.columns
+        assert "variance" in df.columns
+        assert "prob_class_0" not in df.columns
+
+    def test_prob_values_correct(self):
+        probs = np.array([[0.3, 0.7], [0.8, 0.2]])
+        targets = np.array([1.0, 0.0])
+        preds = Predictions(means=probs)
+        df = preds.to_dataframe(self._make_candidates(2), targets)
+        assert df["prob_class_0"].tolist() == pytest.approx([0.3, 0.8])
+        assert df["prob_class_1"].tolist() == pytest.approx([0.7, 0.2])
