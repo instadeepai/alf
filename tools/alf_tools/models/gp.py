@@ -22,6 +22,7 @@ import gpytorch
 import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
+from alf_core.enums import ProblemType
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from jaxtyping import Float
 
@@ -534,12 +535,14 @@ class GPModel(BaseModel):
         self,
         train_data: LabelledCandidates,
         val_data: LabelledCandidates | None = None,
+        problem_type: ProblemType = ProblemType.REGRESSION,
     ) -> None:
         """Train the GP model by optimizing hyperparameters.
 
         Args:
             train_data: Training data containing sequences and oracle values.
             val_data: Optional validation data (used for monitoring, not for training).
+            problem_type: Type of problem determining which metrics are computed.
 
         Note:
             For exact GPs, all training data is used for predictions. Validation
@@ -582,7 +585,11 @@ class GPModel(BaseModel):
             train_vars = train_preds.variance.cpu().numpy()
 
         train_predictions_obj = Predictions(means=train_means, variances=train_vars)
-        train_results = Results(predictions=train_predictions_obj, targets=train_data.labels, problem_type="regression")
+        train_results = Results(
+            predictions=train_predictions_obj,
+            targets=train_data.labels,
+            problem_type=problem_type,
+        )
         self.training_metrics.update({
             f"final_train_{k}": v for k, v in train_results.metrics.items()
         })
@@ -592,7 +599,11 @@ class GPModel(BaseModel):
         # Evaluate on validation data if provided
         if val_data is not None and len(val_data) > 0:
             val_predictions = self.predict(val_data.candidates)
-            val_results = Results(predictions=val_predictions, targets=val_data.labels, problem_type="regression")
+            val_results = Results(
+                predictions=val_predictions,
+                targets=val_data.labels,
+                problem_type=problem_type,
+            )
             self.training_metrics.update({
                 f"final_val_{k}": v for k, v in val_results.metrics.items()
             })
