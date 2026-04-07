@@ -582,7 +582,7 @@ class GPModel(BaseModel):
             train_vars = train_preds.variance.cpu().numpy()
 
         train_predictions_obj = Predictions(means=train_means, variances=train_vars)
-        train_results = Results(predictions=train_predictions_obj, targets=train_data.labels)
+        train_results = Results(predictions=train_predictions_obj, targets=train_data.labels, problem_type="regression")
         self.training_metrics.update({
             f"final_train_{k}": v for k, v in train_results.metrics.items()
         })
@@ -592,7 +592,7 @@ class GPModel(BaseModel):
         # Evaluate on validation data if provided
         if val_data is not None and len(val_data) > 0:
             val_predictions = self.predict(val_data.candidates)
-            val_results = Results(predictions=val_predictions, targets=val_data.labels)
+            val_results = Results(predictions=val_predictions, targets=val_data.labels, problem_type="regression")
             self.training_metrics.update({
                 f"final_val_{k}": v for k, v in val_results.metrics.items()
             })
