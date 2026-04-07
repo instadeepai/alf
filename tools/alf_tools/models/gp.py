@@ -22,8 +22,8 @@ import gpytorch
 import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
-from alf_core.enums import ProblemType
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_core.enums import ProblemType
 from jaxtyping import Float
 
 from alf_tools.models.utils.sequence_utils import (
