@@ -94,5 +94,5 @@ preview = true
 
 [lint.per-file-ignores]
 "__init__.py" = ["F401", "D104"]
-"tests/*" = ["DOC"]
+"**/tests/**" = ["D", "DOC"]
 "tutorials/**/*.ipynb" = ["D", "E501", "W293", "DOC"]

@@ -25,6 +25,8 @@ from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Resu
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from jaxtyping import Float
 
+from alf_tools.models.base_train_config import BaseTrainConfig
+from alf_tools.models.utils.normalizer import InputNormalizer, OutputStandardizer
 from alf_tools.models.utils.sequence_utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
@@ -72,8 +74,10 @@ class GPModelConfig:
 
 
 @dataclass
-class GPTrainConfig:
+class GPTrainConfig(BaseTrainConfig):
     """Configuration for Gaussian Process training.
+
+    Inherits standardize_outputs and normalize_inputs from BaseTrainConfig.
 
     Args:
         learning_rate: Learning rate for the optimizer.
@@ -316,6 +320,10 @@ class GPModel(BaseModel):
         self.train_x: Float[torch.Tensor, "n_samples n_features"] | None = None
         self.train_y: Float[torch.Tensor, "n_samples"] | None = None
 
+        # Normalizers — fitted on each train() call, used at predict() time
+        self._output_standardizer: OutputStandardizer | None = None
+        self._input_normalizer: InputNormalizer | None = None
+
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
@@ -550,7 +558,25 @@ class GPModel(BaseModel):
 
         # Featurize training data
         train_x = self.featurise(train_data).to(self.device)
-        train_y = torch.tensor(train_data.labels, dtype=torch.float32).to(self.device)
+        train_y_np = train_data.labels.astype(np.float64)
+
+        # Fit and apply input normalizer
+        if self.train_config.normalize_inputs:
+            self._input_normalizer = InputNormalizer()
+            self._input_normalizer.fit(train_x)
+            train_x = self._input_normalizer.transform(train_x)
+        else:
+            self._input_normalizer = None
+
+        # Fit and apply output standardizer
+        if self.train_config.standardize_outputs:
+            self._output_standardizer = OutputStandardizer()
+            self._output_standardizer.fit(train_y_np)
+            train_y_np = self._output_standardizer.transform(train_y_np)
+        else:
+            self._output_standardizer = None
+
+        train_y = torch.tensor(train_y_np, dtype=torch.float32).to(self.device)
 
         # Store training data for later predictions
         self.train_x = train_x
@@ -573,13 +599,18 @@ class GPModel(BaseModel):
         # Store training metrics
         self.training_metrics = train_metrics
 
-        # Evaluate on training data
+        # Evaluate on training data — inverse-transform to original scale for metrics
         self.gp_model.eval()
         self.likelihood.eval()
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
             train_preds = self.likelihood(self.gp_model(train_x))
             train_means = train_preds.mean.cpu().numpy()
             train_vars = train_preds.variance.cpu().numpy()
+
+        if self._output_standardizer is not None:
+            train_means, train_vars = self._output_standardizer.inverse_transform(
+                train_means, train_vars
+            )
 
         train_predictions_obj = Predictions(means=train_means, variances=train_vars)
         train_results = Results(predictions=train_predictions_obj, targets=train_data.labels)
@@ -621,11 +652,19 @@ class GPModel(BaseModel):
         # Featurize input
         test_x = self.featurise(candidate_points).to(self.device)
 
+        # Apply input normalization if fitted
+        if self._input_normalizer is not None:
+            test_x = self._input_normalizer.transform(test_x)
+
         # Make predictions with fast predictive variance computation
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
             predictions = self.likelihood(self.gp_model(test_x))
             means = predictions.mean.cpu().numpy()
             variances = predictions.variance.cpu().numpy()
+
+        # Inverse-transform to original label scale
+        if self._output_standardizer is not None:
+            means, variances = self._output_standardizer.inverse_transform(means, variances)
 
         return Predictions(means=means, variances=variances)
 
