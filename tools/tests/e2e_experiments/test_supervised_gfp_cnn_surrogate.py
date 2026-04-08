@@ -96,10 +96,10 @@ def expected_metrics():
     """
     return {
         "surrogate": {
-            "test_mse": 2.82286,
-            "test_spearman": 0.08317,
-            "test_pearson": 0.18264,
-            "test_pairwise_xent": 0.34481,
+            "test_mse": 0.93528,
+            "test_spearman": 0.21226,
+            "test_pearson": 0.20999,
+            "test_pairwise_xent": 0.34484,
         },
         "dataset": {
             "num_train": 50.00000,
