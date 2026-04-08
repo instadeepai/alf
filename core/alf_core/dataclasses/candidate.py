@@ -31,7 +31,7 @@ else:
     ]
 
 try:
-    import torch  # type: ignore[no-redef]
+    import torch
 
     HAS_TORCH = True
 except ImportError:
