@@ -17,7 +17,7 @@ import time
 from typing import Union
 
 import numpy as np
-from alf_core.dataclasses import Candidate, LabelledCandidates, TaskState
+from alf_core.dataclasses import Candidate, LabelledCandidates, State
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.model.base_model import BaseModel
 
@@ -38,8 +38,8 @@ class Oracle:
         self.scorer: BaseModel | BaseDataset = scorer
 
     def evaluate(
-        self, candidates: list[Candidate], state: TaskState
-    ) -> tuple[LabelledCandidates, TaskState]:
+        self, candidates: list[Candidate], state: State
+    ) -> tuple[LabelledCandidates, State]:
         """Evaluate candidates and return their labels.
 
         Args:
@@ -59,7 +59,7 @@ class Oracle:
                 candidates=candidates, labels=self.scorer.predict(candidates).means
             )
         t1 = time.perf_counter()
-        state.round_metrics.update({"oracle_time": t1 - t0})
+        state.round_metrics.metrics.update({"oracle_time": t1 - t0})
         return evaluated_candidates, state
 
     def get_metrics(self) -> dict[str, Union[float, int, np.number]]:

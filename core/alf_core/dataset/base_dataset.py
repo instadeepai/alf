@@ -52,7 +52,7 @@ class BaseDatasetConfig(BaseModel):
     train_ratio: FloatBetweenZeroAndOne
     validation_frac: FloatBetweenZeroAndOne
     test_ratio: FloatBetweenZeroAndOne
-    split_type: Literal["random", "low_vs_high"]
+    split_type: Literal["random", "low_vs_high"] = "random"
     max_candidate_pool: int | None = None
 
     @model_validator(mode="after")

@@ -9,6 +9,7 @@ description = "A Python package for performing active learning experiments."
 readme = "README.md"
 requires-python = ">=3.12,<3.14.1"
 dependencies = [
+    "beartype>=0.18.0",
     "numpy>=1.21.0",
     "pandas>=1.3.0",
     "pydantic",
@@ -18,18 +19,3 @@ dependencies = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["alf_core*"]
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
-
-[[tool.uv.index]]
-name = "pytorch-gpu"
-url = "https://download.pytorch.org/whl/cu121"
-explicit = true
-
-# For testing pytorch-cpu is enough. If it's otherwise, replace the index
-# with "pytorch-gpu"
-[tool.uv.sources]
-torch = { index = "pytorch-cpu" }

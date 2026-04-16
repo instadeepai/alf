@@ -9,9 +9,7 @@
 [![Tests and Linters 🧪](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml/badge.svg?branch=main)](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml)
 
 
-**ALF** is a Python package for performing active learning experiments to facilitate
-iterative optimization of design targets (e.g., proteins, molecules, materials) through
-intelligent candidate selection (data acquisition), model adaptation, and evaluation.
+**ALF** is an active learning framework for computational science, designed to optimize high-dimensional and combinatorially vast search spaces where data acquisition is expensive—from wet-lab experiments and physical measurements to costly simulations. ALF accelerates discovery of optimal designs (proteins, molecules, materials) through intelligent candidate selection, adaptive modeling, and efficient evaluation strategies.
 
 ## ✨ Features
 
@@ -19,6 +17,16 @@ intelligent candidate selection (data acquisition), model adaptation, and evalua
 - **Multiple Experiment Setups**: Multi-round optimization, supervised learning, and zero-shot evaluation
 - **Offline and Online Evaluation**: Dataset-based and model-based optimization scenarios
 - **Evaluation Metrics**: Metrics for prediction accuracy and uncertainty calibration
+
+## 📦 Package Architecture
+
+ALF is split into two packages:
+
+**alf-core** - Lightweight framework with base classes, core data structures, and minimal dependencies (numpy, pandas, scipy) - no ML framework dependencies. Use for custom implementations or when integrating into existing systems.
+
+**alf-tools** - Ready-to-use datasets, models, and acquisition functions with heavier dependencies (PyTorch). Depends on alf-core. Use for quick start and prototyping.
+
+Install only what you need: `alf-core` for minimal dependencies, or `alf-tools` (includes alf-core) for batteries-included implementations.
 
 ## 📦 Installation
 
@@ -44,7 +52,9 @@ For more information on creating personal access tokens, see [GitHub's documenta
 
 ## 📖 Documentation
 
-Full API documentation is available at **[instadeepai.github.io/alf](https://instadeepai.github.io/alf/)**
+- 📖 **[Full Documentation](https://instadeepai.github.io/alf/)** - Complete API reference
+- 🛠️ **[Contributing Guide](docs/CONTRIBUTING.md)** - How to extend ALF and contribute code
+- 📥 **[Installation Guide](docs/INSTALLATION.md)** - Detailed installation instructions
 
 ### Building Documentation Locally
 
@@ -78,7 +88,7 @@ To build and view the documentation on your local machine:
 ### Design Task
 
 ```python
-from alf_core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask, TerminalTaskStateLogger
+from alf_core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask, TerminalStateLogger
 from alf.tools.datasets.gfp import GFP
 from alf.tools.models.cnn import CNNModel
 from alf.tools.optimizer.acquisition_functions.greedy import Greedy
@@ -94,7 +104,7 @@ oracle = Oracle(scorer=dataset)
 # Run design task
 task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
 state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, task_state_loggers=[TerminalTaskStateLogger()], optimizer=optimizer, oracle=oracle)
+task.run(state=state, state_loggers=[TerminalStateLogger()], optimizer=optimizer, oracle=oracle)
 ```
 
 ## 📁 Project Structure
@@ -127,11 +137,22 @@ alf/
 
 ## 🎓 Tutorials
 
-Explore the tutorials to learn how to use ALF:
+### Experiment Tutorials
 
-- **[Offline Design Tutorial](tutorials/offline_design_tutorial.ipynb)** - Complete guide
-  to running offline design experiments
-- **[Example Scripts](tutorials/experiments/)** - Ready-to-run examples for all task types
+End-to-end guides for running active learning experiments:
+
+- **[Offline Design Tutorial](tutorials/experiments/offline_design_tutorial.ipynb)** - Dataset-based optimization
+- **[Online Design Tutorial](tutorials/experiments/online_design_tutorial.ipynb)** - Model-based optimization
+
+### Extension Tutorials
+
+Learn how to extend ALF's base classes for custom implementations:
+
+- **[Models](tutorials/extending_base_classes/models.ipynb)** - Create custom models for oracle/surrogate/generator roles
+- **[Datasets](tutorials/extending_base_classes/datasets.ipynb)** - Add custom data sources
+- **[Search Functions](tutorials/extending_base_classes/search_functions.ipynb)** - Implement custom search strategies
+- **[Acquisition Functions](tutorials/extending_base_classes/acquisition_functions.ipynb)** - Create custom acquisition strategies
+- **[Model Roles](tutorials/extending_base_classes/model_roles.ipynb)** - Oracle, Surrogate, and Generator patterns
 
 
 ## 🛠️ Development
@@ -140,7 +161,7 @@ Explore the tutorials to learn how to use ALF:
 
 ```bash
 # Clone the repository
-git clone https://github.com/instadeepai/alf.git
+git clone git@github.com:instadeepai/alf.git
 cd alf
 
 # Install all packages with development dependencies
@@ -171,12 +192,12 @@ uv run pre-commit run --all-files
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+We welcome contributions! To get started:
 
-1. Create a feature branch (`git checkout -b feature/amazing-feature`)
-2. Commit your changes (`git commit -m 'Add some amazing feature'`)
-3. Push to the branch (`git push origin feature/amazing-feature`)
-4. Open a Pull Request
+1. Read our **[Contributing Guide](docs/CONTRIBUTING.md)** for development setup and guidelines
+2. Check out the **[Extension Tutorials](tutorials/extending_base_classes/)** to learn how to extend ALF's base classes
+
+For questions or discussions, please open an issue.
 
 ## 📄 License
 

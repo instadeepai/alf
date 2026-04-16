@@ -19,11 +19,11 @@ from alf_core import (
     BaseDatasetConfig,
     DatasetSearch,
     DesignTask,
-    FileTaskStateLogger,
+    FileStateLogger,
     Optimizer,
     Oracle,
     Surrogate,
-    TerminalTaskStateLogger,
+    TerminalStateLogger,
 )
 from alf_tools.datasets import GFP
 from alf_tools.optimizer.acquisition_functions import Greedy
@@ -216,16 +216,16 @@ class TestDesignGFPRandomSurrogate:
         save_path = tmp_path / "design_gfp_random_surrogate"
         save_path.mkdir()
 
-        metrics_logger = TerminalTaskStateLogger()
-        file_logger = FileTaskStateLogger(output_path=save_path)
-        task_state_loggers = [metrics_logger, file_logger]
+        metrics_logger = TerminalStateLogger()
+        file_logger = FileStateLogger(output_path=save_path)
+        state_loggers = [metrics_logger, file_logger]
 
         # Create and run the design task
         task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
         state = task.setup(dataset=gfp_dataset, surrogate=surrogate_model)
         task.run(
             state=state,
-            task_state_loggers=task_state_loggers,
+            state_loggers=state_loggers,
             optimizer=optimizer,
             oracle=oracle,
         )

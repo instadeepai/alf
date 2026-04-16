@@ -38,7 +38,7 @@ class Predictions:
     empirical_dist: np.ndarray | None = None
 
     def __post_init__(self) -> None:
-        """Validate that predictions arrays have consistent lengths.
+        """Validate prediction arrays have consistent lengths.
 
         Raises:
             AssertionError: If means is empty, or if variances or empirical_dist

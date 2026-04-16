@@ -18,11 +18,11 @@ import pytest
 import torch
 from alf_core import (
     BaseDatasetConfig,
-    FileTaskStateLogger,
+    FileStateLogger,
     Oracle,
     SupervisedTask,
     Surrogate,
-    TerminalTaskStateLogger,
+    TerminalStateLogger,
 )
 from alf_tools.datasets import GFP
 from alf_tools.models import CNNModel, CNNTrainConfig
@@ -131,16 +131,16 @@ class TestSupervised:
         save_path = tmp_path / "supervised_gfp_cnn"
         save_path.mkdir()
 
-        metrics_logger = TerminalTaskStateLogger()
-        file_logger = FileTaskStateLogger(output_path=save_path)
-        task_state_loggers = [metrics_logger, file_logger]
+        metrics_logger = TerminalStateLogger()
+        file_logger = FileStateLogger(output_path=save_path)
+        state_loggers = [metrics_logger, file_logger]
 
         # Create and run the supervised task
         task = SupervisedTask()
         state = task.setup(dataset=gfp_dataset, surrogate=surrogate_model)
         task.run(
             state=state,
-            task_state_loggers=task_state_loggers,
+            state_loggers=state_loggers,
         )
 
         # Load and verify results
@@ -154,6 +154,13 @@ class TestSupervised:
 
         # Test dataset metrics
         self._assert_dataset_metrics(metrics, expected_metrics["dataset"])
+
+        # Assert training_history was populated for the supervised round
+        num_epochs = surrogate_model.model.train_config.num_epochs
+        assert len(state.round_metrics.training_history) == num_epochs, (
+            f"Expected {num_epochs} epoch entries in training_history, "
+            f"got {len(state.round_metrics.training_history)}"
+        )
 
     def _assert_surrogate_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert surrogate model performance metrics."""

@@ -14,7 +14,7 @@
 
 import time
 
-from alf_core.dataclasses import Candidate, TaskState
+from alf_core.dataclasses import Candidate, State
 from alf_core.optimizer.acquisition_function import AcquisitionFunction
 from alf_core.optimizer.search import BaseSearch
 
@@ -42,8 +42,8 @@ class Optimizer:
 
     def ask(
         self,
-        state: TaskState,
-    ) -> tuple[list[Candidate], TaskState]:
+        state: State,
+    ) -> tuple[list[Candidate], State]:
         """Propose the next batch of candidates to evaluate.
 
         Uses the search function to generate a candidate pool, then the acquisition
@@ -63,13 +63,13 @@ class Optimizer:
         acquisition_candidates = self.acquisition_fn(search_candidates, state)
         acquired_candidates = acquisition_candidates.get_top_k(state.acq_batch_size).candidates
         t1 = time.perf_counter()
-        state.round_metrics.update({"ask_time": t1 - t0})
+        state.round_metrics.metrics["ask_time"] = t1 - t0
         return acquired_candidates, state
 
     def tell(
         self,
-        state: TaskState,
-    ) -> TaskState:
+        state: State,
+    ) -> State:
         """Update the surrogate model with newly acquired data.
 
         Trains the surrogate model on the updated training and validation datasets,
@@ -79,23 +79,24 @@ class Optimizer:
             state: Current task state with updated dataset.
 
         Returns:
-            Updated state with tell_time and optimizer metrics.
+            Updated state with tell_time, training_history, and optimizer metrics.
         """
         t0 = time.perf_counter()
-        state.surrogate.fit(
+        epoch_metrics = state.surrogate.fit(
             train_data=state.dataset.train_dataset,
             val_data=state.dataset.validation_dataset,
         )
         t1 = time.perf_counter()
 
-        state.round_metrics.update({"tell_time": t1 - t0})
-        state.round_metrics.update(self.get_metrics(state))
+        state.round_metrics.training_history = epoch_metrics  # full replacement, not append
+        state.round_metrics.metrics["tell_time"] = t1 - t0
+        state.round_metrics.metrics.update(self.get_metrics(state))
 
         return state
 
     def get_metrics(
         self,
-        state: TaskState,
+        state: State,
     ) -> dict[str, float]:
         """Collect metrics from acquired candidates, surrogate, and search functions.
 

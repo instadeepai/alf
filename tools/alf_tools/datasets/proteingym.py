@@ -153,17 +153,17 @@ class ProteinGym(BaseDataset):
 
         # Shuffle dataset
         shuffled_dataset = self._raw_dataset.shuffle(self.config.seed)
-        train_and_validation_dataset = LabelledCandidates(candidates=[], labels=[])
-        test_and_candidate_pool_dataset = LabelledCandidates(candidates=[], labels=[])
+        train_and_validation_dataset = LabelledCandidates(candidates=[], labels=np.array([]))
+        test_and_candidate_pool_dataset = LabelledCandidates(candidates=[], labels=np.array([]))
 
         # Split dataset into train/test sets depending on cross-validation fold
         cv_type = f"{self.config.cross_validation_type}_fold_id"
         cv_fold = self.config.cross_validation_fold
         for candidate, label in shuffled_dataset:
             if cv_fold == candidate.features[cv_type]:
-                test_and_candidate_pool_dataset.append([candidate], [label])
+                test_and_candidate_pool_dataset.append([candidate], np.array([label]))
             else:
-                train_and_validation_dataset.append([candidate], [label])
+                train_and_validation_dataset.append([candidate], np.array([label]))
 
         # Split train/validation and test/candidate pool sets
         train_dataset = LabelledCandidates(*train_and_validation_dataset[:train_size])

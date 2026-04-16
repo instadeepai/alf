@@ -15,11 +15,12 @@
 import logging
 from typing import Any
 
-from alf_core.dataclasses import TaskState
+from alf_core.dataclasses import State
+from alf_core.dataclasses.round_metrics import RoundMetrics
 from alf_core.optimizer.optimizer import Optimizer
 from alf_core.oracle.oracle import Oracle
 from alf_core.tasks.base_task import BaseTask
-from alf_core.utils.task_state_logger import TaskStateLogger
+from alf_core.utils.state_logger import StateLogger
 
 logger = logging.getLogger("alf-core")
 
@@ -38,33 +39,33 @@ class DesignTask(BaseTask):
         """
         super().__init__(task_type="Design", **kwargs)
 
-    def run_initial_train_round(
-        self, state: TaskState, state_loggers: list[TaskStateLogger]
-    ) -> TaskState:
+    def run_initial_train_round(self, state: State, state_loggers: list[StateLogger]) -> State:
         """Run the initial train round on the train and validation sets.
 
         Args:
             state: Task state with dataset and surrogate.
-            state_loggers: List of TaskStateLogger for recording the state.
+            state_loggers: List of StateLogger for recording the state.
 
         Returns:
             Updated state with surrogate fine-tuned on the train and validation sets.
         """
         logger.info("Running initial round of surrogate model fine-tuning on the train dataset ...")
-        state.surrogate.fit(
+        # Construct RoundMetrics before fit() so state is always typed, even on failure
+        state.round_metrics = RoundMetrics(round=0)
+        epoch_metrics = state.surrogate.fit(
             train_data=state.dataset.train_dataset,
             val_data=state.dataset.validation_dataset,
         )
-        state.round_metrics = {"round": 0}
-        self.evaluate(state=state)
+        state.round_metrics.training_history = epoch_metrics
+        state = self.evaluate(state=state)
         for state_logger in state_loggers:
             state_logger.log(state, round_name="initial_train_round")
         return state
 
     def run(  # type: ignore[override]
         self,
-        state: TaskState,
-        task_state_loggers: list[TaskStateLogger],
+        state: State,
+        state_loggers: list[StateLogger],
         optimizer: Optimizer,
         oracle: Oracle,
     ) -> None:
@@ -81,7 +82,7 @@ class DesignTask(BaseTask):
 
         Args:
             state: Initial task state with dataset and surrogate.
-            task_state_loggers: List of TaskStateLogger for recording the state.
+            state_loggers: List of StateLogger for recording the state.
             optimizer: Optimizer for candidate acquisition.
             oracle: Oracle for evaluating candidate labels.
         """
@@ -90,17 +91,16 @@ class DesignTask(BaseTask):
         # If the train data is provided, run an initial round of fine-tuning the surrogate
         # model on the training dataset.
         if len(state.dataset.train_dataset) > 0:
-            state = self.run_initial_train_round(state, task_state_loggers)
+            state = self.run_initial_train_round(state, state_loggers)
 
         for round_i in range(1, self.num_acq_rounds + 1):
-            state.round_metrics = {"round": round_i}
+            state.round_metrics = RoundMetrics(round=round_i)
             acquired_candidates, state = optimizer.ask(state)
             labelled_candidates, state = oracle.evaluate(acquired_candidates, state)
-            state.update(labelled_candidates)
-            state = optimizer.tell(state=state)
-
+            state.update(labelled_candidates)  # increments state.round to round_i + 1
+            state = optimizer.tell(state=state)  # populates round_metrics.training_history
             state = self.evaluate(state=state)
-            for task_state_logger in task_state_loggers:
-                task_state_logger.log(state)
+            for state_logger in state_loggers:
+                state_logger.log(state)
 
         return

@@ -15,5 +15,6 @@
 from alf_tools.datasets.botorch_synthetic_dataset import (
     BoTorchSyntheticDataset,
 )
+from alf_tools.datasets.flip import FLIP, FLIPConfig
 from alf_tools.datasets.gfp import GFP
 from alf_tools.datasets.proteingym import ProteinGym
