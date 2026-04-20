@@ -23,7 +23,7 @@ from typing import Literal, Optional
 
 import numpy as np
 import torch
-from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, TaskState
+from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
 from alf_tools.models.utils.botorch_model_adapter import BoTorchModelAdapter
 from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
 from alf_tools.utils.botorch_utils import (
@@ -216,7 +216,7 @@ class BoTorchAcquisition(AcquisitionFunction):
     def __call__(
         self,
         search_candidates: list[Candidate],
-        state: TaskState,
+        state: State,
     ) -> LabelledCandidates:
         """Compute acquisition values or optimize in continuous space.
 
@@ -249,7 +249,7 @@ class BoTorchAcquisition(AcquisitionFunction):
     def _score_candidates(
         self,
         candidates: list[Candidate],
-        state: TaskState,
+        state: State,
         best_f: float,
     ) -> LabelledCandidates:
         """Score a discrete pool of candidates.
@@ -307,7 +307,7 @@ class BoTorchAcquisition(AcquisitionFunction):
 
     def _optimize_continuous(
         self,
-        state: TaskState,
+        state: State,
         best_f: float,
     ) -> LabelledCandidates:
         """Optimize acquisition function in continuous space.

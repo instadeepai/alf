@@ -18,7 +18,7 @@ This module provides search functions designed to work with BoTorch acquisition
 functions that can directly optimize candidates in continuous spaces.
 """
 
-from alf_core import Candidate, TaskState
+from alf_core import Candidate, State
 from alf_core.optimizer.search import BaseSearch
 
 
@@ -47,7 +47,7 @@ class ContinuousSearch(BaseSearch):
         ... )
     """
 
-    def __call__(self, task_state: TaskState, **kwargs) -> list[Candidate]:
+    def __call__(self, task_state: State, **kwargs) -> list[Candidate]:
         """Return empty list to signal continuous optimization mode.
 
         Args:
@@ -60,7 +60,7 @@ class ContinuousSearch(BaseSearch):
         """
         return []
 
-    def get_metrics(self, task_state: TaskState) -> dict[str, float]:
+    def get_metrics(self, task_state: State) -> dict[str, float]:
         """Return empty metrics dict.
 
         Args:
