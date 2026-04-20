@@ -332,7 +332,7 @@ class BoTorchAcquisition(AcquisitionFunction):
 
         # Convert bounds from list[list[float]] to list[tuple[float, float]]
         bounds_tuples = [(b[0], b[1]) for b in self.bounds]
-        bounds_tensor = get_bounds_tensor(bounds_tuples)
+        bounds_tensor = get_bounds_tensor(bounds_tuples, device=state.surrogate.model.device)
 
         # Get training data for qNEI
         X_baseline = None
