@@ -74,7 +74,7 @@ jobs:
 
         - name: Pytest coverage comment (core) 💬
           id: coverageCommentCore
-          uses: MishaKav/pytest-coverage-comment@main
+          uses: MishaKav/pytest-coverage-comment@287292879eaaff04116f36d3eb1a670f6e5df1a4
           with:
             title: Core Coverage Report
             unique-id-for-comment: coverage-core
@@ -83,7 +83,7 @@ jobs:
 
         - name: Pytest coverage comment (tools) 💬
           id: coverageCommentTools
-          uses: MishaKav/pytest-coverage-comment@main
+          uses: MishaKav/pytest-coverage-comment@287292879eaaff04116f36d3eb1a670f6e5df1a4
           with:
             title: Tools Coverage Report
             unique-id-for-comment: coverage-tools
@@ -92,7 +92,7 @@ jobs:
 
         - name: Update core coverage badge 🏷️
           if: github.ref == 'refs/heads/main'
-          uses: schneegans/dynamic-badges-action@v1.7.0
+          uses: schneegans/dynamic-badges-action@e9a478b16159b4d31420099ba146cdc50f134483
           with:
             auth: ${{ secrets.GIST_SECRET }}
             gistID: 114eb5680493468e40f5a528c08f1888
@@ -104,7 +104,7 @@ jobs:
 
         - name: Update tools coverage badge 🏷️
           if: github.ref == 'refs/heads/main'
-          uses: schneegans/dynamic-badges-action@v1.7.0
+          uses: schneegans/dynamic-badges-action@e9a478b16159b4d31420099ba146cdc50f134483
           with:
             auth: ${{ secrets.GIST_SECRET }}
             gistID: 25ce4b64d5b9cda177203366146f5bf0
