@@ -18,6 +18,11 @@ dependencies = [
     "scipy>=1.9.0",
 ]
 
+[project.optional-dependencies]
+benchmarks = [
+    "rdkit>=2023.3.1",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["alf_tools*"]
