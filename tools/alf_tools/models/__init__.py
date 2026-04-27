@@ -14,6 +14,7 @@
 
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
+from alf_tools.models.mlp import MLPModel, MLPModelConfig, MLPTrainConfig
 from alf_tools.models.utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
@@ -33,4 +34,7 @@ __all__ = [
     "GPModelConfig",
     "GPModel",
     "GPTrainConfig",
+    "MLPModel",
+    "MLPModelConfig",
+    "MLPTrainConfig",
 ]
