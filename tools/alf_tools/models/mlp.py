@@ -128,7 +128,7 @@ class MLPModel(BaseModel):
         numeric = {
             k: v
             for k, v in features.items()
-            if isinstance(v, (int, float, np.floating))
+            if isinstance(v, (int, float, np.number))
         }
         if not numeric:
             return None
@@ -199,15 +199,25 @@ class MLPModel(BaseModel):
         else:
             raise ValueError("Input must be LabelledCandidates or list of Candidates")
 
-        features = []
+        if not candidates:
+            return torch.zeros((0, 0), dtype=torch.float32)
+
+        feature_list = []
         for candidate in candidates:
             precomputed = self._numeric_features_from_dict(candidate.features)
             if precomputed is not None:
-                features.append(precomputed)
+                feature_list.append(precomputed)
             else:
-                features.append(self._features_from_smiles(candidate.data))
+                feature_list.append(self._features_from_smiles(candidate.data))
 
-        return torch.tensor(np.array(features), dtype=torch.float32)
+        dims = {f.shape[0] for f in feature_list}
+        if len(dims) > 1:
+            raise ValueError(
+                f"Inconsistent feature dimensions across candidates: {dims}. "
+                "Ensure all candidates use the same featurisation path."
+            )
+
+        return torch.tensor(np.array(feature_list), dtype=torch.float32)
 
     def train(self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None) -> None:
         """Train the MLP model (implemented in Task 4)."""
