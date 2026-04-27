@@ -20,7 +20,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
+from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -247,6 +247,11 @@ class MLPModel(BaseModel):
         optimizer = optim.AdamW(self.model.parameters(), lr=self.train_config.learning_rate)
         criterion = nn.MSELoss()
 
+        X_val_t = y_val_t = None
+        if val_data is not None:
+            X_val_t = self.featurise(val_data).to(self.device)
+            y_val_t = torch.tensor(val_data.labels, dtype=torch.float32).to(self.device)
+
         avg_train_loss = float("nan")
         avg_val_loss: float | None = None
         val_spearman: float | None = None
@@ -265,16 +270,14 @@ class MLPModel(BaseModel):
 
             avg_val_loss = None
             val_spearman = None
-            if val_data is not None and len(val_data) > 0:
+            if X_val_t is not None and y_val_t is not None and len(X_val_t) > 0:
                 self.model.eval()
-                X_val = self.featurise(val_data).to(self.device)
-                y_val = torch.tensor(val_data.labels, dtype=torch.float32).to(self.device)
                 with torch.no_grad():
-                    val_preds = self.model(X_val)
-                    avg_val_loss = float(criterion(val_preds, y_val).item())
+                    val_preds = self.model(X_val_t)
+                    avg_val_loss = float(criterion(val_preds, y_val_t).item())
                 val_preds_np = val_preds.cpu().numpy()
-                y_val_np = y_val.cpu().numpy()
-                if len(val_preds_np) >= 2:
+                y_val_np = y_val_t.cpu().numpy()
+                if len(val_preds_np) >= 2 and val_preds_np.std() > 0 and y_val_np.std() > 0:
                     val_spearman = float(spearmanr(val_preds_np, y_val_np).statistic)
                 else:
                     val_spearman = float("nan")
