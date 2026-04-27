@@ -194,3 +194,71 @@ class TestGuacaMolSingleFileLoad:
             from alf_tools.datasets.guacamol import GuacaMol
             GuacaMol(config)
         mock_get.assert_not_called()
+
+
+TRAIN_SMILES = ["c1ccccc1", "CC(=O)O", "CCO"]
+PAPER_VALID_SMILES = ["CC(C)Cc1ccc(cc1)C(C)C(=O)O"]
+PAPER_TEST_SMILES = ["c1ccc2ccccc2c1", "c1ccncc1"]
+
+
+def _paper_config(**overrides) -> GuacaMolConfig:
+    defaults = dict(
+        name="guacamol",
+        modality="sequence",
+        seed=42,
+        train_ratio=0.6,
+        validation_frac=0.1,
+        test_ratio=0.2,
+        target_property="TPSA",
+        split_mode="paper",
+    )
+    defaults.update(overrides)
+    return GuacaMolConfig(**defaults)
+
+
+def _write_paper_files(tmp_path):
+    (tmp_path / FILENAME_TRAIN).write_text("\n".join(TRAIN_SMILES))
+    (tmp_path / FILENAME_VALID).write_text("\n".join(PAPER_VALID_SMILES))
+    (tmp_path / FILENAME_TEST).write_text("\n".join(PAPER_TEST_SMILES))
+
+
+class TestGuacaMolPaperSplits:
+    def test_train_split_contains_train_file_smiles(self, tmp_path):
+        _write_paper_files(tmp_path)
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
+            from alf_tools.datasets.guacamol import GuacaMol
+            dataset = GuacaMol(_paper_config())
+        assert {c.data for c in dataset.train_dataset.candidates} == set(TRAIN_SMILES)
+
+    def test_validation_split_contains_valid_file_smiles(self, tmp_path):
+        _write_paper_files(tmp_path)
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
+            from alf_tools.datasets.guacamol import GuacaMol
+            dataset = GuacaMol(_paper_config())
+        assert {c.data for c in dataset.validation_dataset.candidates} == set(PAPER_VALID_SMILES)
+
+    def test_test_split_contains_test_file_smiles(self, tmp_path):
+        _write_paper_files(tmp_path)
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
+            from alf_tools.datasets.guacamol import GuacaMol
+            dataset = GuacaMol(_paper_config())
+        assert {c.data for c in dataset.test_dataset.candidates} == set(PAPER_TEST_SMILES)
+
+    def test_candidate_pool_is_empty_for_paper_splits(self, tmp_path):
+        _write_paper_files(tmp_path)
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
+            from alf_tools.datasets.guacamol import GuacaMol
+            dataset = GuacaMol(_paper_config())
+        assert len(dataset.candidate_pool) == 0
+
+    def test_split_feature_tag_matches_source_file(self, tmp_path):
+        _write_paper_files(tmp_path)
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
+            from alf_tools.datasets.guacamol import GuacaMol
+            dataset = GuacaMol(_paper_config())
+        for cand in dataset.train_dataset.candidates:
+            assert cand.features["split"] == "train"
+        for cand in dataset.validation_dataset.candidates:
+            assert cand.features["split"] == "valid"
+        for cand in dataset.test_dataset.candidates:
+            assert cand.features["split"] == "test"

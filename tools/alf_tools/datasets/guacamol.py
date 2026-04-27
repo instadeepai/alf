@@ -240,3 +240,62 @@ class GuacaMol(BaseDataset):
         return _label_smiles(
             smiles_list, properties, self.config.target_property, self.modality
         )
+
+    def _load_paper_splits(self) -> LabelledCandidates:
+        """Download (if absent) train/valid/test files and label all candidates.
+
+        Each candidate is tagged with a "split" key in features ("train", "valid", "test").
+        The three split corpuses are combined into a single LabelledCandidates for storage
+        as _raw_dataset; _split_dataset() partitions them back by the tag.
+        """
+        split_files = [
+            (FILENAME_TRAIN, URL_TRAIN, "train"),
+            (FILENAME_VALID, URL_VALID, "valid"),
+            (FILENAME_TEST, URL_TEST, "test"),
+        ]
+        properties = list(self.config.computed_properties or ALL_PROPERTIES)
+        all_candidates: list[Candidate] = []
+        all_labels: list[float] = []
+        for filename, url, tag in split_files:
+            filepath = DATAPATH / filename
+            if not filepath.exists():
+                _download_file(url, filepath, self.config.max_molecules)
+            smiles_list = _load_smiles_file(filepath)
+            if self.config.max_molecules is not None:
+                smiles_list = smiles_list[: self.config.max_molecules]
+            split_lc = _label_smiles(
+                smiles_list, properties, self.config.target_property, self.modality, tag
+            )
+            all_candidates.extend(split_lc.candidates)
+            all_labels.extend(split_lc.labels.tolist())
+        return LabelledCandidates(
+            candidates=all_candidates, labels=np.array(all_labels, dtype=float)
+        )
+
+    def _split_dataset(self) -> dict[str, LabelledCandidates]:
+        """Split by paper file tags when split_mode is 'paper'; else use base class."""
+        if self.config.split_mode != "paper":
+            return super()._split_dataset()
+
+        assert self._raw_dataset is not None, "Dataset must be loaded before splitting"
+        tag_to_key = {"train": "train", "valid": "validation", "test": "test"}
+        buckets: dict[str, tuple[list[Candidate], list[float]]] = {
+            "train": ([], []),
+            "validation": ([], []),
+            "test": ([], []),
+        }
+        for candidate, label in self._raw_dataset:
+            key = tag_to_key[candidate.features["split"]]
+            buckets[key][0].append(candidate)
+            buckets[key][1].append(float(label))
+        splits = {
+            key: LabelledCandidates(
+                candidates=cands, labels=np.array(lbls, dtype=float)
+            )
+            for key, (cands, lbls) in buckets.items()
+        }
+        splits["candidate_pool"] = LabelledCandidates(
+            candidates=[], labels=np.array([], dtype=float)
+        )
+        self.init_candidate_pool = copy.deepcopy(splits["candidate_pool"])
+        return splits
