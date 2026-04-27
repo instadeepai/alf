@@ -116,9 +116,98 @@ class MLPModel(BaseModel):
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
 
+    # ------------------------------------------------------------------
+    # Featurisation helpers
+    # ------------------------------------------------------------------
+
+    def _numeric_features_from_dict(self, features: dict) -> np.ndarray | None:
+        """Extract numeric feature values from a dict, sorted by key.
+
+        Returns None if the dict contains no numeric values (e.g., only a 'split' string tag).
+        """
+        numeric = {
+            k: v
+            for k, v in features.items()
+            if isinstance(v, (int, float, np.floating))
+        }
+        if not numeric:
+            return None
+        keys = sorted(numeric.keys())
+        return np.array([numeric[k] for k in keys], dtype=np.float32)
+
+    def _features_from_smiles(self, smiles: str) -> np.ndarray:
+        """Compute ECFP4 fingerprint (2048 bits) + 9 physicochemical descriptors from SMILES.
+
+        The 9 descriptors match the GuacaMol physicochemical property set (excluding QED):
+        BertzCT, MolLogP, MolWt, TPSA, NumHAcceptors, NumHDonors,
+        NumRotatableBonds, NumAliphaticRings, NumAromaticRings.
+        Total feature dimension: 2048 + 9 = 2057.
+        """
+        try:
+            from rdkit import Chem
+            from rdkit.Chem import AllChem, Descriptors, GraphDescriptors, rdMolDescriptors
+        except ImportError as e:
+            raise ImportError(
+                "RDKit is required for SMILES featurisation. "
+                "Install it with: pip install 'alf_tools[benchmarks]'"
+            ) from e
+
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            raise ValueError(f"Invalid SMILES: {smiles!r}")
+
+        fp = np.array(
+            AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=2048),
+            dtype=np.float32,
+        )
+        desc = np.array([
+            GraphDescriptors.BertzCT(mol),
+            Descriptors.MolLogP(mol),
+            Descriptors.MolWt(mol),
+            Descriptors.TPSA(mol),
+            Descriptors.NumHAcceptors(mol),
+            Descriptors.NumHDonors(mol),
+            Descriptors.NumRotatableBonds(mol),
+            rdMolDescriptors.CalcNumAliphaticRings(mol),
+            rdMolDescriptors.CalcNumAromaticRings(mol),
+        ], dtype=np.float32)
+        return np.concatenate([fp, desc])  # shape: (2057,)
+
     def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> torch.Tensor:
-        """Convert candidates to feature tensor (implemented in Task 3)."""
-        raise NotImplementedError
+        """Convert candidates to a float feature tensor.
+
+        Precomputed path: reads numeric values from Candidate.features, sorted by key.
+        This is used when GuacaMol is configured with computed_properties, which stores
+        RDKit property values in each Candidate's features dict.
+
+        SMILES path: computes ECFP4 (2048 bits) + 9 physicochemical descriptors on-the-fly.
+        This is used when Candidate.features has no numeric values.
+
+        Args:
+            inputs: LabelledCandidates or list of Candidates.
+
+        Returns:
+            Float tensor of shape (n_candidates, feature_dim).
+
+        Raises:
+            ValueError: If inputs is not LabelledCandidates or list of Candidates.
+        """
+        if isinstance(inputs, LabelledCandidates):
+            candidates = inputs.candidates
+        elif isinstance(inputs, list):
+            candidates = inputs
+        else:
+            raise ValueError("Input must be LabelledCandidates or list of Candidates")
+
+        features = []
+        for candidate in candidates:
+            precomputed = self._numeric_features_from_dict(candidate.features)
+            if precomputed is not None:
+                features.append(precomputed)
+            else:
+                features.append(self._features_from_smiles(candidate.data))
+
+        return torch.tensor(np.array(features), dtype=torch.float32)
 
     def train(self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None) -> None:
         """Train the MLP model (implemented in Task 4)."""
