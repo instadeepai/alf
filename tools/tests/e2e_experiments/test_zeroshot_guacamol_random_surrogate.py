@@ -72,10 +72,9 @@ class BaseTestZeroShotGuacaMol(abc.ABC):
         split mode and produces expected metrics for the GuacaMol dataset using a
         random surrogate model.
         """
-        # Set seed for reproducible results
-        np.random.seed(42)
-
         # Build dataset — patch DATAPATH so the module reads from the local fixture
+        # train_ratio/test_ratio/validation_frac are required by BaseDatasetConfig but
+        # ignored by split_mode="paper" which uses the pre-defined file boundaries.
         config = GuacaMolConfig(
             name="guacamol",
             modality="sequence",
