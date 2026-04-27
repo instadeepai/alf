@@ -210,6 +210,23 @@ class TestSupervisedQED(BaseTestSupervisedGuacaMol):
     def target_property(self) -> str:
         return "QED"
 
+    @property
+    def expected_metrics(self) -> dict:
+        return {
+            "surrogate": {
+                "test_mse": 0.2872,
+                "test_spearman": -0.479,
+                "test_pearson": -0.3436,
+                "test_pairwise_xent": 0.3443,
+            },
+            "dataset": {
+                "num_train": 25,
+                "num_test": 100,
+                "train_mean": 0.6164,
+                "test_mean": 0.5356,
+            },
+        }
+
 
 class TestSupervisedMolWt(BaseTestSupervisedGuacaMol):
     """Tests a supervised experiment with an MLP surrogate on the GuacaMol MolWt property."""
@@ -218,6 +235,23 @@ class TestSupervisedMolWt(BaseTestSupervisedGuacaMol):
     def target_property(self) -> str:
         return "MolWt"
 
+    @property
+    def expected_metrics(self) -> dict:
+        return {
+            "surrogate": {
+                "test_mse": 17558.1114,
+                "test_spearman": -0.5782,
+                "test_pearson": -0.4518,
+                "test_pairwise_xent": 0.3446,
+            },
+            "dataset": {
+                "num_train": 25,
+                "num_test": 100,
+                "train_mean": 159.2121,
+                "test_mean": 115.3263,
+            },
+        }
+
 
 class TestSupervisedMolLogP(BaseTestSupervisedGuacaMol):
     """Tests a supervised experiment with an MLP surrogate on the GuacaMol MolLogP property."""
@@ -225,3 +259,20 @@ class TestSupervisedMolLogP(BaseTestSupervisedGuacaMol):
     @property
     def target_property(self) -> str:
         return "MolLogP"
+
+    @property
+    def expected_metrics(self) -> dict:
+        return {
+            "surrogate": {
+                "test_mse": 2.8017,
+                "test_spearman": 0.035,
+                "test_pearson": -0.0162,
+                "test_pairwise_xent": 0.3432,
+            },
+            "dataset": {
+                "num_train": 25,
+                "num_test": 100,
+                "train_mean": 1.8406,
+                "test_mean": 1.1909,
+            },
+        }
