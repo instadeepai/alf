@@ -185,24 +185,24 @@ class TestMLPModelTrainPredict:
         assert preds.means.shape == (2,)
 
     def test_train_with_validation_data(self, mlp_model, train_data):
-        """Training with val_data must populate 'final_val_loss' in the summary metrics."""
+        """Training with val_data must populate 'val_loss' in the summary metrics."""
         val_data = _make_labelled([BENZENE, ASPIRIN], [0.2, 0.7])
         mlp_model.train(train_data, val_data=val_data)
         metrics = mlp_model.get_training_summary_metrics()
-        assert "final_val_loss" in metrics
+        assert "val_loss" in metrics
 
     def test_train_without_validation_data(self, mlp_model, train_data):
-        """Training without val_data must populate 'final_train_loss' but not 'final_val_loss'."""
+        """Training without val_data must populate 'train_loss' but not 'val_loss'."""
         mlp_model.train(train_data)
         metrics = mlp_model.get_training_summary_metrics()
-        assert "final_train_loss" in metrics
-        assert "final_val_loss" not in metrics
+        assert "train_loss" in metrics
+        assert "val_loss" not in metrics
 
     def test_train_loss_is_finite(self, mlp_model, train_data):
         """Train loss must be a finite float after training."""
         mlp_model.train(train_data)
         metrics = mlp_model.get_training_summary_metrics()
-        assert np.isfinite(metrics["final_train_loss"])
+        assert np.isfinite(metrics["train_loss"])
 
     def test_epoch_metrics_length_matches_num_epochs(self, mlp_model, train_data):
         """get_epoch_metrics() must return exactly num_epochs entries after training."""

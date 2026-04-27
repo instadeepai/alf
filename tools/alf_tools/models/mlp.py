@@ -298,11 +298,11 @@ class MLPModel(BaseModel):
                     msg += f", val_spearman: {val_spearman:.4f}"
                 logger.info(msg)
 
-        self.training_metrics = {"final_train_loss": avg_train_loss}
+        self.training_metrics = {"train_loss": avg_train_loss}
         if avg_val_loss is not None:
-            self.training_metrics["final_val_loss"] = avg_val_loss
+            self.training_metrics["val_loss"] = avg_val_loss
         if val_spearman is not None:
-            self.training_metrics["final_val_spearman"] = val_spearman
+            self.training_metrics["val_spearman"] = val_spearman
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Make predictions for candidates.
