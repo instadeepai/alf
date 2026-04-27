@@ -17,6 +17,7 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 - **GFP** - Green Fluorescent Protein fitness dataset
 - **ProteinGym** - Protein sequence datasets from ProteinGym benchmark
 - **FLIP** - Fitness Landscape Inference for Proteins benchmark (AAV, GB1, Meltome, SCL, SAV)
+- **GuacaMol** — Physicochemical property optimisation over SMILES. Supports `split_mode="paper"` for original train/valid/test boundaries, `split_mode="low_vs_high"` for cold-start AL scenarios, and `query()` for scoring arbitrary novel molecules without a fixed pool.
 
 ### Models
 - **CNNModel** - Convolutional neural network for sequence modeling with uncertainty quantification
