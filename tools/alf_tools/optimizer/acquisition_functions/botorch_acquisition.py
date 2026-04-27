@@ -36,6 +36,7 @@ from botorch.acquisition.monte_carlo import (
     qNoisyExpectedImprovement,
     qUpperConfidenceBound,
 )
+from botorch.acquisition.logei import qLogExpectedImprovement
 from botorch.optim import optimize_acqf
 from jaxtyping import Float
 
@@ -55,6 +56,7 @@ class BoTorchAcquisition(AcquisitionFunction):
 
     Supported acquisition functions:
     - **qEI** (qExpectedImprovement): Standard batch expected improvement
+    - **qLogEI** (qLogExpectedImprovement): Log batch expected improvement
     - **qNEI** (qNoisyExpectedImprovement): For noisy observations
     - **qUCB** (qUpperConfidenceBound): Upper confidence bound with exploration bonus
     - **qKG** (qKnowledgeGradient): More sophisticated but expensive
@@ -91,6 +93,7 @@ class BoTorchAcquisition(AcquisitionFunction):
     Args:
         acquisition_type: Type of acquisition function. Options:
             - "qEI": Expected Improvement (general purpose)
+            - "qLogEI": Log Expected Improvement (See [Ament2023logei]_ for details.)
             - "qNEI": Noisy Expected Improvement (for noisy observations)
             - "qUCB": Upper Confidence Bound (tunable exploration)
             - "qKG": Knowledge Gradient (expensive but sophisticated)
@@ -140,10 +143,10 @@ class BoTorchAcquisition(AcquisitionFunction):
         self.kwargs = kwargs
 
         # Validate acquisition type
-        if acquisition_type not in ["qEI", "qNEI", "qUCB", "qKG"]:
+        if acquisition_type not in ["qEI", "qLogEI", "qNEI", "qUCB", "qKG"]:
             raise ValueError(
                 f"Unsupported acquisition_type: {acquisition_type}. "
-                f"Must be one of: qEI, qNEI, qUCB, qKG"
+                f"Must be one of: qEI, qLogEI, qNEI, qUCB, qKG"
             )
 
         # Set up sampler
@@ -183,6 +186,13 @@ class BoTorchAcquisition(AcquisitionFunction):
         # Create acquisition function based on type
         if self.acquisition_type == "qEI":
             return qExpectedImprovement(
+                model=model,
+                best_f=best_f,
+                sampler=sampler,
+                **self.kwargs,
+            )
+        if self.acquisition_type == "qLogEI":
+            return qLogExpectedImprovement(
                 model=model,
                 best_f=best_f,
                 sampler=sampler,
