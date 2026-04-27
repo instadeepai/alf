@@ -86,3 +86,31 @@ class TestGuacaMolConfig:
         for prop in ["TPSA", "MolWt", "QED"]:
             config = _base_config(target_property=prop, computed_properties=None)
             assert config.task_type == "property"
+
+
+class TestComputeProperties:
+    def test_returns_all_keys_when_all_properties_requested(self):
+        from alf_tools.datasets.guacamol import _compute_properties, ALL_PROPERTIES
+        result = _compute_properties("c1ccccc1", list(ALL_PROPERTIES))
+        assert set(result.keys()) == ALL_PROPERTIES
+
+    def test_returns_only_requested_subset(self):
+        from alf_tools.datasets.guacamol import _compute_properties
+        result = _compute_properties("c1ccccc1", ["TPSA", "MolWt"])
+        assert set(result.keys()) == {"TPSA", "MolWt"}
+
+    def test_tpsa_of_benzene_is_zero(self):
+        from alf_tools.datasets.guacamol import _compute_properties
+        result = _compute_properties("c1ccccc1", ["TPSA"])
+        assert result["TPSA"] == pytest.approx(0.0, abs=1e-3)
+
+    def test_molwt_of_ethanol(self):
+        from alf_tools.datasets.guacamol import _compute_properties
+        result = _compute_properties("CCO", ["MolWt"])
+        assert result["MolWt"] == pytest.approx(46.069, rel=1e-3)
+
+    def test_all_values_are_float(self):
+        from alf_tools.datasets.guacamol import _compute_properties, ALL_PROPERTIES
+        result = _compute_properties("CC(=O)O", list(ALL_PROPERTIES))
+        for key, val in result.items():
+            assert isinstance(val, float), f"{key} value is not a float"

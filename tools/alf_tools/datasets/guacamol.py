@@ -108,3 +108,30 @@ class GuacaMolConfig(BaseDatasetConfig):
         if self.split_mode != "paper":
             self.split_type = self.split_mode  # type: ignore[assignment]
         return self
+
+
+def _compute_properties(smiles: str, properties: list[str]) -> dict[str, float]:
+    """Compute RDKit physicochemical properties for a SMILES string.
+
+    Args:
+        smiles: A valid SMILES string (caller must ensure mol parses correctly).
+        properties: List of property names from GuacaMolPropertyName to compute.
+
+    Returns:
+        Dict mapping each property name to its computed float value.
+    """
+    _require_rdkit()
+    mol = Chem.MolFromSmiles(smiles)
+    _property_fns: dict[str, object] = {
+        "BertzCT": lambda m: float(GraphDescriptors.BertzCT(m)),
+        "MolLogP": lambda m: float(Descriptors.MolLogP(m)),
+        "MolWt": lambda m: float(Descriptors.MolWt(m)),
+        "TPSA": lambda m: float(Descriptors.TPSA(m)),
+        "NumHAcceptors": lambda m: float(Descriptors.NumHAcceptors(m)),
+        "NumHDonors": lambda m: float(Descriptors.NumHDonors(m)),
+        "NumRotatableBonds": lambda m: float(Descriptors.NumRotatableBonds(m)),
+        "NumAliphaticRings": lambda m: float(rdMolDescriptors.CalcNumAliphaticRings(m)),
+        "NumAromaticRings": lambda m: float(rdMolDescriptors.CalcNumAromaticRings(m)),
+        "QED": lambda m: float(RDKitQED.qed(m)),
+    }
+    return {name: _property_fns[name](mol) for name in properties}  # type: ignore[operator]
