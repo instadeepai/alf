@@ -72,6 +72,13 @@ class MolecularMLP(nn.Module):
         hidden_dims: list[int],
         dropout: float,
     ):
+        """Initialize MolecularMLP.
+
+        Args:
+            input_dim: Number of input features.
+            hidden_dims: List of hidden layer sizes.
+            dropout: Dropout probability applied after each hidden layer.
+        """
         super().__init__()
         layers: list[nn.Module] = []
         in_dim = input_dim
@@ -101,6 +108,7 @@ class MLPModel(BaseModel):
         train_config: MLPTrainConfig | None = None,
         device: str | None = None,
     ):
+        super().__init__()
         self.model_config = model_config or MLPModelConfig()
         self.train_config = train_config or MLPTrainConfig()
         self.device = get_device(device)
