@@ -272,6 +272,53 @@ class GuacaMol(BaseDataset):
             candidates=all_candidates, labels=np.array(all_labels, dtype=float)
         )
 
+    def query(self, candidates: list[Candidate]) -> LabelledCandidates:
+        """Return labels for candidates, computing via RDKit for SMILES not in the corpus.
+
+        Args:
+            candidates: Candidates to label. May include SMILES not present in _raw_dataset.
+
+        Returns:
+            LabelledCandidates with 1D labels of shape (N,).
+
+        Raises:
+            NotImplementedError: If task_type is "benchmark_task".
+            ValueError: If a novel candidate's SMILES string is invalid.
+        """
+        if self.config.task_type == "benchmark_task":
+            raise NotImplementedError(
+                f"Online query for task '{self.config.target_property}' is not yet implemented."
+            )
+        assert self._raw_dataset is not None, "Dataset must be loaded before querying"
+
+        known_smiles_index = {
+            c.data: i for i, c in enumerate(self._raw_dataset.candidates)
+        }
+        result_candidates: list[Candidate] = []
+        result_labels: list[float] = []
+
+        for candidate in candidates:
+            if candidate.data in known_smiles_index:
+                idx = known_smiles_index[candidate.data]
+                result_labels.append(float(self._raw_dataset.labels[idx]))
+            else:
+                _require_rdkit()
+                mol = Chem.MolFromSmiles(candidate.data)
+                if mol is None:
+                    raise ValueError(
+                        f"Cannot compute label for invalid SMILES: {candidate.data!r}"
+                    )
+                label = _compute_properties(
+                    candidate.data, [self.config.target_property]
+                )[self.config.target_property]
+                result_labels.append(label)
+            result_candidates.append(candidate)
+
+        return LabelledCandidates(
+            candidates=result_candidates,
+            labels=np.array(result_labels, dtype=float),
+        )
+
     def _split_dataset(self) -> dict[str, LabelledCandidates]:
         """Split by paper file tags when split_mode is 'paper'; else use base class."""
         if self.config.split_mode != "paper":

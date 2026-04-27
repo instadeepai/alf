@@ -262,3 +262,45 @@ class TestGuacaMolPaperSplits:
             assert cand.features["split"] == "valid"
         for cand in dataset.test_dataset.candidates:
             assert cand.features["split"] == "test"
+
+
+class TestGuacaMolQuery:
+    def _loaded_dataset(self, tmp_path):
+        config = _base_config(max_molecules=5)
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path), \
+             patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
+            from alf_tools.datasets.guacamol import GuacaMol
+            return GuacaMol(config)
+
+    def test_query_known_candidate_returns_precomputed_label(self, tmp_path):
+        dataset = self._loaded_dataset(tmp_path)
+        known = dataset._raw_dataset.candidates[0]
+        result = dataset.query([known])
+        assert len(result) == 1
+        assert result.labels[0] == pytest.approx(dataset._raw_dataset.labels[0], rel=1e-9)
+
+    def test_query_novel_smiles_computes_label_via_rdkit(self, tmp_path):
+        dataset = self._loaded_dataset(tmp_path)
+        from alf_core import Candidate, Modality
+        from alf_tools.datasets.guacamol import _compute_properties
+        novel = Candidate(data="c1ccncc1", modality=Modality.SEQUENCE)  # pyridine, not in corpus
+        result = dataset.query([novel])
+        assert len(result) == 1
+        expected = _compute_properties("c1ccncc1", ["TPSA"])["TPSA"]
+        assert result.labels[0] == pytest.approx(expected, rel=1e-6)
+
+    def test_query_invalid_novel_smiles_raises_value_error(self, tmp_path):
+        dataset = self._loaded_dataset(tmp_path)
+        from alf_core import Candidate, Modality
+        bad = Candidate(data="NOTVALID", modality=Modality.SEQUENCE)
+        with pytest.raises(ValueError, match="NOTVALID"):
+            dataset.query([bad])
+
+    def test_query_mixed_known_and_novel_returns_both(self, tmp_path):
+        dataset = self._loaded_dataset(tmp_path)
+        from alf_core import Candidate, Modality
+        known = dataset._raw_dataset.candidates[0]
+        novel = Candidate(data="c1ccncc1", modality=Modality.SEQUENCE)
+        result = dataset.query([known, novel])
+        assert len(result) == 2
+        assert result.labels.ndim == 1
