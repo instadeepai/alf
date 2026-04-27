@@ -69,3 +69,42 @@ def _require_rdkit() -> None:
             "RDKit is required for the GuacaMol dataset. "
             "Install it with: pip install 'alf_tools[benchmarks]'"
         )
+
+
+class GuacaMolConfig(BaseDatasetConfig):
+    """Configuration for GuacaMol dataset.
+
+    Attributes:
+        target_property: Property or task name used as labels in LabelledCandidates.
+        task_type: Auto-derived from target_property — "property" or "benchmark_task".
+            Never set directly.
+        computed_properties: RDKit properties computed and stored in Candidate.features.
+            None means all 10 GuacaMol properties. Only applies when task_type == "property".
+        max_molecules: Cap on SMILES lines written to disk and loaded per file. None = full corpus.
+        split_mode: "random" and "low_vs_high" use BaseDataset splitting on the combined
+            corpus file. "paper" uses the original train/valid/test figshare file boundaries.
+            Replaces BaseDatasetConfig.split_type — do not set split_type directly.
+    """
+
+    target_property: GuacaMolPropertyName | GuacaMolTaskName
+    task_type: Literal["property", "benchmark_task"] = "property"
+    computed_properties: list[GuacaMolPropertyName] | None = None
+    max_molecules: int | None = None
+    split_mode: Literal["random", "low_vs_high", "paper"] = "random"
+
+    @model_validator(mode="after")
+    def _validate_and_sync(self) -> "GuacaMolConfig":
+        self.task_type = (
+            "property" if self.target_property in ALL_PROPERTIES else "benchmark_task"
+        )
+        if (
+            self.computed_properties is not None
+            and self.target_property not in self.computed_properties
+        ):
+            raise ValueError(
+                f"target_property '{self.target_property}' must be present in "
+                "computed_properties when computed_properties is explicitly set."
+            )
+        if self.split_mode != "paper":
+            self.split_type = self.split_mode  # type: ignore[assignment]
+        return self
