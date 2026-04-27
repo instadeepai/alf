@@ -114,3 +114,83 @@ class TestComputeProperties:
         result = _compute_properties("CC(=O)O", list(ALL_PROPERTIES))
         for key, val in result.items():
             assert isinstance(val, float), f"{key} value is not a float"
+
+
+VALID_SMILES_LINES = [
+    "c1ccccc1",
+    "CC(=O)O",
+    "CCO",
+    "CC(C)Cc1ccc(cc1)C(C)C(=O)O",
+    "c1ccc2ccccc2c1",
+]
+INVALID_SMILES_LINE = "NOTASMILES"
+
+
+def _make_mock_response(smiles_lines: list[str]) -> MagicMock:
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.iter_lines.return_value = iter(line.encode() for line in smiles_lines)
+    return mock_resp
+
+
+class TestGuacaMolSingleFileLoad:
+    def test_load_returns_correct_number_of_candidates(self, tmp_path):
+        config = _base_config(max_molecules=5)
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path), \
+             patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
+            from alf_tools.datasets.guacamol import GuacaMol
+            dataset = GuacaMol(config)
+        assert len(dataset._raw_dataset) == 5
+
+    def test_labels_are_1d_numpy_array(self, tmp_path):
+        config = _base_config(max_molecules=5)
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path), \
+             patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
+            from alf_tools.datasets.guacamol import GuacaMol
+            dataset = GuacaMol(config)
+        assert isinstance(dataset._raw_dataset.labels, np.ndarray)
+        assert dataset._raw_dataset.labels.ndim == 1
+        assert len(dataset._raw_dataset.labels) == 5
+
+    def test_candidate_features_contain_computed_properties(self, tmp_path):
+        config = _base_config(max_molecules=3, computed_properties=["TPSA", "MolWt"])
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path), \
+             patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
+            from alf_tools.datasets.guacamol import GuacaMol
+            dataset = GuacaMol(config)
+        for cand in dataset._raw_dataset.candidates:
+            assert "TPSA" in cand.features
+            assert "MolWt" in cand.features
+
+    def test_invalid_smiles_are_skipped_and_not_in_dataset(self, tmp_path):
+        lines_with_invalid = VALID_SMILES_LINES[:3] + [INVALID_SMILES_LINE] + VALID_SMILES_LINES[3:]
+        config = _base_config(max_molecules=len(lines_with_invalid))
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path), \
+             patch("requests.get", return_value=_make_mock_response(lines_with_invalid)):
+            from alf_tools.datasets.guacamol import GuacaMol
+            dataset = GuacaMol(config)
+        assert len(dataset._raw_dataset) == len(VALID_SMILES_LINES)
+
+    def test_max_molecules_caps_corpus_size(self, tmp_path):
+        config = _base_config(max_molecules=3)
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path), \
+             patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
+            from alf_tools.datasets.guacamol import GuacaMol
+            dataset = GuacaMol(config)
+        assert len(dataset._raw_dataset) <= 3
+
+    def test_benchmark_task_target_raises_not_implemented(self, tmp_path):
+        config = _base_config(target_property="celecoxib_rediscovery")
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
+            from alf_tools.datasets.guacamol import GuacaMol
+            with pytest.raises(NotImplementedError):
+                GuacaMol(config)
+
+    def test_no_download_if_file_already_cached(self, tmp_path):
+        (tmp_path / FILENAME_ALL).write_text("\n".join(VALID_SMILES_LINES[:3]))
+        config = _base_config(max_molecules=3)
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path), \
+             patch("requests.get") as mock_get:
+            from alf_tools.datasets.guacamol import GuacaMol
+            GuacaMol(config)
+        mock_get.assert_not_called()

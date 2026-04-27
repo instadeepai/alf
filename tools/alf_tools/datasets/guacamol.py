@@ -135,3 +135,108 @@ def _compute_properties(smiles: str, properties: list[str]) -> dict[str, float]:
         "QED": lambda m: float(RDKitQED.qed(m)),
     }
     return {name: _property_fns[name](mol) for name in properties}  # type: ignore[operator]
+
+
+def _download_file(url: str, filepath: Path, max_lines: int | None) -> None:
+    """Stream a text file from url, writing up to max_lines lines to filepath."""
+    response = requests.get(url, stream=True)
+    if response.status_code != 200:
+        raise FileNotFoundError(
+            f"Failed to download GuacaMol file from {url}. "
+            f"Status code: {response.status_code}"
+        )
+    filepath.parent.mkdir(parents=True, exist_ok=True)
+    with open(filepath, "w") as f:
+        for i, line in enumerate(response.iter_lines()):
+            if max_lines is not None and i >= max_lines:
+                break
+            f.write(line.decode("utf-8") + "\n")
+    logger.info(f"Downloaded GuacaMol file to {filepath}.")
+
+
+def _load_smiles_file(filepath: Path) -> list[str]:
+    """Read non-empty SMILES strings from a file, one per line."""
+    with open(filepath) as f:
+        return [line.strip() for line in f if line.strip()]
+
+
+def _label_smiles(
+    smiles_list: list[str],
+    properties: list[str],
+    target_property: str,
+    modality: object,
+    split_tag: str | None = None,
+) -> LabelledCandidates:
+    """Parse SMILES, compute properties, build LabelledCandidates.
+
+    Invalid SMILES are skipped with a warning and excluded from the result.
+
+    Args:
+        smiles_list: Raw SMILES strings to process.
+        properties: Property names to compute via RDKit.
+        target_property: The property name whose value becomes the label.
+        modality: Modality to assign to each Candidate.
+        split_tag: If provided, stored as features["split"] on each Candidate.
+
+    Returns:
+        LabelledCandidates with 1D labels of shape (N,).
+    """
+    _require_rdkit()
+    candidates = []
+    labels = []
+    for smiles in smiles_list:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            logger.warning(f"Skipping invalid SMILES: {smiles!r}")
+            continue
+        features = _compute_properties(smiles, properties)
+        if split_tag is not None:
+            features["split"] = split_tag
+        candidates.append(Candidate(data=smiles, modality=modality, features=features))
+        labels.append(features[target_property])
+    return LabelledCandidates(candidates=candidates, labels=np.array(labels, dtype=float))
+
+
+class GuacaMol(BaseDataset):
+    """GuacaMol dataset class."""
+
+    def __init__(self, config: GuacaMolConfig) -> None:
+        """Initialize the GuacaMol dataset.
+
+        Args:
+            config: Configuration for the GuacaMol dataset.
+        """
+        super().__init__(config)
+        self.setup()
+
+    def load_dataset(self) -> LabelledCandidates:
+        """Load GuacaMol SMILES and compute physicochemical property labels via RDKit.
+
+        Returns:
+            LabelledCandidates with SMILES candidates and 1D property labels.
+
+        Raises:
+            NotImplementedError: If target_property is a benchmark task.
+            FileNotFoundError: If the corpus cannot be downloaded.
+        """
+        if self.config.task_type == "benchmark_task":
+            raise NotImplementedError(
+                f"GuacaMol goal-directed task '{self.config.target_property}' is not yet "
+                "implemented. Only physicochemical properties are currently supported."
+            )
+        if self.config.split_mode == "paper":
+            return self._load_paper_splits()
+        return self._load_single_file()
+
+    def _load_single_file(self) -> LabelledCandidates:
+        """Download (if absent) and label the combined corpus file."""
+        filepath = DATAPATH / FILENAME_ALL
+        if not filepath.exists():
+            _download_file(URL_ALL, filepath, self.config.max_molecules)
+        smiles_list = _load_smiles_file(filepath)
+        if self.config.max_molecules is not None:
+            smiles_list = smiles_list[: self.config.max_molecules]
+        properties = list(self.config.computed_properties or ALL_PROPERTIES)
+        return _label_smiles(
+            smiles_list, properties, self.config.target_property, self.modality
+        )
