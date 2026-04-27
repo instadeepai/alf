@@ -142,9 +142,13 @@ dmypy.json
 # Results
 data/
 results/
+outputs/
 
 # Test meta-files
 tools/pytest-tools.xml
 tools/coverage-tools.xml
 core/pytest-tools.xml
 core/coverage-tools.xml
+
+# Agentic
+docs/superpowers

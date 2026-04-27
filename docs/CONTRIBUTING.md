@@ -115,6 +115,19 @@ tools/alf_tools/
 └── optimizer/           # Custom search/acquisition functions
 ```
 
+#### Adding a new dataset
+
+1. Create `tools/alf_tools/datasets/<name>.py` implementing `BaseDataset`.
+   - `load_dataset()` must return `LabelledCandidates` with 1-D labels.
+   - Download logic must check for a local cache before hitting the network.
+2. Create `tools/tests/fixtures/<name>/` with synthetic fixture files that
+   exercise all code paths (valid, invalid, empty, large samples).
+   Run `generate.py` once and commit the output.
+3. Create `tools/tests/datasets/test_<name>.py`. Mark every test with
+   `pytestmark = pytest.mark.<name>` and run `pytest -m <name>` to verify
+   no network calls are needed.
+4. Register the marker in `tools/pyproject.toml` under `[tool.pytest.ini_options]`.
+
 ## Understanding Model Roles
 
 Models in ALF can serve three distinct roles depending on how they're used in the active learning loop:
