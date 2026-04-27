@@ -81,10 +81,9 @@ class BaseTestSupervisedGuacaMol(abc.ABC):
         ...
 
     @property
-    @abc.abstractmethod
     def expected_metrics(self) -> dict:
         """Expected metric values for assertions (filled in Task 7)."""
-        ...
+        return {}
 
     def test_supervised_experiment(self, set_seed, guacamol_data_path, tmp_path):
         """Test the complete supervised GuacaMol MLP experiment pipeline.
@@ -211,10 +210,6 @@ class TestSupervisedQED(BaseTestSupervisedGuacaMol):
     def target_property(self) -> str:
         return "QED"
 
-    @property
-    def expected_metrics(self) -> dict:
-        return {}
-
 
 class TestSupervisedMolWt(BaseTestSupervisedGuacaMol):
     """Tests a supervised experiment with an MLP surrogate on the GuacaMol MolWt property."""
@@ -223,10 +218,6 @@ class TestSupervisedMolWt(BaseTestSupervisedGuacaMol):
     def target_property(self) -> str:
         return "MolWt"
 
-    @property
-    def expected_metrics(self) -> dict:
-        return {}
-
 
 class TestSupervisedMolLogP(BaseTestSupervisedGuacaMol):
     """Tests a supervised experiment with an MLP surrogate on the GuacaMol MolLogP property."""
@@ -234,7 +225,3 @@ class TestSupervisedMolLogP(BaseTestSupervisedGuacaMol):
     @property
     def target_property(self) -> str:
         return "MolLogP"
-
-    @property
-    def expected_metrics(self) -> dict:
-        return {}
