@@ -220,14 +220,111 @@ class MLPModel(BaseModel):
         return torch.tensor(np.array(feature_list), dtype=torch.float32)
 
     def train(self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None) -> None:
-        """Train the MLP model (implemented in Task 4)."""
-        raise NotImplementedError
+        """Train the MLP model.
+
+        Args:
+            train_data: Training data containing candidates and labels.
+            val_data: Optional validation data.
+        """
+        from scipy.stats import spearmanr
+
+        self._epoch_metrics = []
+
+        X_train = self.featurise(train_data).to(self.device)
+        y_train = torch.tensor(train_data.labels, dtype=torch.float32).to(self.device)
+
+        if self.model is None:
+            input_dim = X_train.shape[1]
+            self.model = MolecularMLP(
+                input_dim=input_dim,
+                hidden_dims=self.model_config.hidden_dims,
+                dropout=self.model_config.dropout,
+            ).to(self.device)
+
+        dataset = TensorDataset(X_train, y_train)
+        loader = DataLoader(dataset, batch_size=self.train_config.batch_size, shuffle=True)
+
+        optimizer = optim.AdamW(self.model.parameters(), lr=self.train_config.learning_rate)
+        criterion = nn.MSELoss()
+
+        avg_train_loss = float("nan")
+        avg_val_loss: float | None = None
+        val_spearman: float | None = None
+
+        for epoch in range(self.train_config.num_epochs):
+            self.model.train()
+            batch_losses = []
+            for batch_x, batch_y in loader:
+                optimizer.zero_grad()
+                preds = self.model(batch_x)
+                loss = criterion(preds, batch_y)
+                loss.backward()
+                optimizer.step()
+                batch_losses.append(loss.item())
+            avg_train_loss = float(np.mean(batch_losses))
+
+            avg_val_loss = None
+            val_spearman = None
+            if val_data is not None and len(val_data) > 0:
+                self.model.eval()
+                X_val = self.featurise(val_data).to(self.device)
+                y_val = torch.tensor(val_data.labels, dtype=torch.float32).to(self.device)
+                with torch.no_grad():
+                    val_preds = self.model(X_val)
+                    avg_val_loss = float(criterion(val_preds, y_val).item())
+                val_preds_np = val_preds.cpu().numpy()
+                y_val_np = y_val.cpu().numpy()
+                if len(val_preds_np) >= 2:
+                    val_spearman = float(spearmanr(val_preds_np, y_val_np).statistic)
+                else:
+                    val_spearman = float("nan")
+
+            additional: dict[str, float] = {}
+            if val_spearman is not None:
+                additional["val_spearman"] = val_spearman
+
+            self._epoch_metrics.append(SurrogateEpochMetrics(
+                epoch=epoch,
+                train_loss=avg_train_loss,
+                val_loss=avg_val_loss,
+                additional_metrics=additional,
+            ))
+
+            if (epoch + 1) % self.train_config.log_frequency == 0:
+                msg = f"Epoch {epoch + 1}/{self.train_config.num_epochs} — train_loss: {avg_train_loss:.4f}"
+                if avg_val_loss is not None:
+                    msg += f", val_loss: {avg_val_loss:.4f}"
+                if val_spearman is not None:
+                    msg += f", val_spearman: {val_spearman:.4f}"
+                logger.info(msg)
+
+        self.training_metrics = {"final_train_loss": avg_train_loss}
+        if avg_val_loss is not None:
+            self.training_metrics["final_val_loss"] = avg_val_loss
+        if val_spearman is not None:
+            self.training_metrics["final_val_spearman"] = val_spearman
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
-        """Make predictions (implemented in Task 4)."""
+        """Make predictions for candidates.
+
+        Args:
+            candidate_points: List of candidates to predict for.
+
+        Returns:
+            Predictions containing predicted values.
+
+        Raises:
+            RuntimeError: If the model has not been trained.
+        """
         if self.model is None:
             raise RuntimeError("Model not trained. Call train() first.")
-        raise NotImplementedError
+
+        X = self.featurise(candidate_points).to(self.device)
+        self.model.eval()
+        with torch.no_grad():
+            preds = self.model(X).cpu().numpy()
+
+        return Predictions(means=preds)
 
     def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
         """Sample candidate points from the model."""
