@@ -12,10 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import shutil
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import alf_tools.datasets.guacamol as _guacamol_module
 import numpy as np
 import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+from alf_core import Candidate, Modality
+from alf_tools.datasets.guacamol import (
+    ALL_PROPERTIES,
+    FILENAME_ALL,
+    FILENAME_TEST,
+    FILENAME_TRAIN,
+    FILENAME_VALID,
+    GuacaMol,
+    GuacaMolConfig,
+    _compute_properties,  # noqa: PLC2701
+    _download_file,  # noqa: PLC2701
+    _load_smiles_file,  # noqa: PLC2701
+)
 
 pytestmark = pytest.mark.guacamol
 
@@ -27,20 +43,14 @@ LARGE_FIXTURE = FIXTURES / "large.smiles"
 
 
 def test_require_rdkit_raises_informative_error_when_unavailable():
-    """_require_rdkit() must raise ImportError with install instructions."""
-    import alf_tools.datasets.guacamol as gm
-    original = gm._RDKIT_AVAILABLE
-    gm._RDKIT_AVAILABLE = False
+    """_require_rdkit() raises ImportError with install instructions when RDKit is absent."""
+    original = _guacamol_module._RDKIT_AVAILABLE
+    _guacamol_module._RDKIT_AVAILABLE = False
     try:
         with pytest.raises(ImportError, match="alf_tools\\[benchmarks\\]"):
-            gm._require_rdkit()
+            _guacamol_module._require_rdkit()
     finally:
-        gm._RDKIT_AVAILABLE = original
-
-
-from alf_tools.datasets.guacamol import (
-    GuacaMolConfig, FILENAME_ALL, FILENAME_TRAIN, FILENAME_VALID, FILENAME_TEST,
-)
+        _guacamol_module._RDKIT_AVAILABLE = original
 
 
 def _base_config(**overrides) -> GuacaMolConfig:
@@ -58,68 +68,82 @@ def _base_config(**overrides) -> GuacaMolConfig:
 
 
 class TestGuacaMolConfig:
+    """Unit tests for GuacaMolConfig validation and auto-derived fields."""
+
     def test_task_type_auto_set_to_property(self):
+        """task_type is 'property' when target is a physicochemical property."""
         config = _base_config(target_property="TPSA")
         assert config.task_type == "property"
 
     def test_task_type_auto_set_to_benchmark_task(self):
+        """task_type is 'benchmark_task' for goal-directed benchmark targets."""
         config = _base_config(target_property="celecoxib_rediscovery")
         assert config.task_type == "benchmark_task"
 
     def test_default_max_molecules_is_none(self):
+        """max_molecules defaults to None (no corpus cap)."""
         assert _base_config().max_molecules is None
 
     def test_default_split_mode_is_random(self):
+        """split_mode defaults to 'random'."""
         assert _base_config().split_mode == "random"
 
     def test_default_computed_properties_is_none(self):
+        """computed_properties defaults to None (all 10 properties computed)."""
         assert _base_config().computed_properties is None
 
     def test_target_property_absent_from_explicit_computed_properties_raises(self):
+        """Raises ValueError when target_property is not in computed_properties."""
         with pytest.raises(ValueError, match="target_property"):
             _base_config(target_property="TPSA", computed_properties=["MolLogP", "MolWt"])
 
     def test_target_property_present_in_computed_properties_is_valid(self):
+        """computed_properties list is accepted when it includes the target_property."""
         config = _base_config(target_property="TPSA", computed_properties=["TPSA", "MolLogP"])
         assert config.computed_properties == ["TPSA", "MolLogP"]
 
     def test_split_type_synced_with_split_mode_low_vs_high(self):
+        """split_type is synced to 'low_vs_high' when split_mode is 'low_vs_high'."""
         config = _base_config(split_mode="low_vs_high")
         assert config.split_type == "low_vs_high"
 
     def test_split_mode_paper_does_not_alter_split_type(self):
+        """split_mode 'paper' is preserved and does not overwrite split_type."""
         config = _base_config(split_mode="paper")
         assert config.split_mode == "paper"
 
     def test_computed_properties_none_always_valid_regardless_of_target(self):
+        """computed_properties=None is valid for any target_property."""
         for prop in ["TPSA", "MolWt", "QED"]:
             config = _base_config(target_property=prop, computed_properties=None)
             assert config.task_type == "property"
 
 
 class TestComputeProperties:
+    """Unit tests for the _compute_properties RDKit descriptor helper."""
+
     def test_returns_all_keys_when_all_properties_requested(self):
-        from alf_tools.datasets.guacamol import _compute_properties, ALL_PROPERTIES
+        """Returns a dict with all 10 GuacaMol property keys."""
         result = _compute_properties("c1ccccc1", list(ALL_PROPERTIES))
         assert set(result.keys()) == ALL_PROPERTIES
 
     def test_returns_only_requested_subset(self):
-        from alf_tools.datasets.guacamol import _compute_properties
+        """Returns only the keys that were explicitly requested."""
         result = _compute_properties("c1ccccc1", ["TPSA", "MolWt"])
         assert set(result.keys()) == {"TPSA", "MolWt"}
 
     def test_tpsa_of_benzene_is_zero(self):
-        from alf_tools.datasets.guacamol import _compute_properties
+        """Benzene TPSA is 0.0 (no polar surface area)."""
         result = _compute_properties("c1ccccc1", ["TPSA"])
         assert result["TPSA"] == pytest.approx(0.0, abs=1e-3)
 
     def test_molwt_of_ethanol(self):
-        from alf_tools.datasets.guacamol import _compute_properties
+        """Ethanol molecular weight matches the known value."""
         result = _compute_properties("CCO", ["MolWt"])
         assert result["MolWt"] == pytest.approx(46.069, rel=1e-3)
 
     def test_all_values_are_float(self):
-        from alf_tools.datasets.guacamol import _compute_properties, ALL_PROPERTIES
+        """All returned property values are Python floats."""
         result = _compute_properties("CC(=O)O", list(ALL_PROPERTIES))
         for key, val in result.items():
             assert isinstance(val, float), f"{key} value is not a float"
@@ -143,64 +167,66 @@ def _make_mock_response(smiles_lines: list[str]) -> MagicMock:
 
 
 class TestGuacaMolSingleFileLoad:
+    """Tests for GuacaMol dataset loading from a single combined corpus file."""
+
     def test_load_returns_correct_number_of_candidates(self, tmp_path):
+        """Dataset contains exactly max_molecules candidates after loading."""
         config = _base_config(max_molecules=5)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path), \
              patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(config)
         assert len(dataset._raw_dataset) == 5
 
     def test_labels_are_1d_numpy_array(self, tmp_path):
+        """Labels are stored as a 1D numpy array of length max_molecules."""
         config = _base_config(max_molecules=5)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path), \
              patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(config)
         assert isinstance(dataset._raw_dataset.labels, np.ndarray)
         assert dataset._raw_dataset.labels.ndim == 1
         assert len(dataset._raw_dataset.labels) == 5
 
     def test_candidate_features_contain_computed_properties(self, tmp_path):
+        """Each candidate's features dict includes all requested computed properties."""
         config = _base_config(max_molecules=3, computed_properties=["TPSA", "MolWt"])
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path), \
              patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(config)
         for cand in dataset._raw_dataset.candidates:
             assert "TPSA" in cand.features
             assert "MolWt" in cand.features
 
     def test_invalid_smiles_are_skipped_and_not_in_dataset(self, tmp_path):
+        """Invalid SMILES strings are silently skipped and excluded from candidates."""
         lines_with_invalid = VALID_SMILES_LINES[:3] + [INVALID_SMILES_LINE] + VALID_SMILES_LINES[3:]
         config = _base_config(max_molecules=len(lines_with_invalid))
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path), \
              patch("requests.get", return_value=_make_mock_response(lines_with_invalid)):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(config)
         assert len(dataset._raw_dataset) == len(VALID_SMILES_LINES)
 
     def test_max_molecules_caps_corpus_size(self, tmp_path):
+        """Dataset size does not exceed max_molecules."""
         config = _base_config(max_molecules=3)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path), \
              patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(config)
         assert len(dataset._raw_dataset) <= 3
 
     def test_benchmark_task_target_raises_not_implemented(self, tmp_path):
+        """NotImplementedError is raised when target_property is a benchmark task."""
         config = _base_config(target_property="celecoxib_rediscovery")
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
-            from alf_tools.datasets.guacamol import GuacaMol
             with pytest.raises(NotImplementedError):
                 GuacaMol(config)
 
     def test_no_download_if_file_already_cached(self, tmp_path):
+        """requests.get is not called when the corpus file already exists on disk."""
         (tmp_path / FILENAME_ALL).write_text("\n".join(VALID_SMILES_LINES[:3]))
         config = _base_config(max_molecules=3)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path), \
              patch("requests.get") as mock_get:
-            from alf_tools.datasets.guacamol import GuacaMol
             GuacaMol(config)
         mock_get.assert_not_called()
 
@@ -232,38 +258,40 @@ def _write_paper_files(tmp_path):
 
 
 class TestGuacaMolPaperSplits:
+    """Tests for GuacaMol paper-split mode using original figshare file boundaries."""
+
     def test_train_split_contains_train_file_smiles(self, tmp_path):
+        """train_dataset candidates exactly match the train split file contents."""
         _write_paper_files(tmp_path)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(_paper_config())
         assert {c.data for c in dataset.train_dataset.candidates} == set(TRAIN_SMILES)
 
     def test_validation_split_contains_valid_file_smiles(self, tmp_path):
+        """validation_dataset candidates exactly match the valid split file contents."""
         _write_paper_files(tmp_path)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(_paper_config())
         assert {c.data for c in dataset.validation_dataset.candidates} == set(PAPER_VALID_SMILES)
 
     def test_test_split_contains_test_file_smiles(self, tmp_path):
+        """test_dataset candidates exactly match the test split file contents."""
         _write_paper_files(tmp_path)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(_paper_config())
         assert {c.data for c in dataset.test_dataset.candidates} == set(PAPER_TEST_SMILES)
 
     def test_candidate_pool_is_empty_for_paper_splits(self, tmp_path):
+        """candidate_pool is empty when using paper splits (no residual pool)."""
         _write_paper_files(tmp_path)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(_paper_config())
         assert len(dataset.candidate_pool) == 0
 
     def test_split_feature_tag_matches_source_file(self, tmp_path):
+        """Each candidate's features['split'] matches its source file's split tag."""
         _write_paper_files(tmp_path)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(_paper_config())
         for cand in dataset.train_dataset.candidates:
             assert cand.features["split"] == "train"
@@ -274,14 +302,16 @@ class TestGuacaMolPaperSplits:
 
 
 class TestGuacaMolQuery:
+    """Tests for GuacaMol.query(), including in-corpus lookup and on-the-fly RDKit labelling."""
+
     def _loaded_dataset(self, tmp_path):
         config = _base_config(max_molecules=5)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path), \
              patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
-            from alf_tools.datasets.guacamol import GuacaMol
             return GuacaMol(config)
 
     def test_query_known_candidate_returns_precomputed_label(self, tmp_path):
+        """Querying a corpus candidate returns its precomputed label without recomputing."""
         dataset = self._loaded_dataset(tmp_path)
         known = dataset._raw_dataset.candidates[0]
         result = dataset.query([known])
@@ -289,9 +319,8 @@ class TestGuacaMolQuery:
         assert result.labels[0] == pytest.approx(dataset._raw_dataset.labels[0], rel=1e-9)
 
     def test_query_novel_smiles_computes_label_via_rdkit(self, tmp_path):
+        """Querying a novel SMILES string computes its label on the fly via RDKit."""
         dataset = self._loaded_dataset(tmp_path)
-        from alf_core import Candidate, Modality
-        from alf_tools.datasets.guacamol import _compute_properties
         novel = Candidate(data="c1ccncc1", modality=Modality.SEQUENCE)  # pyridine, not in corpus
         result = dataset.query([novel])
         assert len(result) == 1
@@ -299,15 +328,15 @@ class TestGuacaMolQuery:
         assert result.labels[0] == pytest.approx(expected, rel=1e-6)
 
     def test_query_invalid_novel_smiles_raises_value_error(self, tmp_path):
+        """ValueError is raised for a novel candidate with an invalid SMILES string."""
         dataset = self._loaded_dataset(tmp_path)
-        from alf_core import Candidate, Modality
         bad = Candidate(data="NOTVALID", modality=Modality.SEQUENCE)
         with pytest.raises(ValueError, match="NOTVALID"):
             dataset.query([bad])
 
     def test_query_mixed_known_and_novel_returns_both(self, tmp_path):
+        """Querying a mix of corpus and novel candidates returns labels for all."""
         dataset = self._loaded_dataset(tmp_path)
-        from alf_core import Candidate, Modality
         known = dataset._raw_dataset.candidates[0]
         novel = Candidate(data="c1ccncc1", modality=Modality.SEQUENCE)
         result = dataset.query([known, novel])
@@ -323,18 +352,18 @@ class TestLoadSmilesFile:
     """Unit tests for the _load_smiles_file helper."""
 
     def test_returns_non_empty_lines_only(self):
-        from alf_tools.datasets.guacamol import _load_smiles_file
+        """All returned strings are non-empty after stripping whitespace."""
         result = _load_smiles_file(VALID_FIXTURE)
-        assert all(line.strip() != "" for line in result)
+        assert all(line.strip() for line in result)
 
     def test_empty_file_returns_empty_list(self):
-        from alf_tools.datasets.guacamol import _load_smiles_file
+        """An empty file returns an empty list."""
         result = _load_smiles_file(EMPTY_FIXTURE)
         assert result == []
 
     def test_valid_fixture_count_matches_non_blank_lines(self):
-        from alf_tools.datasets.guacamol import _load_smiles_file
-        expected = sum(1 for l in VALID_FIXTURE.read_text().splitlines() if l.strip())
+        """Returned list length equals the number of non-blank lines in the file."""
+        expected = sum(1 for ln in VALID_FIXTURE.read_text().splitlines() if ln.strip())
         assert len(_load_smiles_file(VALID_FIXTURE)) == expected
 
 
@@ -342,7 +371,7 @@ class TestDownloadFile:
     """Unit tests for _download_file error path."""
 
     def test_non_200_status_raises_file_not_found(self, tmp_path):
-        from alf_tools.datasets.guacamol import _download_file
+        """FileNotFoundError is raised when the server returns a non-200 status."""
         mock_resp = MagicMock()
         mock_resp.status_code = 404
         with patch("requests.get", return_value=mock_resp):
@@ -350,7 +379,7 @@ class TestDownloadFile:
                 _download_file("https://example.com/fake.smiles", tmp_path / "out.smiles", None)
 
     def test_successful_download_writes_file(self, tmp_path):
-        from alf_tools.datasets.guacamol import _download_file
+        """A successful download writes all lines to the destination file."""
         lines = [b"c1ccccc1", b"CCO", b"CC(=O)O"]
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -362,7 +391,7 @@ class TestDownloadFile:
         assert out.read_text().count("\n") == 3
 
     def test_max_lines_cap_limits_written_lines(self, tmp_path):
-        from alf_tools.datasets.guacamol import _download_file
+        """max_lines truncates the downloaded file to at most that many lines."""
         lines = [b"c1ccccc1", b"CCO", b"CC(=O)O", b"c1ccncc1", b"NCCc1ccc(O)c(O)c1"]
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -370,7 +399,7 @@ class TestDownloadFile:
         out = tmp_path / "out.smiles"
         with patch("requests.get", return_value=mock_resp):
             _download_file("https://example.com/fake.smiles", out, 2)
-        written = [l for l in out.read_text().splitlines() if l.strip()]
+        written = [ln for ln in out.read_text().splitlines() if ln.strip()]
         assert len(written) == 2
 
 
@@ -391,71 +420,62 @@ class TestGuacaMolWithFixtures:
         return GuacaMolConfig(**defaults)
 
     def test_load_from_valid_fixture_returns_candidates(self, tmp_path):
-        import shutil
+        """Loading from a valid SMILES fixture produces at least one candidate."""
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
         config = self._config(tmp_path)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(config)
         assert len(dataset._raw_dataset) > 0
 
     def test_candidate_data_field_is_smiles_string(self, tmp_path):
-        import shutil
+        """Each candidate's data field is a non-empty SMILES string."""
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
         config = self._config(tmp_path)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(config)
         candidate = dataset._raw_dataset.candidates[0]
         assert isinstance(candidate.data, str)
         assert len(candidate.data) > 0
 
     def test_computed_properties_none_stores_all_ten_in_features(self, tmp_path):
-        import shutil
-        from alf_tools.datasets.guacamol import ALL_PROPERTIES
+        """computed_properties=None stores all 10 GuacaMol properties in candidate features."""
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
         config = self._config(tmp_path, computed_properties=None)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(config)
         for cand in dataset._raw_dataset.candidates:
             assert ALL_PROPERTIES.issubset(set(cand.features.keys()))
 
     def test_empty_smiles_file_produces_empty_dataset(self, tmp_path):
-        import shutil
+        """An empty fixture file results in a dataset with zero candidates."""
         shutil.copy(EMPTY_FIXTURE, tmp_path / FILENAME_ALL)
         config = self._config(tmp_path)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(config)
         assert len(dataset._raw_dataset) == 0
 
     def test_all_invalid_smiles_skipped_leaves_empty_dataset(self, tmp_path):
-        import shutil
+        """A fixture containing only invalid SMILES results in an empty dataset."""
         shutil.copy(INVALID_FIXTURE, tmp_path / FILENAME_ALL)
         config = self._config(tmp_path)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(config)
         assert len(dataset._raw_dataset) == 0
 
     def test_large_fixture_loads_without_crash(self, tmp_path):
-        import shutil
+        """A 1000-SMILES fixture loads successfully without errors."""
         shutil.copy(LARGE_FIXTURE, tmp_path / FILENAME_ALL)
         config = self._config(tmp_path)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(config)
         assert len(dataset._raw_dataset) > 0
 
     def test_query_benchmark_task_raises_not_implemented(self, tmp_path):
-        import shutil
+        """query() raises NotImplementedError when task_type is 'benchmark_task'."""
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
-        from alf_core import Candidate, Modality
         # Load with a valid property target first, then swap task_type to simulate benchmark
         config = self._config(tmp_path)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(config)
         dataset.config.task_type = "benchmark_task"
         cand = dataset._raw_dataset.candidates[0]
@@ -472,18 +492,16 @@ class TestGuacaMolWithFixtures:
         config = self._config(tmp_path, split_mode="paper")
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path), \
              patch("requests.get", return_value=mock_resp) as mock_get:
-            from alf_tools.datasets.guacamol import GuacaMol
             GuacaMol(config)
         assert mock_get.call_count == 3
 
     def test_paper_splits_max_molecules_caps_each_split(self, tmp_path):
-        import shutil
+        """max_molecules caps the candidate count in each paper split independently."""
         shutil.copy(LARGE_FIXTURE, tmp_path / FILENAME_TRAIN)
         shutil.copy(LARGE_FIXTURE, tmp_path / FILENAME_VALID)
         shutil.copy(LARGE_FIXTURE, tmp_path / FILENAME_TEST)
         config = self._config(tmp_path, split_mode="paper", max_molecules=10)
         with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
-            from alf_tools.datasets.guacamol import GuacaMol
             dataset = GuacaMol(config)
         train_count = len(dataset.train_dataset.candidates)
         valid_count = len(dataset.validation_dataset.candidates)

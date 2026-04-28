@@ -15,7 +15,7 @@
 import copy
 import logging
 from pathlib import Path
-from typing import Literal, get_args
+from typing import Callable, Literal, get_args
 
 import numpy as np
 import requests
@@ -56,8 +56,8 @@ ALL_TASKS: frozenset[str] = frozenset(get_args(GuacaMolTaskName))
 
 try:
     from rdkit import Chem
-    from rdkit.Chem import Descriptors, GraphDescriptors, rdMolDescriptors
     from rdkit.Chem import QED as RDKitQED
+    from rdkit.Chem import Descriptors, GraphDescriptors, rdMolDescriptors
     _RDKIT_AVAILABLE = True
 except ImportError:
     _RDKIT_AVAILABLE = False
@@ -122,7 +122,7 @@ def _compute_properties(smiles: str, properties: list[str]) -> dict[str, float]:
     """
     _require_rdkit()
     mol = Chem.MolFromSmiles(smiles)
-    _property_fns: dict[str, object] = {
+    _property_fns: dict[str, Callable[..., float]] = {
         "BertzCT": lambda m: float(GraphDescriptors.BertzCT(m)),
         "MolLogP": lambda m: float(Descriptors.MolLogP(m)),
         "MolWt": lambda m: float(Descriptors.MolWt(m)),
@@ -138,7 +138,16 @@ def _compute_properties(smiles: str, properties: list[str]) -> dict[str, float]:
 
 
 def _download_file(url: str, filepath: Path, max_lines: int | None) -> None:
-    """Stream a text file from url, writing up to max_lines lines to filepath."""
+    """Stream a text file from url, writing up to max_lines lines to filepath.
+
+    Args:
+        url: URL to download from.
+        filepath: Destination path for the downloaded file.
+        max_lines: If set, truncate the file after this many lines.
+
+    Raises:
+        FileNotFoundError: If the server returns a non-200 status code.
+    """
     response = requests.get(url, stream=True)
     if response.status_code != 200:
         raise FileNotFoundError(
@@ -146,7 +155,7 @@ def _download_file(url: str, filepath: Path, max_lines: int | None) -> None:
             f"Status code: {response.status_code}"
         )
     filepath.parent.mkdir(parents=True, exist_ok=True)
-    with open(filepath, "w") as f:
+    with open(filepath, "w", encoding="utf-8") as f:
         for i, line in enumerate(response.iter_lines()):
             if max_lines is not None and i >= max_lines:
                 break
@@ -155,8 +164,15 @@ def _download_file(url: str, filepath: Path, max_lines: int | None) -> None:
 
 
 def _load_smiles_file(filepath: Path) -> list[str]:
-    """Read non-empty SMILES strings from a file, one per line."""
-    with open(filepath) as f:
+    """Read non-empty SMILES strings from a file, one per line.
+
+    Args:
+        filepath: Path to a newline-delimited SMILES file.
+
+    Returns:
+        List of stripped, non-empty SMILES strings.
+    """
+    with open(filepath, encoding="utf-8") as f:
         return [line.strip() for line in f if line.strip()]
 
 
@@ -209,6 +225,15 @@ class GuacaMol(BaseDataset):
         super().__init__(config)
         self.setup()
 
+    def __repr__(self) -> str:
+        """Return a string representation identifying dataset and target."""
+        return (
+            f"GuacaMol(name={self.config.name}, modality={self.modality}, "
+            f"seed={self.config.seed}, "
+            f"target_property={self.config.target_property}, "
+            f"split_mode={self.config.split_mode})"
+        )
+
     def load_dataset(self) -> LabelledCandidates:
         """Load GuacaMol SMILES and compute physicochemical property labels via RDKit.
 
@@ -229,7 +254,11 @@ class GuacaMol(BaseDataset):
         return self._load_single_file()
 
     def _load_single_file(self) -> LabelledCandidates:
-        """Download (if absent) and label the combined corpus file."""
+        """Download (if absent) and label the combined corpus file.
+
+        Returns:
+            LabelledCandidates built from the combined corpus.
+        """
         filepath = DATAPATH / FILENAME_ALL
         if not filepath.exists():
             _download_file(URL_ALL, filepath, self.config.max_molecules)
@@ -247,6 +276,9 @@ class GuacaMol(BaseDataset):
         Each candidate is tagged with a "split" key in features ("train", "valid", "test").
         The three split corpuses are combined into a single LabelledCandidates for storage
         as _raw_dataset; _split_dataset() partitions them back by the tag.
+
+        Returns:
+            Combined LabelledCandidates with split tags stored in each candidate's features.
         """
         split_files = [
             (FILENAME_TRAIN, URL_TRAIN, "train"),
@@ -265,6 +297,10 @@ class GuacaMol(BaseDataset):
                 smiles_list = smiles_list[: self.config.max_molecules]
             split_lc = _label_smiles(
                 smiles_list, properties, self.config.target_property, self.modality, tag
+            )
+            logger.debug(
+                "Paper split '%s': %d SMILES → %d valid candidates",
+                tag, len(smiles_list), len(split_lc.candidates),
             )
             all_candidates.extend(split_lc.candidates)
             all_labels.extend(split_lc.labels.tolist())
@@ -320,7 +356,11 @@ class GuacaMol(BaseDataset):
         )
 
     def _split_dataset(self) -> dict[str, LabelledCandidates]:
-        """Split by paper file tags when split_mode is 'paper'; else use base class."""
+        """Split by paper file tags when split_mode is 'paper'; else use base class.
+
+        Returns:
+            Dict with keys "train", "validation", "test", and "candidate_pool".
+        """
         if self.config.split_mode != "paper":
             return super()._split_dataset()
 

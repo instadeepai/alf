@@ -5,8 +5,8 @@ Fixtures are committed to the repo — do not regenerate in CI.
 
 Uses real SMILES strings for the valid/large fixtures so RDKit can parse them.
 """
-import random
 import json
+import random
 from pathlib import Path
 
 SEED = 42
@@ -46,41 +46,42 @@ _VALID_POOL = [
     "N",
 ]
 
-rng = random.Random(SEED)
+if __name__ == "__main__":
+    rng = random.Random(SEED)
 
-# valid: all 30 + 2 exact duplicates + 1 minimum-length + 1 long-ish
-valid = list(_VALID_POOL)
-valid += [valid[0], valid[1]]
-valid += ["C", "N"]
-valid += ["CC(=O)Nc1ccc(OCC(=O)O)c(c1)OC"]
-(OUT / "valid.smiles").write_text("\n".join(valid) + "\n")
+    # valid: all 30 + 2 exact duplicates + 1 minimum-length + 1 long-ish
+    valid = list(_VALID_POOL)
+    valid += [valid[0], valid[1]]
+    valid += ["C", "N"]
+    valid += ["CC(=O)Nc1ccc(OCC(=O)O)c(c1)OC"]
+    (OUT / "valid.smiles").write_text("\n".join(valid) + "\n")
 
-# invalid: syntactically malformed and semantically broken
-invalid = [
-    "not-a-smiles!!!",
-    "(((unclosed",
-    "",
-    "NOTASMILES",
-    "123456",
-    "[[[[[unclosed_bracket",
-]
-(OUT / "invalid.smiles").write_text("\n".join(invalid) + "\n")
+    # invalid: syntactically malformed and semantically broken
+    invalid = [
+        "not-a-smiles!!!",
+        "(((unclosed",
+        "",
+        "NOTASMILES",
+        "123456",
+        "[[[[[unclosed_bracket",
+    ]
+    (OUT / "invalid.smiles").write_text("\n".join(invalid) + "\n")
 
-# empty: zero bytes
-(OUT / "empty.smiles").write_text("")
+    # empty: zero bytes
+    (OUT / "empty.smiles").write_text("")
 
-# large: 1 000 SMILES sampled from valid pool (fast; no network needed)
-rng2 = random.Random(SEED + 1)
-large = [rng2.choice(_VALID_POOL) for _ in range(1_000)]
-(OUT / "large.smiles").write_text("\n".join(large) + "\n")
+    # large: 1 000 SMILES sampled from valid pool (fast; no network needed)
+    rng2 = random.Random(SEED + 1)
+    large = [rng2.choice(_VALID_POOL) for _ in range(1_000)]
+    (OUT / "large.smiles").write_text("\n".join(large) + "\n")
 
-# metadata
-metadata = {
-    "name": "guacamol_synthetic",
-    "version": "0.0.0-synthetic",
-    "num_valid_samples": len(valid),
-    "description": "Synthetic fixture for testing — not real chemistry data.",
-}
-(OUT / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
+    # metadata
+    metadata = {
+        "name": "guacamol_synthetic",
+        "version": "0.0.0-synthetic",
+        "num_valid_samples": len(valid),
+        "description": "Synthetic fixture for testing — not real chemistry data.",
+    }
+    (OUT / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
 
-print("Fixtures written to", OUT)
+    print("Fixtures written to", OUT)
