@@ -16,7 +16,7 @@ import warnings
 from functools import wraps
 from typing import Any, Callable, Union
 
-from jaxtyping import Float
+from jaxtyping import Float, Int
 import numpy as np
 from scipy.stats import norm, pearsonr, spearmanr
 from sklearn.metrics import (
@@ -739,7 +739,10 @@ def regret_ucb_alpha_sweep(
 
 
 @classification_metric
-def accuracy(probs: np.ndarray, targets: np.ndarray) -> dict[str, float]:
+def accuracy(
+    probs: Float[np.ndarray, "n_samples num_classes"],
+    targets: Int[np.ndarray, " n_samples"],
+) -> dict[str, float]:
     """Compute classification accuracy.
 
     Args:
@@ -754,7 +757,10 @@ def accuracy(probs: np.ndarray, targets: np.ndarray) -> dict[str, float]:
 
 
 @classification_metric
-def f1(probs: np.ndarray, targets: np.ndarray) -> dict[str, float]:
+def f1(
+    probs: Float[np.ndarray, "n_samples num_classes"],
+    targets: Int[np.ndarray, " n_samples"],
+) -> dict[str, float]:
     """Compute macro-averaged F1 score.
 
     Args:
@@ -769,7 +775,10 @@ def f1(probs: np.ndarray, targets: np.ndarray) -> dict[str, float]:
 
 
 @classification_metric
-def precision(probs: np.ndarray, targets: np.ndarray) -> dict[str, float]:
+def precision(
+    probs: Float[np.ndarray, "n_samples num_classes"],
+    targets: Int[np.ndarray, " n_samples"],
+) -> dict[str, float]:
     """Compute macro-averaged precision.
 
     Args:
@@ -784,7 +793,10 @@ def precision(probs: np.ndarray, targets: np.ndarray) -> dict[str, float]:
 
 
 @classification_metric
-def recall(probs: np.ndarray, targets: np.ndarray) -> dict[str, float]:
+def recall(
+    probs: Float[np.ndarray, "n_samples num_classes"],
+    targets: Int[np.ndarray, " n_samples"],
+) -> dict[str, float]:
     """Compute macro-averaged recall.
 
     Args:
@@ -799,7 +811,10 @@ def recall(probs: np.ndarray, targets: np.ndarray) -> dict[str, float]:
 
 
 @classification_metric
-def auc_roc(probs: np.ndarray, targets: np.ndarray) -> dict[str, float]:
+def auc_roc(
+    probs: Float[np.ndarray, "n_samples num_classes"],
+    targets: Int[np.ndarray, " n_samples"],
+) -> dict[str, float]:
     """Compute Area Under the ROC Curve (AUC-ROC).
 
     For binary classification, uses the positive-class probabilities.
