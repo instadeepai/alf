@@ -195,8 +195,11 @@ def register_classification_metric(metric_fn: Callable) -> Callable:
     """
 
     @wraps(metric_fn)
-    def wrapper(probs: Float[np.ndarray, "n_samples num_classes"], targets: Float[np.ndarray, " n_samples"]) -> dict[str, float]:
-        assert probs.ndim == 2, f"probs must be with shape (n_samples, num_classes), got shape {probs.shape}"
+    def wrapper(probs: Float[np.ndarray, "n_samples num_classes"], 
+                targets: Float[np.ndarray, " n_samples"]) -> dict[str, float]:
+        assert probs.ndim == 2, (
+            "probs must be with shape (n_samples, num_classes), "
+            f"got shape {probs.shape}")
         assert len(probs) != 0, "Empty input arrays"
         assert probs.shape[0] == targets.shape[0], (
             f"probs and targets batch size mismatch: {probs.shape[0]} vs {targets.shape[0]}"

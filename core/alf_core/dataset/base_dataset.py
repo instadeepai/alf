@@ -131,7 +131,8 @@ class BaseDataset(abc.ABC):
         """
         assert "train" in self.splits, (
                 "Dataset must be split before accessing train dataset; "
-                "train split has not been created yet — call dataset.setup() before accessing train_dataset"
+                "train split has not been created yet — "
+                "call dataset.setup() before accessing train_dataset"
             )
         return self.splits["train"]
 
@@ -147,7 +148,8 @@ class BaseDataset(abc.ABC):
         """
         assert "test" in self.splits, (
                 "Dataset must be split before accessing test dataset; "
-                "test split has not been created yet — call dataset.setup() before accessing test_dataset"
+                "test split has not been created yet — "
+                "call dataset.setup() before accessing test_dataset"
             )
         return self.splits["test"]
 
@@ -163,7 +165,8 @@ class BaseDataset(abc.ABC):
         """
         assert "validation" in self.splits, (
             "Dataset must be split before accessing validation dataset; "
-            "validation split has not been created yet — call dataset.setup() before accessing validation_dataset"
+            "validation split has not been created yet — "
+            "call dataset.setup() before accessing validation_dataset"
         )
         return self.splits["validation"]
 
@@ -179,7 +182,8 @@ class BaseDataset(abc.ABC):
         """
         assert "candidate_pool" in self.splits, (
             "Dataset must be split before accessing candidate pool; "
-            "candidate_pool split has not been created yet — call dataset.setup() before accessing candidate_pool"
+            "candidate_pool split has not been created yet — "
+            "call dataset.setup() before accessing candidate_pool"
         )
         return self.splits["candidate_pool"]
 

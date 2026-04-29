@@ -138,7 +138,8 @@ class SequenceCNN(nn.Module):
             nn.Linear(fc_hidden_dim // 2, output_neurons),
         )
 
-    def forward(self, x: Float[torch.Tensor, "batch_size alphabet_size seq_length"]) -> torch.Tensor:
+    def forward(self, x: Float[torch.Tensor, "batch_size alphabet_size seq_length"]
+                ) -> torch.Tensor:
         """Forward pass through the network.
 
         Args:
@@ -201,7 +202,8 @@ class CNNModel(BaseModel):
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
 
-    def _one_hot_encode(self, sequences: list[str]) -> Float[torch.Tensor, "batch_size alphabet_size seq_length"]:
+    def _one_hot_encode(self, sequences: list[str]
+                        ) -> Float[torch.Tensor, "batch_size alphabet_size seq_length"]:
         """One-hot encode sequences.
 
         Args:
@@ -217,7 +219,8 @@ class CNNModel(BaseModel):
             flatten=False,
         )
 
-    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> Float[torch.Tensor, "batch_size alphabet_size seq_length"]:
+    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]
+                  ) -> Float[torch.Tensor, "batch_size alphabet_size seq_length"]:
         """Convert inputs to one-hot encoded tensors.
 
         Args:
@@ -278,7 +281,7 @@ class CNNModel(BaseModel):
             Tuple of (average_loss, metrics_dict).
 
         Raises:
-            ValueError: If the model is not initialized.
+            RuntimeError: If the model is not initialized.
         """
         if self.model is None:
             raise RuntimeError(
@@ -331,7 +334,7 @@ class CNNModel(BaseModel):
             Tuple of (average_loss, metrics_dict).
 
         Raises:
-            ValueError: If the model is not initialized.
+            RuntimeError: If the model is not initialized.
         """
         if self.model is None:
             raise RuntimeError(
@@ -419,6 +422,7 @@ class CNNModel(BaseModel):
         Args:
             train_data: Training data containing sequences and oracle values.
             val_data: Optional validation data.
+            problem_type: Type of problem determining which metrics are computed.
             **kwargs: Additional keyword arguments. Recognises ``problem_type``
                 (``ProblemType``) to configure loss, label dtype, and output layer.
         """
@@ -467,7 +471,7 @@ class CNNModel(BaseModel):
             criterion = nn.CrossEntropyLoss()
 
         # Training loop
-        avg_val_loss, val_metrics = None, None
+        avg_val_loss, val_metrics = None, {}
         for epoch in range(self.train_config.num_epochs):
             # Train
             avg_train_loss, train_metrics = self._train_epoch(train_loader, optimizer, criterion)

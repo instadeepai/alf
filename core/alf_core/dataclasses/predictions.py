@@ -46,7 +46,8 @@ class Predictions:
             AssertionError: If means is empty, or if variances or empirical_dist
                 don't match the length of means.
         """
-        assert len(self.means) > 0, "Means must have at least one prediction — expected shape (num_candidates,)"
+        assert len(self.means) > 0, "Means must have at least one prediction — "
+        "expected shape (num_candidates,)"
         if self.variances is not None:
             assert len(self.variances) == len(self.means), (
                 "Variances must have the same length as means (num_candidates,), "
@@ -54,7 +55,8 @@ class Predictions:
             )
         if self.empirical_dist is not None:
             assert len(self.empirical_dist) == len(self.means), (
-                "Empirical_dist must have the same length as means - shape (num_candidates, num_ensemble_models), "
+                "Empirical_dist must have the same length as means - "
+                "shape (num_candidates, num_ensemble_models), "
                 f"but its first dimension ({len(self.empirical_dist)}) does not match "
                 f"len(means) ({len(self.means)})"
             )
@@ -81,6 +83,7 @@ class Predictions:
         Args:
             candidates: List of Candidate objects corresponding to the predictions.
             targets: Ground truth target values corresponding to each candidate.
+            problem_type: Optional ProblemType to determine the predictions type.
 
         Returns:
             A DataFrame with predictions, targets, and optionally variances

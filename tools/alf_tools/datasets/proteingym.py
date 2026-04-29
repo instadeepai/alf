@@ -141,7 +141,7 @@ class ProteinGym(BaseDataset):
             A dictionary of the splits.
 
         Raises:
-            ValueError: If dataset is not loaded before splitting.
+            RuntimeError: If dataset is not loaded before splitting.
         """
         if self._raw_dataset is None:
             raise RuntimeError(

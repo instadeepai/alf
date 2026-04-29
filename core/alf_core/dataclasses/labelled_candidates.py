@@ -103,7 +103,8 @@ class LabelledCandidates:
         else:
             assert labels is not None, (
                     "Labels must be provided when appending a list of Candidates "
-                    "(pass a LabelledCandidates instead to append without providing labels separately)"
+                    "(pass a LabelledCandidates instead to append "
+                    "without providing labels separately)"
                 )
             assert len(candidates) == len(labels), (
                     f"Candidates and labels must have the same length, "

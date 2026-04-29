@@ -93,7 +93,8 @@ def one_hot_encode(
     char_to_idx: dict[str, int],
     alphabet_size: int,
     flatten: bool = False,
-) -> Float[torch.Tensor, "batch_size alphabet_size seq_length"] | Float[torch.Tensor, "batch_size flat_features"]:
+) -> Float[torch.Tensor, "batch_size alphabet_size seq_length"
+           ] | Float[torch.Tensor, "batch_size flat_features"]:
     """One-hot encode sequences.
 
     Args:
