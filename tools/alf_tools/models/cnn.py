@@ -460,6 +460,7 @@ class CNNModel(BaseModel):
             criterion = nn.CrossEntropyLoss()
 
         # Training loop
+        avg_val_loss, val_metrics = None, None
         for epoch in range(self.train_config.num_epochs):
             # Train
             avg_train_loss, train_metrics = self._train_epoch(train_loader, optimizer, criterion)

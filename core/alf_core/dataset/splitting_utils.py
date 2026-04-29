@@ -196,37 +196,40 @@ def split_stratified(
         Dictionary with keys "train", "validation", "test", and "candidate_pool".
     """
     labels = dataset.labels.astype(int)
-    n = len(labels)
+    assert np.allclose(dataset.labels, labels.astype(float)), "Labels must be integers (no fractional parts)"
     rng = np.random.RandomState(seed)
 
     classes = np.unique(labels)
-    split_indices: dict[str, list[int]] = {
-        "train": [],
-        "validation": [],
-        "test": [],
-        "candidate_pool": [],
-    }
+    split_names = ["train", "validation", "test", "candidate_pool"]
+    split_sizes = [train_size, validation_size, test_size, candidate_pool_size]
 
-    for cls in classes:
-        cls_idx = np.where(labels == cls)[0]
-        cls_idx = rng.permutation(cls_idx)
-        frac = len(cls_idx) / n
+    # Ensure that split ratios do not leave out any samples.
+    # Shuffle each class's indices once, then track how many have been consumed.
+    cls_idxs = {cls: rng.permutation(np.where(labels == cls)[0]) for cls in classes}
+    cls_used = {cls: 0 for cls in classes}
 
-        n_train = round(frac * train_size)
-        n_val = round(frac * validation_size)
-        n_test = round(frac * test_size)
-        n_pool = round(frac * candidate_pool_size)
+    split_indices: dict[str, list[int]] = {name: [] for name in split_names}
 
-        i = 0
-        split_indices["train"].extend(cls_idx[i : i + n_train].tolist())
-        i += n_train
-        split_indices["validation"].extend(cls_idx[i : i + n_val].tolist())
-        i += n_val
-        split_indices["test"].extend(cls_idx[i : i + n_test].tolist())
-        i += n_test
-        split_indices["candidate_pool"].extend(cls_idx[i : i + n_pool].tolist())
+    for name, S in zip(split_names, split_sizes):
+        # Remaining samples available per class at this point in the loop.
+        avail = [len(cls_idxs[cls]) - cls_used[cls] for cls in classes]
+        total_avail = sum(avail)
+
+        # Largest remainder method: allocate exactly S samples proportional to
+        # remaining class availability, guaranteeing no rounding waste within the split.
+        exact = [a / total_avail * S for a in avail]
+        alloc = [int(e) for e in exact]
+        remainders = [e - a for e, a in zip(exact, alloc)]
+        leftover = S - sum(alloc)
+        for i in sorted(range(len(classes)), key=lambda i: -remainders[i])[:leftover]:
+            alloc[i] += 1
+
+        for cls, n in zip(classes, alloc):
+            start = cls_used[cls]
+            split_indices[name].extend(cls_idxs[cls][start : start + n].tolist())
+            cls_used[cls] += n
 
     return {
-        key: LabelledCandidates(*dataset[np.array(indices)])
+        key: LabelledCandidates(*dataset[np.array(indices, dtype=int)])
         for key, indices in split_indices.items()
     }

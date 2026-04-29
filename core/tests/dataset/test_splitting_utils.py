@@ -103,6 +103,22 @@ class TestSplitStratified:
         cands_b = [c.data for c in splits_b["train"].candidates]
         assert cands_a != cands_b
 
+    def test_stratified_split_sizes_clamped(self):
+        """Test that stratified split sizes are clamped to the requested values."""
+        labels = [0] * 3 + [1] * 3 + [2] * 3
+        dataset = make_dataset(labels)
+        requested = dict(train_size=2, validation_size=2, test_size=2, candidate_pool_size=2)
+        splits = split_stratified(dataset, **requested, seed=0)
+
+        assert len(splits["train"]) == requested["train_size"]
+        assert len(splits["validation"]) == requested["validation_size"]
+        assert len(splits["test"]) == requested["test_size"]
+        assert len(splits["candidate_pool"]) == requested["candidate_pool_size"]
+        assert sum(len(split) for split in splits.values()) == sum(requested.values())
+        
+        # Test that shuffling is working
+        assert splits["train"].labels.astype(int).tolist() != [0, 0]
+
 
 class TestBaseDatasetConfigStratifiedValidator:
     """Tests for the Pydantic validator guarding stratified + REGRESSION."""
