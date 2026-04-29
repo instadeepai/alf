@@ -340,7 +340,7 @@ class GPModel(BaseModel):
             )
         return self.featurizer_config.custom_featurizer(sequences)
 
-    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> torch.Tensor:
+    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> Float[torch.Tensor, "batch_size n_features"]:
         """Convert inputs to feature tensors.
 
         Args:
