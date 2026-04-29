@@ -419,7 +419,8 @@ class GPModel(BaseModel):
         """
         if self.likelihood is None:
             raise RuntimeError(
-                "likelihood is None — _initialize_likelihood() must be called before _initialize_gp_model()"
+                "likelihood is None — _initialize_likelihood() "
+                "must be called before _initialize_gp_model()"
             )
 
         gp_model = ExactGPModel(
@@ -453,6 +454,7 @@ class GPModel(BaseModel):
 
         Raises:
             RuntimeError: If GP model or likelihood is not initialized.
+            ValueError: If optimizer_type in train_config is not supported.
         """
         if self.gp_model is None or self.likelihood is None:
             uninit = [name for name, obj in [("gp_model", self.gp_model), 

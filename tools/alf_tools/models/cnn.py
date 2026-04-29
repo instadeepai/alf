@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import torch
@@ -380,8 +380,8 @@ class CNNModel(BaseModel):
         epoch: int,
         avg_train_loss: float,
         train_metrics: dict,
-        avg_val_loss: float | None = None,
-        val_metrics: dict | None = None,
+        avg_val_loss: Optional[float] = None,
+        val_metrics: Optional[Dict[str, float]] = None,
     ) -> None:
         """Record epoch metrics and log at the configured frequency.
 
@@ -471,7 +471,8 @@ class CNNModel(BaseModel):
             criterion = nn.CrossEntropyLoss()
 
         # Training loop
-        avg_val_loss, val_metrics = None, {}
+        avg_val_loss = None
+        val_metrics: Dict[str, float] = {}
         for epoch in range(self.train_config.num_epochs):
             # Train
             avg_train_loss, train_metrics = self._train_epoch(train_loader, optimizer, criterion)

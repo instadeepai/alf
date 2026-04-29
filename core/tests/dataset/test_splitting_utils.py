@@ -187,7 +187,8 @@ class TestBaseDatasetConfigStratifiedValidator:
             BaseDatasetConfig(**self._base_kwargs(), split_type="unknown")
 
 def test_split_dataset_invalid_split_type_string():
-    """Test that passing an invalid split type string raises a ValueError with an informative message."""
+    """Test that passing an invalid split type string 
+    raises a ValueError with an informative message."""
     dataset = make_dataset([0, 1, 2])
     with pytest.raises(ValueError, match="Expected one of"):
         split_dataset("not-a-number", dataset, 1, 1, 1, 0, seed=0)
