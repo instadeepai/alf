@@ -23,6 +23,7 @@ import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.enums import ProblemType
+from jaxtyping import Float
 from torch.utils.data import DataLoader, TensorDataset
 
 from alf_tools.models.utils import (
@@ -137,7 +138,7 @@ class SequenceCNN(nn.Module):
             nn.Linear(fc_hidden_dim // 2, output_neurons),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Float[torch.Tensor, "batch_size alphabet_size seq_length"]) -> torch.Tensor:
         """Forward pass through the network.
 
         Args:
@@ -200,7 +201,7 @@ class CNNModel(BaseModel):
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
 
-    def _one_hot_encode(self, sequences: list[str]) -> torch.Tensor:
+    def _one_hot_encode(self, sequences: list[str]) -> Float[torch.Tensor, "batch_size alphabet_size seq_length"]:
         """One-hot encode sequences.
 
         Args:
@@ -216,7 +217,7 @@ class CNNModel(BaseModel):
             flatten=False,
         )
 
-    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> torch.Tensor:
+    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> Float[torch.Tensor, "batch_size alphabet_size seq_length"]:
         """Convert inputs to one-hot encoded tensors.
 
         Args:
@@ -403,6 +404,7 @@ class CNNModel(BaseModel):
         self,
         train_data: LabelledCandidates,
         val_data: LabelledCandidates | None = None,
+        problem_type: ProblemType = ProblemType.REGRESSION,
         **kwargs: Any,
     ) -> None:
         """Train the CNN model.
@@ -418,7 +420,6 @@ class CNNModel(BaseModel):
             f"Training CNN with {len(train_data)} samples (problem_type={self._problem_type})"
         )
         self._epoch_metrics = []
-        logger.info(f"Training CNN with {len(train_data)} samples")
 
         # Determine output neurons: 1 for regression/binary, num_classes for multiclass
         output_neurons = (
