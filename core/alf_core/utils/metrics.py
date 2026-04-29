@@ -16,6 +16,7 @@ import warnings
 from functools import wraps
 from typing import Any, Callable, Union
 
+from jaxtyping import Float
 import numpy as np
 from scipy.stats import norm, pearsonr, spearmanr
 from sklearn.metrics import (
@@ -181,7 +182,7 @@ def classification_metric(metric_fn: Callable) -> Callable:
     """
 
     @wraps(metric_fn)
-    def wrapper(probs: np.ndarray, targets: np.ndarray) -> Any:
+    def wrapper(probs: Float[np.ndarray, "n_samples num_classes" ], targets: Float[np.ndarray, " n_samples" ]) -> dict[str, float]:
         assert probs.ndim == 2, f"probs must be 2D, got shape {probs.shape}"
         assert len(probs) != 0, "Empty input arrays"
         assert probs.shape[0] == targets.shape[0], (
@@ -194,10 +195,10 @@ def classification_metric(metric_fn: Callable) -> Callable:
 
 
 def monte_carlo_ranking(
-    means: np.ndarray,
-    variances: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
     num_samples: int = 10000,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[Float[np.ndarray, " b"], Float[np.ndarray, " b"]]:
     """Compute ranks, their means and variances using Monte Carlo simulation.
 
     For predicted means and variances, estimates normally distributed means
@@ -231,7 +232,11 @@ def monte_carlo_ranking(
 
 
 @no_variance_required
-def mse(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dict[str, float]:
+def mse(
+    means: Float[np.ndarray, " b"],
+    _: Float[np.ndarray, " b"] | None,
+    targets: Float[np.ndarray, " b"],
+) -> dict[str, float]:
     """Compute the mean squared error.
 
     For each sample compute the squared euclidean distance between
@@ -249,7 +254,11 @@ def mse(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dict[st
 
 
 @no_variance_required
-def spearman(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dict[str, float]:
+def spearman(
+    means: Float[np.ndarray, " b"],
+    _: Float[np.ndarray, " b"] | None,
+    targets: Float[np.ndarray, " b"],
+) -> dict[str, float]:
     """Compute the spearman correlation.
 
     This is a non-parametric statistical test which measures
@@ -270,7 +279,11 @@ def spearman(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> di
 
 
 @no_variance_required
-def pearson(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dict[str, float]:
+def pearson(
+    means: Float[np.ndarray, " b"],
+    _: Float[np.ndarray, " b"] | None,
+    targets: Float[np.ndarray, " b"],
+) -> dict[str, float]:
     """Compute the pearson correlation.
 
     This is a statistical test which measures the strength
@@ -290,7 +303,11 @@ def pearson(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dic
 
 
 @no_variance_required
-def pairwise_xent(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dict[str, float]:
+def pairwise_xent(
+    means: Float[np.ndarray, " b"],
+    _: Float[np.ndarray, " b"] | None,
+    targets: Float[np.ndarray, " b"],
+) -> dict[str, float]:
     """Compute the ranking loss for a pairwise classification problem.
 
     For each pair of items in the batch, predict which item has the higher target value.
@@ -322,9 +339,9 @@ def pairwise_xent(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) 
 
 @requires_variance
 def expected_calibration_error(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
     n_grid_points: int = 100,
 ) -> dict[str, float]:
     """Compute Expected Calibration Error (ECE).
@@ -360,9 +377,9 @@ def expected_calibration_error(
 
 @requires_variance
 def rank_expected_calibration_error(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
 ) -> dict[str, float]:
     """Compute Expected Calibration Error (ECE) in rank space.
 
@@ -389,9 +406,9 @@ def rank_expected_calibration_error(
 
 @requires_variance
 def width(
-    _: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    _: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
     alpha: float = 0.95,
 ) -> dict[str, float]:
     """Compute average confidence interval width normalized by dataset range.
@@ -429,9 +446,9 @@ def width(
 
 @requires_variance
 def rank_width(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
     alpha: float = 0.95,
 ) -> dict[str, float]:
     """Compute average confidence interval width in rank space.
@@ -464,9 +481,9 @@ def rank_width(
 
 @requires_variance
 def coverage(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
     alpha: float = 0.95,
 ) -> dict[str, float]:
     """Compute coverage at alpha% confidence level.
@@ -501,9 +518,9 @@ def coverage(
 
 @requires_variance
 def rank_coverage(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
     alpha: float = 0.95,
 ) -> dict[str, float]:
     """Compute coverage at alpha% confidence level in rank space.
@@ -537,9 +554,9 @@ def rank_coverage(
 
 @requires_variance
 def residual_spearman(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
 ) -> dict[str, float]:
     """Compute Spearman correlation between residuals and variances.
 
@@ -562,9 +579,9 @@ def residual_spearman(
 
 @requires_variance
 def residual_pearson(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
 ) -> dict[str, float]:
     """Compute Pearson correlation between residuals and standard deviations.
 
@@ -587,9 +604,9 @@ def residual_pearson(
 
 @requires_variance
 def regret_ucb_alpha(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
     alpha: float = 0.1,
     num_acquisitions: int = 100,
 ) -> dict[str, float]:
@@ -658,9 +675,9 @@ def regret_ucb_alpha(
 
 @requires_variance
 def regret_ucb_alpha_sweep(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
     alpha: Union[float, list[float]] | None = None,
     num_acquisitions: int = 100,
 ) -> dict[str, float]:
