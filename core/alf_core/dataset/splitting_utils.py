@@ -13,12 +13,15 @@
 # limitations under the License.
 
 
+from typing import Literal
 import numpy as np
 from alf_core.dataclasses.labelled_candidates import LabelledCandidates
 
+ALLOWED_SPLIT_TYPES = ("random", "low_vs_high", "stratified")
+
 
 def split_dataset(
-    split_type: str,
+    split_type: Literal["random", "low_vs_high", "stratified"],
     dataset: LabelledCandidates,
     train_size: int,
     validation_size: int,
@@ -41,8 +44,17 @@ def split_dataset(
         Dictionary with keys "train", "validation", "test", and "candidate_pool".
 
     Raises:
-        ValueError: If split_type is not "random", "low_vs_high", or "stratified".
+        TypeError: If split_type is not a string.
+        ValueError: If split_type is not one of the supported split types.
     """
+    if not isinstance(split_type, str):
+        raise TypeError(
+            f"split_type must be one of {ALLOWED_SPLIT_TYPES}, got {type(split_type).__name__}"
+        )
+    if split_type not in ALLOWED_SPLIT_TYPES:
+        raise ValueError(
+            f"Invalid split type: {split_type!r}. Expected one of {ALLOWED_SPLIT_TYPES}."
+        )
     if split_type == "random":
         return split_random(
             dataset, train_size, validation_size, test_size, candidate_pool_size, seed

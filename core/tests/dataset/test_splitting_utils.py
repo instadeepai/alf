@@ -19,7 +19,7 @@ import pytest
 from alf_core.dataclasses import Candidate, LabelledCandidates
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataset.base_dataset import BaseDatasetConfig
-from alf_core.dataset.splitting_utils import split_stratified
+from alf_core.dataset.splitting_utils import split_dataset, split_stratified
 from alf_core.enums import ProblemType
 from pydantic import ValidationError
 
@@ -169,3 +169,14 @@ class TestBaseDatasetConfigStratifiedValidator:
         """Test that an unknown split type raises a ValidationError."""
         with pytest.raises(ValidationError):
             BaseDatasetConfig(**self._base_kwargs(), split_type="unknown")
+
+def test_split_dataset_invalid_split_type_string():
+    dataset = make_dataset([0, 1, 2])
+    with pytest.raises(ValueError, match="Expected one of"):
+        split_dataset("not-a-number", dataset, 1, 1, 1, 0, seed=0)
+
+
+def test_split_dataset_invalid_split_type_type():
+    dataset = make_dataset([0, 1, 2])
+    with pytest.raises(TypeError, match="split_type must be one of"):
+        split_dataset(123, dataset, 1, 1, 1, 0, seed=0)
