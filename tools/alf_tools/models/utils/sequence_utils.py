@@ -28,10 +28,11 @@ Note:
     Characters not present in the alphabet will raise a ValueError.
 """
 
-from typing import Union
+from typing import Literal, Union, overload
 
 import torch
 from alf_core import Candidate, LabelledCandidates
+from jaxtyping import Float
 
 
 def create_char_to_idx_mapping(alphabet: str) -> dict[str, int]:
@@ -66,12 +67,30 @@ def extract_sequences_from_inputs(inputs: Union[LabelledCandidates, list[Candida
         raise ValueError("Input must be LabelledCandidates or list of Candidates")
 
 
+@overload
+def one_hot_encode(
+    sequences: list[str],
+    char_to_idx: dict[str, int],
+    alphabet_size: int,
+    flatten: Literal[True],
+) -> Float[torch.Tensor, "batch_size flat_features"]: ...
+
+
+@overload
+def one_hot_encode(
+    sequences: list[str],
+    char_to_idx: dict[str, int],
+    alphabet_size: int,
+    flatten: Literal[False] = ...,
+) -> Float[torch.Tensor, "batch_size alphabet_size seq_length"]: ...
+
+
 def one_hot_encode(
     sequences: list[str],
     char_to_idx: dict[str, int],
     alphabet_size: int,
     flatten: bool = False,
-) -> torch.Tensor:
+) -> Float[torch.Tensor, "batch_size alphabet_size seq_length"] | Float[torch.Tensor, "batch_size flat_features"]:
     """One-hot encode sequences.
 
     Args:
@@ -104,7 +123,6 @@ def one_hot_encode(
                     f"Available characters: {list(char_to_idx.keys())}"
                 )
 
-    # Flatten if requested
     if flatten:
         one_hot = one_hot.view(batch_size, -1)
 
