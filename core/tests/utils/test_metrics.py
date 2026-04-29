@@ -190,19 +190,19 @@ class TestClassificationMetricInputValidation:
         """Test that 1D probability arrays are rejected."""
         probs = np.array([0.1, 0.9])
         targets = np.array([1])
-        with pytest.raises(AssertionError, match="2D"):
+        with pytest.raises(AssertionError, match="n_samples, num_classes"):
             accuracy(probs, targets)
 
     def test_empty_input_raises(self):
         """Test that empty inputs are rejected."""
         probs = np.empty((0, 2))
         targets = np.empty(0)
-        with pytest.raises(AssertionError, match="Empty"):
+        with pytest.raises(AssertionError, match="must not be empty"):
             accuracy(probs, targets)
 
     def test_batch_size_mismatch_raises(self):
         """Test that mismatched batch sizes between probs and targets are rejected."""
         probs = np.array([[0.6, 0.4], [0.4, 0.6]])
         targets = np.array([0])
-        with pytest.raises(AssertionError, match="batch size mismatch"):
+        with pytest.raises(AssertionError, match="same number of samples"):
             accuracy(probs, targets)

@@ -22,12 +22,12 @@ from alf_core.enums import ProblemType
 from beartype.roar import BeartypeCallHintParamViolation
 
 
-def binary_probs(n: int = 4) -> np.ndarray:
+def get_binary_probs(n: int = 4) -> np.ndarray:
     """Return simple binary probability array."""
     return np.array([[0.8, 0.2], [0.3, 0.7], [0.9, 0.1], [0.2, 0.8]][:n])
 
 
-def multiclass_probs(n: int = 3) -> np.ndarray:
+def get_multiclass_probs(n: int = 3) -> np.ndarray:
     """Return simple 3-class probability array."""
     return np.array([[0.7, 0.2, 0.1], [0.1, 0.7, 0.2], [0.1, 0.2, 0.7]][:n])
 
@@ -70,14 +70,14 @@ class TestResultsValidation:
     """Test cases for Results validation."""
 
     def test_mismatched_lengths_raises(self, predictions):
-        """Test that mismatched targets and predictions lengths raises AssertionError."""
+        """Test that mismatched targets and predictions lengths raises ValueError."""
         targets = np.array([1.0, 2.0])  # length 2 vs predictions length 3
         with pytest.raises(AssertionError, match="same length"):
             Results(targets=targets, predictions=predictions, problem_type=ProblemType.REGRESSION)
 
     def test_mismatched_lengths_raises_2d(self):
         """Test length mismatch is also caught for 2D classification means."""
-        probs = binary_probs(4)
+        probs = get_binary_probs(4)
         targets = np.array([0, 1, 0])  # wrong length
         preds = Predictions(means=probs)
         with pytest.raises(AssertionError):
@@ -132,7 +132,7 @@ class TestResultsBinaryRouting:
 
     def test_classification_metrics_computed(self):
         """Test that all classification metrics are computed for BINARY."""
-        probs = binary_probs()
+        probs = get_binary_probs()
         targets = np.array([0, 1, 0, 1])
         preds = Predictions(means=probs)
         results = Results(targets=targets, predictions=preds, problem_type=ProblemType.BINARY)
@@ -144,7 +144,7 @@ class TestResultsBinaryRouting:
 
     def test_no_regression_metrics(self):
         """Test that regression metrics are absent for BINARY."""
-        probs = binary_probs()
+        probs = get_binary_probs()
         targets = np.array([0, 1, 0, 1])
         preds = Predictions(means=probs)
         results = Results(targets=targets, predictions=preds, problem_type=ProblemType.BINARY)
@@ -165,7 +165,7 @@ class TestResultsMulticlassRouting:
 
     def test_classification_metrics_computed(self):
         """Test that classification metrics are computed for MULTICLASS."""
-        probs = multiclass_probs()
+        probs = get_multiclass_probs()
         targets = np.array([0, 1, 2])
         preds = Predictions(means=probs)
         results = Results(targets=targets, predictions=preds, problem_type=ProblemType.MULTICLASS)
@@ -174,7 +174,7 @@ class TestResultsMulticlassRouting:
 
     def test_perfect_multiclass(self):
         """Test that accuracy is 1.0 for perfect multiclass predictions."""
-        probs = multiclass_probs()
+        probs = get_multiclass_probs()
         targets = np.array([0, 1, 2])
         preds = Predictions(means=probs)
         results = Results(targets=targets, predictions=preds, problem_type=ProblemType.MULTICLASS)

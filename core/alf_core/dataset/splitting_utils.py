@@ -196,7 +196,12 @@ def split_stratified(
         Dictionary with keys "train", "validation", "test", and "candidate_pool".
     """
     labels = dataset.labels.astype(int)
-    assert np.allclose(dataset.labels, labels.astype(float)), "Labels must be integers (no fractional parts)"
+    non_integer_mask = ~np.isclose(dataset.labels, dataset.labels.astype(int).astype(float))
+    assert np.allclose(dataset.labels, labels.astype(float)),  (
+            f"split_type='stratified' requires integer class labels, but {non_integer_mask.sum()} "
+            f"labels have fractional parts (e.g. {dataset.labels[non_integer_mask][:3]}). "
+            f"Cast your labels to int or use split_type='random'."
+        )
     rng = np.random.RandomState(seed)
 
     classes = np.unique(labels)

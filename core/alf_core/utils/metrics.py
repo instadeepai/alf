@@ -39,11 +39,15 @@ def check_inputs(means: np.ndarray, targets: np.ndarray) -> None:
         AssertionError: If shapes don't match, arrays are empty, or contain NaN values.
     """
     assert means.shape == targets.shape, (
-        f"Means shape {means.shape} and targets shape {targets.shape} don't match"
+        f"Means shape {means.shape} does not match targets shape {targets.shape} "
+        f"(both must be (b,))"
     )
-    assert len(means) != 0, "Empty input arrays"
-    assert not (np.any(np.isnan(means))), "Mean prediction array contains NaN values"
-    assert not (np.any(np.isnan(targets))), "Target array contains NaN values"
+    assert len(
+        means) != 0, "Means and targets must not be empty (expected shape (b,) with b > 0)"
+    assert not (np.any(np.isnan(means))), (
+        "Mean prediction array contains NaN values")
+    assert not (np.any(np.isnan(targets))), (
+        "Target array contains NaN values")
 
 
 def check_variance_validity(variances: np.ndarray, targets: np.ndarray) -> None:
@@ -57,13 +61,20 @@ def check_variance_validity(variances: np.ndarray, targets: np.ndarray) -> None:
         AssertionError: If variances is None, contains negative values, length
             doesn't match targets, or contains NaN values.
     """
-    assert variances is not None, "This function requires variances but it is None"
-    assert np.all(variances >= 0), "All uncertainty values must be non-negative (variances)."
-    assert len(variances) == len(targets), (
-        f"Length of variances vector ({len(variances)})"
-        f"should equal length of targets vector ({len(targets)})"
+    assert variances is not None, (
+        "variances is None — this metric requires uncertainty estimates; "
+        "ensure your model's predict() returns a Predictions object with variances set"
     )
-    assert not (np.any(np.isnan(variances))), "Variance arrays contain NaN values"
+    assert np.all(variances >= 0), (
+        f"variances must be non-negative, but {np.sum(variances < 0)} values are negative "
+        f"(min={variances.min():.4g})"
+    )
+    assert len(variances) == len(targets), (
+        f"variances has {len(variances)} elements but targets has {len(targets)} — "
+        f"both must have shape (b,)"
+    )
+    assert not (np.any(np.isnan(variances))), (
+        "Variance arrays contain NaN values")
 
 
 class MetricRegistry:
@@ -107,7 +118,7 @@ metric_registry = MetricRegistry()
 classification_metric_registry = MetricRegistry()
 
 
-def requires_variance(metric_fn: Callable) -> Callable:
+def register_requires_variance(metric_fn: Callable) -> Callable:
     """Decorator to mark a metric as requiring variance.
 
     Automatically registers the metric in the global registry and applies input validation.
@@ -123,7 +134,7 @@ def requires_variance(metric_fn: Callable) -> Callable:
     @wraps(metric_fn)
     def wrapper(
         means: np.ndarray,
-        variances: np.ndarray | None,
+        variances: np.ndarray,
         targets: np.ndarray,
         *args: Any,
         **kwargs: Any,
@@ -133,11 +144,12 @@ def requires_variance(metric_fn: Callable) -> Callable:
         return metric_fn(means, variances, targets, *args, **kwargs)
 
     # Register the metric with variance requirement
-    metric_registry.register(metric_fn.__name__, wrapper, requires_variance=True)
+    metric_registry.register(
+        metric_fn.__name__, wrapper, requires_variance=True)
     return wrapper
 
 
-def no_variance_required(metric_fn: Callable) -> Callable:
+def register_no_variance_required(metric_fn: Callable) -> Callable:
     """Decorator to mark a metric as not requiring variance.
 
     Automatically registers the metric in the global registry and applies input validation.
@@ -162,11 +174,12 @@ def no_variance_required(metric_fn: Callable) -> Callable:
         return metric_fn(means, variances, targets, *args, **kwargs)
 
     # Register the metric without variance requirement
-    metric_registry.register(metric_fn.__name__, wrapper, requires_variance=False)
+    metric_registry.register(
+        metric_fn.__name__, wrapper, requires_variance=False)
     return wrapper
 
 
-def classification_metric(metric_fn: Callable) -> Callable:
+def register_classification_metric(metric_fn: Callable) -> Callable:
     """Decorator to register a classification metric.
 
     Automatically registers the metric in the classification registry and applies
@@ -182,15 +195,16 @@ def classification_metric(metric_fn: Callable) -> Callable:
     """
 
     @wraps(metric_fn)
-    def wrapper(probs: Float[np.ndarray, "n_samples num_classes" ], targets: Float[np.ndarray, " n_samples" ]) -> dict[str, float]:
-        assert probs.ndim == 2, f"probs must be 2D, got shape {probs.shape}"
+    def wrapper(probs: Float[np.ndarray, "n_samples num_classes"], targets: Float[np.ndarray, " n_samples"]) -> dict[str, float]:
+        assert probs.ndim == 2, f"probs must be with shape (n_samples, num_classes), got shape {probs.shape}"
         assert len(probs) != 0, "Empty input arrays"
         assert probs.shape[0] == targets.shape[0], (
             f"probs and targets batch size mismatch: {probs.shape[0]} vs {targets.shape[0]}"
         )
         return metric_fn(probs, targets)
 
-    classification_metric_registry.register(metric_fn.__name__, wrapper, requires_variance=False)
+    classification_metric_registry.register(
+        metric_fn.__name__, wrapper, requires_variance=False)
     return wrapper
 
 
@@ -219,7 +233,8 @@ def monte_carlo_ranking(
     n = len(means)
 
     # Simulate Gaussian scores
-    mean_samples = np.random.normal(loc=means, scale=np.sqrt(variances), size=(num_samples, n))
+    mean_samples = np.random.normal(
+        loc=means, scale=np.sqrt(variances), size=(num_samples, n))
 
     # Compute hard ranks for each sample
     rank_samples = np.argsort(np.argsort(-mean_samples, axis=1), axis=1) + 1
@@ -231,7 +246,7 @@ def monte_carlo_ranking(
     return mean_rank, rank_variances
 
 
-@no_variance_required
+@register_no_variance_required
 def mse(
     means: Float[np.ndarray, " b"],
     _: Float[np.ndarray, " b"] | None,
@@ -253,7 +268,7 @@ def mse(
     return {"mse": ((targets - means) ** 2).mean(0)}
 
 
-@no_variance_required
+@register_no_variance_required
 def spearman(
     means: Float[np.ndarray, " b"],
     _: Float[np.ndarray, " b"] | None,
@@ -278,7 +293,7 @@ def spearman(
     return {"spearman": spearmanr(targets, means)[0]}
 
 
-@no_variance_required
+@register_no_variance_required
 def pearson(
     means: Float[np.ndarray, " b"],
     _: Float[np.ndarray, " b"] | None,
@@ -302,7 +317,7 @@ def pearson(
     return {"pearson": pearsonr(targets, means)[0]}
 
 
-@no_variance_required
+@register_no_variance_required
 def pairwise_xent(
     means: Float[np.ndarray, " b"],
     _: Float[np.ndarray, " b"] | None,
@@ -337,7 +352,7 @@ def pairwise_xent(
     return {"pairwise_xent": ranking_xent}
 
 
-@requires_variance
+@register_requires_variance
 def expected_calibration_error(
     means: Float[np.ndarray, " b"],
     variances: Float[np.ndarray, " b"],
@@ -375,7 +390,7 @@ def expected_calibration_error(
     return {"ece": ece}
 
 
-@requires_variance
+@register_requires_variance
 def rank_expected_calibration_error(
     means: Float[np.ndarray, " b"],
     variances: Float[np.ndarray, " b"],
@@ -399,12 +414,13 @@ def rank_expected_calibration_error(
     mean_rank, rank_variances = monte_carlo_ranking(means, variances)
     target_ranks = (-targets).argsort().argsort() + 1
 
-    ece = expected_calibration_error(mean_rank, rank_variances, target_ranks)["ece"]
+    ece = expected_calibration_error(
+        mean_rank, rank_variances, target_ranks)["ece"]
 
     return {"rank_ece": ece}
 
 
-@requires_variance
+@register_requires_variance
 def width(
     _: Float[np.ndarray, " b"],
     variances: Float[np.ndarray, " b"],
@@ -444,7 +460,7 @@ def width(
     return {f"width_{alpha:.2f}": avg_width_ratio}
 
 
-@requires_variance
+@register_requires_variance
 def rank_width(
     means: Float[np.ndarray, " b"],
     variances: Float[np.ndarray, " b"],
@@ -474,12 +490,13 @@ def rank_width(
     mean_rank, rank_variances = monte_carlo_ranking(means, variances)
     target_ranks = (-targets).argsort().argsort() + 1
 
-    avg_width_ratio = width(mean_rank, rank_variances, target_ranks, alpha)[f"width_{alpha:.2f}"]
+    avg_width_ratio = width(mean_rank, rank_variances, target_ranks, alpha)[
+        f"width_{alpha:.2f}"]
 
     return {f"rank_width_{alpha:.2f}": avg_width_ratio}
 
 
-@requires_variance
+@register_requires_variance
 def coverage(
     means: Float[np.ndarray, " b"],
     variances: Float[np.ndarray, " b"],
@@ -516,7 +533,7 @@ def coverage(
     return {f"coverage_{alpha:.2f}": coverage_at_alpha}
 
 
-@requires_variance
+@register_requires_variance
 def rank_coverage(
     means: Float[np.ndarray, " b"],
     variances: Float[np.ndarray, " b"],
@@ -552,7 +569,7 @@ def rank_coverage(
     return {f"rank_coverage_{alpha:.2f}": coverage_at_alpha}
 
 
-@requires_variance
+@register_requires_variance
 def residual_spearman(
     means: Float[np.ndarray, " b"],
     variances: Float[np.ndarray, " b"],
@@ -577,7 +594,7 @@ def residual_spearman(
     return {"residual_spearman": spearmanr(residuals, variances)[0]}
 
 
-@requires_variance
+@register_requires_variance
 def residual_pearson(
     means: Float[np.ndarray, " b"],
     variances: Float[np.ndarray, " b"],
@@ -602,7 +619,7 @@ def residual_pearson(
     return {"residual_pearson": pearsonr(residuals, np.sqrt(variances))[0]}
 
 
-@requires_variance
+@register_requires_variance
 def regret_ucb_alpha(
     means: Float[np.ndarray, " b"],
     variances: Float[np.ndarray, " b"],
@@ -630,7 +647,8 @@ def regret_ucb_alpha(
     Raises:
         AssertionError: If num_acquisitions is not a positive integer.
     """
-    assert isinstance(num_acquisitions, int), "num_acquisitions should be an integer."
+    assert isinstance(num_acquisitions,
+                      int), "num_acquisitions should be an integer."
     assert num_acquisitions > 0, "num_acquisitions should be positive"
     # Handle case where num_acquisitions > available items
     if num_acquisitions > len(means):
@@ -673,7 +691,7 @@ def regret_ucb_alpha(
     return {f"regret_ucb_{alpha:.2f}": cumulative_regret}
 
 
-@requires_variance
+@register_requires_variance
 def regret_ucb_alpha_sweep(
     means: Float[np.ndarray, " b"],
     variances: Float[np.ndarray, " b"],
@@ -704,7 +722,8 @@ def regret_ucb_alpha_sweep(
         TypeError: If alpha is not a float or list of floats.
     """
     assert variances is not None, "UCB regret requires variances"
-    assert np.all(variances >= 0), "All uncertainty values must be non-negative (variances)."
+    assert np.all(
+        variances >= 0), "All uncertainty values must be non-negative (variances)."
 
     # Set the default list if alpha was not provided.
     # This is an ugly solution, but setting a mutable object (a list)
@@ -727,7 +746,8 @@ def regret_ucb_alpha_sweep(
 
     for a in alpha_list:
         # Compute UCB values
-        regret_alpha = regret_ucb_alpha(means, variances, targets, a, num_acquisitions)
+        regret_alpha = regret_ucb_alpha(
+            means, variances, targets, a, num_acquisitions)
 
         regret_alpha_list.update(regret_alpha)
     return regret_alpha_list
@@ -738,7 +758,7 @@ def regret_ucb_alpha_sweep(
 # ---------------------------------------------------------------------------
 
 
-@classification_metric
+@register_classification_metric
 def accuracy(
     probs: Float[np.ndarray, "n_samples num_classes"],
     targets: Int[np.ndarray, " n_samples"],
@@ -756,7 +776,7 @@ def accuracy(
     return {"accuracy": float(accuracy_score(targets, preds))}
 
 
-@classification_metric
+@register_classification_metric
 def f1(
     probs: Float[np.ndarray, "n_samples num_classes"],
     targets: Int[np.ndarray, " n_samples"],
@@ -774,7 +794,7 @@ def f1(
     return {"f1": float(f1_score(targets, preds, average="macro", zero_division=0))}
 
 
-@classification_metric
+@register_classification_metric
 def precision(
     probs: Float[np.ndarray, "n_samples num_classes"],
     targets: Int[np.ndarray, " n_samples"],
@@ -792,7 +812,7 @@ def precision(
     return {"precision": float(precision_score(targets, preds, average="macro", zero_division=0))}
 
 
-@classification_metric
+@register_classification_metric
 def recall(
     probs: Float[np.ndarray, "n_samples num_classes"],
     targets: Int[np.ndarray, " n_samples"],
@@ -810,7 +830,7 @@ def recall(
     return {"recall": float(recall_score(targets, preds, average="macro", zero_division=0))}
 
 
-@classification_metric
+@register_classification_metric
 def auc_roc(
     probs: Float[np.ndarray, "n_samples num_classes"],
     targets: Int[np.ndarray, " n_samples"],

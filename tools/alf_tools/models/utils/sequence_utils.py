@@ -64,7 +64,10 @@ def extract_sequences_from_inputs(inputs: Union[LabelledCandidates, list[Candida
     elif isinstance(inputs, list) and all(isinstance(c, Candidate) for c in inputs):
         return [c.data for c in inputs]
     else:
-        raise ValueError("Input must be LabelledCandidates or list of Candidates")
+        raise ValueError(
+            f"Inputs must be a LabelledCandidates or list[Candidate], "
+            f"got {type(inputs).__name__}"
+        )
 
 
 @overload

@@ -79,7 +79,11 @@ class ProteinGym(BaseDataset):
             ValueError: If HF token is not set as environment variable.
         """
         if os.environ.get("HF_TOKEN") is None:
-            raise ValueError("HF token must be set as environment variable")
+            raise ValueError(
+                "HF token must be set as environment variable; "
+                "HF_TOKEN environment variable is not set — export HF_TOKEN=<your_token> "
+                "or set os.environ['HF_TOKEN'] before loading ProteinGym"
+            )
 
         dms_name = self.config.dms_name
         dms_type = self.config.dms_type
@@ -140,7 +144,9 @@ class ProteinGym(BaseDataset):
             ValueError: If dataset is not loaded before splitting.
         """
         if self._raw_dataset is None:
-            raise ValueError("Dataset must be loaded before splitting")
+            raise RuntimeError(
+                "_raw_dataset is None — call dataset.setup() (or load_dataset()) before splitting"
+            )
         # Calculate split sizes
         dataset_size = len(self._raw_dataset)
         train_plus_validation_size = round(dataset_size * self.split_ratio["train"])

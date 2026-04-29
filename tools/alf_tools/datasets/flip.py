@@ -195,7 +195,10 @@ class FLIP(BaseDataset):
             ValueError: If dataset has not been loaded yet.
         """
         if self._raw_dataset is None:
-            raise ValueError("Dataset must be loaded before splitting")
+            raise RuntimeError(
+                "Dataset must be loaded before splitting; "
+                "_raw_dataset is None — call dataset.setup() (or load_dataset()) before splitting"
+            )
 
         # Separate FLIP's pre-defined train and test pools
         flip_train = LabelledCandidates(candidates=[], labels=np.array([]))

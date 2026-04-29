@@ -129,7 +129,10 @@ class BaseDataset(abc.ABC):
         Raises:
             AssertionError: If dataset hasn't been split yet.
         """
-        assert "train" in self.splits, "Dataset must be split before accessing train dataset"
+        assert "train" in self.splits, (
+                "Dataset must be split before accessing train dataset; "
+                "train split has not been created yet — call dataset.setup() before accessing train_dataset"
+            )
         return self.splits["train"]
 
     @property
@@ -142,7 +145,10 @@ class BaseDataset(abc.ABC):
         Raises:
             AssertionError: If dataset hasn't been split yet.
         """
-        assert "test" in self.splits, "Dataset must be split before accessing test dataset"
+        assert "test" in self.splits, (
+                "Dataset must be split before accessing test dataset; "
+                "test split has not been created yet — call dataset.setup() before accessing test_dataset"
+            )
         return self.splits["test"]
 
     @property
@@ -156,7 +162,8 @@ class BaseDataset(abc.ABC):
             AssertionError: If dataset hasn't been split yet.
         """
         assert "validation" in self.splits, (
-            "Dataset must be split before accessing validation dataset"
+            "Dataset must be split before accessing validation dataset; "
+            "validation split has not been created yet — call dataset.setup() before accessing validation_dataset"
         )
         return self.splits["validation"]
 
@@ -171,7 +178,8 @@ class BaseDataset(abc.ABC):
             AssertionError: If dataset hasn't been split yet.
         """
         assert "candidate_pool" in self.splits, (
-            "Dataset must be split before accessing candidate pool"
+            "Dataset must be split before accessing candidate pool; "
+            "candidate_pool split has not been created yet — call dataset.setup() before accessing candidate_pool"
         )
         return self.splits["candidate_pool"]
 
@@ -204,7 +212,11 @@ class BaseDataset(abc.ABC):
         Raises:
             AssertionError: If dataset hasn't been loaded yet.
         """
-        assert self._raw_dataset is not None, "Dataset must be loaded before splitting"
+        assert self._raw_dataset is not None, (
+            "Dataset must be loaded before splitting; "
+            "_raw_dataset is None — load_dataset() must be called and return a "
+            "LabelledCandidates before _split_dataset() is called"
+        )
 
         # Calculate split sizes
         dataset_size = len(self._raw_dataset)
@@ -274,7 +286,10 @@ class BaseDataset(abc.ABC):
             AssertionError: If dataset hasn't been loaded yet.
             ValueError: If any candidate's data is not found in the dataset.
         """
-        assert self._raw_dataset is not None, "Dataset must be loaded before querying"
+        assert self._raw_dataset is not None, (
+            "Dataset must be loaded before querying; "
+            "_raw_dataset is None — call dataset.setup() before querying"
+        )
         indices = [self._raw_dataset.candidates.index(cand) for cand in candidates]
         labels = self._raw_dataset.labels[indices]
         return LabelledCandidates(candidates=candidates, labels=labels)

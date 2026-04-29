@@ -234,7 +234,10 @@ class CNNModel(BaseModel):
         elif isinstance(inputs, list) and all(isinstance(c, Candidate) for c in inputs):
             sequences = [c.data for c in inputs]
         else:
-            raise ValueError("Input must be LabelledCandidates or list of Candidates")
+            raise ValueError(
+                f"Inputs must be a LabelledCandidates or list[Candidate], "
+                f"got {type(inputs).__name__}"
+            )
 
         return self._one_hot_encode(sequences)
 
@@ -278,7 +281,9 @@ class CNNModel(BaseModel):
             ValueError: If the model is not initialized.
         """
         if self.model is None:
-            raise ValueError("Model must be initialized before training")
+            raise RuntimeError(
+                "CNN model has not been initialized — call model.train() before _train_epoch()"
+            )
         self.model.train()
         train_losses = []
         train_predictions_all = []
@@ -329,7 +334,9 @@ class CNNModel(BaseModel):
             ValueError: If the model is not initialized.
         """
         if self.model is None:
-            raise ValueError("Model must be initialized before validation")
+            raise RuntimeError(
+                "CNN model has not been initialized — call model.train() before _validate_epoch()"
+            )
 
         self.model.eval()
         val_losses = []

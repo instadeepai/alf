@@ -227,7 +227,10 @@ class PyRosetta(BaseModel):
             elif self.average_fn_over_repeats == "median":
                 score = np.median(np.array(scores))
             else:
-                raise ValueError(f"Invalid average function: {self.average_fn_over_repeats}")
+                raise ValueError(
+                    f"Invalid average_fn_over_repeats: {self.average_fn_over_repeats!r}. "
+                    f"Expected 'mean' or 'median'."
+                )
             fitness_scores.append(score)
             if self.repeats_per_prediction > 1:
                 variances.append(np.var(scores))

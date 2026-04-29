@@ -373,8 +373,10 @@ class GPModel(BaseModel):
                 return torch.stack(sequences)
             else:
                 raise ValueError(
-                    "For featurizer_type='precomputed', Candidate.data must be "
-                    "torch.Tensor or np.ndarray"
+                    f"For featurizer_type='precomputed', Candidate.data must be torch.Tensor or "
+                    f"np.ndarray, got {type(sequences[0]).__name__}. "
+                    f"Wrap your data in a np.ndarray or torch.Tensor when creating Candidates, "
+                    f"or switch to featurizer_type='one_hot'."
                 )
         else:
             raise ValueError(
@@ -415,7 +417,9 @@ class GPModel(BaseModel):
             ValueError: If likelihood has not been initialized before calling this method.
         """
         if self.likelihood is None:
-            raise ValueError("Likelihood must be initialized before GP model")
+            raise RuntimeError(
+                "likelihood is None — _initialize_likelihood() must be called before _initialize_gp_model()"
+            )
 
         gp_model = ExactGPModel(
             train_x=train_x,
@@ -450,7 +454,10 @@ class GPModel(BaseModel):
             ValueError: If GP model or likelihood is not initialized.
         """
         if self.gp_model is None or self.likelihood is None:
-            raise ValueError("GP model and likelihood must be initialized before optimization")
+            uninit = [name for name, obj in [("gp_model", self.gp_model), ("likelihood", self.likelihood)] if obj is None]
+            raise RuntimeError(
+                f"{' and '.join(uninit)} not initialized — call train() before _optimize_hyperparameters()"
+            )
 
         # Set to training mode
         self.gp_model.train()
@@ -472,7 +479,10 @@ class GPModel(BaseModel):
                 line_search_fn="strong_wolfe",
             )
         else:
-            raise ValueError(f"Unsupported optimizer_type: {self.train_config.optimizer_type}")
+            raise ValueError(
+                f"Unsupported optimizer_type: {self.train_config.optimizer_type!r}. "
+                f"Expected one of 'adam' or 'lbfgs'."
+            )
 
         # Training loop
         losses = []

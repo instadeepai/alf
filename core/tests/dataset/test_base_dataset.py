@@ -250,7 +250,8 @@ class TestBaseDatasetProperties:
         )
         dataset = NoSetupDataset(config)
 
-        with pytest.raises(AssertionError, match="Dataset must be split before accessing"):
+        with pytest.raises(AssertionError, match="Dataset must be split before accessing train dataset; "
+                "train split has not been created yet — call dataset.setup() before accessing train_dataset"):
             _ = dataset.train_dataset
 
 
