@@ -138,8 +138,9 @@ class SequenceCNN(nn.Module):
             nn.Linear(fc_hidden_dim // 2, output_neurons),
         )
 
-    def forward(self, x: Float[torch.Tensor, "batch_size alphabet_size seq_length"]
-                ) -> torch.Tensor:
+    def forward(
+        self, x: Float[torch.Tensor, "batch_size alphabet_size seq_length"]
+    ) -> torch.Tensor:
         """Forward pass through the network.
 
         Args:
@@ -202,8 +203,9 @@ class CNNModel(BaseModel):
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
 
-    def _one_hot_encode(self, sequences: list[str]
-                        ) -> Float[torch.Tensor, "batch_size alphabet_size seq_length"]:
+    def _one_hot_encode(
+        self, sequences: list[str]
+    ) -> Float[torch.Tensor, "batch_size alphabet_size seq_length"]:
         """One-hot encode sequences.
 
         Args:
@@ -219,8 +221,9 @@ class CNNModel(BaseModel):
             flatten=False,
         )
 
-    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]
-                  ) -> Float[torch.Tensor, "batch_size alphabet_size seq_length"]:
+    def featurise(
+        self, inputs: Union[LabelledCandidates, list[Candidate]]
+    ) -> Float[torch.Tensor, "batch_size alphabet_size seq_length"]:
         """Convert inputs to one-hot encoded tensors.
 
         Args:

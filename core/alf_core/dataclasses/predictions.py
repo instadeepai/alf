@@ -73,7 +73,7 @@ class Predictions:
         self,
         candidates: list[Candidate],
         targets: np.ndarray,
-        problem_type: Optional[ProblemType] = None
+        problem_type: Optional[ProblemType] = None,
     ) -> pd.DataFrame:
         """Convert predictions to a DataFrame.
 

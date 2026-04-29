@@ -281,8 +281,9 @@ class TestPredictionsToDataframeClassification:
         probs = np.array([[0.8, 0.2], [0.3, 0.7]])
         targets = np.array([0.0, 1.0])
         preds = Predictions(means=probs)
-        df = preds.to_dataframe(self._make_candidates(2), targets, 
-                                problem_type=ProblemType.REGRESSION)
+        df = preds.to_dataframe(
+            self._make_candidates(2), targets, problem_type=ProblemType.REGRESSION
+        )
         # Should have mean and variance columns, not prob_class
         assert "mean" in df.columns
         assert "variance" in df.columns

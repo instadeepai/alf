@@ -65,8 +65,7 @@ def extract_sequences_from_inputs(inputs: Union[LabelledCandidates, list[Candida
         return [c.data for c in inputs]
     else:
         raise ValueError(
-            f"Inputs must be a LabelledCandidates or list[Candidate], "
-            f"got {type(inputs).__name__}"
+            f"Inputs must be a LabelledCandidates or list[Candidate], got {type(inputs).__name__}"
         )
 
 
@@ -93,8 +92,10 @@ def one_hot_encode(
     char_to_idx: dict[str, int],
     alphabet_size: int,
     flatten: bool = False,
-) -> Float[torch.Tensor, "batch_size alphabet_size seq_length"
-           ] | Float[torch.Tensor, "batch_size flat_features"]:
+) -> (
+    Float[torch.Tensor, "batch_size alphabet_size seq_length"]
+    | Float[torch.Tensor, "batch_size flat_features"]
+):
     """One-hot encode sequences.
 
     Args:

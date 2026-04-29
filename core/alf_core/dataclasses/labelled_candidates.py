@@ -40,8 +40,8 @@ class LabelledCandidates:
             AssertionError: If the length of candidates and labels don't match.
         """
         assert len(self.candidates) == len(self.labels), (
-                f"Candidates and labels must have the same length, "
-                f"got {len(self.candidates)} candidates and {len(self.labels)} labels"
+            f"Candidates and labels must have the same length, "
+            f"got {len(self.candidates)} candidates and {len(self.labels)} labels"
         )
 
     def __len__(self) -> int:
@@ -102,14 +102,14 @@ class LabelledCandidates:
             self.labels = np.concatenate((self.labels, candidates.labels), axis=0)
         else:
             assert labels is not None, (
-                    "Labels must be provided when appending a list of Candidates "
-                    "(pass a LabelledCandidates instead to append "
-                    "without providing labels separately)"
-                )
+                "Labels must be provided when appending a list of Candidates "
+                "(pass a LabelledCandidates instead to append "
+                "without providing labels separately)"
+            )
             assert len(candidates) == len(labels), (
-                    f"Candidates and labels must have the same length, "
-                    f"got {len(candidates)} candidates and {len(labels)} labels"
-                )
+                f"Candidates and labels must have the same length, "
+                f"got {len(candidates)} candidates and {len(labels)} labels"
+            )
             self.candidates.extend(candidates)
             self.labels = np.concatenate((self.labels, labels), axis=0)
 
