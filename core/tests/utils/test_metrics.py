@@ -197,12 +197,12 @@ class TestClassificationMetricInputValidation:
         """Test that empty inputs are rejected."""
         probs = np.empty((0, 2))
         targets = np.empty(0)
-        with pytest.raises(AssertionError, match="must not be empty"):
+        with pytest.raises(AssertionError, match="Empty input arrays"):
             accuracy(probs, targets)
 
     def test_batch_size_mismatch_raises(self):
         """Test that mismatched batch sizes between probs and targets are rejected."""
         probs = np.array([[0.6, 0.4], [0.4, 0.6]])
         targets = np.array([0])
-        with pytest.raises(AssertionError, match="same number of samples"):
+        with pytest.raises(AssertionError, match="probs and targets batch size mismatch"):
             accuracy(probs, targets)

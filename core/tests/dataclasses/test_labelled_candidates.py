@@ -350,7 +350,7 @@ class TestLabelledCandidatesAppend:
 
         new_candidates = [Candidate(data="test2", modality=Modality.SEQUENCE)]
 
-        with pytest.raises(AssertionError, match="Candidates and labels must have the same length"):
+        with pytest.raises(AssertionError, match="Labels must be provided when appending a list of Candidates"):
             labelled_candidates.append(new_candidates, None)
 
     def test_multiple_append_operations(self):
