@@ -181,7 +181,7 @@ class BoTorchGPModel(BaseModel):
         logger.info(f"Training BoTorch GP model on {len(train_data.candidates)} samples")
 
         # Convert candidates to tensors
-        self.train_X = candidates_to_tensor(train_data.candidates, device=self.device)
+        self.train_X = candidates_to_tensor(train_data.candidates, device=self.device).to(dtype=self.dtype)
         self.train_Y = torch.tensor(
             train_data.labels, dtype=self.dtype, device=self.device
         ).unsqueeze(-1)
