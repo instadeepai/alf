@@ -14,10 +14,12 @@
 
 
 from dataclasses import dataclass
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
 from alf_core.dataclasses.candidate import Candidate
+from alf_core.enums import ProblemType
 
 
 @dataclass
@@ -66,6 +68,7 @@ class Predictions:
         self,
         candidates: list[Candidate],
         targets: np.ndarray,
+        problem_type: Optional[ProblemType] = None
     ) -> pd.DataFrame:
         """Convert predictions to a DataFrame.
 
@@ -81,10 +84,13 @@ class Predictions:
             and ensemble predictions.
         """
         predictions_list = []
-        is_classification = self.means.ndim == 2
+        if problem_type is None:
+            is_classification = self.means.ndim == 2
+        else:
+            is_classification = problem_type in [ProblemType.BINARY, ProblemType.MULTICLASS]
 
         for i in range(len(self.means)):
-            record_i: dict = {"sequence": candidates[i].data, "targets": targets[i]}
+            record_i: dict[str, Any] = {"sequence": candidates[i].data, "targets": targets[i]}
 
             if is_classification:
                 for cls_idx in range(self.means.shape[1]):

@@ -274,3 +274,18 @@ class TestPredictionsToDataframeClassification:
         df = preds.to_dataframe(self._make_candidates(2), targets)
         assert df["prob_class_0"].tolist() == pytest.approx([0.3, 0.8])
         assert df["prob_class_1"].tolist() == pytest.approx([0.7, 0.2])
+
+    def test_override_to_regression_with_problem_type(self):
+        """Test that passing problem_type=REGRESSION forces regression output even for 2D means."""
+        probs = np.array([[0.8, 0.2], [0.3, 0.7]])
+        targets = np.array([0.0, 1.0])
+        preds = Predictions(means=probs)
+        from alf_core.enums import ProblemType
+        df = preds.to_dataframe(self._make_candidates(2), targets, problem_type=ProblemType.REGRESSION)
+        # Should have mean and variance columns, not prob_class
+        assert "mean" in df.columns
+        assert "variance" in df.columns
+        assert "prob_class_0" not in df.columns
+        assert "prob_class_1" not in df.columns
+        # mean should be the array
+        assert len(df["mean"].iloc[0]) == 2  # array of length 2
