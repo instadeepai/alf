@@ -426,7 +426,7 @@ class CNNModel(BaseModel):
             **kwargs: Additional keyword arguments. Recognises ``problem_type``
                 (``ProblemType``) to configure loss, label dtype, and output layer.
         """
-        self._problem_type = kwargs.get("problem_type", ProblemType.REGRESSION)
+        self._problem_type = kwargs.get("problem_type", problem_type)
         logger.info(
             f"Training CNN with {len(train_data)} samples (problem_type={self._problem_type})"
         )
