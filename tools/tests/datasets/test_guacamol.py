@@ -572,7 +572,7 @@ class TestDownloadGuacaMol:
         lines = lines or ["c1ccccc1", "CCO"]
         mock = MagicMock()
         mock.status_code = 200
-        mock.iter_lines.return_value = iter(ln.encode() for ln in lines)
+        mock.iter_lines.side_effect = lambda **kw: iter(ln.encode() for ln in lines)
         return mock
 
     def test_downloads_all_four_files(self, tmp_path):
@@ -607,7 +607,7 @@ class TestDownloadGuacaMol:
             download_guacamol(data_dir=tmp_path, max_lines=3)
         for filename in [FILENAME_ALL, FILENAME_TRAIN, FILENAME_VALID, FILENAME_TEST]:
             lines = [ln for ln in (tmp_path / filename).read_text().splitlines() if ln.strip()]
-            assert len(lines) <= 3
+            assert 1 <= len(lines) <= 3
 
     def test_default_data_dir_is_datapath(self):
         """download_guacamol's default data_dir parameter equals the module DATAPATH constant."""
