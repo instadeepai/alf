@@ -219,12 +219,14 @@ class MLPModel(BaseModel):
 
         return torch.tensor(np.array(feature_list), dtype=torch.float32)
 
-    def train(self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None) -> None:
+    def train(self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None, **kwargs: Any) -> None:
         """Train the MLP model.
 
         Args:
             train_data: Training data containing candidates and labels.
             val_data: Optional validation data.
+            **kwargs: Additional keyword arguments (e.g. ``problem_type``), accepted for
+                interface compatibility but unused — MLPModel is always regression-only.
         """
         from scipy.stats import spearmanr
 

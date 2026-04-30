@@ -21,6 +21,7 @@ import numpy as np
 import requests
 from alf_core import BaseDataset, Candidate, LabelledCandidates
 from alf_core.dataset.base_dataset import BaseDatasetConfig
+from alf_core.enums import ProblemType
 from pydantic import model_validator
 
 logger = logging.getLogger("alf-tools")
@@ -86,6 +87,7 @@ class GuacaMolConfig(BaseDatasetConfig):
             Replaces BaseDatasetConfig.split_type — do not set split_type directly.
     """
 
+    problem_type: ProblemType = ProblemType.REGRESSION
     target_property: GuacaMolPropertyName | GuacaMolTaskName
     task_type: Literal["property", "benchmark_task"] = "property"
     computed_properties: list[GuacaMolPropertyName] | None = None
