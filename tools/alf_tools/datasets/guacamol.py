@@ -85,6 +85,7 @@ class GuacaMolConfig(BaseDatasetConfig):
         split_mode: "random" and "low_vs_high" use BaseDataset splitting on the combined
             corpus file. "paper" uses the original train/valid/test figshare file boundaries.
             Replaces BaseDatasetConfig.split_type — do not set split_type directly.
+        data_dir: Directory where SMILES files are cached. Defaults to the package data dir.
     """
 
     problem_type: ProblemType = ProblemType.REGRESSION
@@ -93,6 +94,7 @@ class GuacaMolConfig(BaseDatasetConfig):
     computed_properties: list[GuacaMolPropertyName] | None = None
     max_molecules: int | None = None
     split_mode: Literal["random", "low_vs_high", "paper"] = "random"
+    data_dir: Path = DATAPATH
 
     @model_validator(mode="after")
     def _validate_and_sync(self) -> "GuacaMolConfig":
@@ -261,7 +263,7 @@ class GuacaMol(BaseDataset):
         Returns:
             LabelledCandidates built from the combined corpus.
         """
-        filepath = DATAPATH / FILENAME_ALL
+        filepath = self.config.data_dir / FILENAME_ALL
         if not filepath.exists():
             _download_file(URL_ALL, filepath, self.config.max_molecules)
         smiles_list = _load_smiles_file(filepath)
@@ -291,7 +293,7 @@ class GuacaMol(BaseDataset):
         all_candidates: list[Candidate] = []
         all_labels: list[float] = []
         for filename, url, tag in split_files:
-            filepath = DATAPATH / filename
+            filepath = self.config.data_dir / filename
             if not filepath.exists():
                 _download_file(url, filepath, self.config.max_molecules)
             smiles_list = _load_smiles_file(filepath)

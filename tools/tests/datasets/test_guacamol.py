@@ -118,6 +118,17 @@ class TestGuacaMolConfig:
             config = _base_config(target_property=prop, computed_properties=None)
             assert config.task_type == "property"
 
+    def test_data_dir_defaults_to_datapath(self):
+        """data_dir defaults to the package-level DATAPATH constant."""
+        from alf_tools.datasets.guacamol import DATAPATH
+        config = _base_config()
+        assert config.data_dir == DATAPATH
+
+    def test_data_dir_can_be_overridden(self, tmp_path):
+        """data_dir accepts a custom Path and stores it."""
+        config = _base_config(data_dir=tmp_path)
+        assert config.data_dir == tmp_path
+
 
 class TestComputeProperties:
     """Unit tests for the _compute_properties RDKit descriptor helper."""
