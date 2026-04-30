@@ -33,6 +33,7 @@ from botorch.fit import fit_gpytorch_mll
 from botorch.models import SingleTaskGP
 from botorch.optim.fit import fit_gpytorch_mll_torch
 from gpytorch.mlls import ExactMarginalLogLikelihood
+from gpytorch.kernels import MaternKernel, ScaleKernel
 from torch.optim import Adam
 
 from alf_tools.models.utils.torch_utils import get_device
@@ -87,6 +88,8 @@ class BoTorchGPModel(BaseModel):
         max_attempts: int = 5,
         device: Optional[str] = None,
         dtype: torch.dtype = torch.float32,
+        kernel_type: str | None = None,
+        nu: float = 2.5
     ):
         """Initialize BoTorch GP model.
 
@@ -108,6 +111,8 @@ class BoTorchGPModel(BaseModel):
                 up to max_attempts times with different initializations.
             device: Device to run on ('cpu' or 'cuda'). If None, auto-detects.
             dtype: Data type for tensors. Default: torch.float32.
+            kernel_type: "matern" or None. If None, RBF is used by default.
+            nu: nu value for Matern kernel. Default 2.5 aka Matern 5/2.
 
         Raises:
             ValueError: If optimizer is not 'scipy' or 'torch'.
@@ -122,6 +127,8 @@ class BoTorchGPModel(BaseModel):
         self.optimizer = optimizer
         self.max_attempts = max_attempts
         self.dtype = dtype
+        self.kernel_type = kernel_type
+        self.nu = nu
 
         if optimizer not in ["scipy", "torch"]:
             raise ValueError(f"optimizer must be 'scipy' or 'torch', got {optimizer}")
@@ -195,9 +202,15 @@ class BoTorchGPModel(BaseModel):
         # Initialize SingleTaskGP
         # Note: SingleTaskGP automatically applies Standardize outcome transform
         # if standardize_outputs=True (which is the default)
+        if self.kernel_type == "matern":
+            covar_module = ScaleKernel(MaternKernel(nu=self.nu))
+        else:
+            covar_module = None
+
         self.model = SingleTaskGP(
             train_X=self.train_X,
             train_Y=self.train_Y,
+            covar_module=covar_module
         )
         self.model = self.model.to(device=self.device, dtype=self.dtype)
 
