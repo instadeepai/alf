@@ -327,7 +327,8 @@ class GuacaMol(BaseDataset):
             raise NotImplementedError(
                 f"Online query for task '{self.config.target_property}' is not yet implemented."
             )
-        assert self._raw_dataset is not None, "Dataset must be loaded before querying"
+        if self._raw_dataset is None:
+            raise RuntimeError("Dataset must be loaded before querying")  # pragma: no cover
 
         known_smiles_index = {
             c.data: i for i, c in enumerate(self._raw_dataset.candidates)
@@ -366,7 +367,8 @@ class GuacaMol(BaseDataset):
         if self.config.split_mode != "paper":
             return super()._split_dataset()
 
-        assert self._raw_dataset is not None, "Dataset must be loaded before splitting"
+        if self._raw_dataset is None:
+            raise RuntimeError("Dataset must be loaded before splitting")  # pragma: no cover
         tag_to_key = {"train": "train", "valid": "validation", "test": "test"}
         buckets: dict[str, tuple[list[Candidate], list[float]]] = {
             "train": ([], []),

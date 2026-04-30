@@ -509,3 +509,67 @@ class TestGuacaMolWithFixtures:
         assert train_count <= 10
         assert valid_count <= 10
         assert test_count <= 10
+
+
+class TestGuacaMolEdgeCases:
+    """Edge-case tests for truncation, invalid SMILES in query, and featurise paths."""
+
+    def _config(self, tmp_path, **overrides):
+        defaults = dict(
+            name="guacamol",
+            modality="sequence",
+            seed=42,
+            train_ratio=0.6,
+            validation_frac=0.1,
+            test_ratio=0.2,
+            target_property="TPSA",
+        )
+        defaults.update(overrides)
+        return GuacaMolConfig(**defaults)
+
+    def test_max_molecules_zero_produces_empty_dataset(self, tmp_path):
+        """max_molecules=0 should yield an empty dataset without raising."""
+        shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
+        config = self._config(tmp_path, max_molecules=0)
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
+            dataset = GuacaMol(config)
+        total = (
+            len(dataset.train_dataset)
+            + len(dataset.validation_dataset)
+            + len(dataset.test_dataset)
+            + len(dataset.candidate_pool)
+        )
+        assert total == 0
+
+    def test_query_invalid_novel_smiles_raises_value_error(self, tmp_path):
+        """query() must raise ValueError for a novel candidate with an unparseable SMILES."""
+        shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
+        config = self._config(tmp_path, target_property="MolWt")
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
+            dataset = GuacaMol(config)
+        bad = Candidate(data="not_a_smiles!!!", modality="sequence")
+        with pytest.raises(ValueError, match="invalid SMILES"):
+            dataset.query([bad])
+
+    def test_computed_properties_stored_as_candidate_features(self, tmp_path):
+        """Each Candidate must carry exactly the requested computed_properties as features."""
+        shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
+        config = self._config(
+            tmp_path,
+            target_property="MolWt",
+            computed_properties=["MolWt", "MolLogP"],
+        )
+        with patch("alf_tools.datasets.guacamol.DATAPATH", tmp_path):
+            dataset = GuacaMol(config)
+        all_splits = [
+            dataset.train_dataset,
+            dataset.validation_dataset,
+            dataset.test_dataset,
+            dataset.candidate_pool,
+        ]
+        for split in all_splits:
+            for candidate in split.candidates:
+                assert "MolWt" in candidate.features
+                assert "MolLogP" in candidate.features
+                assert isinstance(candidate.features["MolWt"], float)
+                assert isinstance(candidate.features["MolLogP"], float)

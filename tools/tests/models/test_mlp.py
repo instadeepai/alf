@@ -238,3 +238,53 @@ class TestMLPModelTrainPredict:
         """sample() must raise NotImplementedError as it is not implemented for MLPModel."""
         with pytest.raises(NotImplementedError):
             mlp_model.sample()
+
+    def test_train_accepts_problem_type_kwarg(self, mlp_model, train_data):
+        """train() must silently accept problem_type kwarg for Surrogate.fit() compatibility."""
+        from alf_core.enums import ProblemType
+        mlp_model.train(train_data, problem_type=ProblemType.REGRESSION)
+        assert mlp_model.model is not None
+
+
+class TestMLPModelEdgeCases:
+    """Tests for error paths and edge cases in MLPModel."""
+
+    def test_featurise_invalid_smiles_raises_value_error(self):
+        """featurise() must raise ValueError for an invalid SMILES string."""
+        model = MLPModel(
+            model_config=MLPModelConfig(hidden_dims=[8]),
+            train_config=MLPTrainConfig(num_epochs=1),
+            device="cpu",
+        )
+        bad = Candidate(data="not_a_smiles!!!", modality="sequence")
+        with pytest.raises(ValueError, match="Invalid SMILES"):
+            model.featurise([bad])
+
+    def test_featurise_empty_list_returns_empty_tensor(self):
+        """featurise([]) must return a (0, 0) float tensor without error."""
+        model = MLPModel(device="cpu")
+        result = model.featurise([])
+        assert isinstance(result, torch.Tensor)
+        assert result.shape == (0, 0)
+        assert result.dtype == torch.float32
+
+    def test_featurise_dimension_mismatch_raises_value_error(self):
+        """featurise() must raise ValueError when candidates mix precomputed and SMILES paths."""
+        from rdkit import Chem
+        from rdkit.Chem import Descriptors
+        model = MLPModel(device="cpu")
+        mol = Chem.MolFromSmiles(BENZENE)
+        precomputed = Candidate(
+            data=BENZENE,
+            modality="sequence",
+            features={"MolWt": float(Descriptors.MolWt(mol))},
+        )
+        raw = Candidate(data=ETHANOL, modality="sequence")
+        with pytest.raises(ValueError, match="Inconsistent feature dimensions"):
+            model.featurise([precomputed, raw])
+
+    def test_featurise_invalid_input_type_raises_value_error(self):
+        """featurise() must raise ValueError for inputs that are not a list or LabelledCandidates."""
+        model = MLPModel(device="cpu")
+        with pytest.raises(ValueError, match="Input must be"):
+            model.featurise("not_a_valid_input")  # type: ignore[arg-type]
