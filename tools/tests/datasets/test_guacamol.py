@@ -22,6 +22,7 @@ import pytest
 from alf_core import Candidate, Modality
 from alf_tools.datasets.guacamol import (
     ALL_PROPERTIES,
+    DATAPATH,
     FILENAME_ALL,
     FILENAME_TEST,
     FILENAME_TRAIN,
@@ -31,6 +32,7 @@ from alf_tools.datasets.guacamol import (
     _compute_properties,  # noqa: PLC2701
     _download_file,  # noqa: PLC2701
     _load_smiles_file,  # noqa: PLC2701
+    download_guacamol,
 )
 
 pytestmark = pytest.mark.guacamol
@@ -561,3 +563,62 @@ class TestGuacaMolEdgeCases:
                 assert "MolLogP" in candidate.features
                 assert isinstance(candidate.features["MolWt"], float)
                 assert isinstance(candidate.features["MolLogP"], float)
+
+
+class TestDownloadGuacaMol:
+    """Tests for the download_guacamol public function."""
+
+    def _mock_response(self, lines: list[str] | None = None) -> MagicMock:
+        lines = lines or ["c1ccccc1", "CCO"]
+        mock = MagicMock()
+        mock.status_code = 200
+        mock.iter_lines.return_value = iter(ln.encode() for ln in lines)
+        return mock
+
+    def test_downloads_all_four_files(self, tmp_path):
+        """download_guacamol writes all four .smiles files to the target directory."""
+        with patch("requests.get", return_value=self._mock_response()):
+            download_guacamol(data_dir=tmp_path)
+        assert (tmp_path / FILENAME_ALL).exists()
+        assert (tmp_path / FILENAME_TRAIN).exists()
+        assert (tmp_path / FILENAME_VALID).exists()
+        assert (tmp_path / FILENAME_TEST).exists()
+
+    def test_makes_exactly_four_network_requests(self, tmp_path):
+        """download_guacamol calls requests.get exactly once per file."""
+        with patch("requests.get", return_value=self._mock_response()) as mock_get:
+            download_guacamol(data_dir=tmp_path)
+        assert mock_get.call_count == 4
+
+    def test_files_written_inside_data_dir_not_datapath(self, tmp_path):
+        """Files appear in the provided data_dir, not in the package DATAPATH."""
+        other_dir = tmp_path / "other"
+        other_dir.mkdir()
+        with patch("requests.get", return_value=self._mock_response()):
+            download_guacamol(data_dir=other_dir)
+        for filename in [FILENAME_ALL, FILENAME_TRAIN, FILENAME_VALID, FILENAME_TEST]:
+            assert (other_dir / filename).exists()
+            assert not (tmp_path / filename).exists()
+
+    def test_max_lines_caps_each_downloaded_file(self, tmp_path):
+        """max_lines is forwarded and each file is truncated to at most that many lines."""
+        many_lines = ["c1ccccc1"] * 10
+        with patch("requests.get", return_value=self._mock_response(many_lines)):
+            download_guacamol(data_dir=tmp_path, max_lines=3)
+        for filename in [FILENAME_ALL, FILENAME_TRAIN, FILENAME_VALID, FILENAME_TEST]:
+            lines = [ln for ln in (tmp_path / filename).read_text().splitlines() if ln.strip()]
+            assert len(lines) <= 3
+
+    def test_default_data_dir_is_datapath(self):
+        """download_guacamol's default data_dir parameter equals the module DATAPATH constant."""
+        import inspect
+        sig = inspect.signature(download_guacamol)
+        assert sig.parameters["data_dir"].default == DATAPATH
+
+    def test_creates_data_dir_if_missing(self, tmp_path):
+        """download_guacamol creates the target directory if it does not exist."""
+        new_dir = tmp_path / "nonexistent" / "nested"
+        with patch("requests.get", return_value=self._mock_response()):
+            download_guacamol(data_dir=new_dir)
+        assert new_dir.exists()
+        assert (new_dir / FILENAME_ALL).exists()

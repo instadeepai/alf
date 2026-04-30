@@ -180,6 +180,23 @@ def _load_smiles_file(filepath: Path) -> list[str]:
         return [line.strip() for line in f if line.strip()]
 
 
+def download_guacamol(data_dir: Path = DATAPATH, max_lines: int | None = None) -> None:
+    """Download all four GuacaMol SMILES files to data_dir.
+
+    Args:
+        data_dir: Destination directory. Defaults to the package data directory.
+        max_lines: If set, each file is truncated to at most this many lines.
+    """
+    files = [
+        (FILENAME_ALL, URL_ALL),
+        (FILENAME_TRAIN, URL_TRAIN),
+        (FILENAME_VALID, URL_VALID),
+        (FILENAME_TEST, URL_TEST),
+    ]
+    for filename, url in files:
+        _download_file(url, data_dir / filename, max_lines)
+
+
 def _label_smiles(
     smiles_list: list[str],
     properties: list[str],
