@@ -161,6 +161,67 @@ class TestComputeProperties:
         for key, val in result.items():
             assert isinstance(val, float), f"{key} value is not a float"
 
+    def test_bertzct_of_benzene_is_positive(self):
+        """Benzene BertzCT is positive (ring increases graph complexity)."""
+        result = _compute_properties("c1ccccc1", ["BertzCT"])
+        assert result["BertzCT"] > 0.0
+
+    def test_bertzct_increases_with_complexity(self):
+        """Naphthalene (two rings) has higher BertzCT than benzene (one ring)."""
+        benzene = _compute_properties("c1ccccc1", ["BertzCT"])["BertzCT"]
+        naphthalene = _compute_properties("c1ccc2ccccc2c1", ["BertzCT"])["BertzCT"]
+        assert naphthalene > benzene
+
+    def test_num_h_acceptors_of_ethanol(self):
+        """Ethanol has one H-bond acceptor (the oxygen)."""
+        result = _compute_properties("CCO", ["NumHAcceptors"])
+        assert result["NumHAcceptors"] == pytest.approx(1.0)
+
+    def test_num_h_donors_of_ethanol(self):
+        """Ethanol has one H-bond donor (the O-H group)."""
+        result = _compute_properties("CCO", ["NumHDonors"])
+        assert result["NumHDonors"] == pytest.approx(1.0)
+
+    def test_num_rotatable_bonds_of_butane(self):
+        """Butane (CCCC) has one rotatable bond (the central C-C; terminal methyls excluded)."""
+        result = _compute_properties("CCCC", ["NumRotatableBonds"])
+        assert result["NumRotatableBonds"] == pytest.approx(1.0)
+
+    def test_num_rotatable_bonds_of_ethane_is_zero(self):
+        """Ethane (CC) has no rotatable bonds (both carbons are terminal)."""
+        result = _compute_properties("CC", ["NumRotatableBonds"])
+        assert result["NumRotatableBonds"] == pytest.approx(0.0)
+
+    def test_num_aliphatic_rings_of_cyclohexane(self):
+        """Cyclohexane has one aliphatic ring."""
+        result = _compute_properties("C1CCCCC1", ["NumAliphaticRings"])
+        assert result["NumAliphaticRings"] == pytest.approx(1.0)
+
+    def test_num_aliphatic_rings_of_benzene_is_zero(self):
+        """Benzene has no aliphatic rings (it is fully aromatic)."""
+        result = _compute_properties("c1ccccc1", ["NumAliphaticRings"])
+        assert result["NumAliphaticRings"] == pytest.approx(0.0)
+
+    def test_num_aromatic_rings_of_benzene(self):
+        """Benzene has exactly one aromatic ring."""
+        result = _compute_properties("c1ccccc1", ["NumAromaticRings"])
+        assert result["NumAromaticRings"] == pytest.approx(1.0)
+
+    def test_num_aromatic_rings_of_naphthalene(self):
+        """Naphthalene has two aromatic rings."""
+        result = _compute_properties("c1ccc2ccccc2c1", ["NumAromaticRings"])
+        assert result["NumAromaticRings"] == pytest.approx(2.0)
+
+    def test_mollogp_of_ethanol_is_negative(self):
+        """Ethanol MolLogP is negative (hydrophilic molecule)."""
+        result = _compute_properties("CCO", ["MolLogP"])
+        assert result["MolLogP"] < 0.0
+
+    def test_qed_is_between_zero_and_one(self):
+        """QED is always in [0, 1] for any valid molecule."""
+        result = _compute_properties("CC(=O)Nc1ccc(O)cc1", ["QED"])
+        assert 0.0 <= result["QED"] <= 1.0
+
 
 VALID_SMILES_LINES = [
     "c1ccccc1",
@@ -175,7 +236,7 @@ INVALID_SMILES_LINE = "NOTASMILES"
 def _make_mock_response(smiles_lines: list[str]) -> MagicMock:
     mock_resp = MagicMock()
     mock_resp.status_code = 200
-    mock_resp.iter_lines.return_value = iter(line.encode() for line in smiles_lines)
+    mock_resp.iter_lines.side_effect = lambda **kw: iter(line.encode() for line in smiles_lines)
     return mock_resp
 
 

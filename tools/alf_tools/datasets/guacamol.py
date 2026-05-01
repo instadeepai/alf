@@ -15,22 +15,23 @@
 import copy
 import logging
 from pathlib import Path
-from typing import Callable, Literal, Optional, get_args
-from platformdirs import user_data_dir
+from typing import TYPE_CHECKING, Callable, Literal, Optional, get_args
 
 import numpy as np
 import requests
-import hashlib
 from alf_core import BaseDataset, Candidate, LabelledCandidates
 from alf_core.dataset.base_dataset import BaseDatasetConfig
 from alf_core.enums import ProblemType
 from pydantic import model_validator
-from urllib3.util import response
+
+if TYPE_CHECKING:
+    from rdkit import Chem
+    from rdkit.Chem import QED as RDKitQED
+    from rdkit.Chem import Descriptors, GraphDescriptors, rdMolDescriptors
 
 logger = logging.getLogger("alf-tools")
 
-# DATAPATH = Path(__file__).parent / "data"
-DATAPATH = Path(user_data_dir("alf", "alf"))
+DATAPATH = Path.home() / ".cache" / "alf"
 
 # All 4 GuacaMol files via Figshare public API
 # Source: https://api.figshare.com/v2/articles/{id}
@@ -80,10 +81,15 @@ GuacaMolTaskName = Literal[
 ALL_PROPERTIES: frozenset[str] = frozenset(get_args(GuacaMolPropertyName))
 ALL_TASKS: frozenset[str] = frozenset(get_args(GuacaMolTaskName))
 
+FILENAME_TRAIN: str = GUACAMOL_FILES["TRAIN"]["name"]
+FILENAME_VALID: str = GUACAMOL_FILES["VALID"]["name"]
+FILENAME_TEST: str = GUACAMOL_FILES["TEST"]["name"]
+FILENAME_ALL: str = GUACAMOL_FILES["ALL"]["name"]
+
 try:
-    from rdkit import Chem
-    from rdkit.Chem import QED as RDKitQED
-    from rdkit.Chem import Descriptors, GraphDescriptors, rdMolDescriptors
+    from rdkit import Chem  # type: ignore[no-redef]
+    from rdkit.Chem import QED as RDKitQED  # type: ignore[no-redef]
+    from rdkit.Chem import Descriptors, GraphDescriptors, rdMolDescriptors  # type: ignore[no-redef]
     _RDKIT_AVAILABLE = True
 except ImportError:
     _RDKIT_AVAILABLE = False
@@ -166,60 +172,44 @@ def _compute_properties(smiles: str, properties: list[str]) -> dict[str, float]:
     return {name: _property_fns[name](mol) for name in properties}  # type: ignore[operator]
 
 
-def _download_file(entry: dict, dest_dir: Path, max_lines: Optional[int] = None) -> Path:
-    """Stream a text file from url, writing up to max_lines lines to filepath.
+def _download_file(url: str, filepath: Path, max_lines: Optional[int] = None) -> Path:
+    """Stream a text file from url to filepath, optionally truncating to max_lines lines.
+
+    Skips the download if filepath already exists. Creates parent directories as needed.
 
     Args:
-        entry: Dictionary containing file information (URL, name, size, MD5).
-        dest_dir: Destination directory for the downloaded file.
-        max_lines: If set, truncate the file after this many lines.
+        url: HTTPS URL to stream from.
+        filepath: Destination file path (not a directory).
+        max_lines: If set, stop writing after exactly this many lines.
+
+    Returns:
+        The resolved filepath.
 
     Raises:
         FileNotFoundError: If the server returns a non-200 status code.
     """
-    filepath = dest_dir / entry["name"]
-    if filepath.exists() and filepath.stat().st_size == entry["size"]:
-        logging.info(f"  ✓ {filepath} already exists, skipping.")
+    if filepath.exists():
+        logger.info("  ✓ %s already exists, skipping.", filepath)
         return filepath
 
-    logging.info(f"  ↓ Downloading {entry['name']}"
-          + (f" (first {max_lines} lines)" if max_lines is not None else f" ({entry['size'] / 1e6:.1f} MB)")
-          + "...")
-    
-    # allow_redirects=True is the default — requests follows the 302 → S3 automatically
-    response = requests.get(entry["url"], stream=True, timeout=60)
-    if response.status_code != 200:
-        raise FileNotFoundError(
-            f"Failed to download GuacaMol file from {entry['url']}. "
-            f"Status code: {response.status_code}"
-        )
-        
-    response.raise_for_status()
-    md5 = hashlib.md5()
+    logger.info(
+        "  ↓ Downloading %s%s...",
+        filepath.name,
+        f" (first {max_lines} lines)" if max_lines is not None else "",
+    )
     filepath.parent.mkdir(parents=True, exist_ok=True)
+    # allow_redirects=True is the default — requests follows the 302 → S3 automatically
+    resp = requests.get(url, stream=True, timeout=60)
+    if resp.status_code != 200:
+        raise FileNotFoundError(
+            f"Failed to download from {url}. Status code: {resp.status_code}"
+        )
     with open(filepath, "wb") as f:
-        if max_lines is None:
-            for chunk in response.iter_content(chunk_size=1 << 20):
-                f.write(chunk)
-                md5.update(chunk)
-        else:
-            # iterate the response line-by-line without buffering the whole file
-            for idx_last_line_retrieved, raw_line in enumerate(response.iter_lines()):
-                line = raw_line + b"\n"
-                f.write(line)
-                if idx_last_line_retrieved >= max_lines:
-                    break
-
-    if max_lines is None:
-        digest = md5.hexdigest()
-        if digest != entry["md5"]:
-            filepath.unlink()
-            raise ValueError(f"MD5 mismatch for {entry['name']}: got {digest}")
-        logging.info(f"  ✓ {entry['name']} — MD5 OK")
-    else:
-        logging.info(f"  ✓ {entry['name']} — {min(idx_last_line_retrieved, max_lines)} lines written")
-
-    logger.info(f"Downloaded GuacaMol file to {filepath}.")
+        for idx, raw_line in enumerate(resp.iter_lines()):
+            f.write(raw_line + b"\n")
+            if max_lines is not None and idx + 1 >= max_lines:
+                break
+    logger.info("  ✓ %s written to %s.", filepath.name, filepath.parent)
     return filepath
 
 
@@ -243,8 +233,9 @@ def download_guacamol(data_dir: Path = DATAPATH, max_lines: int | None = None) -
         data_dir: Destination directory. Defaults to the package data directory.
         max_lines: If set, each file is truncated to at most this many lines.
     """
+    data_dir.mkdir(parents=True, exist_ok=True)
     for file_info in GUACAMOL_FILES.values():
-        _download_file(file_info, data_dir, max_lines)
+        _download_file(file_info["url"], data_dir / file_info["name"], max_lines)
 
 
 
@@ -275,7 +266,7 @@ def _label_smiles(
     for smiles in smiles_list:
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
-            logger.warning(f"Skipping invalid SMILES: {smiles!r}")
+            logger.warning("Skipping invalid SMILES: %r", smiles)
             continue
         features = _compute_properties(smiles, properties)
         if split_tag is not None:
@@ -286,7 +277,21 @@ def _label_smiles(
 
 
 class GuacaMol(BaseDataset):
-    """GuacaMol dataset class."""
+    """GuacaMol dataset for physicochemical property prediction on drug-like molecules.
+
+    Wraps the GuacaMol benchmark corpus (1.6 M SMILES from ChEMBL) and computes
+    RDKit physicochemical properties (e.g. MolLogP, TPSA, QED) as regression targets.
+
+    Three split modes are supported:
+    - ``"random"`` / ``"low_vs_high"``: BaseDataset splitting on the combined corpus.
+    - ``"paper"``: uses the original train/valid/test file boundaries from the
+      GuacaMol paper (Brown et al., 2019), allowing direct comparison with published results.
+
+    Novel SMILES not present in the corpus can be queried on-the-fly via :meth:`query`;
+    their properties are computed directly with RDKit.
+    """
+
+    config: GuacaMolConfig  # narrows BaseDataset.config for static analysis
 
     def __init__(self, config: GuacaMolConfig) -> None:
         """Initialize the GuacaMol dataset.
@@ -331,8 +336,12 @@ class GuacaMol(BaseDataset):
         Returns:
             LabelledCandidates built from the combined corpus.
         """
-        entry_info_all = GUACAMOL_FILES['ALL']
-        filepath = _download_file(entry_info_all, self.config.data_dir, self.config.max_molecules)
+        entry_info_all = GUACAMOL_FILES["ALL"]
+        filepath = _download_file(
+            entry_info_all["url"],
+            self.config.data_dir / entry_info_all["name"],
+            self.config.max_molecules,
+        )
         smiles_list = _load_smiles_file(filepath)
         if self.config.max_molecules is not None:
             smiles_list = smiles_list[: self.config.max_molecules]
@@ -351,17 +360,21 @@ class GuacaMol(BaseDataset):
         Returns:
             Combined LabelledCandidates with split tags stored in each candidate's features.
         """
-        split_files = {k: GUACAMOL_FILES[k] for k in GUACAMOL_FILES.keys() if k in ['TRAIN', 'VALID', 'TEST']}
+        split_files = {k: GUACAMOL_FILES[k] for k in ("TRAIN", "VALID", "TEST")}
         properties = list(self.config.computed_properties or ALL_PROPERTIES)
         all_candidates: list[Candidate] = []
         all_labels: list[float] = []
         for tag, entry_info in split_files.items():
-            filepath = _download_file(entry_info, self.config.data_dir, self.config.max_molecules)
+            filepath = _download_file(
+                entry_info["url"],
+                self.config.data_dir / entry_info["name"],
+                self.config.max_molecules,
+            )
             smiles_list = _load_smiles_file(filepath)
             if self.config.max_molecules is not None:
                 smiles_list = smiles_list[: self.config.max_molecules]
             split_lc = _label_smiles(
-                smiles_list, properties, self.config.target_property, self.modality, tag
+                smiles_list, properties, self.config.target_property, self.modality, tag.lower()
             )
             logger.debug(
                 "Paper split '%s': %d SMILES → %d valid candidates",
