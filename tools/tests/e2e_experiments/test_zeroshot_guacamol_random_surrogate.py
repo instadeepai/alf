@@ -16,8 +16,6 @@ import abc
 import math
 import shutil
 from pathlib import Path
-from unittest.mock import patch
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -72,7 +70,6 @@ class BaseTestZeroShotGuacaMol(abc.ABC):
         split mode and produces expected metrics for the GuacaMol dataset using a
         random surrogate model.
         """
-        # Build dataset — patch DATAPATH so the module reads from the local fixture
         # train_ratio/test_ratio/validation_frac are required by BaseDatasetConfig but
         # ignored by split_mode="paper" which uses the pre-defined file boundaries.
         config = GuacaMolConfig(
@@ -86,9 +83,9 @@ class BaseTestZeroShotGuacaMol(abc.ABC):
             train_ratio=0.0,
             validation_frac=0.0,
             test_ratio=1.0,
+            data_dir=guacamol_data_path,
         )
-        with patch("alf_tools.datasets.guacamol.DATAPATH", guacamol_data_path):
-            dataset = GuacaMol(config)
+        dataset = GuacaMol(config)
 
         surrogate_model = Surrogate(model=random_model)
 

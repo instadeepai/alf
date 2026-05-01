@@ -16,8 +16,6 @@ import abc
 import math
 import shutil
 from pathlib import Path
-from unittest.mock import patch
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -94,7 +92,6 @@ class BaseTestSupervisedGuacaMol(abc.ABC):
         # Set seed for reproducible results
         set_seed(42)
 
-        # Build dataset — patch DATAPATH so the module reads from the local fixture
         config = GuacaMolConfig(
             name="guacamol",
             modality="sequence",
@@ -106,9 +103,9 @@ class BaseTestSupervisedGuacaMol(abc.ABC):
             split_mode="random",
             computed_properties=["MolWt", "MolLogP", "QED"],
             max_molecules=500,
+            data_dir=guacamol_data_path,
         )
-        with patch("alf_tools.datasets.guacamol.DATAPATH", guacamol_data_path):
-            dataset = GuacaMol(config)
+        dataset = GuacaMol(config)
 
         # Build surrogate
         mlp_model = MLPModel(

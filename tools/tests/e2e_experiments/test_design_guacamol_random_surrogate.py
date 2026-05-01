@@ -16,8 +16,6 @@ import abc
 import math
 import shutil
 from pathlib import Path
-from unittest.mock import patch
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -86,7 +84,6 @@ class BaseTestDesignGuacaMol(abc.ABC):
         n_rounds = 5
         batch_size = 50
 
-        # Build dataset — patch DATAPATH so the module reads from the local fixture
         config = GuacaMolConfig(
             name="guacamol",
             modality="sequence",
@@ -98,9 +95,9 @@ class BaseTestDesignGuacaMol(abc.ABC):
             train_ratio=0.1,
             validation_frac=0.1,
             test_ratio=0.2,
+            data_dir=guacamol_data_path,
         )
-        with patch("alf_tools.datasets.guacamol.DATAPATH", guacamol_data_path):
-            dataset = GuacaMol(config)
+        dataset = GuacaMol(config)
 
         surrogate_model = Surrogate(model=random_model)
 

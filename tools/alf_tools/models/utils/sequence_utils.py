@@ -65,7 +65,7 @@ def extract_sequences_from_inputs(inputs: Union[LabelledCandidates, list[Candida
         return [c.data for c in inputs]
     else:
         raise ValueError(
-            f"Inputs must be a LabelledCandidates or list[Candidate], "
+            f"Input must be a LabelledCandidates or list[Candidate], "
             f"got {type(inputs).__name__}"
         )
 
