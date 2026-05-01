@@ -208,6 +208,7 @@ class TestZeroShotQED(BaseTestZeroShotGuacaMol):
 
     @property
     def target_property(self) -> str:
+        """Quantitative Estimate of Druglikeness (0-1 scale)."""
         return "QED"
 
     @property
@@ -233,6 +234,7 @@ class TestZeroShotMolWt(BaseTestZeroShotGuacaMol):
 
     @property
     def target_property(self) -> str:
+        """Average molecular weight (Da)."""
         return "MolWt"
 
     @property
@@ -258,6 +260,7 @@ class TestZeroShotMolLogP(BaseTestZeroShotGuacaMol):
 
     @property
     def target_property(self) -> str:
+        """Wildman-Crippen octanol-water partition coefficient."""
         return "MolLogP"
 
     @property
