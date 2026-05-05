@@ -27,6 +27,8 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from alf_tools.models.utils import get_device
 
+logger = logging.getLogger("alf-tools")
+
 if TYPE_CHECKING:
     from rdkit import Chem
     from rdkit.Chem import AllChem, Descriptors, GraphDescriptors, rdMolDescriptors
@@ -45,8 +47,6 @@ def _require_rdkit() -> None:
             "RDKit is required for SMILES featurisation. "
             "Install it with: pip install 'alf_tools[benchmarks]'"
         )
-
-logger = logging.getLogger("alf-tools")
 
 
 @dataclass
