@@ -556,7 +556,7 @@ class GPModel(BaseModel):
         
         # Featurize training data
         train_x = self.featurise(train_data).to(self.device)
-        train_y_np = train_data.labels.astype(np.float64)
+        train_y = train_data.labels.astype(np.float64)
 
         # Fit and apply input normalizer
         if self.train_config.normalize_inputs:
@@ -569,12 +569,12 @@ class GPModel(BaseModel):
         # Fit and apply output standardizer
         if self.train_config.standardize_outputs:
             self._output_standardizer = OutputStandardizer()
-            self._output_standardizer.fit(train_y_np)
-            train_y_np = self._output_standardizer.transform(train_y_np)
+            self._output_standardizer.fit(train_y)
+            train_y = self._output_standardizer.transform(train_y)
         else:
             self._output_standardizer = None
 
-        train_y = torch.tensor(train_y_np, dtype=torch.float32).to(self.device)
+        train_y = torch.tensor(train_y, dtype=torch.float32).to(self.device)
         
         return train_x, train_y
 
