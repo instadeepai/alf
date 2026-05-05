@@ -50,7 +50,8 @@ class ThompsonSampling(AcquisitionFunction):
         elif predictions.variances is not None:
             # NOTE: This needs to be implemented for GP
             raise NotImplementedError(
-                "Thompson Sampling via variances-only (without empirical_dist) is not yet implemented. "
+                "Thompson Sampling via variances-only (without "
+                "empirical_dist) is not yet implemented. "
                 "Use an ensemble model that populates predictions.empirical_dist."
             )
         else:

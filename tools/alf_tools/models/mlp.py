@@ -22,9 +22,19 @@ import torch.nn as nn
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from scipy.stats import spearmanr
 from torch.utils.data import DataLoader, TensorDataset
 
 from alf_tools.models.utils import get_device
+
+try:
+    from rdkit import Chem
+    from rdkit.Chem import AllChem, Descriptors, GraphDescriptors, rdMolDescriptors
+except ImportError as e:
+    raise ImportError(
+        "RDKit is required for SMILES featurisation. "
+        "Install it with: pip install 'alf_tools[benchmarks]'"
+    ) from e
 
 logger = logging.getLogger("alf-tools")
 
@@ -94,7 +104,14 @@ class MolecularMLP(nn.Module):
         self.network = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass returning scalar predictions of shape (batch_size,)."""
+        """Forward pass returning scalar predictions of shape (batch_size,).
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, input_dim).
+
+        Returns:
+            torch.Tensor: Output tensor of shape (batch_size,).
+        """
         return self.network(x).squeeze(-1)
 
 
@@ -108,6 +125,16 @@ class MLPModel(BaseModel):
         train_config: MLPTrainConfig | None = None,
         device: str | None = None,
     ):
+        """Initialisation of MLP model with architecture and training configurations.
+
+        Args:
+            name (str, optional): Optional name for the model. Defaults to "mlp_model".
+            model_config (MLPModelConfig | None, optional): Configuration for
+        the MLP architecture. Defaults to None.
+            train_config (MLPTrainConfig | None, optional): Configuration for
+        training the MLP. Defaults to None.
+            device (str | None, optional): Device to run the model on. Defaults to None.
+        """
         super().__init__()
         self.model_config = model_config or MLPModelConfig()
         self.train_config = train_config or MLPTrainConfig()
@@ -123,7 +150,13 @@ class MLPModel(BaseModel):
     def _numeric_features_from_dict(self, features: dict) -> np.ndarray | None:
         """Extract numeric feature values from a dict, sorted by key.
 
-        Returns None if the dict contains no numeric values (e.g., only a 'split' string tag).
+        Args:
+            features (dict): Dictionary of features from a Candidate.
+            Only numeric values will be extracted.
+
+        Returns:
+            np.ndarray | None: None if the dict contains no numeric values
+            (e.g., only a 'split' string tag).
         """
         numeric = {k: v for k, v in features.items() if isinstance(v, (int, float, np.number))}
         if not numeric:
@@ -138,16 +171,16 @@ class MLPModel(BaseModel):
         BertzCT, MolLogP, MolWt, TPSA, NumHAcceptors, NumHDonors,
         NumRotatableBonds, NumAliphaticRings, NumAromaticRings.
         Total feature dimension: 2048 + 9 = 2057.
-        """
-        try:
-            from rdkit import Chem
-            from rdkit.Chem import AllChem, Descriptors, GraphDescriptors, rdMolDescriptors
-        except ImportError as e:
-            raise ImportError(
-                "RDKit is required for SMILES featurisation. "
-                "Install it with: pip install 'alf_tools[benchmarks]'"
-            ) from e
 
+        Args:
+            smiles (str): Input SMILES string to featurise.
+
+        Raises:
+            ValueError: If the SMILES string is invalid.
+
+        Returns:
+            np.ndarray: Feature vector of shape (n_features,).
+        """
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
             raise ValueError(f"Invalid SMILES: {smiles!r}")
@@ -232,8 +265,6 @@ class MLPModel(BaseModel):
             **kwargs: Additional keyword arguments (e.g. ``problem_type``), accepted for
                 interface compatibility but unused — MLPModel is always regression-only.
         """
-        from scipy.stats import spearmanr
-
         self._epoch_metrics = []
 
         X_train = self.featurise(train_data).to(self.device)
@@ -302,7 +333,8 @@ class MLPModel(BaseModel):
             )
 
             if (epoch + 1) % self.train_config.log_frequency == 0:
-                msg = f"Epoch {epoch + 1}/{self.train_config.num_epochs} — train_loss: {avg_train_loss:.4f}"
+                msg = f"Epoch {epoch + 1}/{self.train_config.num_epochs} — train_loss: {
+                    avg_train_loss:.4f}"
                 if avg_val_loss is not None:
                     msg += f", val_loss: {avg_val_loss:.4f}"
                 if val_spearman is not None:

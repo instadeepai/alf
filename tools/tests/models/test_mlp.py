@@ -15,9 +15,20 @@
 import numpy as np
 import pytest
 import torch
-from alf_core import Candidate, LabelledCandidates
+from alf_core import Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_core.enums import ProblemType
 from alf_tools.models.mlp import MLPModel, MLPModelConfig, MLPTrainConfig
+
+try:
+    from rdkit import Chem
+    from rdkit.Chem import Descriptors
+except ImportError as e:
+    raise ImportError(
+        "RDKit is required for SMILES featurisation. "
+        "Install it with: pip install 'alf_tools[benchmarks]'"
+    ) from e
+
 
 BENZENE = "c1ccccc1"
 ETHANOL = "CCO"
@@ -36,10 +47,15 @@ def _make_labelled(smiles_list: list[str], labels: list[float]) -> LabelledCandi
 
 
 def _make_precomputed_candidates(smiles_list: list[str]) -> list[Candidate]:
-    """Candidates with MolWt and MolLogP pre-populated in features."""
-    from rdkit import Chem
-    from rdkit.Chem import Descriptors
+    """Candidates with MolWt and MolLogP pre-populated in features.
 
+    Args:
+        smiles_list (list[str]): List of SMILES strings.
+
+    Returns:
+        list[Candidate]: List of candidates with precomputed features
+        for each SMILES string.
+    """
     candidates = []
     for s in smiles_list:
         mol = Chem.MolFromSmiles(s)
@@ -64,6 +80,13 @@ LABELS = [0.1, 0.5, 0.3, 0.8, 0.6]
 
 @pytest.fixture
 def mlp_model():
+    """Make a toy 2-layer MLP model with a training
+    configuration for testing.
+
+    Returns:
+        MLPModel: MLP model and a training configuration with
+        2 epochs and a batch size of 4.
+    """
     return MLPModel(
         model_config=MLPModelConfig(hidden_dims=[32, 16], dropout=0.0),
         train_config=MLPTrainConfig(batch_size=4, num_epochs=2),
@@ -73,15 +96,29 @@ def mlp_model():
 
 @pytest.fixture
 def train_data():
+    """Make a toy dataset of preset SMILES strings and labels.
+
+    Returns:
+        LabelledCandidates: Paired inputs and labels for testing
+        MLPModel training and prediction, using SMILES strings as input data.
+    """
     return _make_labelled(SMILES, LABELS)
 
 
 @pytest.fixture
 def train_data_precomputed():
+    """Make a toy dataset for SMILES strings and precomputed labels.
+
+    Returns:
+        LabelledCandidates: Paired inputs and labels with
+        pre-computed features for testing the MLPModel.
+    """
     return _make_precomputed_labelled(SMILES, LABELS)
 
 
 class TestMLPModelInit:
+    """Test MLP model initialisation, especially with GuacaMol dataset."""
+
     def test_model_is_none_before_training(self, mlp_model):
         """Model attribute must be None before any training call."""
         assert mlp_model.model is None
@@ -91,13 +128,17 @@ class TestMLPModelInit:
         assert mlp_model.get_epoch_metrics() == []
 
     def test_predict_before_train_raises(self, mlp_model):
-        """predict() must raise RuntimeError with 'Model not trained' before train() is called."""
+        """predict() must raise RuntimeError with 'Model not trained'
+        before train() is called.
+        """
         candidates = _make_smiles_candidates([BENZENE])
         with pytest.raises(RuntimeError, match="Model not trained"):
             mlp_model.predict(candidates)
 
 
 class TestMLPModelFeaturise:
+    """Test MLP model featurisation, especially using GuacaMol dataset."""
+
     def test_featurise_smiles_returns_tensor(self, mlp_model):
         """featurise() must return a 2-D torch.Tensor with one row per candidate."""
         candidates = _make_smiles_candidates([BENZENE, ETHANOL])
@@ -113,7 +154,9 @@ class TestMLPModelFeaturise:
         assert torch.all(torch.isfinite(result))
 
     def test_featurise_precomputed_returns_tensor(self, mlp_model):
-        """featurise() with pre-populated features must return a tensor of shape (n, num_features)."""
+        """featurise() with pre-populated features must return a
+        tensor of shape (n, num_features).
+        """
         candidates = _make_precomputed_candidates([BENZENE, ETHANOL])
         result = mlp_model.featurise(candidates)
         assert isinstance(result, torch.Tensor)
@@ -121,9 +164,6 @@ class TestMLPModelFeaturise:
 
     def test_featurise_precomputed_values_match_rdkit(self, mlp_model):
         """Precomputed feature values in the tensor must match the RDKit-computed values."""
-        from rdkit import Chem
-        from rdkit.Chem import Descriptors
-
         mol = Chem.MolFromSmiles(ETHANOL)
         expected_mw = float(Descriptors.MolWt(mol))
         expected_lp = float(Descriptors.MolLogP(mol))
@@ -134,7 +174,9 @@ class TestMLPModelFeaturise:
         assert torch.isclose(result[0, 1], torch.tensor(expected_mw), atol=1e-3)
 
     def test_featurise_smiles_path_used_when_no_features(self, mlp_model):
-        """Without pre-populated features, featurise() must use the SMILES fingerprint path (2057 dims)."""
+        """Without pre-populated features, featurise()
+        must use the SMILES fingerprint path (2057 dims).
+        """
         candidates = _make_smiles_candidates([BENZENE])
         result_smiles = mlp_model.featurise(candidates)
         # SMILES path: 2048-bit fingerprint + 9 descriptors = 2057
@@ -164,6 +206,8 @@ class TestMLPModelFeaturise:
 
 
 class TestMLPModelTrainPredict:
+    """Test MLP model training predictions."""
+
     def test_train_initialises_model(self, mlp_model, train_data):
         """train() must set the model attribute to a non-None value."""
         mlp_model.train(train_data)
@@ -172,7 +216,6 @@ class TestMLPModelTrainPredict:
     def test_predict_returns_predictions_object(self, mlp_model, train_data):
         """predict() must return a Predictions object with finite means of correct shape."""
         mlp_model.train(train_data)
-        from alf_core import Predictions
 
         preds = mlp_model.predict(_make_smiles_candidates([BENZENE, ETHANOL]))
         assert isinstance(preds, Predictions)
@@ -243,8 +286,6 @@ class TestMLPModelTrainPredict:
 
     def test_train_accepts_problem_type_kwarg(self, mlp_model, train_data):
         """train() must silently accept problem_type kwarg for Surrogate.fit() compatibility."""
-        from alf_core.enums import ProblemType
-
         mlp_model.train(train_data, problem_type=ProblemType.REGRESSION)
         assert mlp_model.model is not None
 
@@ -273,9 +314,6 @@ class TestMLPModelEdgeCases:
 
     def test_featurise_dimension_mismatch_raises_value_error(self):
         """featurise() must raise ValueError when candidates mix precomputed and SMILES paths."""
-        from rdkit import Chem
-        from rdkit.Chem import Descriptors
-
         model = MLPModel(device="cpu")
         mol = Chem.MolFromSmiles(BENZENE)
         precomputed = Candidate(
@@ -288,7 +326,9 @@ class TestMLPModelEdgeCases:
             model.featurise([precomputed, raw])
 
     def test_featurise_invalid_input_type_raises_value_error(self):
-        """featurise() must raise ValueError for inputs that are not a list or LabelledCandidates."""
+        """featurise() must raise ValueError for inputs that
+        are not a list or LabelledCandidates.
+        """
         model = MLPModel(device="cpu")
         with pytest.raises(ValueError, match="Input must be"):
             model.featurise("not_a_valid_input")  # type: ignore[arg-type]

@@ -188,12 +188,14 @@ class TestBaseDatasetConfigStratifiedValidator:
 
 
 def test_split_dataset_invalid_split_type_string():
+    """Test that splitting the dataset raises an error with an invalid split_type string."""
     dataset = make_dataset([0, 1, 2])
     with pytest.raises(ValueError, match="Expected one of"):
         split_dataset("not-a-number", dataset, 1, 1, 1, 0, seed=0)
 
 
 def test_split_dataset_invalid_split_type_type():
+    """Test that splitting the dataset raises an error with an incorrect split_type."""
     dataset = make_dataset([0, 1, 2])
     with pytest.raises(TypeError, match="split_type must be one of"):
         split_dataset(123, dataset, 1, 1, 1, 0, seed=0)

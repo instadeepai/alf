@@ -15,7 +15,7 @@
 import copy
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Literal, Optional, get_args
+from typing import TYPE_CHECKING, Callable, Final, Literal, Optional, TypedDict, Union, get_args
 
 import numpy as np
 import requests
@@ -35,27 +35,48 @@ DATAPATH = Path.home() / ".cache" / "alf"
 
 # All 4 GuacaMol files via Figshare public API
 # Source: https://api.figshare.com/v2/articles/{id}
-GUACAMOL_FILES = {
+FILENAME_TRAIN: str = "guacamol_v1_train.smiles"
+FILENAME_VALID: str = "guacamol_v1_valid.smiles"
+FILENAME_TEST: str = "guacamol_v1_test.smiles"
+FILENAME_ALL: str = "guacamol_v1_all.smiles"
+
+GuacaMolSplitName = Literal["TRAIN", "VALID", "TEST", "ALL"]
+
+
+class GuacaMolFileInfo(TypedDict):
+    """Typed fields for file information for downloading GuacaMol.
+
+    Args:
+        TypedDict (_type_): Includes name, url, md5, and size of the file.
+    """
+
+    name: str
+    url: str
+    md5: str
+    size: int
+
+
+GUACAMOL_FILES: Final[dict[GuacaMolSplitName, GuacaMolFileInfo]] = {
     "TRAIN": {
-        "name": "guacamol_v1_train.smiles",
+        "name": FILENAME_TRAIN,
         "url": "https://ndownloader.figshare.com/files/13612760",
         "md5": "05ad85d871958a05c02ab51a4fde8530",
         "size": 61_841_218,
     },
     "VALID": {
-        "name": "guacamol_v1_valid.smiles",
+        "name": FILENAME_VALID,
         "url": "https://ndownloader.figshare.com/files/13612766",
         "md5": "e53db4bff7dc4784123ae6df72e3b1f0",
         "size": 3_859_125,
     },
     "TEST": {
-        "name": "guacamol_v1_test.smiles",
+        "name": FILENAME_TEST,
         "url": "https://ndownloader.figshare.com/files/13612757",
         "md5": "677b757ccec4809febd83850b43e1616",
         "size": 11_590_126,
     },
     "ALL": {
-        "name": "guacamol_v1_all.smiles",
+        "name": FILENAME_ALL,
         "url": "https://ndownloader.figshare.com/files/13612745",
         "md5": "7d45bc95c33c10cb96ef5e78c38ac0b6",
         "size": 77_290_469,
@@ -99,11 +120,6 @@ GuacaMolTaskName = Literal[
 
 ALL_PROPERTIES: frozenset[str] = frozenset(get_args(GuacaMolPropertyName))
 ALL_TASKS: frozenset[str] = frozenset(get_args(GuacaMolTaskName))
-
-FILENAME_TRAIN: str = GUACAMOL_FILES["TRAIN"]["name"]
-FILENAME_VALID: str = GUACAMOL_FILES["VALID"]["name"]
-FILENAME_TEST: str = GUACAMOL_FILES["TEST"]["name"]
-FILENAME_ALL: str = GUACAMOL_FILES["ALL"]["name"]
 
 try:
     from rdkit import Chem  # type: ignore[no-redef]
@@ -163,7 +179,7 @@ class GuacaMolConfig(BaseDatasetConfig):
         return self
 
 
-def _compute_properties(smiles: str, properties: list[str]) -> dict[str, float]:
+def _compute_properties(smiles: str, properties: list[str]) -> dict[str, Union[str, float]]:
     """Compute RDKit physicochemical properties for a SMILES string.
 
     Args:
@@ -373,7 +389,7 @@ class GuacaMol(BaseDataset):
         Returns:
             Combined LabelledCandidates with split tags stored in each candidate's features.
         """
-        split_files = {k: GUACAMOL_FILES[k] for k in ("TRAIN", "VALID", "TEST")}
+        split_files = {k: GUACAMOL_FILES[k] for k in GUACAMOL_FILES.keys() if k not in ("ALL",)}
         properties = list(self.config.computed_properties or ALL_PROPERTIES)
         all_candidates: list[Candidate] = []
         all_labels: list[float] = []
@@ -413,6 +429,7 @@ class GuacaMol(BaseDataset):
         Raises:
             NotImplementedError: If task_type is "benchmark_task".
             ValueError: If a novel candidate's SMILES string is invalid.
+            RuntimeError: If the dataset is not loaded before querying.
         """
         if self.config.task_type == "benchmark_task":
             raise NotImplementedError(
@@ -423,7 +440,7 @@ class GuacaMol(BaseDataset):
 
         known_smiles_index = {c.data: i for i, c in enumerate(self._raw_dataset.candidates)}
         result_candidates: list[Candidate] = []
-        result_labels: list[float] = []
+        result_labels: list[Union[str, float]] = []
 
         for candidate in candidates:
             if candidate.data in known_smiles_index:
@@ -448,8 +465,12 @@ class GuacaMol(BaseDataset):
     def _split_dataset(self) -> dict[str, LabelledCandidates]:
         """Split by paper file tags when split_mode is 'paper'; else use base class.
 
+        Raises:
+            RuntimeError: If the raw dataset is None, indicating it was not initialized properly.
+
         Returns:
-            Dict with keys "train", "validation", "test", and "candidate_pool".
+            dict[str, LabelledCandidates]: Dict with keys "train",
+            "validation", "test", and "candidate_pool".
         """
         if self.config.split_mode != "paper":
             return super()._split_dataset()

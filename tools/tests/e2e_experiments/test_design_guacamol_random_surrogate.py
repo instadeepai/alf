@@ -293,11 +293,17 @@ class TestDesignQED(BaseTestDesignGuacaMol):
 
     @property
     def target_property(self) -> str:
-        """Quantitative Estimate of Druglikeness (0–1 scale)."""
+        """Quantitative Estimate of Druglikeness (0-1 scale)."""
         return "QED"
 
     @property
     def expected_metrics(self) -> dict:
+        """Expected metrics for testing the surrogate model and dataset.
+
+        Returns:
+            dict: Surrogate model metrics (MSE, Spearman, Pearson, pairwise cross-entropy)
+            and dataset metrics (split sizes and test mean) for the GuacaMol QED property
+        """
         return {
             "surrogate": {
                 # 6 rounds: initial train round + 5 acquisition rounds
@@ -354,6 +360,12 @@ class TestDesignMolWt(BaseTestDesignGuacaMol):
 
     @property
     def expected_metrics(self) -> dict:
+        """Expected metrics for testing the surrogate model and dataset.
+
+        Returns:
+            dict: Surrogate model metrics (MSE, Spearman, Pearson, pairwise cross-entropy)
+            and dataset metrics (split sizes and test mean) for the GuacaMol MolWt property
+        """
         return {
             "surrogate": {
                 "test_mse": [
@@ -408,6 +420,12 @@ class TestDesignMolLogP(BaseTestDesignGuacaMol):
 
     @property
     def expected_metrics(self) -> dict:
+        """Expected metrics for testing the surrogate model and dataset.
+
+        Returns:
+            dict: Surrogate model metrics (MSE, Spearman, Pearson, pairwise cross-entropy)
+            and dataset metrics (split sizes and test mean) for the GuacaMol MolLogP property
+        """
         return {
             "surrogate": {
                 "test_mse": [

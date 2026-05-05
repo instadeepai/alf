@@ -44,7 +44,8 @@ class Results:
         """
         assert self.targets.shape[0] == self.predictions.means.shape[0], (
             f"Targets and predictions must have the same length (number of samples), "
-            f"got targets.shape={self.targets.shape} and predictions.means.shape={self.predictions.means.shape}"
+            f"got targets.shape={self.targets.shape} and "
+            f"predictions.means.shape={self.predictions.means.shape}"
         )
         self.metrics = self.compute_metrics()
 

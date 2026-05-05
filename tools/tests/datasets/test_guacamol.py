@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import inspect
 import shutil
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -122,8 +123,6 @@ class TestGuacaMolConfig:
 
     def test_data_dir_defaults_to_datapath(self):
         """data_dir defaults to the package-level DATAPATH constant."""
-        from alf_tools.datasets.guacamol import DATAPATH
-
         config = _base_config()
         assert config.data_dir == DATAPATH
 
@@ -676,8 +675,6 @@ class TestDownloadGuacaMol:
 
     def test_default_data_dir_is_datapath(self):
         """download_guacamol's default data_dir parameter equals the module DATAPATH constant."""
-        import inspect
-
         sig = inspect.signature(download_guacamol)
         assert sig.parameters["data_dir"].default == DATAPATH
 

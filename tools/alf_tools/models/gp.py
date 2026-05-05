@@ -416,11 +416,12 @@ class GPModel(BaseModel):
             Initialized ExactGPModel.
 
         Raises:
-            ValueError: If likelihood has not been initialized before calling this method.
+            RuntimeError: If likelihood is None, which indicates it was not initialized properly.
         """
         if self.likelihood is None:
             raise RuntimeError(
-                "likelihood is None — _initialize_likelihood() must be called before _initialize_gp_model()"
+                "likelihood is None — _initialize_likelihood() must "
+                "be called before _initialize_gp_model()"
             )
 
         gp_model = ExactGPModel(
@@ -454,6 +455,7 @@ class GPModel(BaseModel):
 
         Raises:
             ValueError: If GP model or likelihood is not initialized.
+            RuntimeError: If NaN observation policy is set to 'fill', which is not supported.
         """
         if self.gp_model is None or self.likelihood is None:
             uninit = [
@@ -462,7 +464,8 @@ class GPModel(BaseModel):
                 if obj is None
             ]
             raise RuntimeError(
-                f"{' and '.join(uninit)} not initialized — call train() before _optimize_hyperparameters()"
+                f"{' and '.join(uninit)} not initialized — call train() "
+                "before _optimize_hyperparameters()"
             )
 
         # Set to training mode

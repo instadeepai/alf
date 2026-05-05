@@ -17,6 +17,7 @@ import pytest
 import torch
 from alf_core.dataclasses.candidate import Candidate, Modality
 from alf_core.dataclasses.predictions import Predictions
+from alf_core.enums import ProblemType
 from beartype.roar import BeartypeCallHintParamViolation
 
 
@@ -280,7 +281,6 @@ class TestPredictionsToDataframeClassification:
         probs = np.array([[0.8, 0.2], [0.3, 0.7]])
         targets = np.array([0.0, 1.0])
         preds = Predictions(means=probs)
-        from alf_core.enums import ProblemType
 
         df = preds.to_dataframe(
             self._make_candidates(2), targets, problem_type=ProblemType.REGRESSION

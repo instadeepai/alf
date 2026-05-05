@@ -214,6 +214,12 @@ class TestZeroShotQED(BaseTestZeroShotGuacaMol):
 
     @property
     def expected_metrics(self) -> dict:
+        """Expected metrics for testing the surrogate model and dataset.
+
+        Returns:
+            dict: Surrogate model metrics (MSE, Spearman, Pearson, pairwise cross-entropy)
+            and dataset metrics (split sizes and test mean) for the GuacaMol QED property
+        """
         return {
             "surrogate": {
                 "test_mse": 1.2160,
@@ -240,6 +246,12 @@ class TestZeroShotMolWt(BaseTestZeroShotGuacaMol):
 
     @property
     def expected_metrics(self) -> dict:
+        """Expected metrics for testing the surrogate model and dataset.
+
+        Returns:
+            dict: Surrogate model metrics (MSE, Spearman, Pearson, pairwise cross-entropy)
+            and dataset metrics (split sizes and test mean) for the GuacaMol MolWt property
+        """
         return {
             "surrogate": {
                 "test_mse": 16293.4287,
@@ -266,6 +278,12 @@ class TestZeroShotMolLogP(BaseTestZeroShotGuacaMol):
 
     @property
     def expected_metrics(self) -> dict:
+        """Expected metrics for testing the surrogate model and dataset.
+
+        Returns:
+            dict: Surrogate model metrics (MSE, Spearman, Pearson, pairwise cross-entropy)
+            and dataset metrics (split sizes and test mean) for the MolLogP property
+        """
         return {
             "surrogate": {
                 "test_mse": 3.7903,

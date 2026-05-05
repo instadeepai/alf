@@ -284,7 +284,7 @@ class CNNModel(BaseModel):
             Tuple of (average_loss, metrics_dict).
 
         Raises:
-            ValueError: If the model is not initialized.
+            RuntimeError: If the model is None, which indicates it was not initialized properly.
         """
         if self.model is None:
             raise RuntimeError(
@@ -337,7 +337,7 @@ class CNNModel(BaseModel):
             Tuple of (average_loss, metrics_dict).
 
         Raises:
-            ValueError: If the model is not initialized.
+            RuntimeError: If the model is None, which indicates it was not initialized properly.
         """
         if self.model is None:
             raise RuntimeError(
@@ -425,8 +425,9 @@ class CNNModel(BaseModel):
         Args:
             train_data: Training data containing sequences and oracle values.
             val_data: Optional validation data.
-            **kwargs: Additional keyword arguments. Recognises ``problem_type``
-                (``ProblemType``) to configure loss, label dtype, and output layer.
+            problem_type: Type of problem (REGRESSION, BINARY, or MULTICLASS) to determine
+            loss, label dtype, output layer, and metrics. Defaults to REGRESSION.
+            **kwargs: Additional keyword arguments.
         """
         self._problem_type = problem_type
         logger.info(
@@ -473,7 +474,8 @@ class CNNModel(BaseModel):
             criterion = nn.CrossEntropyLoss()
 
         # Training loop
-        avg_val_loss, val_metrics = None, None
+        avg_val_loss = float("nan")
+        val_metrics: dict = {}
         for epoch in range(self.train_config.num_epochs):
             # Train
             avg_train_loss, train_metrics = self._train_epoch(train_loader, optimizer, criterion)

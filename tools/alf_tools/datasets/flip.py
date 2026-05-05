@@ -192,7 +192,7 @@ class FLIP(BaseDataset):
             Dictionary with keys "train", "validation", "test", "candidate_pool".
 
         Raises:
-            ValueError: If dataset has not been loaded yet.
+            RuntimeError: If dataset has not been loaded yet.
         """
         if self._raw_dataset is None:
             raise RuntimeError(

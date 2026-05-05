@@ -56,7 +56,8 @@ class Predictions:
             )
         if self.empirical_dist is not None:
             assert len(self.empirical_dist) == len(self.means), (
-                "Empirical_dist must have the same length as means - shape (num_candidates, num_ensemble_models), "
+                "Empirical_dist must have the same length as means - shape "
+                "(num_candidates, num_ensemble_models), "
                 f"but its first dimension ({len(self.empirical_dist)}) does not match "
                 f"len(means) ({len(self.means)})"
             )
@@ -83,6 +84,8 @@ class Predictions:
         Args:
             candidates: List of Candidate objects corresponding to the predictions.
             targets: Ground truth target values corresponding to each candidate.
+            problem_type: Optional ProblemType indicating if predictions are for
+            classification or regression. If None, classification is inferred if means is 2D.
 
         Returns:
             A DataFrame with predictions, targets, and optionally variances
