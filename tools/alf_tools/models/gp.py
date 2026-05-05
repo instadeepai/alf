@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Callable, Literal, TypeAlias, Union
+from typing import Any, Callable, Literal, Optional, TypeAlias, Union
 
 import gpytorch
 import numpy as np
@@ -32,6 +32,7 @@ from alf_tools.models.utils.sequence_utils import (
     extract_sequences_from_inputs,
     one_hot_encode,
 )
+from torch.utils.data import DataLoader
 from alf_tools.models.utils.torch_utils import get_device
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
@@ -538,24 +539,21 @@ class GPModel(BaseModel):
 
         return metrics
 
-    def train(
+    def _prepare_train_data(
         self,
         train_data: LabelledCandidates,
-        val_data: LabelledCandidates | None = None,
-    ) -> None:
-        """Train the GP model by optimizing hyperparameters.
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Prepare the training data by featurising inputs x,
+        normalizing x, and standardizing outputs y. Transform
+        numpy arrays into tensors and put on the current device.
 
         Args:
             train_data: Training data containing sequences and oracle values.
-            val_data: Optional validation data (used for monitoring, not for training).
 
-        Note:
-            For exact GPs, all training data is used for predictions. Validation
-            data is only used for logging validation metrics during training.
+        Returns:
+            A tuple of training features and targets as tensors on the current device.
         """
-        self._epoch_metrics = []
-        logger.info(f"Training GP with {len(train_data)} samples")
-
+        
         # Featurize training data
         train_x = self.featurise(train_data).to(self.device)
         train_y_np = train_data.labels.astype(np.float64)
@@ -577,7 +575,30 @@ class GPModel(BaseModel):
             self._output_standardizer = None
 
         train_y = torch.tensor(train_y_np, dtype=torch.float32).to(self.device)
+        
+        return train_x, train_y
 
+
+    def train(
+        self,
+        train_data: LabelledCandidates,
+        val_data: Optional[LabelledCandidates] = None,
+    ) -> None:
+        """Train the GP model by optimizing hyperparameters.
+
+        Args:
+            train_data: Training data containing sequences and oracle values.
+            val_data: Optional validation data (used for monitoring, not for training).
+
+        Note:
+            For exact GPs, all training data is used for predictions. Validation
+            data is only used for logging validation metrics during training.
+        """
+        self._epoch_metrics = []
+        logger.info(f"Training GP with {len(train_data)} samples")
+
+        train_x, train_y = self._prepare_train_data(train_data)
+        
         # Store training data for later predictions
         self.train_x = train_x
         self.train_y = train_y
