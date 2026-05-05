@@ -30,11 +30,11 @@ from alf_tools.models.utils import get_device
 logger = logging.getLogger("alf-tools")
 
 if TYPE_CHECKING:
-    from rdkit import Chem
+    from rdkit import Chem, DataStructs
     from rdkit.Chem import AllChem, Descriptors, GraphDescriptors, rdMolDescriptors
 
 try:
-    from rdkit import Chem  # type: ignore[no-redef]
+    from rdkit import Chem, DataStructs  # type: ignore[no-redef]
     from rdkit.Chem import AllChem, Descriptors, GraphDescriptors, rdMolDescriptors  # type: ignore[no-redef]
     _RDKIT_AVAILABLE = True
 except ImportError:
@@ -197,9 +197,9 @@ class MLPModel(BaseModel):
         if mol is None:
             raise ValueError(f"Invalid SMILES: {smiles!r}")
 
-        fp = np.array(
-            AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=2048),
-            dtype=np.float32,
+        fp = np.zeros(2048, dtype=np.float32)
+        DataStructs.ConvertToNumpyArray(
+            AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=2048), fp
         )
         desc = np.array(
             [
