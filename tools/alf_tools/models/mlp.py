@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Union
+from typing import TYPE_CHECKING, Any, Union
 
 import numpy as np
 import torch
@@ -27,14 +27,24 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from alf_tools.models.utils import get_device
 
-try:
+if TYPE_CHECKING:
     from rdkit import Chem
     from rdkit.Chem import AllChem, Descriptors, GraphDescriptors, rdMolDescriptors
-except ImportError as e:
-    raise ImportError(
-        "RDKit is required for SMILES featurisation. "
-        "Install it with: pip install 'alf_tools[benchmarks]'"
-    ) from e
+
+try:
+    from rdkit import Chem  # type: ignore[no-redef]
+    from rdkit.Chem import AllChem, Descriptors, GraphDescriptors, rdMolDescriptors  # type: ignore[no-redef]
+    _RDKIT_AVAILABLE = True
+except ImportError:
+    _RDKIT_AVAILABLE = False
+
+
+def _require_rdkit() -> None:
+    if not _RDKIT_AVAILABLE:
+        raise ImportError(
+            "RDKit is required for SMILES featurisation. "
+            "Install it with: pip install 'alf_tools[benchmarks]'"
+        )
 
 logger = logging.getLogger("alf-tools")
 
@@ -176,11 +186,13 @@ class MLPModel(BaseModel):
             smiles (str): Input SMILES string to featurise.
 
         Raises:
+            ImportError: If RDKit is not installed.
             ValueError: If the SMILES string is invalid.
 
         Returns:
             np.ndarray: Feature vector of shape (n_features,).
         """
+        _require_rdkit()
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
             raise ValueError(f"Invalid SMILES: {smiles!r}")
