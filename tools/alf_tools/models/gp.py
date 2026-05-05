@@ -32,7 +32,6 @@ from alf_tools.models.utils.sequence_utils import (
     extract_sequences_from_inputs,
     one_hot_encode,
 )
-from torch.utils.data import DataLoader
 from alf_tools.models.utils.torch_utils import get_device
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
@@ -553,7 +552,6 @@ class GPModel(BaseModel):
         Returns:
             A tuple of training features and targets as tensors on the current device.
         """
-        
         # Featurize training data
         train_x = self.featurise(train_data).to(self.device)
         train_y = train_data.labels.astype(np.float64)
@@ -575,9 +573,8 @@ class GPModel(BaseModel):
             self._output_standardizer = None
 
         train_y = torch.tensor(train_y, dtype=torch.float32).to(self.device)
-        
-        return train_x, train_y
 
+        return train_x, train_y
 
     def train(
         self,
@@ -598,7 +595,7 @@ class GPModel(BaseModel):
         logger.info(f"Training GP with {len(train_data)} samples")
 
         train_x, train_y = self._prepare_train_data(train_data)
-        
+
         # Store training data for later predictions
         self.train_x = train_x
         self.train_y = train_y
