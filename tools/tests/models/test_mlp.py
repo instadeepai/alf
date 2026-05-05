@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import alf_tools.models.mlp as _mlp_module
 import numpy as np
 import pytest
 import torch
@@ -20,14 +21,11 @@ from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.enums import ProblemType
 from alf_tools.models.mlp import MLPModel, MLPModelConfig, MLPTrainConfig
 
-try:
-    from rdkit import Chem
-    from rdkit.Chem import Descriptors
-except ImportError as e:
-    raise ImportError(
-        "RDKit is required for SMILES featurisation. "
-        "Install it with: pip install 'alf_tools[benchmarks]'"
-    ) from e
+pytest.importorskip("rdkit")
+from rdkit import Chem  # noqa: E402
+from rdkit.Chem import Descriptors  # noqa: E402
+
+pytestmark = pytest.mark.rdkit
 
 
 BENZENE = "c1ccccc1"
@@ -332,3 +330,28 @@ class TestMLPModelEdgeCases:
         model = MLPModel(device="cpu")
         with pytest.raises(ValueError, match="Input must be"):
             model.featurise("not_a_valid_input")  # type: ignore[arg-type]
+
+
+class TestMLPModelNoRDKit:
+    """Tests that verify graceful ImportError when RDKit is absent."""
+
+    def test_require_rdkit_raises_informative_error_when_unavailable(self):
+        """_require_rdkit() raises ImportError with install instructions when RDKit is absent."""
+        original = _mlp_module._RDKIT_AVAILABLE
+        _mlp_module._RDKIT_AVAILABLE = False
+        try:
+            with pytest.raises(ImportError, match="alf_tools\\[benchmarks\\]"):
+                _mlp_module._require_rdkit()
+        finally:
+            _mlp_module._RDKIT_AVAILABLE = original
+
+    def test_features_from_smiles_raises_when_rdkit_unavailable(self):
+        """_features_from_smiles() raises ImportError with install instructions when RDKit is absent."""
+        model = MLPModel(device="cpu")
+        original = _mlp_module._RDKIT_AVAILABLE
+        _mlp_module._RDKIT_AVAILABLE = False
+        try:
+            with pytest.raises(ImportError, match="alf_tools\\[benchmarks\\]"):
+                model._features_from_smiles(BENZENE)
+        finally:
+            _mlp_module._RDKIT_AVAILABLE = original
