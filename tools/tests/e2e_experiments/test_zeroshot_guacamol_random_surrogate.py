@@ -20,6 +20,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+
+pytest.importorskip("rdkit")
+
+pytestmark = pytest.mark.rdkit
+
 from alf_core import (
     FileStateLogger,
     Surrogate,
