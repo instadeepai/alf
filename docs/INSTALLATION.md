@@ -21,6 +21,8 @@ cd alf
 # Install all packages with development dependencies
 uv sync
 
+> This installs the local repo meta-package with `alf_tools[benchmarks]` by default, so RDKit is available for benchmark and tools tests.
+
 # Verify installation
 uv run python -c "from alf_tools.models import CNNModel; print('✓ ALF installed successfully')"
 ```

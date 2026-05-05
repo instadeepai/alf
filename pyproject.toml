@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12,<3.14.1"
 dependencies = [
     "alf_core",
-    "alf_tools",
+    "alf_tools[benchmarks]",
     "alf_tutorials",
 ]
 
