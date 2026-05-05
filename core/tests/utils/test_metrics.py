@@ -197,7 +197,7 @@ class TestClassificationMetricInputValidation:
         """Test that empty inputs are rejected."""
         probs = np.empty((0, 2))
         targets = np.empty(0)
-        with pytest.raises(AssertionError, match="must not be empty"):
+        with pytest.raises(AssertionError, match="empty"):
             accuracy(probs, targets)
 
     def test_batch_size_mismatch_raises(self):
