@@ -36,7 +36,7 @@ from alf_tools.datasets.guacamol import (
     download_guacamol,
 )
 
-pytestmark = pytest.mark.guacamol
+pytestmark = [pytest.mark.guacamol, pytest.mark.rdkit]
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "guacamol"
 VALID_FIXTURE = FIXTURES / "valid.smiles"
