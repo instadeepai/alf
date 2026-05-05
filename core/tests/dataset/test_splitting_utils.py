@@ -115,7 +115,7 @@ class TestSplitStratified:
         assert len(splits["test"]) == requested["test_size"]
         assert len(splits["candidate_pool"]) == requested["candidate_pool_size"]
         assert sum(len(split) for split in splits.values()) == sum(requested.values())
-        
+
         # Test that shuffling is working
         assert splits["train"].labels.astype(int).tolist() != [0, 0]
 
@@ -185,6 +185,7 @@ class TestBaseDatasetConfigStratifiedValidator:
         """Test that an unknown split type raises a ValidationError."""
         with pytest.raises(ValidationError):
             BaseDatasetConfig(**self._base_kwargs(), split_type="unknown")
+
 
 def test_split_dataset_invalid_split_type_string():
     dataset = make_dataset([0, 1, 2])

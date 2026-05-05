@@ -43,9 +43,9 @@ class Results:
             AssertionError: If targets and predictions have different lengths.
         """
         assert self.targets.shape[0] == self.predictions.means.shape[0], (
-                f"Targets and predictions must have the same length (number of samples), "
-                f"got targets.shape={self.targets.shape} and predictions.means.shape={self.predictions.means.shape}"
-            )
+            f"Targets and predictions must have the same length (number of samples), "
+            f"got targets.shape={self.targets.shape} and predictions.means.shape={self.predictions.means.shape}"
+        )
         self.metrics = self.compute_metrics()
 
     def compute_metrics(self) -> dict[str, Union[float, int, np.number]]:

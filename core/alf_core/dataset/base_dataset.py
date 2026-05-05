@@ -130,9 +130,9 @@ class BaseDataset(abc.ABC):
             AssertionError: If dataset hasn't been split yet.
         """
         assert "train" in self.splits, (
-                "Dataset must be split before accessing train dataset; "
-                "train split has not been created yet — call dataset.setup() before accessing train_dataset"
-            )
+            "Dataset must be split before accessing train dataset; "
+            "train split has not been created yet — call dataset.setup() before accessing train_dataset"
+        )
         return self.splits["train"]
 
     @property
@@ -146,9 +146,9 @@ class BaseDataset(abc.ABC):
             AssertionError: If dataset hasn't been split yet.
         """
         assert "test" in self.splits, (
-                "Dataset must be split before accessing test dataset; "
-                "test split has not been created yet — call dataset.setup() before accessing test_dataset"
-            )
+            "Dataset must be split before accessing test dataset; "
+            "test split has not been created yet — call dataset.setup() before accessing test_dataset"
+        )
         return self.splits["test"]
 
     @property

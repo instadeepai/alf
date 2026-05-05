@@ -281,7 +281,10 @@ class TestPredictionsToDataframeClassification:
         targets = np.array([0.0, 1.0])
         preds = Predictions(means=probs)
         from alf_core.enums import ProblemType
-        df = preds.to_dataframe(self._make_candidates(2), targets, problem_type=ProblemType.REGRESSION)
+
+        df = preds.to_dataframe(
+            self._make_candidates(2), targets, problem_type=ProblemType.REGRESSION
+        )
         # Should have mean and variance columns, not prob_class
         assert "mean" in df.columns
         assert "variance" in df.columns

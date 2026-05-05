@@ -340,7 +340,9 @@ class GPModel(BaseModel):
             )
         return self.featurizer_config.custom_featurizer(sequences)
 
-    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> Float[torch.Tensor, "batch_size n_features"]:
+    def featurise(
+        self, inputs: Union[LabelledCandidates, list[Candidate]]
+    ) -> Float[torch.Tensor, "batch_size n_features"]:
         """Convert inputs to feature tensors.
 
         Args:
@@ -454,7 +456,11 @@ class GPModel(BaseModel):
             ValueError: If GP model or likelihood is not initialized.
         """
         if self.gp_model is None or self.likelihood is None:
-            uninit = [name for name, obj in [("gp_model", self.gp_model), ("likelihood", self.likelihood)] if obj is None]
+            uninit = [
+                name
+                for name, obj in [("gp_model", self.gp_model), ("likelihood", self.likelihood)]
+                if obj is None
+            ]
             raise RuntimeError(
                 f"{' and '.join(uninit)} not initialized — call train() before _optimize_hyperparameters()"
             )

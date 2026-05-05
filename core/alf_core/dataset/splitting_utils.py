@@ -14,6 +14,7 @@
 
 
 from typing import Literal
+
 import numpy as np
 from alf_core.dataclasses.labelled_candidates import LabelledCandidates
 
@@ -197,11 +198,11 @@ def split_stratified(
     """
     labels = dataset.labels.astype(int)
     non_integer_mask = ~np.isclose(dataset.labels, dataset.labels.astype(int).astype(float))
-    assert np.allclose(dataset.labels, labels.astype(float)),  (
-            f"split_type='stratified' requires integer class labels, but {non_integer_mask.sum()} "
-            f"labels have fractional parts (e.g. {dataset.labels[non_integer_mask][:3]}). "
-            f"Cast your labels to int or use split_type='random'."
-        )
+    assert np.allclose(dataset.labels, labels.astype(float)), (
+        f"split_type='stratified' requires integer class labels, but {non_integer_mask.sum()} "
+        f"labels have fractional parts (e.g. {dataset.labels[non_integer_mask][:3]}). "
+        f"Cast your labels to int or use split_type='random'."
+    )
     rng = np.random.RandomState(seed)
 
     classes = np.unique(labels)

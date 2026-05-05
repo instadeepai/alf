@@ -19,7 +19,6 @@ from alf_core import Candidate, LabelledCandidates
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_tools.models.mlp import MLPModel, MLPModelConfig, MLPTrainConfig
 
-
 BENZENE = "c1ccccc1"
 ETHANOL = "CCO"
 ASPIRIN = "CC(=O)Oc1ccccc1C(=O)O"
@@ -40,6 +39,7 @@ def _make_precomputed_candidates(smiles_list: list[str]) -> list[Candidate]:
     """Candidates with MolWt and MolLogP pre-populated in features."""
     from rdkit import Chem
     from rdkit.Chem import Descriptors
+
     candidates = []
     for s in smiles_list:
         mol = Chem.MolFromSmiles(s)
@@ -123,6 +123,7 @@ class TestMLPModelFeaturise:
         """Precomputed feature values in the tensor must match the RDKit-computed values."""
         from rdkit import Chem
         from rdkit.Chem import Descriptors
+
         mol = Chem.MolFromSmiles(ETHANOL)
         expected_mw = float(Descriptors.MolWt(mol))
         expected_lp = float(Descriptors.MolLogP(mol))
@@ -172,6 +173,7 @@ class TestMLPModelTrainPredict:
         """predict() must return a Predictions object with finite means of correct shape."""
         mlp_model.train(train_data)
         from alf_core import Predictions
+
         preds = mlp_model.predict(_make_smiles_candidates([BENZENE, ETHANOL]))
         assert isinstance(preds, Predictions)
         assert preds.means.shape == (2,)
@@ -242,6 +244,7 @@ class TestMLPModelTrainPredict:
     def test_train_accepts_problem_type_kwarg(self, mlp_model, train_data):
         """train() must silently accept problem_type kwarg for Surrogate.fit() compatibility."""
         from alf_core.enums import ProblemType
+
         mlp_model.train(train_data, problem_type=ProblemType.REGRESSION)
         assert mlp_model.model is not None
 
@@ -272,6 +275,7 @@ class TestMLPModelEdgeCases:
         """featurise() must raise ValueError when candidates mix precomputed and SMILES paths."""
         from rdkit import Chem
         from rdkit.Chem import Descriptors
+
         model = MLPModel(device="cpu")
         mol = Chem.MolFromSmiles(BENZENE)
         precomputed = Candidate(

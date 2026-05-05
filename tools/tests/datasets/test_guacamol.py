@@ -123,6 +123,7 @@ class TestGuacaMolConfig:
     def test_data_dir_defaults_to_datapath(self):
         """data_dir defaults to the package-level DATAPATH constant."""
         from alf_tools.datasets.guacamol import DATAPATH
+
         config = _base_config()
         assert config.data_dir == DATAPATH
 
@@ -261,7 +262,9 @@ class TestGuacaMolSingleFileLoad:
 
     def test_candidate_features_contain_computed_properties(self, tmp_path):
         """Each candidate's features dict includes all requested computed properties."""
-        config = _base_config(data_dir=tmp_path, max_molecules=3, computed_properties=["TPSA", "MolWt"])
+        config = _base_config(
+            data_dir=tmp_path, max_molecules=3, computed_properties=["TPSA", "MolWt"]
+        )
         with patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
             dataset = GuacaMol(config)
         for cand in dataset._raw_dataset.candidates:
@@ -408,6 +411,7 @@ class TestGuacaMolQuery:
 # ---------------------------------------------------------------------------
 # Fixture-based tests — cover gaps identified in audit
 # ---------------------------------------------------------------------------
+
 
 class TestLoadSmilesFile:
     """Unit tests for the _load_smiles_file helper."""
@@ -673,6 +677,7 @@ class TestDownloadGuacaMol:
     def test_default_data_dir_is_datapath(self):
         """download_guacamol's default data_dir parameter equals the module DATAPATH constant."""
         import inspect
+
         sig = inspect.signature(download_guacamol)
         assert sig.parameters["data_dir"].default == DATAPATH
 

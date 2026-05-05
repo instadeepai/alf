@@ -36,46 +36,65 @@ DATAPATH = Path.home() / ".cache" / "alf"
 # All 4 GuacaMol files via Figshare public API
 # Source: https://api.figshare.com/v2/articles/{id}
 GUACAMOL_FILES = {
-    'TRAIN': {
-        "name":     "guacamol_v1_train.smiles",
-        "url":      "https://ndownloader.figshare.com/files/13612760",
-        "md5":      "05ad85d871958a05c02ab51a4fde8530",
-        "size":     61_841_218,
+    "TRAIN": {
+        "name": "guacamol_v1_train.smiles",
+        "url": "https://ndownloader.figshare.com/files/13612760",
+        "md5": "05ad85d871958a05c02ab51a4fde8530",
+        "size": 61_841_218,
     },
-    'VALID': {
-        "name":     "guacamol_v1_valid.smiles",
-        "url":      "https://ndownloader.figshare.com/files/13612766",
-        "md5":      "e53db4bff7dc4784123ae6df72e3b1f0",
-        "size":     3_859_125,
+    "VALID": {
+        "name": "guacamol_v1_valid.smiles",
+        "url": "https://ndownloader.figshare.com/files/13612766",
+        "md5": "e53db4bff7dc4784123ae6df72e3b1f0",
+        "size": 3_859_125,
     },
-    'TEST': {
-        "name":     "guacamol_v1_test.smiles",
-        "url":      "https://ndownloader.figshare.com/files/13612757",
-        "md5":      "677b757ccec4809febd83850b43e1616",
-        "size":     11_590_126,
+    "TEST": {
+        "name": "guacamol_v1_test.smiles",
+        "url": "https://ndownloader.figshare.com/files/13612757",
+        "md5": "677b757ccec4809febd83850b43e1616",
+        "size": 11_590_126,
     },
-    'ALL': {
-        "name":     "guacamol_v1_all.smiles",
-        "url":      "https://ndownloader.figshare.com/files/13612745",
-        "md5":      "7d45bc95c33c10cb96ef5e78c38ac0b6",
-        "size":     77_290_469,
+    "ALL": {
+        "name": "guacamol_v1_all.smiles",
+        "url": "https://ndownloader.figshare.com/files/13612745",
+        "md5": "7d45bc95c33c10cb96ef5e78c38ac0b6",
+        "size": 77_290_469,
     },
 }
 
 
 GuacaMolPropertyName = Literal[
-    "BertzCT", "MolLogP", "MolWt", "TPSA",
-    "NumHAcceptors", "NumHDonors", "NumRotatableBonds",
-    "NumAliphaticRings", "NumAromaticRings", "QED",
+    "BertzCT",
+    "MolLogP",
+    "MolWt",
+    "TPSA",
+    "NumHAcceptors",
+    "NumHDonors",
+    "NumRotatableBonds",
+    "NumAliphaticRings",
+    "NumAromaticRings",
+    "QED",
 ]
 GuacaMolTaskName = Literal[
-    "celecoxib_rediscovery", "troglitazone_rediscovery", "thiothixene_rediscovery",
-    "aripiprazole_similarity", "albuterol_similarity", "mestranol_similarity",
-    "camphor_menthol_median", "tadalafil_sildenafil_median",
-    "fexofenadine_mpo", "osimertinib_mpo", "ranolazine_mpo",
-    "perindopril_mpo", "amlodipine_mpo", "sitagliptin_mpo", "zaleplon_mpo",
-    "c7h8n2o2_isomer", "c9h10n2o2pf2cl_isomer",
-    "aripiprazole_scaffold_hop", "aripiprazole_decorator_hop",
+    "celecoxib_rediscovery",
+    "troglitazone_rediscovery",
+    "thiothixene_rediscovery",
+    "aripiprazole_similarity",
+    "albuterol_similarity",
+    "mestranol_similarity",
+    "camphor_menthol_median",
+    "tadalafil_sildenafil_median",
+    "fexofenadine_mpo",
+    "osimertinib_mpo",
+    "ranolazine_mpo",
+    "perindopril_mpo",
+    "amlodipine_mpo",
+    "sitagliptin_mpo",
+    "zaleplon_mpo",
+    "c7h8n2o2_isomer",
+    "c9h10n2o2pf2cl_isomer",
+    "aripiprazole_scaffold_hop",
+    "aripiprazole_decorator_hop",
 ]
 
 ALL_PROPERTIES: frozenset[str] = frozenset(get_args(GuacaMolPropertyName))
@@ -90,6 +109,7 @@ try:
     from rdkit import Chem  # type: ignore[no-redef]
     from rdkit.Chem import QED as RDKitQED  # type: ignore[no-redef]
     from rdkit.Chem import Descriptors, GraphDescriptors, rdMolDescriptors  # type: ignore[no-redef]
+
     _RDKIT_AVAILABLE = True
 except ImportError:
     _RDKIT_AVAILABLE = False
@@ -129,9 +149,7 @@ class GuacaMolConfig(BaseDatasetConfig):
 
     @model_validator(mode="after")
     def _validate_and_sync(self) -> "GuacaMolConfig":
-        self.task_type = (
-            "property" if self.target_property in ALL_PROPERTIES else "benchmark_task"
-        )
+        self.task_type = "property" if self.target_property in ALL_PROPERTIES else "benchmark_task"
         if (
             self.computed_properties is not None
             and self.target_property not in self.computed_properties
@@ -201,9 +219,7 @@ def _download_file(url: str, filepath: Path, max_lines: Optional[int] = None) ->
     # allow_redirects=True is the default — requests follows the 302 → S3 automatically
     resp = requests.get(url, stream=True, timeout=60)
     if resp.status_code != 200:
-        raise FileNotFoundError(
-            f"Failed to download from {url}. Status code: {resp.status_code}"
-        )
+        raise FileNotFoundError(f"Failed to download from {url}. Status code: {resp.status_code}")
     with open(filepath, "wb") as f:
         for idx, raw_line in enumerate(resp.iter_lines()):
             f.write(raw_line + b"\n")
@@ -236,7 +252,6 @@ def download_guacamol(data_dir: Path = DATAPATH, max_lines: int | None = None) -
     data_dir.mkdir(parents=True, exist_ok=True)
     for file_info in GUACAMOL_FILES.values():
         _download_file(file_info["url"], data_dir / file_info["name"], max_lines)
-
 
 
 def _label_smiles(
@@ -346,9 +361,7 @@ class GuacaMol(BaseDataset):
         if self.config.max_molecules is not None:
             smiles_list = smiles_list[: self.config.max_molecules]
         properties = list(self.config.computed_properties or ALL_PROPERTIES)
-        return _label_smiles(
-            smiles_list, properties, self.config.target_property, self.modality
-        )
+        return _label_smiles(smiles_list, properties, self.config.target_property, self.modality)
 
     def _load_paper_splits(self) -> LabelledCandidates:
         """Download (if absent) train/valid/test files and label all candidates.
@@ -378,7 +391,9 @@ class GuacaMol(BaseDataset):
             )
             logger.debug(
                 "Paper split '%s': %d SMILES → %d valid candidates",
-                tag, len(smiles_list), len(split_lc.candidates),
+                tag,
+                len(smiles_list),
+                len(split_lc.candidates),
             )
             all_candidates.extend(split_lc.candidates)
             all_labels.extend(split_lc.labels.tolist())
@@ -406,9 +421,7 @@ class GuacaMol(BaseDataset):
         if self._raw_dataset is None:
             raise RuntimeError("Dataset must be loaded before querying")  # pragma: no cover
 
-        known_smiles_index = {
-            c.data: i for i, c in enumerate(self._raw_dataset.candidates)
-        }
+        known_smiles_index = {c.data: i for i, c in enumerate(self._raw_dataset.candidates)}
         result_candidates: list[Candidate] = []
         result_labels: list[float] = []
 
@@ -420,12 +433,10 @@ class GuacaMol(BaseDataset):
                 _require_rdkit()
                 mol = Chem.MolFromSmiles(candidate.data)
                 if mol is None:
-                    raise ValueError(
-                        f"Cannot compute label for invalid SMILES: {candidate.data!r}"
-                    )
-                label = _compute_properties(
-                    candidate.data, [self.config.target_property]
-                )[self.config.target_property]
+                    raise ValueError(f"Cannot compute label for invalid SMILES: {candidate.data!r}")
+                label = _compute_properties(candidate.data, [self.config.target_property])[
+                    self.config.target_property
+                ]
                 result_labels.append(label)
             result_candidates.append(candidate)
 
@@ -456,9 +467,7 @@ class GuacaMol(BaseDataset):
             buckets[key][0].append(candidate)
             buckets[key][1].append(float(label))
         splits = {
-            key: LabelledCandidates(
-                candidates=cands, labels=np.array(lbls, dtype=float)
-            )
+            key: LabelledCandidates(candidates=cands, labels=np.array(lbls, dtype=float))
             for key, (cands, lbls) in buckets.items()
         }
         splits["candidate_pool"] = LabelledCandidates(

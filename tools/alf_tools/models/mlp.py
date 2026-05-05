@@ -125,11 +125,7 @@ class MLPModel(BaseModel):
 
         Returns None if the dict contains no numeric values (e.g., only a 'split' string tag).
         """
-        numeric = {
-            k: v
-            for k, v in features.items()
-            if isinstance(v, (int, float, np.number))
-        }
+        numeric = {k: v for k, v in features.items() if isinstance(v, (int, float, np.number))}
         if not numeric:
             return None
         keys = sorted(numeric.keys())
@@ -160,17 +156,20 @@ class MLPModel(BaseModel):
             AllChem.GetMorganFingerprintAsBitVect(mol, radius=2, nBits=2048),
             dtype=np.float32,
         )
-        desc = np.array([
-            GraphDescriptors.BertzCT(mol),
-            Descriptors.MolLogP(mol),
-            Descriptors.MolWt(mol),
-            Descriptors.TPSA(mol),
-            Descriptors.NumHAcceptors(mol),
-            Descriptors.NumHDonors(mol),
-            Descriptors.NumRotatableBonds(mol),
-            rdMolDescriptors.CalcNumAliphaticRings(mol),
-            rdMolDescriptors.CalcNumAromaticRings(mol),
-        ], dtype=np.float32)
+        desc = np.array(
+            [
+                GraphDescriptors.BertzCT(mol),
+                Descriptors.MolLogP(mol),
+                Descriptors.MolWt(mol),
+                Descriptors.TPSA(mol),
+                Descriptors.NumHAcceptors(mol),
+                Descriptors.NumHDonors(mol),
+                Descriptors.NumRotatableBonds(mol),
+                rdMolDescriptors.CalcNumAliphaticRings(mol),
+                rdMolDescriptors.CalcNumAromaticRings(mol),
+            ],
+            dtype=np.float32,
+        )
         return np.concatenate([fp, desc])  # shape: (2057,)
 
     def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> torch.Tensor:
@@ -219,7 +218,12 @@ class MLPModel(BaseModel):
 
         return torch.tensor(np.array(feature_list), dtype=torch.float32)
 
-    def train(self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None, **kwargs: Any) -> None:
+    def train(
+        self,
+        train_data: LabelledCandidates,
+        val_data: LabelledCandidates | None = None,
+        **kwargs: Any,
+    ) -> None:
         """Train the MLP model.
 
         Args:
@@ -288,12 +292,14 @@ class MLPModel(BaseModel):
             if val_spearman is not None:
                 additional["val_spearman"] = val_spearman
 
-            self._epoch_metrics.append(SurrogateEpochMetrics(
-                epoch=epoch,
-                train_loss=avg_train_loss,
-                val_loss=avg_val_loss,
-                additional_metrics=additional,
-            ))
+            self._epoch_metrics.append(
+                SurrogateEpochMetrics(
+                    epoch=epoch,
+                    train_loss=avg_train_loss,
+                    val_loss=avg_val_loss,
+                    additional_metrics=additional,
+                )
+            )
 
             if (epoch + 1) % self.train_config.log_frequency == 0:
                 msg = f"Epoch {epoch + 1}/{self.train_config.num_epochs} — train_loss: {avg_train_loss:.4f}"
