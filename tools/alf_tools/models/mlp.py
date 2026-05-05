@@ -35,7 +35,13 @@ if TYPE_CHECKING:
 
 try:
     from rdkit import Chem, DataStructs  # type: ignore[no-redef]
-    from rdkit.Chem import AllChem, Descriptors, GraphDescriptors, rdMolDescriptors  # type: ignore[no-redef]
+    from rdkit.Chem import (  # type: ignore[no-redef]
+        AllChem,
+        Descriptors,
+        GraphDescriptors,
+        rdMolDescriptors,
+    )
+
     _RDKIT_AVAILABLE = True
 except ImportError:
     _RDKIT_AVAILABLE = False

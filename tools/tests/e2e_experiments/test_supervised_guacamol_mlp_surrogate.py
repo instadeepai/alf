@@ -26,15 +26,15 @@ pytest.importorskip("rdkit")
 
 pytestmark = pytest.mark.rdkit
 
-from alf_core import (
+from alf_core import (  # noqa: E402
     FileStateLogger,
     SupervisedTask,
     Surrogate,
     TerminalStateLogger,
 )
-from alf_tools.datasets import GuacaMol, GuacaMolConfig
-from alf_tools.datasets.guacamol import FILENAME_ALL
-from alf_tools.models import MLPModel, MLPModelConfig, MLPTrainConfig
+from alf_tools.datasets import GuacaMol, GuacaMolConfig  # noqa: E402
+from alf_tools.datasets.guacamol import FILENAME_ALL  # noqa: E402
+from alf_tools.models import MLPModel, MLPModelConfig, MLPTrainConfig  # noqa: E402
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "guacamol"
 LARGE_FIXTURE = FIXTURES / "large.smiles"
