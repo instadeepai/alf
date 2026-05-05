@@ -26,6 +26,7 @@ benchmarks = [
 [tool.pytest.ini_options]
 markers = [
     "guacamol: tests for the GuacaMol dataset integration (no network required)",
+    "rdkit: tests that require RDKit (install with 'alf_tools[benchmarks]')",
 ]
 
 [tool.setuptools.packages.find]
