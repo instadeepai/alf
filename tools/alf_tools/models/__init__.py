@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
+from alf_tools.models.esm2 import ESM2DropoutModel, ESM2ModelConfig, ESM2TrainConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.utils import (
     create_char_to_idx_mapping,
@@ -26,6 +27,9 @@ __all__ = [
     "CNNModelConfig",
     "CNNTrainConfig",
     "create_char_to_idx_mapping",
+    "ESM2DropoutModel",
+    "ESM2ModelConfig",
+    "ESM2TrainConfig",
     "extract_sequences_from_inputs",
     "get_device",
     "one_hot_encode",
