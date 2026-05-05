@@ -25,7 +25,7 @@ pytest.importorskip("rdkit")
 
 pytestmark = pytest.mark.rdkit
 
-from alf_core import (
+from alf_core import (  # noqa: E402
     DatasetSearch,
     DesignTask,
     FileStateLogger,
@@ -34,9 +34,9 @@ from alf_core import (
     Surrogate,
     TerminalStateLogger,
 )
-from alf_tools.datasets import GuacaMol, GuacaMolConfig
-from alf_tools.datasets.guacamol import FILENAME_ALL
-from alf_tools.optimizer.acquisition_functions import Greedy
+from alf_tools.datasets import GuacaMol, GuacaMolConfig  # noqa: E402
+from alf_tools.datasets.guacamol import FILENAME_ALL  # noqa: E402
+from alf_tools.optimizer.acquisition_functions import Greedy  # noqa: E402
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "guacamol"
 LARGE_FIXTURE = FIXTURES / "large.smiles"

@@ -16,8 +16,9 @@ import pytest
 
 
 def pytest_collection_modifyitems(config, items):  # noqa: ARG001
+    """Skip rdkit-marked tests when RDKit is not installed."""
     try:
-        import rdkit  # noqa: F401
+        import rdkit  # noqa: F401, PLC0415
 
         return  # RDKit present — nothing to skip
     except ImportError:

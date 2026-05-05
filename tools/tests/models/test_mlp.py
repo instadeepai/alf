@@ -346,7 +346,7 @@ class TestMLPModelNoRDKit:
             _mlp_module._RDKIT_AVAILABLE = original
 
     def test_features_from_smiles_raises_when_rdkit_unavailable(self):
-        """_features_from_smiles() raises ImportError with install instructions when RDKit is absent."""
+        """_features_from_smiles() raises ImportError with install hint when RDKit is absent."""
         model = MLPModel(device="cpu")
         original = _mlp_module._RDKIT_AVAILABLE
         _mlp_module._RDKIT_AVAILABLE = False
