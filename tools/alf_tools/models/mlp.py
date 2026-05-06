@@ -127,6 +127,65 @@ class MLP(nn.Module):
 
 
 class MLPModel(BaseModel):
-    """Placeholder for MLPModel wrapper (implemented in future tasks)."""
+    """Surrogate model wrapping MLP for pre-computed vector inputs.
 
-    pass
+    Featurisation is a passthrough — inputs must arrive as TABULAR or EMBEDDING
+    candidates whose data is a numpy array or torch tensor.
+    """
+
+    def __init__(
+        self,
+        name: str = "mlp_model",
+        model_config: MLPModelConfig | None = None,
+        train_config: MLPTrainConfig | None = None,
+        device: str | None = None,
+    ):
+        self.name = name
+        self.model_config = model_config or MLPModelConfig()
+        self.train_config = train_config or MLPTrainConfig()
+        self.device = get_device(device)
+        self.net: MLP | None = None
+        self.training_metrics: dict[str, Union[float, int, np.number]] = {}
+        self._epoch_metrics: list[SurrogateEpochMetrics] = []
+
+    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> torch.Tensor:
+        if isinstance(inputs, LabelledCandidates):
+            candidates = inputs.candidates
+        elif isinstance(inputs, list):
+            candidates = inputs
+        else:
+            raise ValueError("Input must be LabelledCandidates or list of Candidate")
+
+        for c in candidates:
+            if c.modality not in (Modality.TABULAR, Modality.EMBEDDING):
+                raise ValueError(
+                    f"MLPModel only supports TABULAR and EMBEDDING modalities, got {c.modality}"
+                )
+
+        arrays = []
+        for c in candidates:
+            if isinstance(c.data, torch.Tensor):
+                arrays.append(c.data.float().cpu().numpy())
+            else:
+                arrays.append(np.asarray(c.data, dtype=np.float32))
+
+        return torch.tensor(np.stack(arrays), dtype=torch.float32)
+
+    def sample(self, condition: Any | None = None) -> list[Candidate]:
+        raise NotImplementedError("Sampling is not implemented for MLPModel.")
+
+    def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
+        return self._epoch_metrics
+
+    def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
+        return self.training_metrics
+
+    def train(
+        self,
+        train_data: LabelledCandidates,
+        val_data: LabelledCandidates | None = None,
+    ) -> None:
+        raise NotImplementedError("train() not yet implemented")
+
+    def predict(self, candidate_points: list[Candidate]) -> Predictions:
+        raise NotImplementedError("predict() not yet implemented")
