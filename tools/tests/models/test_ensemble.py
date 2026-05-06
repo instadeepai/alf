@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Callable
+
 import numpy as np
 import pytest
 from alf_core import Candidate, LabelledCandidates
@@ -48,7 +50,7 @@ def mlp_factory(seed: int) -> MLPModel:
     )
 
 
-def mc_mlp_factory(n_passes: int, dropout: float = 0.3) -> callable:
+def mc_mlp_factory(n_passes: int, dropout: float = 0.3) -> Callable[[int], MLPModel]:
     def factory(seed: int) -> MLPModel:
         return MLPModel(
             model_config=MLPModelConfig(
@@ -177,6 +179,14 @@ class TestEnsembleWrapperTrain:
         )
         with pytest.raises(NotImplementedError):
             wrapper.sample()
+
+    def test_predict_before_train_raises(self, tabular_candidates):
+        wrapper = EnsembleWrapper(
+            model_factory=mlp_factory,
+            config=EnsembleWrapperConfig(base_seed=0, n_members=2),
+        )
+        with pytest.raises(RuntimeError, match="not trained"):
+            wrapper.predict(tabular_candidates)
 
 
 # ---------------------------------------------------------------------------
