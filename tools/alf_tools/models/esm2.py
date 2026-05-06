@@ -106,6 +106,61 @@ class ESM2RegressionHead(nn.Module):
         return self.net(x).squeeze(-1)
 
 
+class ESM2Embedder:
+    """Frozen ESM-2 encoder with in-memory sequence embedding cache.
+
+    Owns the tokenizer, encoder weights, and embedding cache. The encoder is
+    frozen at construction and never receives gradients.
+    """
+
+    def __init__(self, model_id: str, batch_size: int, device: torch.device) -> None:
+        self.batch_size = batch_size
+        self.device = device
+        self.tokenizer = AutoTokenizer.from_pretrained(model_id)
+        self.encoder = EsmModel.from_pretrained(model_id)
+        for param in self.encoder.parameters():
+            param.requires_grad = False
+        self.encoder.to(device)
+        self.encoder.eval()
+        self._cache: dict[str, np.ndarray] = {}
+
+    def get_embeddings(self, sequences: list[str]) -> torch.Tensor:
+        """Compute or retrieve cached mean-pooled ESM-2 embeddings.
+
+        Uncached sequences are run through the encoder in batches, mean-pooled
+        over non-padding token positions, and stored in the cache.
+
+        Args:
+            sequences: Protein sequences to embed.
+
+        Returns:
+            Float32 tensor of shape (len(sequences), embedding_dim).
+        """
+        uncached = [seq for seq in sequences if seq not in self._cache]
+
+        if uncached:
+            for i in range(0, len(uncached), self.batch_size):
+                batch_seqs = uncached[i : i + self.batch_size]
+                tokens = self.tokenizer(batch_seqs, return_tensors="pt", padding=True)
+                input_ids = tokens["input_ids"].to(self.device)
+                attention_mask = tokens["attention_mask"].to(self.device)
+
+                with torch.no_grad():
+                    outputs = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
+
+                last_hidden = outputs.last_hidden_state  # (batch, seq_len, hidden)
+                mask_expanded = attention_mask.unsqueeze(-1).float()
+                sum_embeddings = (last_hidden * mask_expanded).sum(dim=1)
+                sum_mask = mask_expanded.sum(dim=1).clamp(min=1e-9)
+                mean_embeddings = sum_embeddings / sum_mask  # (batch, hidden)
+
+                for seq, emb in zip(batch_seqs, mean_embeddings):
+                    self._cache[seq] = emb.cpu().numpy()
+
+        embeddings = np.stack([self._cache[seq] for seq in sequences])
+        return torch.tensor(embeddings, dtype=torch.float32)
+
+
 class ESM2DropoutModel(BaseModel):
     """ESM-2 frozen encoder with trainable MC Dropout regression head.
 
@@ -133,58 +188,15 @@ class ESM2DropoutModel(BaseModel):
         self.train_config = train_config or ESM2TrainConfig()
         self.device = get_device(device)
 
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_config.esm_model_id)
-        self.encoder = EsmModel.from_pretrained(self.model_config.esm_model_id)
-        for param in self.encoder.parameters():
-            param.requires_grad = False
-        self.encoder.to(self.device)
-        self.encoder.eval()
+        self._embedder = ESM2Embedder(
+            model_id=self.model_config.esm_model_id,
+            batch_size=self.train_config.batch_size,
+            device=self.device,
+        )
 
         self.head: ESM2RegressionHead | None = None
-        self._embedding_cache: dict[str, np.ndarray] = {}
-
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
-        
-    def _cache_embeddings(self, sequences: list[str]) -> None:
-        """Compute and cache embeddings for a list of sequences."""
-        uncached = [seq for seq in sequences if seq not in self._embedding_cache]
-        if not uncached:
-            return
-
-        for i in range(0, len(uncached), self.train_config.batch_size):
-            batch_seqs = uncached[i : i + self.train_config.batch_size]
-            tokens = self.tokenizer(batch_seqs, return_tensors="pt", padding=True)
-            input_ids = tokens["input_ids"].to(self.device)
-            attention_mask = tokens["attention_mask"].to(self.device)
-
-            with torch.no_grad():
-                outputs = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
-
-            last_hidden = outputs.last_hidden_state  # (batch, seq_len, hidden)
-            mask_expanded = attention_mask.unsqueeze(-1).float()
-            sum_embeddings = (last_hidden * mask_expanded).sum(dim=1)
-            sum_mask = mask_expanded.sum(dim=1).clamp(min=1e-9)
-            mean_embeddings = sum_embeddings / sum_mask  # (batch, hidden)
-
-            for seq, emb in zip(batch_seqs, mean_embeddings):
-                self._embedding_cache[seq] = emb.cpu().numpy()
-
-    def _get_embeddings(self, sequences: list[str]) -> torch.Tensor:
-        """Compute or retrieve cached ESM-2 embeddings for sequences.
-
-        Uncached sequences are run through the encoder in batches, mean-pooled
-        over non-padding token positions, and stored in the cache.
-
-        Args:
-            sequences: Protein sequences to embed.
-
-        Returns:
-            Float32 tensor of shape (len(sequences), embedding_dim).
-        """
-        self._cache_embeddings(sequences)
-        embeddings = np.stack([self._embedding_cache[seq] for seq in sequences])
-        return torch.tensor(embeddings, dtype=torch.float32)
 
     def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> torch.Tensor:
         """Embed sequences using the frozen ESM-2 encoder.
@@ -196,21 +208,25 @@ class ESM2DropoutModel(BaseModel):
             Float32 tensor of shape (N, embedding_dim).
         """
         sequences = extract_sequences_from_inputs(inputs)
-        return self._get_embeddings(sequences)
+        return self._embedder.get_embeddings(sequences)
 
     def _prepare_data_loader(self, data: LabelledCandidates, shuffle: bool = False) -> DataLoader:
         x = self.featurise(data).to(self.device)
         y = torch.tensor(data.labels, dtype=torch.float32).to(self.device)
         dataset = TensorDataset(x, y)
         return DataLoader(dataset, batch_size=self.train_config.batch_size, shuffle=shuffle)
-    
+
     def _calculate_metrics(self, predictions: np.ndarray, targets: np.ndarray) -> dict:
         if len(predictions) >= 2:
             metrics = Results(
                 predictions=Predictions(means=predictions, variances=None), targets=targets
             ).metrics
         else:
-            metrics = {"mse": float(np.mean((predictions - targets) ** 2))}
+            metrics = {
+                "mse": nn.MSELoss()(
+                    torch.tensor(predictions), torch.tensor(targets)
+                ).item()
+            }
         return metrics
 
     def _train_epoch(
@@ -303,6 +319,7 @@ class ESM2DropoutModel(BaseModel):
         """Train the regression head on pre-computed ESM-2 embeddings.
 
         The encoder is never updated. Embeddings are cached after the first call.
+        Each call reinitialises the regression head from scratch.
 
         Args:
             train_data: Training data with sequence candidates and labels.
@@ -311,22 +328,20 @@ class ESM2DropoutModel(BaseModel):
         self._epoch_metrics = []
         logger.info(f"Training ESM-2 head with {len(train_data)} samples")
 
-        if self.head is None:
-            self.head = ESM2RegressionHead(
-                embedding_dim=self.model_config.embedding_dim,
-                hidden_dim=self.model_config.hidden_dim,
-                num_hidden_layers=self.model_config.num_hidden_layers,
-                dropout=self.model_config.dropout,
-            ).to(self.device)
-            total_params = sum(p.numel() for p in self.head.parameters())
-            logger.info(f"ESM-2 regression head initialized with {total_params:,} parameters")
+        self.head = ESM2RegressionHead(
+            embedding_dim=self.model_config.embedding_dim,
+            hidden_dim=self.model_config.hidden_dim,
+            num_hidden_layers=self.model_config.num_hidden_layers,
+            dropout=self.model_config.dropout,
+        ).to(self.device)
+        total_params = sum(p.numel() for p in self.head.parameters())
+        logger.info(f"ESM-2 regression head initialized with {total_params:,} parameters")
 
         train_loader = self._prepare_data_loader(train_data, shuffle=True)
         val_loader = None
         if val_data is not None and len(val_data) > 0:
             val_loader = self._prepare_data_loader(val_data, shuffle=False)
 
-        # Setup training
         optimizer = optim.Adam(self.head.parameters(), lr=self.train_config.learning_rate)
         criterion = nn.MSELoss()
 
@@ -376,10 +391,9 @@ class ESM2DropoutModel(BaseModel):
 
         x = self.featurise(candidate_points).to(self.device)
 
-        self.encoder.eval()
         if with_uncertainty:
             self.head.train()  # Keeps dropout active for MC sampling
-        else: 
+        else:
             self.head.eval()
 
         samples = []

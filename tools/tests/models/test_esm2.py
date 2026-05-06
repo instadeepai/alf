@@ -135,14 +135,14 @@ class TestESM2EmbeddingCache:
         esm2_model.train(train_data)
         training_sequences = {c.data for c in train_data.candidates}
         for seq in training_sequences:
-            assert seq in esm2_model._embedding_cache
+            assert seq in esm2_model._embedder._cache
 
     def test_no_new_embeddings_on_predict(self, esm2_model, train_data):
         esm2_model.train(train_data)
 
         # Replace the encoder with a mock — any call here is a cache miss
         spy = MagicMock()
-        esm2_model.encoder = spy
+        esm2_model._embedder.encoder = spy
 
         esm2_model.predict(train_data.candidates)
 
@@ -151,7 +151,15 @@ class TestESM2EmbeddingCache:
 
 class TestESM2FrozenEncoder:
     def test_frozen_encoder(self, esm2_model):
-        for param in esm2_model.encoder.parameters():
+        for param in esm2_model._embedder.encoder.parameters():
             assert not param.requires_grad, (
                 f"Encoder parameter {param.shape} should have requires_grad=False"
             )
+
+
+class TestESM2HeadReinitialisation:
+    def test_head_reinitialised_on_retrain(self, esm2_model, train_data):
+        esm2_model.train(train_data)
+        first_head_id = id(esm2_model.head)
+        esm2_model.train(train_data)
+        assert id(esm2_model.head) != first_head_id
