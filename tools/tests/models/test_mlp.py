@@ -270,3 +270,30 @@ class TestMLPModelTrain:
         )
         model.train(labelled_tabular)
         assert model.net is not None
+
+
+# ---------------------------------------------------------------------------
+# Task 5: MLPModel.predict() eval mode tests
+# ---------------------------------------------------------------------------
+
+
+class TestMLPModelPredictEval:
+    def test_predict_means_shape(self, mlp_model, tabular_candidates, labelled_tabular):
+        mlp_model.train(labelled_tabular)
+        preds = mlp_model.predict(tabular_candidates)
+        assert preds.means.shape == (8,)
+
+    def test_predict_means_finite(self, mlp_model, tabular_candidates, labelled_tabular):
+        mlp_model.train(labelled_tabular)
+        preds = mlp_model.predict(tabular_candidates)
+        assert np.all(np.isfinite(preds.means))
+
+    def test_predict_no_variances_in_eval_mode(self, mlp_model, tabular_candidates, labelled_tabular):
+        mlp_model.train(labelled_tabular)
+        preds = mlp_model.predict(tabular_candidates)
+        assert preds.variances is None
+        assert preds.empirical_dist is None
+
+    def test_predict_before_train_raises_runtime_error(self, mlp_model, tabular_candidates):
+        with pytest.raises(RuntimeError, match="not trained"):
+            mlp_model.predict(tabular_candidates)

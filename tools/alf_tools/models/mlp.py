@@ -324,4 +324,31 @@ class MLPModel(BaseModel):
         self.net.eval()
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
-        raise NotImplementedError("predict() not yet implemented")
+        if self.net is None:
+            raise RuntimeError("Model not trained. Call train() first.")
+
+        x = self.featurise(candidate_points).to(self.device)
+
+        if self.model_config.n_mc_passes == 0:
+            self.net.eval()
+            with torch.no_grad():
+                preds = self.net(x).cpu().numpy()
+            return Predictions(means=preds)
+
+        # MC dropout: keep model in train() mode so dropout is active
+        self.net.train()
+        seed = (
+            self.model_config.dropout_seed
+            if self.model_config.dropout_seed is not None
+            else self.model_config.model_seed
+        )
+        torch.manual_seed(seed)
+        passes: list[np.ndarray] = []
+        with torch.no_grad():
+            for _ in range(self.model_config.n_mc_passes):
+                passes.append(self.net(x).cpu().numpy())
+
+        empirical_dist = np.stack(passes, axis=1)  # (N, T)
+        means = empirical_dist.mean(axis=1)
+        variances = empirical_dist.var(axis=1)
+        return Predictions(means=means, variances=variances, empirical_dist=empirical_dist)
