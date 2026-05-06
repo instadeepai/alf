@@ -326,6 +326,7 @@ class ESM2DropoutModel(BaseModel):
         if val_data is not None and len(val_data) > 0:
             val_loader = self._prepare_data_loader(val_data, shuffle=False)
 
+        # Setup training
         optimizer = optim.Adam(self.head.parameters(), lr=self.train_config.learning_rate)
         criterion = nn.MSELoss()
 
@@ -378,6 +379,8 @@ class ESM2DropoutModel(BaseModel):
         self.encoder.eval()
         if with_uncertainty:
             self.head.train()  # Keeps dropout active for MC sampling
+        else: 
+            self.head.eval()
 
         samples = []
         with torch.no_grad():
