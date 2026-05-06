@@ -81,6 +81,14 @@ class ESM2RegressionHead(nn.Module):
         num_hidden_layers: int,
         dropout: float,
     ):
+        """Initialize the regression head.
+
+        Args:
+            embedding_dim (int): Dimension of input embeddings from the ESM-2 encoder.
+            hidden_dim (int): Dimension of hidden layers in the MLP.
+            num_hidden_layers (int): Number of hidden layers in the MLP.
+            dropout (float): Dropout rate for MC Dropout uncertainty estimation.
+        """
         super().__init__()
         layers: list[nn.Module] = []
         in_features = embedding_dim
@@ -114,6 +122,13 @@ class ESM2Embedder:
     """
 
     def __init__(self, model_id: str, batch_size: int, device: torch.device) -> None:
+        """Initialize the ESM-2 frozen encoder.
+
+        Args:
+            model_id (str): HuggingFace model ID for the ESM-2 encoder.
+            batch_size (int): Batch size for embedding computation.
+            device (torch.device): Device to run the encoder on (e.g., 'cuda' or 'cpu').
+        """
         self.batch_size = batch_size
         self.device = device
         self.tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -323,6 +338,7 @@ class ESM2DropoutModel(BaseModel):
         Args:
             train_data: Training data with sequence candidates and labels.
             val_data: Optional validation data.
+            reinitialize_head: Whether to reinitialize the regression head before training.
         """
         self._epoch_metrics = []
         logger.info(f"Training ESM-2 head with {len(train_data)} samples")
