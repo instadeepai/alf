@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Union
 
 import numpy as np
@@ -54,6 +54,10 @@ class EnsembleWrapperConfig:
             )
         if self.base_seed is not None and self.n_members is None:
             raise ValueError("n_members must be set when base_seed is provided.")
+        if self.n_members is not None and self.n_members < 1:
+            raise ValueError(f"n_members must be >= 1, got {self.n_members}")
+        if self.member_seeds is not None and len(self.member_seeds) == 0:
+            raise ValueError("member_seeds must not be empty.")
 
     def resolve_seeds(self) -> list[int]:
         """Return the ordered list of per-member seeds."""
@@ -138,3 +142,7 @@ class EnsembleWrapper(BaseModel):
             for k, v in member.get_training_summary_metrics().items():
                 result[f"member_{i}/{k}"] = v
         return result
+
+    def cleanup(self) -> None:
+        for member in self.members:
+            member.cleanup()
