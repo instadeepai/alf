@@ -145,6 +145,30 @@ class ESM2DropoutModel(BaseModel):
 
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
+        
+    def _cache_embeddings(self, sequences: list[str]) -> None:
+        """Compute and cache embeddings for a list of sequences."""
+        uncached = [seq for seq in sequences if seq not in self._embedding_cache]
+        if not uncached:
+            return
+
+        for i in range(0, len(uncached), self.train_config.batch_size):
+            batch_seqs = uncached[i : i + self.train_config.batch_size]
+            tokens = self.tokenizer(batch_seqs, return_tensors="pt", padding=True)
+            input_ids = tokens["input_ids"].to(self.device)
+            attention_mask = tokens["attention_mask"].to(self.device)
+
+            with torch.no_grad():
+                outputs = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
+
+            last_hidden = outputs.last_hidden_state  # (batch, seq_len, hidden)
+            mask_expanded = attention_mask.unsqueeze(-1).float()
+            sum_embeddings = (last_hidden * mask_expanded).sum(dim=1)
+            sum_mask = mask_expanded.sum(dim=1).clamp(min=1e-9)
+            mean_embeddings = sum_embeddings / sum_mask  # (batch, hidden)
+
+            for seq, emb in zip(batch_seqs, mean_embeddings):
+                self._embedding_cache[seq] = emb.cpu().numpy()
 
     def _get_embeddings(self, sequences: list[str]) -> torch.Tensor:
         """Compute or retrieve cached ESM-2 embeddings for sequences.
@@ -158,27 +182,7 @@ class ESM2DropoutModel(BaseModel):
         Returns:
             Float32 tensor of shape (len(sequences), embedding_dim).
         """
-        uncached = [seq for seq in sequences if seq not in self._embedding_cache]
-
-        if uncached:
-            for i in range(0, len(uncached), self.train_config.batch_size):
-                batch_seqs = uncached[i : i + self.train_config.batch_size]
-                tokens = self.tokenizer(batch_seqs, return_tensors="pt", padding=True)
-                input_ids = tokens["input_ids"].to(self.device)
-                attention_mask = tokens["attention_mask"].to(self.device)
-
-                with torch.no_grad():
-                    outputs = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
-
-                last_hidden = outputs.last_hidden_state  # (batch, seq_len, hidden)
-                mask_expanded = attention_mask.unsqueeze(-1).float()
-                sum_embeddings = (last_hidden * mask_expanded).sum(dim=1)
-                sum_mask = mask_expanded.sum(dim=1).clamp(min=1e-9)
-                mean_embeddings = sum_embeddings / sum_mask  # (batch, hidden)
-
-                for seq, emb in zip(batch_seqs, mean_embeddings):
-                    self._embedding_cache[seq] = emb.cpu().numpy()
-
+        self._cache_embeddings(sequences)
         embeddings = np.stack([self._embedding_cache[seq] for seq in sequences])
         return torch.tensor(embeddings, dtype=torch.float32)
 
@@ -199,6 +203,15 @@ class ESM2DropoutModel(BaseModel):
         y = torch.tensor(data.labels, dtype=torch.float32).to(self.device)
         dataset = TensorDataset(x, y)
         return DataLoader(dataset, batch_size=self.train_config.batch_size, shuffle=shuffle)
+    
+    def _calculate_metrics(self, predictions: np.ndarray, targets: np.ndarray) -> dict:
+        if len(predictions) >= 2:
+            metrics = Results(
+                predictions=Predictions(means=predictions, variances=None), targets=targets
+            ).metrics
+        else:
+            metrics = {"mse": float(np.mean((predictions - targets) ** 2))}
+        return metrics
 
     def _train_epoch(
         self,
@@ -227,14 +240,7 @@ class ESM2DropoutModel(BaseModel):
         train_preds = np.concatenate(train_predictions_all)
         train_targets = np.concatenate(train_targets_all)
 
-        train_predictions_obj = Predictions(means=train_preds, variances=None)
-        if len(train_preds) >= 2:
-            train_metrics = Results(
-                predictions=train_predictions_obj, targets=train_targets
-            ).metrics
-        else:
-            train_metrics = {"mse": float(np.mean((train_preds - train_targets) ** 2))}
-
+        train_metrics = self._calculate_metrics(train_preds, train_targets)
         return avg_train_loss, train_metrics
 
     def _validate_epoch(
@@ -259,14 +265,7 @@ class ESM2DropoutModel(BaseModel):
         val_preds = np.concatenate(val_predictions_all)
         val_targets = np.concatenate(val_targets_all)
 
-        val_predictions_obj = Predictions(means=val_preds, variances=None)
-        if len(val_preds) >= 2:
-            val_metrics = Results(
-                predictions=val_predictions_obj, targets=val_targets
-            ).metrics
-        else:
-            val_metrics = {"mse": float(np.mean((val_preds - val_targets) ** 2))}
-
+        val_metrics = self._calculate_metrics(val_preds, val_targets)
         return avg_val_loss, val_metrics
 
     def _record_epoch_metrics(
