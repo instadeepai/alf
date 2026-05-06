@@ -13,7 +13,9 @@
 # limitations under the License.
 
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
+from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
+from alf_tools.models.mlp import MLP, MLPModel, MLPModelConfig, MLPTrainConfig
 from alf_tools.models.utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
@@ -33,4 +35,10 @@ __all__ = [
     "GPModelConfig",
     "GPModel",
     "GPTrainConfig",
+    "EnsembleWrapper",
+    "EnsembleWrapperConfig",
+    "MLP",
+    "MLPModel",
+    "MLPModelConfig",
+    "MLPTrainConfig",
 ]
