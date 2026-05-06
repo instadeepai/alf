@@ -194,9 +194,17 @@ class ESM2DropoutModel(BaseModel):
             device=self.device,
         )
 
-        self.head: ESM2RegressionHead | None = None
+        self.head = self._initialize_head()
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
+
+    def _initialize_head(self) -> ESM2RegressionHead:
+        return ESM2RegressionHead(
+            embedding_dim=self.model_config.embedding_dim,
+            hidden_dim=self.model_config.hidden_dim,
+            num_hidden_layers=self.model_config.num_hidden_layers,
+            dropout=self.model_config.dropout,
+        ).to(self.device)
 
     def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> torch.Tensor:
         """Embed sequences using the frozen ESM-2 encoder.
@@ -222,11 +230,7 @@ class ESM2DropoutModel(BaseModel):
                 predictions=Predictions(means=predictions, variances=None), targets=targets
             ).metrics
         else:
-            metrics = {
-                "mse": nn.MSELoss()(
-                    torch.tensor(predictions), torch.tensor(targets)
-                ).item()
-            }
+            metrics = {"mse": nn.MSELoss()(torch.tensor(predictions), torch.tensor(targets)).item()}
         return metrics
 
     def _train_epoch(
@@ -235,8 +239,6 @@ class ESM2DropoutModel(BaseModel):
         optimizer: optim.Optimizer,
         criterion: nn.Module,
     ) -> tuple[float, dict]:
-        if self.head is None:
-            raise ValueError("Head must be initialized before training")
         self.head.train()
         train_losses = []
         train_predictions_all = []
@@ -259,11 +261,7 @@ class ESM2DropoutModel(BaseModel):
         train_metrics = self._calculate_metrics(train_preds, train_targets)
         return avg_train_loss, train_metrics
 
-    def _validate_epoch(
-        self, val_loader: DataLoader, criterion: nn.Module
-    ) -> tuple[float, dict]:
-        if self.head is None:
-            raise ValueError("Head must be initialized before validation")
+    def _validate_epoch(self, val_loader: DataLoader, criterion: nn.Module) -> tuple[float, dict]:
         self.head.eval()
         val_losses = []
         val_predictions_all = []
@@ -315,6 +313,7 @@ class ESM2DropoutModel(BaseModel):
         self,
         train_data: LabelledCandidates,
         val_data: LabelledCandidates | None = None,
+        reinitialize_head: bool = True,
     ) -> None:
         """Train the regression head on pre-computed ESM-2 embeddings.
 
@@ -328,12 +327,8 @@ class ESM2DropoutModel(BaseModel):
         self._epoch_metrics = []
         logger.info(f"Training ESM-2 head with {len(train_data)} samples")
 
-        self.head = ESM2RegressionHead(
-            embedding_dim=self.model_config.embedding_dim,
-            hidden_dim=self.model_config.hidden_dim,
-            num_hidden_layers=self.model_config.num_hidden_layers,
-            dropout=self.model_config.dropout,
-        ).to(self.device)
+        if reinitialize_head:
+            self.head = self._initialize_head()
         total_params = sum(p.numel() for p in self.head.parameters())
         logger.info(f"ESM-2 regression head initialized with {total_params:,} parameters")
 
@@ -368,7 +363,9 @@ class ESM2DropoutModel(BaseModel):
             self.training_metrics["final_val_loss"] = avg_val_loss
             self.training_metrics.update({f"final_val_{k}": v for k, v in val_metrics.items()})
 
-    def predict(self, candidate_points: list[Candidate], with_uncertainty: bool = True) -> Predictions:
+    def predict(
+        self, candidate_points: list[Candidate], with_uncertainty: bool = True
+    ) -> Predictions:
         """Make predictions using MC Dropout.
 
         Runs num_mc_samples forward passes through the head (in train mode,
@@ -386,8 +383,6 @@ class ESM2DropoutModel(BaseModel):
             RuntimeError: If the model has not been trained.
         """
         num_mc_samples = self.model_config.num_mc_samples if with_uncertainty else 1
-        if self.head is None:
-            raise RuntimeError("Model not trained. Call train() first.")
 
         x = self.featurise(candidate_points).to(self.device)
 
