@@ -97,3 +97,58 @@ class TestMLPTrainConfig:
         assert cfg.num_epochs == 50
         assert cfg.optimizer == "adam"
         assert cfg.weight_decay == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Task 2: MLP(nn.Module) tests
+# ---------------------------------------------------------------------------
+
+
+class TestMLP:
+    def test_forward_shape(self):
+        net = MLP(input_dim=16, hidden_dims=[64, 32], activation="relu", norm="none", dropout=0.0)
+        out = net(torch.randn(8, 16))
+        assert out.shape == (8,)
+
+    def test_single_hidden_layer(self):
+        net = MLP(input_dim=8, hidden_dims=[16], activation="relu", norm="none", dropout=0.0)
+        assert net(torch.randn(4, 8)).shape == (4,)
+
+    def test_gelu_activation(self):
+        net = MLP(input_dim=8, hidden_dims=[16], activation="gelu", norm="none", dropout=0.0)
+        assert net(torch.randn(4, 8)).shape == (4,)
+
+    def test_silu_activation(self):
+        net = MLP(input_dim=8, hidden_dims=[16], activation="silu", norm="none", dropout=0.0)
+        assert net(torch.randn(4, 8)).shape == (4,)
+
+    def test_batch_norm(self):
+        net = MLP(input_dim=8, hidden_dims=[16, 8], activation="relu", norm="batch", dropout=0.0)
+        net.train()
+        assert net(torch.randn(4, 8)).shape == (4,)
+
+    def test_layer_norm(self):
+        net = MLP(input_dim=8, hidden_dims=[16], activation="relu", norm="layer", dropout=0.0)
+        assert net(torch.randn(4, 8)).shape == (4,)
+
+    def test_with_dropout(self):
+        net = MLP(input_dim=8, hidden_dims=[16], activation="relu", norm="none", dropout=0.3)
+        net.eval()
+        assert net(torch.randn(4, 8)).shape == (4,)
+
+    def test_seed_reproducibility(self):
+        def make_net():
+            return MLP(
+                input_dim=8, hidden_dims=[16], activation="relu",
+                norm="none", dropout=0.0, model_seed=42,
+            )
+
+        x = torch.randn(4, 8)
+        torch.testing.assert_close(make_net()(x), make_net()(x))
+
+    def test_different_seeds_different_weights(self):
+        net1 = MLP(input_dim=8, hidden_dims=[16], activation="relu", norm="none", dropout=0.0, model_seed=1)
+        net2 = MLP(input_dim=8, hidden_dims=[16], activation="relu", norm="none", dropout=0.0, model_seed=2)
+        p1 = list(net1.parameters())[0]
+        p2 = list(net2.parameters())[0]
+        assert not torch.allclose(p1, p2)

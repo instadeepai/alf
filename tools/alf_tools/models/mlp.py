@@ -81,9 +81,49 @@ class MLPTrainConfig:
 
 
 class MLP(nn.Module):
-    """Placeholder for MLP torch module (implemented in future tasks)."""
+    """Feedforward MLP for scalar regression on pre-computed feature vectors.
 
-    pass
+    Architecture:
+        input → [Linear → Norm → Activation → Dropout] × depth → Linear → scalar
+    """
+
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_dims: list[int],
+        activation: Literal["relu", "gelu", "silu"],
+        norm: Literal["none", "batch", "layer"],
+        dropout: float,
+        model_seed: int = 0,
+    ):
+        super().__init__()
+        torch.manual_seed(model_seed)
+
+        _activation_map: dict[str, type[nn.Module]] = {
+            "relu": nn.ReLU,
+            "gelu": nn.GELU,
+            "silu": nn.SiLU,
+        }
+        activation_cls = _activation_map[activation]
+
+        layers: list[nn.Module] = []
+        in_dim = input_dim
+        for hidden_dim in hidden_dims:
+            layers.append(nn.Linear(in_dim, hidden_dim))
+            if norm == "batch":
+                layers.append(nn.BatchNorm1d(hidden_dim))
+            elif norm == "layer":
+                layers.append(nn.LayerNorm(hidden_dim))
+            layers.append(activation_cls())
+            if dropout > 0.0:
+                layers.append(nn.Dropout(dropout))
+            in_dim = hidden_dim
+
+        self.hidden_block = nn.Sequential(*layers)
+        self.output_layer = nn.Linear(in_dim, 1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.output_layer(self.hidden_block(x)).squeeze(-1)
 
 
 class MLPModel(BaseModel):
