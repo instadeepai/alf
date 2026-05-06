@@ -185,7 +185,143 @@ class MLPModel(BaseModel):
         train_data: LabelledCandidates,
         val_data: LabelledCandidates | None = None,
     ) -> None:
-        raise NotImplementedError("train() not yet implemented")
+        self._epoch_metrics = []
+        np.random.seed(self.model_config.model_seed)
+        torch.manual_seed(self.model_config.model_seed)
+
+        if self.net is None:
+            input_dim = len(train_data.data[0])
+            self.net = MLP(
+                input_dim=input_dim,
+                hidden_dims=self.model_config.hidden_dims,
+                activation=self.model_config.activation,
+                norm=self.model_config.norm,
+                dropout=self.model_config.dropout,
+                model_seed=self.model_config.model_seed,
+            ).to(self.device)
+            logger.info(
+                f"MLPModel '{self.name}' initialised with input_dim={input_dim}, "
+                f"hidden_dims={self.model_config.hidden_dims}, "
+                f"params={sum(p.numel() for p in self.net.parameters()):,}"
+            )
+
+        x_train = self.featurise(train_data).to(self.device)
+        y_train = torch.tensor(train_data.labels, dtype=torch.float32).to(self.device)
+        train_loader = DataLoader(
+            TensorDataset(x_train, y_train),
+            batch_size=self.train_config.batch_size,
+            shuffle=True,
+        )
+
+        val_loader: DataLoader | None = None
+        if val_data is not None and len(val_data) > 0:
+            x_val = self.featurise(val_data).to(self.device)
+            y_val = torch.tensor(val_data.labels, dtype=torch.float32).to(self.device)
+            val_loader = DataLoader(
+                TensorDataset(x_val, y_val),
+                batch_size=self.train_config.batch_size,
+                shuffle=False,
+            )
+
+        if self.train_config.optimizer == "adamw":
+            optimizer: optim.Optimizer = optim.AdamW(
+                self.net.parameters(),
+                lr=self.train_config.learning_rate,
+                weight_decay=self.train_config.weight_decay,
+            )
+        else:
+            optimizer = optim.Adam(
+                self.net.parameters(),
+                lr=self.train_config.learning_rate,
+                weight_decay=self.train_config.weight_decay,
+            )
+
+        criterion = nn.MSELoss()
+
+        avg_train_loss = 0.0
+        train_metrics: dict[str, float] = {}
+        avg_val_loss: float | None = None
+        val_metrics: dict[str, float] = {}
+
+        for epoch in range(self.train_config.num_epochs):
+            self.net.train()
+            train_losses: list[float] = []
+            train_preds_list: list[np.ndarray] = []
+            train_targets_list: list[np.ndarray] = []
+
+            for batch_x, batch_y in train_loader:
+                optimizer.zero_grad()
+                preds = self.net(batch_x)
+                loss = criterion(preds, batch_y)
+                loss.backward()
+                optimizer.step()
+                train_losses.append(loss.item())
+                train_preds_list.append(preds.detach().cpu().numpy())
+                train_targets_list.append(batch_y.detach().cpu().numpy())
+
+            avg_train_loss = float(np.mean(train_losses))
+            train_preds = np.concatenate(train_preds_list)
+            train_targets = np.concatenate(train_targets_list)
+
+            if len(train_preds) >= 2:
+                train_metrics = Results(
+                    predictions=Predictions(means=train_preds), targets=train_targets
+                ).metrics
+            else:
+                train_metrics = {"mse": float(np.mean((train_preds - train_targets) ** 2))}
+
+            if val_loader is not None:
+                self.net.eval()
+                val_losses: list[float] = []
+                val_preds_list: list[np.ndarray] = []
+                val_targets_list: list[np.ndarray] = []
+
+                with torch.no_grad():
+                    for batch_x, batch_y in val_loader:
+                        preds = self.net(batch_x)
+                        loss = criterion(preds, batch_y)
+                        val_losses.append(loss.item())
+                        val_preds_list.append(preds.cpu().numpy())
+                        val_targets_list.append(batch_y.cpu().numpy())
+
+                avg_val_loss = float(np.mean(val_losses))
+                val_preds = np.concatenate(val_preds_list)
+                val_targets = np.concatenate(val_targets_list)
+
+                if len(val_preds) >= 2:
+                    val_metrics = Results(
+                        predictions=Predictions(means=val_preds), targets=val_targets
+                    ).metrics
+                else:
+                    val_metrics = {"mse": float(np.mean((val_preds - val_targets) ** 2))}
+
+            additional: dict[str, float] = {}
+            if (v := train_metrics.get("spearman")) is not None:
+                additional["train_spearman"] = float(v)
+            if (v := train_metrics.get("mse")) is not None:
+                additional["train_mse"] = float(v)
+            if val_loader is not None:
+                if (v := val_metrics.get("spearman")) is not None:
+                    additional["val_spearman"] = float(v)
+                if (v := val_metrics.get("mse")) is not None:
+                    additional["val_mse"] = float(v)
+
+            self._epoch_metrics.append(
+                SurrogateEpochMetrics(
+                    epoch=epoch,
+                    train_loss=avg_train_loss,
+                    val_loss=avg_val_loss,
+                    additional_metrics=additional,
+                )
+            )
+
+        self.training_metrics = {"final_train_loss": avg_train_loss}
+        self.training_metrics.update({f"final_train_{k}": v for k, v in train_metrics.items()})
+        if val_loader is not None:
+            self.training_metrics["final_val_loss"] = avg_val_loss  # type: ignore[assignment]
+            self.training_metrics.update({f"final_val_{k}": v for k, v in val_metrics.items()})
+
+        self.net.eval()
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         raise NotImplementedError("predict() not yet implemented")
