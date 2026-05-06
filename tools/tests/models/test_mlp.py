@@ -198,3 +198,75 @@ class TestMLPModelFeaturise:
     def test_sample_raises_not_implemented(self, mlp_model):
         with pytest.raises(NotImplementedError):
             mlp_model.sample()
+
+# ---------------------------------------------------------------------------
+# Task 4: MLPModel.train() tests
+# ---------------------------------------------------------------------------
+
+
+class TestMLPModelTrain:
+    def test_train_initialises_net(self, mlp_model, labelled_tabular):
+        assert mlp_model.net is None
+        mlp_model.train(labelled_tabular)
+        assert mlp_model.net is not None
+
+    def test_train_summary_metrics_contains_train_loss(self, mlp_model, labelled_tabular):
+        mlp_model.train(labelled_tabular)
+        metrics = mlp_model.get_training_summary_metrics()
+        assert "final_train_loss" in metrics
+        assert np.isfinite(metrics["final_train_loss"])
+
+    def test_train_with_validation_adds_val_metrics(self, mlp_model, labelled_tabular):
+        val_candidates = [
+            Candidate(data=np.array([0.5, 0.5, 0.5, 0.5], dtype=np.float32), modality="tabular")
+            for _ in range(3)
+        ]
+        val_data = LabelledCandidates(val_candidates, np.array([1.0, 2.0, 3.0]))
+        mlp_model.train(labelled_tabular, val_data=val_data)
+        metrics = mlp_model.get_training_summary_metrics()
+        assert "final_val_loss" in metrics
+        assert np.isfinite(metrics["final_val_loss"])
+
+    def test_epoch_metrics_length_equals_num_epochs(self, mlp_model, labelled_tabular):
+        mlp_model.train(labelled_tabular)
+        assert len(mlp_model.get_epoch_metrics()) == mlp_model.train_config.num_epochs
+
+    def test_epoch_metrics_reset_on_retrain(self, mlp_model, labelled_tabular):
+        mlp_model.train(labelled_tabular)
+        mlp_model.train(labelled_tabular)
+        assert len(mlp_model.get_epoch_metrics()) == mlp_model.train_config.num_epochs
+
+    def test_epoch_metrics_are_surrogate_epoch_metrics(self, mlp_model, labelled_tabular):
+        mlp_model.train(labelled_tabular)
+        for em in mlp_model.get_epoch_metrics():
+            assert isinstance(em, SurrogateEpochMetrics)
+
+    def test_epoch_metrics_train_loss_finite(self, mlp_model, labelled_tabular):
+        mlp_model.train(labelled_tabular)
+        for em in mlp_model.get_epoch_metrics():
+            assert np.isfinite(em.train_loss)
+
+    def test_epoch_metrics_val_loss_populated_with_val_data(self, mlp_model, labelled_tabular):
+        val_candidates = [
+            Candidate(data=np.array([0.5, 0.5, 0.5, 0.5], dtype=np.float32), modality="tabular")
+            for _ in range(3)
+        ]
+        val_data = LabelledCandidates(val_candidates, np.array([1.0, 2.0, 3.0]))
+        mlp_model.train(labelled_tabular, val_data=val_data)
+        for em in mlp_model.get_epoch_metrics():
+            assert em.val_loss is not None
+            assert np.isfinite(em.val_loss)
+
+    def test_epoch_metrics_val_loss_none_without_val_data(self, mlp_model, labelled_tabular):
+        mlp_model.train(labelled_tabular)
+        for em in mlp_model.get_epoch_metrics():
+            assert em.val_loss is None
+
+    def test_adamw_optimizer_trains(self, labelled_tabular):
+        model = MLPModel(
+            model_config=MLPModelConfig(hidden_dims=[8]),
+            train_config=MLPTrainConfig(batch_size=4, num_epochs=2, optimizer="adamw", weight_decay=1e-4),
+            device="cpu",
+        )
+        model.train(labelled_tabular)
+        assert model.net is not None
