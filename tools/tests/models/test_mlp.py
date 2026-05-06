@@ -216,6 +216,12 @@ class TestMLPModelTrain:
         assert "final_train_loss" in metrics
         assert np.isfinite(metrics["final_train_loss"])
 
+    def test_train_summary_metrics_contains_spearman_and_mse(self, mlp_model, labelled_tabular):
+        mlp_model.train(labelled_tabular)
+        metrics = mlp_model.get_training_summary_metrics()
+        assert "final_train_spearman" in metrics
+        assert "final_train_mse" in metrics
+
     def test_train_with_validation_adds_val_metrics(self, mlp_model, labelled_tabular):
         val_candidates = [
             Candidate(data=np.array([0.5, 0.5, 0.5, 0.5], dtype=np.float32), modality="tabular")
@@ -245,6 +251,12 @@ class TestMLPModelTrain:
         mlp_model.train(labelled_tabular)
         for em in mlp_model.get_epoch_metrics():
             assert np.isfinite(em.train_loss)
+
+    def test_epoch_metrics_additional_metrics_keys(self, mlp_model, labelled_tabular):
+        mlp_model.train(labelled_tabular)
+        for em in mlp_model.get_epoch_metrics():
+            assert "train_spearman" in em.additional_metrics
+            assert "train_mse" in em.additional_metrics
 
     def test_epoch_metrics_val_loss_populated_with_val_data(self, mlp_model, labelled_tabular):
         val_candidates = [
