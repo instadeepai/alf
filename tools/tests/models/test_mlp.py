@@ -297,3 +297,131 @@ class TestMLPModelPredictEval:
     def test_predict_before_train_raises_runtime_error(self, mlp_model, tabular_candidates):
         with pytest.raises(RuntimeError, match="not trained"):
             mlp_model.predict(tabular_candidates)
+
+
+# ---------------------------------------------------------------------------
+# Task 6: MLPModel.predict() MC dropout + seeding tests
+# ---------------------------------------------------------------------------
+
+
+class TestMLPModelPredictMCDropout:
+    def test_empirical_dist_shape(self, labelled_tabular, tabular_candidates):
+        model = MLPModel(
+            model_config=MLPModelConfig(hidden_dims=[16], dropout=0.2, n_mc_passes=8, model_seed=0),
+            train_config=MLPTrainConfig(batch_size=4, num_epochs=2),
+            device="cpu",
+        )
+        model.train(labelled_tabular)
+        preds = model.predict(tabular_candidates)
+        assert preds.empirical_dist.shape == (8, 8)
+        assert preds.means.shape == (8,)
+        assert preds.variances.shape == (8,)
+
+    def test_means_equal_rowwise_mean_of_empirical_dist(self, labelled_tabular, tabular_candidates):
+        model = MLPModel(
+            model_config=MLPModelConfig(hidden_dims=[8], dropout=0.3, n_mc_passes=6, model_seed=0),
+            train_config=MLPTrainConfig(batch_size=4, num_epochs=2),
+            device="cpu",
+        )
+        model.train(labelled_tabular)
+        preds = model.predict(tabular_candidates)
+        np.testing.assert_allclose(preds.means, preds.empirical_dist.mean(axis=1), rtol=1e-5)
+
+    def test_variances_equal_rowwise_var_of_empirical_dist(self, labelled_tabular, tabular_candidates):
+        model = MLPModel(
+            model_config=MLPModelConfig(hidden_dims=[8], dropout=0.3, n_mc_passes=6, model_seed=0),
+            train_config=MLPTrainConfig(batch_size=4, num_epochs=2),
+            device="cpu",
+        )
+        model.train(labelled_tabular)
+        preds = model.predict(tabular_candidates)
+        np.testing.assert_allclose(preds.variances, preds.empirical_dist.var(axis=1), rtol=1e-5)
+
+    def test_mc_dropout_is_stochastic(self, labelled_tabular, tabular_candidates):
+        model = MLPModel(
+            model_config=MLPModelConfig(hidden_dims=[16], dropout=0.5, n_mc_passes=10, model_seed=0),
+            train_config=MLPTrainConfig(batch_size=4, num_epochs=2),
+            device="cpu",
+        )
+        model.train(labelled_tabular)
+        preds = model.predict(tabular_candidates)
+        assert preds.variances.sum() > 0, "Dropout should introduce non-zero variance"
+
+    def test_same_dropout_seed_reproducible(self, labelled_tabular, tabular_candidates):
+        model = MLPModel(
+            model_config=MLPModelConfig(
+                hidden_dims=[8], dropout=0.3, n_mc_passes=5, model_seed=0, dropout_seed=99
+            ),
+            train_config=MLPTrainConfig(batch_size=4, num_epochs=2),
+            device="cpu",
+        )
+        model.train(labelled_tabular)
+        preds1 = model.predict(tabular_candidates)
+        preds2 = model.predict(tabular_candidates)
+        np.testing.assert_array_equal(preds1.empirical_dist, preds2.empirical_dist)
+
+    def test_different_dropout_seeds_give_different_passes(self, labelled_tabular, tabular_candidates):
+        def make_model(dropout_seed: int) -> MLPModel:
+            return MLPModel(
+                model_config=MLPModelConfig(
+                    hidden_dims=[16], dropout=0.3, n_mc_passes=5,
+                    model_seed=42, dropout_seed=dropout_seed,
+                ),
+                train_config=MLPTrainConfig(batch_size=4, num_epochs=2),
+                device="cpu",
+            )
+
+        m_a = make_model(10)
+        m_b = make_model(20)
+        m_a.train(labelled_tabular)
+        m_b.train(labelled_tabular)
+        p_a = m_a.predict(tabular_candidates)
+        p_b = m_b.predict(tabular_candidates)
+        assert not np.allclose(p_a.empirical_dist, p_b.empirical_dist)
+
+    def test_dropout_seed_none_falls_back_to_model_seed(self, labelled_tabular, tabular_candidates):
+        """dropout_seed=None must give same passes as dropout_seed=model_seed."""
+        cfg_none = MLPModelConfig(
+            hidden_dims=[8], dropout=0.3, n_mc_passes=5, model_seed=7, dropout_seed=None
+        )
+        cfg_explicit = MLPModelConfig(
+            hidden_dims=[8], dropout=0.3, n_mc_passes=5, model_seed=7, dropout_seed=7
+        )
+        m_none = MLPModel(model_config=cfg_none, train_config=MLPTrainConfig(batch_size=4, num_epochs=2), device="cpu")
+        m_explicit = MLPModel(model_config=cfg_explicit, train_config=MLPTrainConfig(batch_size=4, num_epochs=2), device="cpu")
+        m_none.train(labelled_tabular)
+        m_explicit.train(labelled_tabular)
+        np.testing.assert_array_equal(
+            m_none.predict(tabular_candidates).empirical_dist,
+            m_explicit.predict(tabular_candidates).empirical_dist,
+        )
+
+
+class TestMLPModelSeeding:
+    def test_same_model_seed_same_eval_predictions(self, labelled_tabular, tabular_candidates):
+        def make_and_train() -> MLPModel:
+            m = MLPModel(
+                model_config=MLPModelConfig(hidden_dims=[16], model_seed=42),
+                train_config=MLPTrainConfig(batch_size=4, num_epochs=3),
+                device="cpu",
+            )
+            m.train(labelled_tabular)
+            return m
+
+        p1 = make_and_train().predict(tabular_candidates)
+        p2 = make_and_train().predict(tabular_candidates)
+        np.testing.assert_array_equal(p1.means, p2.means)
+
+    def test_different_model_seeds_different_eval_predictions(self, labelled_tabular, tabular_candidates):
+        def make_and_train(seed: int) -> MLPModel:
+            m = MLPModel(
+                model_config=MLPModelConfig(hidden_dims=[16], model_seed=seed),
+                train_config=MLPTrainConfig(batch_size=4, num_epochs=3),
+                device="cpu",
+            )
+            m.train(labelled_tabular)
+            return m
+
+        p1 = make_and_train(1).predict(tabular_candidates)
+        p2 = make_and_train(2).predict(tabular_candidates)
+        assert not np.allclose(p1.means, p2.means)
