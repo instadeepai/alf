@@ -152,3 +152,49 @@ class TestMLP:
         p1 = list(net1.parameters())[0]
         p2 = list(net2.parameters())[0]
         assert not torch.allclose(p1, p2)
+
+
+# ---------------------------------------------------------------------------
+# Task 3: MLPModel featurise tests
+# ---------------------------------------------------------------------------
+
+
+class TestMLPModelFeaturise:
+    def test_featurise_tabular_list(self, mlp_model, tabular_candidates):
+        x = mlp_model.featurise(tabular_candidates)
+        assert x.shape == (8, 4)
+        assert x.dtype == torch.float32
+
+    def test_featurise_embedding_list(self, mlp_model, embedding_candidates):
+        x = mlp_model.featurise(embedding_candidates)
+        assert x.shape == (8, 4)
+        assert x.dtype == torch.float32
+
+    def test_featurise_labelled_candidates(self, mlp_model, labelled_tabular):
+        x = mlp_model.featurise(labelled_tabular)
+        assert x.shape == (8, 4)
+
+    def test_featurise_rejects_sequence_modality(self, mlp_model):
+        candidates = [Candidate(data="ACGT", modality="sequence")]
+        with pytest.raises(ValueError, match="TABULAR and EMBEDDING"):
+            mlp_model.featurise(candidates)
+
+    def test_featurise_rejects_image_modality(self, mlp_model):
+        candidates = [Candidate(data=np.zeros((3, 4), dtype=np.float32), modality="image")]
+        with pytest.raises(ValueError, match="TABULAR and EMBEDDING"):
+            mlp_model.featurise(candidates)
+
+    def test_featurise_tensor_data(self, mlp_model):
+        candidates = [
+            Candidate(data=torch.randn(4), modality="tabular") for _ in range(3)
+        ]
+        x = mlp_model.featurise(candidates)
+        assert x.shape == (3, 4)
+        assert x.dtype == torch.float32
+
+    def test_get_epoch_metrics_before_train_returns_empty(self, mlp_model):
+        assert mlp_model.get_epoch_metrics() == []
+
+    def test_sample_raises_not_implemented(self, mlp_model):
+        with pytest.raises(NotImplementedError):
+            mlp_model.sample()
