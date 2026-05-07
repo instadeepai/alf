@@ -67,9 +67,20 @@ def mc_mlp_factory(n_passes: int, dropout: float = 0.3) -> Callable[[int], MLPMo
 
 @pytest.fixture
 def sequence_candidates():
-    """Return 6 SEQUENCE Candidates, each a 20-character protein sequence."""
-    seq = "ACDEFGHIKLMNPQRSTVWY"
-    return [Candidate(data=seq, modality="sequence") for _ in range(6)]
+    """Return 6 distinct SEQUENCE Candidates, each a 20-character protein sequence.
+
+    Sequences must be distinct so that per-candidate predictions vary across
+    members in seed-diversity assertions.
+    """
+    seqs = [
+        "ACDEFGHIKLMNPQRSTVWY",
+        "WYTVRSQPNMLKIHGFEDCA",
+        "ACKMNPQRSTVWYDEFGHIL",
+        "MNPQRSTVWYACDEFGHIKL",
+        "RSTVWYACDEFGHIKLMNPQ",
+        "GHIKLMNPQRSTVWYACDEF",
+    ]
+    return [Candidate(data=s, modality="sequence") for s in seqs]
 
 
 @pytest.fixture
@@ -82,8 +93,10 @@ def labelled_sequences(sequence_candidates):
 def cnn_factory(seed: int) -> CNNModel:
     """Seed global RNG then return a small, fast CNNModel.
 
-    torch.manual_seed before construction seeds weight initialisation so
-    different integer seeds produce different initial weights.
+    CNNModelConfig has no model_seed field, so seeding must be done via
+    global torch/numpy state before construction — the same approach used in
+    TestCNNModelReproducibility.test_reproducibility_with_seed. Different
+    integer seeds produce different initial weights.
     """
     torch.manual_seed(seed)
     np.random.seed(seed)
