@@ -483,7 +483,8 @@ class MLPModel(BaseModel):
             else self.model_config.model_seed
         )
         passes: list[np.ndarray] = []
-        with torch.random.fork_rng(), torch.no_grad():
+        _fork_devices = [self.device] if torch.device(self.device).type != "cpu" else []
+        with torch.random.fork_rng(devices=_fork_devices), torch.no_grad():
             torch.manual_seed(seed)
             for _ in range(self.model_config.n_mc_passes):
                 passes.append(self.net(x).cpu().numpy())

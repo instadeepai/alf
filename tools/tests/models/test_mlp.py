@@ -571,10 +571,7 @@ class TestMLPModelPredictMCDropout:
         model.predict(tabular_candidates)
         post_predict = torch.randn(10)
 
-        torch.testing.assert_close(
-            reference, post_predict,
-            msg="predict() must not mutate the process-wide RNG",
-        )
+        torch.testing.assert_close(reference, post_predict)
 
 
 class TestMLPModelSeeding:
