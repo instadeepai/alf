@@ -106,6 +106,11 @@ class TestEnsembleWrapperConfig:
         cfg = EnsembleWrapperConfig(member_seeds=[10, 20], n_members=99)
         assert cfg.resolve_seeds() == [10, 20]
 
+    def test_n_members_zero_raises(self):
+        """n_members=0 with base_seed must raise ValueError."""
+        with pytest.raises(ValueError, match="n_members must be >= 1"):
+            EnsembleWrapperConfig(base_seed=0, n_members=0)
+
 
 # ---------------------------------------------------------------------------
 # Task 8: EnsembleWrapper construction, featurise, train, metrics tests
@@ -139,6 +144,31 @@ class TestEnsembleWrapperConstruction:
         )
         x = wrapper.featurise(tabular_candidates)
         assert x.shape == (6, 4)
+
+    def test_featurise_with_labelled_candidates(self, labelled_tabular):
+        """featurise() must accept LabelledCandidates, not only list[Candidate]."""
+        wrapper = EnsembleWrapper(
+            model_factory=mlp_factory,
+            config=EnsembleWrapperConfig(base_seed=0, n_members=2),
+        )
+        x = wrapper.featurise(labelled_tabular)
+        assert x.shape == (6, 4)
+
+    def test_get_epoch_metrics_before_train_returns_empty(self):
+        """get_epoch_metrics() before train() must return an empty list."""
+        wrapper = EnsembleWrapper(
+            model_factory=mlp_factory,
+            config=EnsembleWrapperConfig(base_seed=0, n_members=2),
+        )
+        assert wrapper.get_epoch_metrics() == []
+
+    def test_get_training_summary_metrics_before_train_returns_empty(self):
+        """get_training_summary_metrics() before train() must return an empty dict."""
+        wrapper = EnsembleWrapper(
+            model_factory=mlp_factory,
+            config=EnsembleWrapperConfig(base_seed=0, n_members=2),
+        )
+        assert wrapper.get_training_summary_metrics() == {}
 
 
 class TestEnsembleWrapperTrain:
@@ -210,6 +240,30 @@ class TestEnsembleWrapperTrain:
         )
         with pytest.raises(RuntimeError, match="not trained"):
             wrapper.predict(tabular_candidates)
+
+    def test_cleanup_delegates_to_all_members(self, labelled_tabular):
+        """cleanup() must call cleanup() on every member without error."""
+        wrapper = EnsembleWrapper(
+            model_factory=mlp_factory,
+            config=EnsembleWrapperConfig(base_seed=0, n_members=3),
+        )
+        wrapper.train(labelled_tabular)
+        wrapper.cleanup()  # must not raise
+
+    def test_train_with_val_data_populates_val_metrics(self, labelled_tabular, tabular_candidates):
+        """Passing val_data to train() must result in finite val_loss in epoch metrics."""
+        val_data = LabelledCandidates(
+            tabular_candidates[:3],
+            np.array([1.0, 2.0, 3.0]),
+        )
+        wrapper = EnsembleWrapper(
+            model_factory=mlp_factory,
+            config=EnsembleWrapperConfig(base_seed=0, n_members=2),
+        )
+        wrapper.train(labelled_tabular, val_data=val_data)
+        for em in wrapper.get_epoch_metrics():
+            assert em.val_loss is not None
+            assert np.isfinite(em.val_loss)
 
 
 # ---------------------------------------------------------------------------
