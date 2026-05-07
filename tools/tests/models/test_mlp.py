@@ -179,6 +179,12 @@ class TestMLP:
         p2 = list(net2.parameters())[0]
         assert not torch.allclose(p1, p2)
 
+    def test_empty_hidden_dims(self):
+        """hidden_dims=[] must build a direct input-to-output linear layer."""
+        net = MLP(input_dim=8, hidden_dims=[], activation="relu", norm="none", dropout=0.0)
+        out = net(torch.randn(4, 8))
+        assert out.shape == (4,)
+
 
 # ---------------------------------------------------------------------------
 # Task 3: MLPModel featurise tests
@@ -232,6 +238,15 @@ class TestMLPModelFeaturise:
         """sample() must raise NotImplementedError."""
         with pytest.raises(NotImplementedError):
             mlp_model.sample()
+
+    def test_cleanup_callable_before_train(self, mlp_model):
+        """cleanup() must be callable before train() without raising."""
+        mlp_model.cleanup()
+
+    def test_cleanup_callable_after_train(self, mlp_model, labelled_tabular):
+        """cleanup() must be callable after train() without raising."""
+        mlp_model.train(labelled_tabular)
+        mlp_model.cleanup()
 
 
 # ---------------------------------------------------------------------------
@@ -333,6 +348,13 @@ class TestMLPModelTrain:
         )
         model.train(labelled_tabular)
         assert model.net is not None
+
+    def test_retrain_preserves_network_identity(self, mlp_model, labelled_tabular):
+        """Calling train() twice must re-use the same MLP object (warm start)."""
+        mlp_model.train(labelled_tabular)
+        net_after_first = mlp_model.net
+        mlp_model.train(labelled_tabular)
+        assert mlp_model.net is net_after_first
 
 
 # ---------------------------------------------------------------------------
