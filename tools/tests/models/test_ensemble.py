@@ -16,7 +16,9 @@ from typing import Callable
 
 import numpy as np
 import pytest
+import torch
 from alf_core import Candidate, LabelledCandidates
+from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig
 from alf_tools.models.mlp import MLPModel, MLPModelConfig, MLPTrainConfig
 
@@ -61,6 +63,35 @@ def mc_mlp_factory(n_passes: int, dropout: float = 0.3) -> Callable[[int], MLPMo
         )
 
     return factory
+
+
+@pytest.fixture
+def sequence_candidates():
+    """Return 6 SEQUENCE Candidates, each a 20-character protein sequence."""
+    seq = "ACDEFGHIKLMNPQRSTVWY"
+    return [Candidate(data=seq, modality="sequence") for _ in range(6)]
+
+
+@pytest.fixture
+def labelled_sequences(sequence_candidates):
+    """Return LabelledCandidates wrapping sequence_candidates with fixed random labels."""
+    rng = np.random.RandomState(2)
+    return LabelledCandidates(sequence_candidates, rng.randn(6))
+
+
+def cnn_factory(seed: int) -> CNNModel:
+    """Seed global RNG then return a small, fast CNNModel.
+
+    torch.manual_seed before construction seeds weight initialisation so
+    different integer seeds produce different initial weights.
+    """
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    return CNNModel(
+        model_config=CNNModelConfig(num_filters=16, num_conv_layers=1, fc_hidden_dim=32),
+        train_config=CNNTrainConfig(batch_size=4, num_epochs=2),
+        device="cpu",
+    )
 
 
 # ---------------------------------------------------------------------------
