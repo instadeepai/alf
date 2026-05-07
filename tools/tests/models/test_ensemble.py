@@ -358,8 +358,14 @@ class TestEnsembleWrapperPredict:
         # p1 = w1.predict(sequence_candidates)
         # p2 = w2.predict(sequence_candidates)
 
-        assert (w1.members[0].model.fc_layers[0].weight.data == w2.members[0].model.fc_layers[0].weight.data).all()
-        assert (w1.members[1].model.fc_layers[0].weight.data == w2.members[1].model.fc_layers[0].weight.data).all()
+        assert (
+            w1.members[0].model.fc_layers[0].weight.data
+            == w2.members[0].model.fc_layers[0].weight.data
+        ).all()
+        assert (
+            w1.members[1].model.fc_layers[0].weight.data
+            == w2.members[1].model.fc_layers[0].weight.data
+        ).all()
 
 
 # ---------------------------------------------------------------------------
