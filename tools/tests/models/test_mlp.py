@@ -555,6 +555,27 @@ class TestMLPModelPredictMCDropout:
         for before, after in zip(bn_before, bn_after):
             torch.testing.assert_close(before, after)
 
+    def test_mc_dropout_does_not_clobber_global_rng(self, labelled_tabular, tabular_candidates):
+        """predict() with MC dropout must not change the process-wide RNG state."""
+        model = MLPModel(
+            model_config=MLPModelConfig(hidden_dims=[8], dropout=0.3, n_mc_passes=5, model_seed=0),
+            train_config=MLPTrainConfig(batch_size=4, num_epochs=2),
+            device="cpu",
+        )
+        model.train(labelled_tabular)
+
+        torch.manual_seed(12345)
+        reference = torch.randn(10)
+
+        torch.manual_seed(12345)
+        model.predict(tabular_candidates)
+        post_predict = torch.randn(10)
+
+        torch.testing.assert_close(
+            reference, post_predict,
+            msg="predict() must not mutate the process-wide RNG",
+        )
+
 
 class TestMLPModelSeeding:
     """Tests that model_seed fully determines weight initialisation and training."""

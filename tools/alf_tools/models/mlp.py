@@ -482,9 +482,9 @@ class MLPModel(BaseModel):
             if self.model_config.dropout_seed is not None
             else self.model_config.model_seed
         )
-        torch.manual_seed(seed)
         passes: list[np.ndarray] = []
-        with torch.no_grad():
+        with torch.random.fork_rng(), torch.no_grad():
+            torch.manual_seed(seed)
             for _ in range(self.model_config.n_mc_passes):
                 passes.append(self.net(x).cpu().numpy())
 
