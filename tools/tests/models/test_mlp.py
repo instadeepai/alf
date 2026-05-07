@@ -125,6 +125,16 @@ class TestMLPTrainConfig:
         with pytest.raises(ValueError, match="num_epochs must be >= 1"):
             MLPTrainConfig(num_epochs=-1)
 
+    def test_log_frequency_zero_raises_value_error(self):
+        """MLPTrainConfig(log_frequency=0) must raise ValueError."""
+        with pytest.raises(ValueError, match="log_frequency must be >= 1"):
+            MLPTrainConfig(log_frequency=0)
+
+    def test_log_frequency_negative_raises_value_error(self):
+        """MLPTrainConfig(log_frequency=-5) must raise ValueError."""
+        with pytest.raises(ValueError, match="log_frequency must be >= 1"):
+            MLPTrainConfig(log_frequency=-5)
+
 
 # ---------------------------------------------------------------------------
 # Task 2: MLP(nn.Module) tests

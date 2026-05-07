@@ -92,10 +92,12 @@ class MLPTrainConfig:
         """Validate training configuration.
 
         Raises:
-            ValueError: If num_epochs < 1.
+            ValueError: If num_epochs < 1 or log_frequency < 1.
         """
         if self.num_epochs < 1:
             raise ValueError("num_epochs must be >= 1")
+        if self.log_frequency < 1:
+            raise ValueError("log_frequency must be >= 1")
 
 
 class MLP(nn.Module):
