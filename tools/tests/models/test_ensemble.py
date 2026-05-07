@@ -161,6 +161,11 @@ class TestEnsembleWrapperConfig:
         with pytest.raises(ValueError, match="n_members must be >= 1"):
             EnsembleWrapperConfig(base_seed=0, n_members=0)
 
+    def test_member_seeds_with_invalid_n_members_does_not_raise(self):
+        """member_seeds takes precedence: n_members < 1 must not raise when member_seeds is set."""
+        cfg = EnsembleWrapperConfig(member_seeds=[1, 2], n_members=0)
+        assert cfg.resolve_seeds() == [1, 2]
+
 
 # ---------------------------------------------------------------------------
 # Task 8: EnsembleWrapper construction, featurise, train, metrics tests

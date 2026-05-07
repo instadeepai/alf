@@ -62,6 +62,8 @@ class MLPModelConfig:
         Raises:
             ValueError: If n_mc_passes > 0 and dropout is not positive.
         """
+        if self.n_mc_passes < 0:
+            raise ValueError(f"n_mc_passes must be >= 0, got {self.n_mc_passes}")
         if self.n_mc_passes > 0 and self.dropout <= 0.0:
             raise ValueError(
                 f"dropout must be > 0 when n_mc_passes > 0, got dropout={self.dropout}"
@@ -230,7 +232,9 @@ class MLPModel(BaseModel):
         """
         return self.training_metrics
 
-    def _train_epoch(self, loader: DataLoader, optimizer: optim.Optimizer, criterion: nn.Module) -> dict:
+    def _train_epoch(
+        self, loader: DataLoader, optimizer: optim.Optimizer, criterion: nn.Module
+    ) -> dict:
         """Run one full training epoch.
 
         Args:
@@ -263,9 +267,7 @@ class MLPModel(BaseModel):
         all_targets = np.concatenate(train_targets_list)
 
         if len(all_preds) >= 2:
-            metrics = Results(
-                predictions=Predictions(means=all_preds), targets=all_targets
-            ).metrics
+            metrics = Results(predictions=Predictions(means=all_preds), targets=all_targets).metrics
         else:
             metrics = {"mse": float(np.mean((all_preds - all_targets) ** 2))}
 
@@ -301,9 +303,7 @@ class MLPModel(BaseModel):
         all_targets = np.concatenate(val_targets_list)
 
         if len(all_preds) >= 2:
-            metrics = Results(
-                predictions=Predictions(means=all_preds), targets=all_targets
-            ).metrics
+            metrics = Results(predictions=Predictions(means=all_preds), targets=all_targets).metrics
         else:
             metrics = {"mse": float(np.mean((all_preds - all_targets) ** 2))}
 

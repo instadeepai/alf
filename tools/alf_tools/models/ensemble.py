@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable, Union
 
 import numpy as np
@@ -42,14 +42,17 @@ class EnsembleWrapperConfig:
     base_seed: int | None = None
     member_seeds: list[int] | None = None
     n_members: int | None = None
+    _resolved_seeds: list[int] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        """Validate that exactly one seed strategy is specified.
+        """Validate that exactly one seed strategy is specified, then resolve seeds.
 
         Raises:
             ValueError: If neither or both seed strategies are provided, or if
                 base_seed is set without n_members, or if n_members < 1, or if
                 member_seeds is empty.
+            AssertionError: If the logic for resolving seeds is somehow
+                incorrect (should be unreachable).
         """
         if self.base_seed is None and self.member_seeds is None:
             raise ValueError("Exactly one of base_seed or member_seeds must be set; got neither.")
@@ -57,17 +60,21 @@ class EnsembleWrapperConfig:
             raise ValueError("Exactly one of base_seed or member_seeds must be set; got both.")
         if self.base_seed is not None and self.n_members is None:
             raise ValueError("n_members must be set when base_seed is provided.")
-        if self.n_members is not None and self.n_members < 1:
+        if self.base_seed is not None and self.n_members is not None and self.n_members < 1:
             raise ValueError(f"n_members must be >= 1, got {self.n_members}")
         if self.member_seeds is not None and len(self.member_seeds) == 0:
             raise ValueError("member_seeds must not be empty.")
 
+        if self.member_seeds is not None:
+            self._resolved_seeds = list(self.member_seeds)
+        elif self.base_seed is not None and self.n_members is not None:
+            self._resolved_seeds = [self.base_seed + i for i in range(self.n_members)]
+        else:
+            raise AssertionError("unreachable: validation above guarantees one branch is taken")
+
     def resolve_seeds(self) -> list[int]:
         """Return the ordered list of per-member seeds."""
-        if self.member_seeds is not None:
-            return list(self.member_seeds)
-        # guaranteed by __post_init__ validation
-        return [self.base_seed + i for i in range(self.n_members)]
+        return self._resolved_seeds
 
 
 class EnsembleWrapper(BaseModel):

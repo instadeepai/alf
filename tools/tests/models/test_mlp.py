@@ -96,6 +96,13 @@ class TestMLPModelConfig:
         assert cfg.n_mc_passes == 10
         assert cfg.dropout == 0.2
 
+    def test_n_mc_passes_negative_raises(self):
+        """n_mc_passes=-1 must raise ValueError before the
+        uninformative stack error in predict().
+        """
+        with pytest.raises(ValueError, match="n_mc_passes must be >= 0"):
+            MLPModelConfig(n_mc_passes=-1)
+
     def test_dropout_seed_optional(self):
         """dropout_seed must default to None and accept an explicit int."""
         cfg = MLPModelConfig(dropout_seed=99)
