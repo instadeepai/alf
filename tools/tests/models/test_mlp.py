@@ -103,7 +103,7 @@ class TestMLPModelConfig:
 
 
 class TestMLPTrainConfig:
-    """Tests for MLPTrainConfig defaults."""
+    """Tests for MLPTrainConfig defaults and validation."""
 
     def test_defaults(self):
         """Default MLPTrainConfig must have expected field values."""
@@ -113,6 +113,17 @@ class TestMLPTrainConfig:
         assert cfg.num_epochs == 50
         assert cfg.optimizer == "adam"
         assert cfg.weight_decay == 0.0
+        assert cfg.log_frequency == 10
+
+    def test_num_epochs_zero_raises_value_error(self):
+        """MLPTrainConfig(num_epochs=0) must raise ValueError."""
+        with pytest.raises(ValueError, match="num_epochs must be >= 1"):
+            MLPTrainConfig(num_epochs=0)
+
+    def test_num_epochs_negative_raises_value_error(self):
+        """MLPTrainConfig(num_epochs=-1) must raise ValueError."""
+        with pytest.raises(ValueError, match="num_epochs must be >= 1"):
+            MLPTrainConfig(num_epochs=-1)
 
 
 # ---------------------------------------------------------------------------

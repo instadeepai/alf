@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Literal, Union
+from typing import Any, Literal, Optional, Union
 
 import numpy as np
 import torch
@@ -42,6 +42,8 @@ class MLPModelConfig:
             0 disables MC dropout and returns means only.
         model_seed: Global seed for weight initialisation and training data shuffling.
             Also used as the dropout generator seed when dropout_seed is None.
+            Note: two models with the same seed will have identical initial weights —
+            pass distinct seeds for ensemble members.
         dropout_seed: If set, overrides model_seed exclusively for the MC dropout
             pass generator.
     """
@@ -73,9 +75,10 @@ class MLPTrainConfig:
     Args:
         learning_rate: Learning rate for the optimiser.
         batch_size: Mini-batch size.
-        num_epochs: Number of training epochs.
+        num_epochs: Number of training epochs. Must be >= 1.
         optimizer: Optimiser type; "adam" or "adamw".
         weight_decay: L2 regularisation coefficient.
+        log_frequency: Log a training summary every this many epochs.
     """
 
     learning_rate: float = 1e-3
@@ -83,6 +86,16 @@ class MLPTrainConfig:
     num_epochs: int = 50
     optimizer: Literal["adam", "adamw"] = "adam"
     weight_decay: float = 0.0
+    log_frequency: int = 10
+
+    def __post_init__(self) -> None:
+        """Validate training configuration.
+
+        Raises:
+            ValueError: If num_epochs < 1.
+        """
+        if self.num_epochs < 1:
+            raise ValueError("num_epochs must be >= 1")
 
 
 class MLP(nn.Module):
@@ -157,6 +170,7 @@ class MLPModel(BaseModel):
         self.train_config = train_config or MLPTrainConfig()
         self.device = get_device(device)
         self.net: MLP | None = None
+        self.input_dim: Optional[int] = None
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
 
@@ -216,6 +230,85 @@ class MLPModel(BaseModel):
         """
         return self.training_metrics
 
+    def _train_epoch(self, loader: DataLoader, optimizer: optim.Optimizer, criterion: nn.Module) -> dict:
+        """Run one full training epoch.
+
+        Args:
+            loader: DataLoader over the training set.
+            optimizer: Optimiser used for gradient updates.
+            criterion: Loss function.
+
+        Returns:
+            Dict with keys ``loss`` (float) and any additional metrics from
+            ``Results.metrics`` (e.g. ``spearman``, ``mse``).
+        """
+        assert self.net is not None
+        self.net.train()
+        train_losses: list[float] = []
+        train_preds_list: list[np.ndarray] = []
+        train_targets_list: list[np.ndarray] = []
+
+        for batch_x, batch_y in loader:
+            optimizer.zero_grad()
+            preds = self.net(batch_x)
+            loss = criterion(preds, batch_y)
+            loss.backward()
+            optimizer.step()
+            train_losses.append(loss.item())
+            train_preds_list.append(preds.detach().cpu().numpy())
+            train_targets_list.append(batch_y.detach().cpu().numpy())
+
+        avg_loss = float(np.mean(train_losses))
+        all_preds = np.concatenate(train_preds_list)
+        all_targets = np.concatenate(train_targets_list)
+
+        if len(all_preds) >= 2:
+            metrics = Results(
+                predictions=Predictions(means=all_preds), targets=all_targets
+            ).metrics
+        else:
+            metrics = {"mse": float(np.mean((all_preds - all_targets) ** 2))}
+
+        return {"loss": avg_loss, **metrics}
+
+    def _validate_epoch(self, loader: DataLoader, criterion: nn.Module) -> dict:
+        """Run one full validation epoch.
+
+        Args:
+            loader: DataLoader over the validation set.
+            criterion: Loss function.
+
+        Returns:
+            Dict with key ``loss`` (float) and any additional metrics from
+            ``Results.metrics`` (e.g. ``spearman``, ``mse``).
+        """
+        assert self.net is not None
+        self.net.eval()
+        val_losses: list[float] = []
+        val_preds_list: list[np.ndarray] = []
+        val_targets_list: list[np.ndarray] = []
+
+        with torch.no_grad():
+            for batch_x, batch_y in loader:
+                preds = self.net(batch_x)
+                loss = criterion(preds, batch_y)
+                val_losses.append(loss.item())
+                val_preds_list.append(preds.cpu().numpy())
+                val_targets_list.append(batch_y.cpu().numpy())
+
+        avg_loss = float(np.mean(val_losses))
+        all_preds = np.concatenate(val_preds_list)
+        all_targets = np.concatenate(val_targets_list)
+
+        if len(all_preds) >= 2:
+            metrics = Results(
+                predictions=Predictions(means=all_preds), targets=all_targets
+            ).metrics
+        else:
+            metrics = {"mse": float(np.mean((all_preds - all_targets) ** 2))}
+
+        return {"loss": avg_loss, **metrics}
+
     def train(
         self,
         train_data: LabelledCandidates,
@@ -229,13 +322,27 @@ class MLPModel(BaseModel):
         Args:
             train_data: Labelled candidates used for gradient updates.
             val_data: Optional labelled candidates for per-epoch validation loss.
+
+        Raises:
+            ValueError: If called after a previous train() with data of a different
+                feature dimension without calling cleanup() first.
         """
         self._epoch_metrics = []
-        np.random.seed(self.model_config.model_seed)
-        torch.manual_seed(self.model_config.model_seed)
+
+        # Featurise first so modality errors surface here with a clear message,
+        # and so we know the true input_dim before building the network.
+        x_train = self.featurise(train_data).to(self.device)
+
+        # Guard against warm-start with mismatched feature dimension.
+        if self.net is not None and x_train.shape[1] != self.input_dim:
+            raise ValueError(
+                f"Input dimension changed from {self.input_dim} to {x_train.shape[1]}. "
+                "Call cleanup() before retraining with different-dimensional data."
+            )
 
         if self.net is None:
-            input_dim = len(train_data.data[0])
+            input_dim = x_train.shape[1]
+            self.input_dim = input_dim
             self.net = MLP(
                 input_dim=input_dim,
                 hidden_dims=self.model_config.hidden_dims,
@@ -250,12 +357,17 @@ class MLPModel(BaseModel):
                 f"params={sum(p.numel() for p in self.net.parameters()):,}"
             )
 
-        x_train = self.featurise(train_data).to(self.device)
         y_train = torch.tensor(train_data.labels, dtype=torch.float32).to(self.device)
+
+        # Use an isolated generator for DataLoader shuffle — avoids clobbering the
+        # process-wide RNG used by other models or library code.
+        g = torch.Generator()
+        g.manual_seed(self.model_config.model_seed)
         train_loader = DataLoader(
             TensorDataset(x_train, y_train),
             batch_size=self.train_config.batch_size,
             shuffle=True,
+            generator=g,
         )
 
         val_loader: DataLoader | None = None
@@ -283,62 +395,20 @@ class MLPModel(BaseModel):
 
         criterion = nn.MSELoss()
 
+        train_metrics: dict = {}
+        val_metrics: dict = {}
         avg_train_loss = 0.0
-        train_metrics: dict[str, float] = {}
         avg_val_loss: float | None = None
-        val_metrics: dict[str, float] = {}
 
         for epoch in range(self.train_config.num_epochs):
-            self.net.train()
-            train_losses: list[float] = []
-            train_preds_list: list[np.ndarray] = []
-            train_targets_list: list[np.ndarray] = []
-
-            for batch_x, batch_y in train_loader:
-                optimizer.zero_grad()
-                preds = self.net(batch_x)
-                loss = criterion(preds, batch_y)
-                loss.backward()
-                optimizer.step()
-                train_losses.append(loss.item())
-                train_preds_list.append(preds.detach().cpu().numpy())
-                train_targets_list.append(batch_y.detach().cpu().numpy())
-
-            avg_train_loss = float(np.mean(train_losses))
-            train_preds = np.concatenate(train_preds_list)
-            train_targets = np.concatenate(train_targets_list)
-
-            if len(train_preds) >= 2:
-                train_metrics = Results(
-                    predictions=Predictions(means=train_preds), targets=train_targets
-                ).metrics
-            else:
-                train_metrics = {"mse": float(np.mean((train_preds - train_targets) ** 2))}
+            train_result = self._train_epoch(train_loader, optimizer, criterion)
+            avg_train_loss = train_result["loss"]
+            train_metrics = {k: v for k, v in train_result.items() if k != "loss"}
 
             if val_loader is not None:
-                self.net.eval()
-                val_losses: list[float] = []
-                val_preds_list: list[np.ndarray] = []
-                val_targets_list: list[np.ndarray] = []
-
-                with torch.no_grad():
-                    for batch_x, batch_y in val_loader:
-                        preds = self.net(batch_x)
-                        loss = criterion(preds, batch_y)
-                        val_losses.append(loss.item())
-                        val_preds_list.append(preds.cpu().numpy())
-                        val_targets_list.append(batch_y.cpu().numpy())
-
-                avg_val_loss = float(np.mean(val_losses))
-                val_preds = np.concatenate(val_preds_list)
-                val_targets = np.concatenate(val_targets_list)
-
-                if len(val_preds) >= 2:
-                    val_metrics = Results(
-                        predictions=Predictions(means=val_preds), targets=val_targets
-                    ).metrics
-                else:
-                    val_metrics = {"mse": float(np.mean((val_preds - val_targets) ** 2))}
+                val_result = self._validate_epoch(val_loader, criterion)
+                avg_val_loss = val_result["loss"]
+                val_metrics = {k: v for k, v in val_result.items() if k != "loss"}
 
             additional: dict[str, float] = {}
             if (v := train_metrics.get("spearman")) is not None:
@@ -359,6 +429,15 @@ class MLPModel(BaseModel):
                     additional_metrics=additional,
                 )
             )
+
+            if epoch % self.train_config.log_frequency == 0:
+                log_msg = (
+                    f"MLPModel '{self.name}' epoch {epoch}/{self.train_config.num_epochs - 1} "
+                    f"train_loss={avg_train_loss:.4f}"
+                )
+                if avg_val_loss is not None:
+                    log_msg += f" val_loss={avg_val_loss:.4f}"
+                logger.debug(log_msg)
 
         self.training_metrics = {"final_train_loss": avg_train_loss}
         self.training_metrics.update({f"final_train_{k}": v for k, v in train_metrics.items()})
@@ -408,6 +487,9 @@ class MLPModel(BaseModel):
         with torch.no_grad():
             for _ in range(self.model_config.n_mc_passes):
                 passes.append(self.net(x).cpu().numpy())
+
+        # Restore full eval state — dropout submodules were put in train() above.
+        self.net.eval()
 
         empirical_dist = np.stack(passes, axis=1)  # (N, T)
         means = empirical_dist.mean(axis=1)
