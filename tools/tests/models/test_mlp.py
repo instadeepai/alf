@@ -274,10 +274,27 @@ class TestMLPModelFeaturise:
         """cleanup() must be callable before train() without raising."""
         mlp_model.cleanup()
 
-    def test_cleanup_callable_after_train(self, mlp_model, labelled_tabular):
-        """cleanup() must be callable after train() without raising."""
+    def test_cleanup_resets_model_to_untrained_state(self, mlp_model, labelled_tabular):
+        """cleanup() after train() must reset net and input_dim so model is untrained."""
         mlp_model.train(labelled_tabular)
+        assert mlp_model.net is not None
         mlp_model.cleanup()
+        assert mlp_model.net is None
+        assert mlp_model.input_dim is None
+        assert mlp_model.get_epoch_metrics() == []
+        assert mlp_model.get_training_summary_metrics() == {}
+
+    def test_cleanup_allows_retrain_with_different_dim(self, mlp_model, labelled_tabular):
+        """After cleanup(), train() must accept data with a different feature dimension."""
+        mlp_model.train(labelled_tabular)  # dim=4
+        mlp_model.cleanup()
+        rng = np.random.RandomState(77)
+        diff_candidates = [
+            Candidate(data=rng.randn(6).astype(np.float32), modality="tabular") for _ in range(8)
+        ]
+        diff_labelled = LabelledCandidates(diff_candidates, rng.randn(8))
+        mlp_model.train(diff_labelled)  # must not raise
+        assert mlp_model.input_dim == 6
 
 
 # ---------------------------------------------------------------------------

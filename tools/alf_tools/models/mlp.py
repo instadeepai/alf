@@ -232,6 +232,17 @@ class MLPModel(BaseModel):
         """
         return self.training_metrics
 
+    def cleanup(self) -> None:
+        """Reset the model to its untrained state.
+
+        After cleanup(), the next train() call will reinitialise the network,
+        allowing reuse with data of a different feature dimension.
+        """
+        self.net = None
+        self.input_dim = None
+        self._epoch_metrics = []
+        self.training_metrics = {}
+
     def _train_epoch(self, loader: DataLoader, optimizer: optim.Optimizer, criterion: nn.Module) -> dict:
         """Run one full training epoch.
 
