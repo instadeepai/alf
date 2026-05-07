@@ -47,6 +47,16 @@ def labelled_tabular(tabular_candidates):
 
 
 @pytest.fixture
+def val_labelled_tabular():
+    """Return 3 labelled validation candidates with varied features and labels."""
+    rng = np.random.RandomState(3)
+    candidates = [
+        Candidate(data=rng.randn(4).astype(np.float32), modality="tabular") for _ in range(3)
+    ]
+    return LabelledCandidates(candidates, np.array([1.0, 2.0, 3.0]))
+
+
+@pytest.fixture
 def mlp_model():
     """Return a small 2-epoch MLPModel with hidden_dims=[16,8] for fast tests."""
     return MLPModel(
@@ -277,14 +287,11 @@ class TestMLPModelTrain:
         assert "final_train_spearman" in metrics
         assert "final_train_mse" in metrics
 
-    def test_train_with_validation_adds_val_metrics(self, mlp_model, labelled_tabular):
+    def test_train_with_validation_adds_val_metrics(
+        self, mlp_model, labelled_tabular, val_labelled_tabular
+    ):
         """Passing val_data must add a finite 'final_val_loss' to summary metrics."""
-        val_candidates = [
-            Candidate(data=np.array([0.5, 0.5, 0.5, 0.5], dtype=np.float32), modality="tabular")
-            for _ in range(3)
-        ]
-        val_data = LabelledCandidates(val_candidates, np.array([1.0, 2.0, 3.0]))
-        mlp_model.train(labelled_tabular, val_data=val_data)
+        mlp_model.train(labelled_tabular, val_data=val_labelled_tabular)
         metrics = mlp_model.get_training_summary_metrics()
         assert "final_val_loss" in metrics
         assert np.isfinite(metrics["final_val_loss"])
@@ -319,14 +326,11 @@ class TestMLPModelTrain:
             assert "train_spearman" in em.additional_metrics
             assert "train_mse" in em.additional_metrics
 
-    def test_epoch_metrics_val_loss_populated_with_val_data(self, mlp_model, labelled_tabular):
+    def test_epoch_metrics_val_loss_populated_with_val_data(
+        self, mlp_model, labelled_tabular, val_labelled_tabular
+    ):
         """With val_data, every epoch val_loss must be finite."""
-        val_candidates = [
-            Candidate(data=np.array([0.5, 0.5, 0.5, 0.5], dtype=np.float32), modality="tabular")
-            for _ in range(3)
-        ]
-        val_data = LabelledCandidates(val_candidates, np.array([1.0, 2.0, 3.0]))
-        mlp_model.train(labelled_tabular, val_data=val_data)
+        mlp_model.train(labelled_tabular, val_data=val_labelled_tabular)
         for em in mlp_model.get_epoch_metrics():
             assert em.val_loss is not None
             assert np.isfinite(em.val_loss)
