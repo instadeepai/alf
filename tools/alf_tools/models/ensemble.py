@@ -66,7 +66,7 @@ class EnsembleWrapperConfig:
         """Return the ordered list of per-member seeds."""
         if self.member_seeds is not None:
             return list(self.member_seeds)
-        assert self.base_seed is not None and self.n_members is not None
+        # guaranteed by __post_init__ validation
         return [self.base_seed + i for i in range(self.n_members)]
 
 

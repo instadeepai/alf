@@ -103,6 +103,7 @@ def cnn_factory(seed: int) -> CNNModel:
     Returns:
         CNNModel: A CNNModel instance with a small architecture and 2 epochs.
     """
+    # TODO: remove global seeding once CNNModelConfig gains a model_seed parameter
     torch.manual_seed(seed)
     np.random.seed(seed)
     return CNNModel(
@@ -622,4 +623,25 @@ class TestEnsembleWrapperMCDropoutExplicit:
         member1_mean = preds.empirical_dist[:, 4:].mean(axis=1)
         assert not np.allclose(member0_mean, member1_mean), (
             "Members with different seeds must produce different prediction distributions"
+        )
+
+    def test_single_member_no_mc_zero_variance(self, tabular_candidates, labelled_tabular):
+        """A single deterministic ensemble member (no MC dropout) must produce zero variance.
+
+        With n_members=1 and n_mc_passes=0 (no MC dropout), the empirical_dist has
+        shape (n_cands, 1). The variance of a single-column distribution is always
+        zero by definition: var([x]) = 0. This is mathematically correct behaviour,
+        not a bug.
+        """
+        wrapper = EnsembleWrapper(
+            model_factory=mlp_factory,
+            config=EnsembleWrapperConfig(member_seeds=[42]),
+        )
+        wrapper.train(labelled_tabular)
+        preds = wrapper.predict(tabular_candidates)
+        assert preds.empirical_dist.shape == (6, 1)
+        np.testing.assert_array_equal(
+            preds.variances,
+            np.zeros(6),
+            err_msg="Single-member non-MC ensembles must always produce zero variance",
         )
