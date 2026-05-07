@@ -381,6 +381,17 @@ class TestMLPModelTrain:
         mlp_model.train(labelled_tabular)
         assert mlp_model.net is net_after_first
 
+    def test_warm_start_dim_mismatch_raises_value_error(self, mlp_model, labelled_tabular):
+        """Re-training with a different input_dim must raise ValueError."""
+        mlp_model.train(labelled_tabular)  # input_dim=4
+        rng = np.random.RandomState(99)
+        diff_candidates = [
+            Candidate(data=rng.randn(6).astype(np.float32), modality="tabular") for _ in range(8)
+        ]
+        diff_labelled = LabelledCandidates(diff_candidates, rng.randn(8))
+        with pytest.raises(ValueError, match="Input dimension changed"):
+            mlp_model.train(diff_labelled)
+
 
 # ---------------------------------------------------------------------------
 # Task 5: MLPModel.predict() eval mode tests
