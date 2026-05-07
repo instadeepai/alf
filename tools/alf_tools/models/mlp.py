@@ -243,13 +243,18 @@ class MLPModel(BaseModel):
         self._epoch_metrics = []
         self.training_metrics = {}
 
-    def _train_epoch(self, loader: DataLoader, optimizer: optim.Optimizer, criterion: nn.Module) -> dict:
+    def _train_epoch(
+        self, loader: DataLoader, optimizer: optim.Optimizer, criterion: nn.Module
+    ) -> dict:
         """Run one full training epoch.
 
         Args:
             loader: DataLoader over the training set.
             optimizer: Optimiser used for gradient updates.
             criterion: Loss function.
+
+        Raises:
+            ValueError: If the network was not initialised (i.e. train() has not been called).
 
         Returns:
             Dict with keys ``loss`` (float) and any additional metrics from
@@ -277,9 +282,7 @@ class MLPModel(BaseModel):
         all_targets = np.concatenate(train_targets_list)
 
         if len(all_preds) >= 2:
-            metrics = Results(
-                predictions=Predictions(means=all_preds), targets=all_targets
-            ).metrics
+            metrics = Results(predictions=Predictions(means=all_preds), targets=all_targets).metrics
         else:
             metrics = {"mse": float(np.mean((all_preds - all_targets) ** 2))}
 
@@ -289,11 +292,14 @@ class MLPModel(BaseModel):
         """Run one full validation epoch.
 
         Args:
-            loader: DataLoader over the validation set.
-            criterion: Loss function.
+            loader (DataLoader): DataLoader over the validation set.
+            criterion (nn.Module): Loss function.
+
+        Raises:
+            ValueError: If the network was not initialised (i.e. train() has not been called).
 
         Returns:
-            Dict with key ``loss`` (float) and any additional metrics from
+            dict: Dict with key ``loss`` (float) and any additional metrics from
             ``Results.metrics`` (e.g. ``spearman``, ``mse``).
         """
         if self.net is None:
@@ -316,9 +322,7 @@ class MLPModel(BaseModel):
         all_targets = np.concatenate(val_targets_list)
 
         if len(all_preds) >= 2:
-            metrics = Results(
-                predictions=Predictions(means=all_preds), targets=all_targets
-            ).metrics
+            metrics = Results(predictions=Predictions(means=all_preds), targets=all_targets).metrics
         else:
             metrics = {"mse": float(np.mean((all_preds - all_targets) ** 2))}
 
