@@ -81,14 +81,8 @@ class EnsembleWrapper(BaseModel):
     """Generic ensemble wrapper that composes N BaseModel instances.
 
     Assembles Predictions.empirical_dist from per-member outputs:
-    - If a member returns empirical_dist (e.g. a model with MC dropout support), all its
-      columns are concatenated.
+    - If a member returns empirical_dist, all its columns are concatenated.
     - If a member returns only means, that column is appended as a single column.
-
-    This gives three modes depending on member type:
-        deep ensemble  : N members, no MC dropout  → empirical_dist (N_cand, N)
-        MC dropout     : 1 member,  n_mc_passes=T  → empirical_dist (N_cand, T)
-        combined       : N members, n_mc_passes=T  → empirical_dist (N_cand, N*T)
     """
 
     def __init__(
