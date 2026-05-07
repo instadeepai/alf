@@ -544,3 +544,77 @@ class TestEnsembleWrapperWithCNN:
         assert not np.allclose(preds.empirical_dist[:, 0], preds.empirical_dist[:, 1]), (
             "Different CNN member seeds must produce different predictions"
         )
+
+
+# ---------------------------------------------------------------------------
+# Explicit MC dropout and combined mode semantics
+# ---------------------------------------------------------------------------
+
+
+class TestEnsembleWrapperMCDropoutExplicit:
+    """Explicit stochasticity and aggregation semantics for MC dropout and combined modes.
+
+    These tests are MLP-only: CNNModel has no n_mc_passes parameter, so
+    MC dropout and combined modes are not applicable to CNN ensembles.
+    """
+
+    def test_mc_dropout_passes_are_stochastic(self, tabular_candidates, labelled_tabular):
+        """MC dropout columns within a single ensemble member must differ from each other.
+
+        With n_mc_passes=5 and dropout=0.3, the 5 stochastic forward passes must
+        not produce identical outputs. Zero variance across all 5 columns would
+        indicate dropout is inactive during inference.
+        """
+        wrapper = EnsembleWrapper(
+            model_factory=mc_mlp_factory(n_passes=5),
+            config=EnsembleWrapperConfig(member_seeds=[42]),
+        )
+        wrapper.train(labelled_tabular)
+        preds = wrapper.predict(tabular_candidates)
+        col0 = preds.empirical_dist[:, 0]
+        col1 = preds.empirical_dist[:, 1]
+        assert not np.allclose(col0, col1), (
+            "MC dropout passes must be stochastic; identical columns indicate dropout is inactive"
+        )
+
+    def test_combined_mode_means_aggregate_all_nt_samples(
+        self, tabular_candidates, labelled_tabular
+    ):
+        """In combined mode, means must equal the grand mean across all N*T columns.
+
+        3 members × 4 MC passes = 12 columns; means must be the mean of all 12,
+        not the mean of the 3 per-member averages (which would differ when T > 1).
+        """
+        n_members = 3
+        n_passes = 4
+        wrapper = EnsembleWrapper(
+            model_factory=mc_mlp_factory(n_passes=n_passes),
+            config=EnsembleWrapperConfig(base_seed=0, n_members=n_members),
+        )
+        wrapper.train(labelled_tabular)
+        preds = wrapper.predict(tabular_candidates)
+        assert preds.empirical_dist.shape == (6, 12)
+        np.testing.assert_allclose(preds.means, preds.empirical_dist.mean(axis=1), rtol=1e-5)
+
+    def test_combined_mode_different_seeds_give_diverse_member_distributions(
+        self, tabular_candidates, labelled_tabular
+    ):
+        """In combined mode, MC pass blocks from different member seeds must differ.
+
+        With member_seeds=[1, 2] and n_mc_passes=4:
+          columns 0–3  → MC passes from member seeded with 1
+          columns 4–7  → MC passes from member seeded with 2
+        The per-member mean predictions must differ, confirming that member seeds
+        produce genuinely different models even when MC dropout is active.
+        """
+        wrapper = EnsembleWrapper(
+            model_factory=mc_mlp_factory(n_passes=4),
+            config=EnsembleWrapperConfig(member_seeds=[1, 2]),
+        )
+        wrapper.train(labelled_tabular)
+        preds = wrapper.predict(tabular_candidates)
+        member0_mean = preds.empirical_dist[:, :4].mean(axis=1)
+        member1_mean = preds.empirical_dist[:, 4:].mean(axis=1)
+        assert not np.allclose(member0_mean, member1_mean), (
+            "Members with different seeds must produce different prediction distributions"
+        )
