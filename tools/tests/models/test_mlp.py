@@ -15,6 +15,7 @@
 import numpy as np
 import pytest
 import torch
+import torch.nn as nn
 from alf_core import Candidate, LabelledCandidates
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 
@@ -407,6 +408,35 @@ class TestMLPModelPredictMCDropout:
             m_none.predict(tabular_candidates).empirical_dist,
             m_explicit.predict(tabular_candidates).empirical_dist,
         )
+
+    def test_batch_norm_running_stats_not_mutated_during_predict(self, labelled_tabular, tabular_candidates):
+        """BatchNorm running stats must not change during predict() with MC dropout."""
+        model = MLPModel(
+            model_config=MLPModelConfig(
+                hidden_dims=[16], norm="batch", dropout=0.3, n_mc_passes=5, model_seed=0
+            ),
+            train_config=MLPTrainConfig(batch_size=4, num_epochs=2),
+            device="cpu",
+        )
+        model.train(labelled_tabular)
+
+        # Capture running mean before predict
+        bn_before = [
+            m.running_mean.clone()
+            for m in model.net.modules()
+            if isinstance(m, nn.BatchNorm1d)
+        ]
+
+        model.predict(tabular_candidates)
+
+        # Running stats must be unchanged after predict
+        bn_after = [
+            m.running_mean
+            for m in model.net.modules()
+            if isinstance(m, nn.BatchNorm1d)
+        ]
+        for before, after in zip(bn_before, bn_after):
+            torch.testing.assert_close(before, after)
 
 
 class TestMLPModelSeeding:

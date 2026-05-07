@@ -335,8 +335,12 @@ class MLPModel(BaseModel):
                 preds = self.net(x).cpu().numpy()
             return Predictions(means=preds)
 
-        # MC dropout: keep model in train() mode so dropout is active
-        self.net.train()
+        # MC dropout: eval mode to freeze BatchNorm stats, then selectively
+        # enable only Dropout modules so stochastic sampling remains active.
+        self.net.eval()
+        for m in self.net.modules():
+            if isinstance(m, nn.Dropout):
+                m.train()
         seed = (
             self.model_config.dropout_seed
             if self.model_config.dropout_seed is not None
