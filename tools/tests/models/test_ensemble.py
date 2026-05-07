@@ -92,11 +92,16 @@ def labelled_sequences(sequence_candidates):
 
 def cnn_factory(seed: int) -> CNNModel:
     """Seed global RNG then return a small, fast CNNModel.
-
     CNNModelConfig has no model_seed field, so seeding must be done via
     global torch/numpy state before construction — the same approach used in
     TestCNNModelReproducibility.test_reproducibility_with_seed. Different
     integer seeds produce different initial weights.
+
+    Args:
+        seed (int): Seed for torch and numpy RNGs to ensure reproducibility.
+
+    Returns:
+        CNNModel: A CNNModel instance with a small architecture and 2 epochs.
     """
     torch.manual_seed(seed)
     np.random.seed(seed)
