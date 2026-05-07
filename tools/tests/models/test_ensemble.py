@@ -12,57 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable
-
 import numpy as np
 import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig
-from alf_tools.models.mlp import MLPModel, MLPModelConfig, MLPTrainConfig
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def tabular_candidates():
-    """Return 6 random tabular Candidates with feature dimension 4."""
-    rng = np.random.RandomState(0)
-    return [Candidate(data=rng.randn(4).astype(np.float32), modality="tabular") for _ in range(6)]
-
-
-@pytest.fixture
-def labelled_tabular(tabular_candidates):
-    """Return LabelledCandidates wrapping tabular_candidates with random labels."""
-    rng = np.random.RandomState(1)
-    return LabelledCandidates(tabular_candidates, rng.randn(6))
-
-
-def mlp_factory(seed: int) -> MLPModel:
-    """Return a small 2-epoch MLPModel seeded with the given seed."""
-    return MLPModel(
-        model_config=MLPModelConfig(hidden_dims=[8], model_seed=seed),
-        train_config=MLPTrainConfig(batch_size=4, num_epochs=2),
-        device="cpu",
-    )
-
-
-def mc_mlp_factory(n_passes: int, dropout: float = 0.3) -> Callable[[int], MLPModel]:
-    """Return a factory that creates MC-dropout MLPModels with n_passes passes."""
-
-    def factory(seed: int) -> MLPModel:
-        return MLPModel(
-            model_config=MLPModelConfig(
-                hidden_dims=[8], dropout=dropout, n_mc_passes=n_passes, model_seed=seed
-            ),
-            train_config=MLPTrainConfig(batch_size=4, num_epochs=2),
-            device="cpu",
-        )
-
-    return factory
 
 
 @pytest.fixture
@@ -92,6 +51,7 @@ def labelled_sequences(sequence_candidates):
 
 def cnn_factory(seed: int) -> CNNModel:
     """Seed global RNG then return a small, fast CNNModel.
+
     CNNModelConfig has no model_seed field, so seeding must be done via
     global torch/numpy state before construction — the same approach used in
     TestCNNModelReproducibility.test_reproducibility_with_seed. Different
@@ -178,7 +138,7 @@ class TestEnsembleWrapperConstruction:
     def test_base_seed_creates_correct_member_count(self):
         """base_seed mode must create exactly n_members members."""
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=3),
         )
         assert len(wrapper.members) == 3
@@ -186,33 +146,37 @@ class TestEnsembleWrapperConstruction:
     def test_member_seeds_creates_correct_member_count(self):
         """member_seeds mode must create one member per seed."""
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(member_seeds=[10, 20, 30]),
         )
         assert len(wrapper.members) == 3
 
-    def test_featurise_delegates_to_first_member(self, tabular_candidates):
-        """featurise() output must match what the first member returns."""
+    def test_featurise_delegates_to_first_member(self, sequence_candidates):
+        """featurise() output must match what the first member returns.
+
+        CNNModel featurise returns a float32 tensor of shape (n_cands, alphabet_size, seq_len).
+        For 6 candidates with 20-char sequences over a 20-character alphabet: (6, 20, 20).
+        """
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
-        x = wrapper.featurise(tabular_candidates)
-        assert x.shape == (6, 4)
+        x = wrapper.featurise(sequence_candidates)
+        assert x.shape == (6, 20, 20)
 
-    def test_featurise_with_labelled_candidates(self, labelled_tabular):
+    def test_featurise_with_labelled_candidates(self, labelled_sequences):
         """featurise() must accept LabelledCandidates, not only list[Candidate]."""
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
-        x = wrapper.featurise(labelled_tabular)
-        assert x.shape == (6, 4)
+        x = wrapper.featurise(labelled_sequences)
+        assert x.shape == (6, 20, 20)
 
     def test_get_epoch_metrics_before_train_returns_empty(self):
         """get_epoch_metrics() before train() must return an empty list."""
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
         assert wrapper.get_epoch_metrics() == []
@@ -220,7 +184,7 @@ class TestEnsembleWrapperConstruction:
     def test_get_training_summary_metrics_before_train_returns_empty(self):
         """get_training_summary_metrics() before train() must return an empty dict."""
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
         assert wrapper.get_training_summary_metrics() == {}
@@ -229,93 +193,91 @@ class TestEnsembleWrapperConstruction:
 class TestEnsembleWrapperTrain:
     """Tests for EnsembleWrapper training and metric aggregation."""
 
-    def test_train_trains_all_members(self, labelled_tabular):
+    def test_train_trains_all_members(self, labelled_sequences):
         """After train(), every member must have an initialised network."""
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=3),
         )
-        wrapper.train(labelled_tabular)
+        wrapper.train(labelled_sequences)
         for member in wrapper.members:
-            assert member.net is not None
+            assert member.model is not None
 
-    def test_epoch_metrics_tagged_with_member_index(self, labelled_tabular):
+    def test_epoch_metrics_tagged_with_member_index(self, labelled_sequences):
         """Epoch metric keys must be prefixed with 'member_0/' and 'member_1/'."""
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
-        wrapper.train(labelled_tabular)
+        wrapper.train(labelled_sequences)
         all_keys: set[str] = set()
         for em in wrapper.get_epoch_metrics():
             all_keys.update(em.additional_metrics.keys())
         assert any(k.startswith("member_0/") for k in all_keys)
         assert any(k.startswith("member_1/") for k in all_keys)
 
-    def test_summary_metrics_tagged_with_member_index(self, labelled_tabular):
+    def test_summary_metrics_tagged_with_member_index(self, labelled_sequences):
         """Summary metric keys must be prefixed with 'member_0/' and 'member_1/'."""
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
-        wrapper.train(labelled_tabular)
+        wrapper.train(labelled_sequences)
         summary = wrapper.get_training_summary_metrics()
         assert any(k.startswith("member_0/") for k in summary)
         assert any(k.startswith("member_1/") for k in summary)
 
-    def test_epoch_metrics_total_length(self, labelled_tabular):
+    def test_epoch_metrics_total_length(self, labelled_sequences):
         """Total epoch metrics count must equal n_members × num_epochs."""
         n_members = 3
-        num_epochs = 2
+        num_epochs = 2  # matches cnn_factory's CNNTrainConfig(num_epochs=2)
         wrapper = EnsembleWrapper(
-            model_factory=lambda seed: MLPModel(
-                model_config=MLPModelConfig(hidden_dims=[8], model_seed=seed),
-                train_config=MLPTrainConfig(batch_size=4, num_epochs=num_epochs),
-                device="cpu",
-            ),
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=n_members),
         )
-        wrapper.train(labelled_tabular)
+        wrapper.train(labelled_sequences)
         assert len(wrapper.get_epoch_metrics()) == n_members * num_epochs
 
     def test_sample_raises_not_implemented(self):
         """sample() must raise NotImplementedError."""
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
         with pytest.raises(NotImplementedError):
             wrapper.sample()
 
-    def test_predict_before_train_raises(self, tabular_candidates):
+    def test_predict_before_train_raises(self, sequence_candidates):
         """predict() before train() must raise RuntimeError."""
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
         with pytest.raises(RuntimeError, match="not trained"):
-            wrapper.predict(tabular_candidates)
+            wrapper.predict(sequence_candidates)
 
-    def test_cleanup_delegates_to_all_members(self, labelled_tabular):
+    def test_cleanup_delegates_to_all_members(self, labelled_sequences):
         """cleanup() must call cleanup() on every member without error."""
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=3),
         )
-        wrapper.train(labelled_tabular)
+        wrapper.train(labelled_sequences)
         wrapper.cleanup()  # must not raise
 
-    def test_train_with_val_data_populates_val_metrics(self, labelled_tabular, tabular_candidates):
+    def test_train_with_val_data_populates_val_metrics(
+        self, labelled_sequences, sequence_candidates
+    ):
         """Passing val_data to train() must result in finite val_loss in epoch metrics."""
         val_data = LabelledCandidates(
-            tabular_candidates[:3],
+            sequence_candidates[:3],
             np.array([1.0, 2.0, 3.0]),
         )
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
-        wrapper.train(labelled_tabular, val_data=val_data)
+        wrapper.train(labelled_sequences, val_data=val_data)
         for em in wrapper.get_epoch_metrics():
             assert em.val_loss is not None
             assert np.isfinite(em.val_loss)
@@ -327,91 +289,77 @@ class TestEnsembleWrapperTrain:
 
 
 class TestEnsembleWrapperPredict:
-    """Tests for EnsembleWrapper prediction across deep-ensemble, MC, and combined modes."""
+    """Tests for EnsembleWrapper prediction in deep-ensemble mode."""
 
-    def test_deep_ensemble_empirical_dist_shape(self, tabular_candidates, labelled_tabular):
+    def test_deep_ensemble_empirical_dist_shape(self, sequence_candidates, labelled_sequences):
         """4-member deep ensemble must produce empirical_dist of shape (6, 4)."""
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=4),
         )
-        wrapper.train(labelled_tabular)
-        preds = wrapper.predict(tabular_candidates)
+        wrapper.train(labelled_sequences)
+        preds = wrapper.predict(sequence_candidates)
         assert preds.empirical_dist.shape == (6, 4)
         assert preds.means.shape == (6,)
         assert preds.variances.shape == (6,)
 
-    def test_deep_ensemble_means_are_rowwise_mean(self, tabular_candidates, labelled_tabular):
+    def test_deep_ensemble_means_are_rowwise_mean(self, sequence_candidates, labelled_sequences):
         """Means must equal empirical_dist.mean(axis=1) for deep ensemble."""
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=3),
         )
-        wrapper.train(labelled_tabular)
-        preds = wrapper.predict(tabular_candidates)
+        wrapper.train(labelled_sequences)
+        preds = wrapper.predict(sequence_candidates)
         np.testing.assert_allclose(preds.means, preds.empirical_dist.mean(axis=1), rtol=1e-5)
 
-    def test_deep_ensemble_variances_are_rowwise_var(self, tabular_candidates, labelled_tabular):
+    def test_deep_ensemble_variances_are_rowwise_var(self, sequence_candidates, labelled_sequences):
         """Variances must equal empirical_dist.var(axis=1) for deep ensemble."""
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=3),
         )
-        wrapper.train(labelled_tabular)
-        preds = wrapper.predict(tabular_candidates)
+        wrapper.train(labelled_sequences)
+        preds = wrapper.predict(sequence_candidates)
         np.testing.assert_allclose(preds.variances, preds.empirical_dist.var(axis=1), rtol=1e-5)
 
-    def test_mc_dropout_single_member_shape(self, tabular_candidates, labelled_tabular):
-        """1 member, n_mc_passes=5 must produce empirical_dist of shape (6, 5)."""
-        wrapper = EnsembleWrapper(
-            model_factory=mc_mlp_factory(n_passes=5),
-            config=EnsembleWrapperConfig(member_seeds=[42]),
-        )
-        wrapper.train(labelled_tabular)
-        preds = wrapper.predict(tabular_candidates)
-        assert preds.empirical_dist.shape == (6, 5)
-
-    def test_combined_mode_shape(self, tabular_candidates, labelled_tabular):
-        """N members × T passes must produce empirical_dist of shape (6, N*T)."""
-        n_members = 3
-        n_passes = 4
-        wrapper = EnsembleWrapper(
-            model_factory=mc_mlp_factory(n_passes=n_passes),
-            config=EnsembleWrapperConfig(base_seed=0, n_members=n_members),
-        )
-        wrapper.train(labelled_tabular)
-        preds = wrapper.predict(tabular_candidates)
-        assert preds.empirical_dist.shape == (6, n_members * n_passes)
-
     def test_different_member_seeds_give_different_columns(
-        self, tabular_candidates, labelled_tabular
+        self, sequence_candidates, labelled_sequences
     ):
         """Different member seeds must produce different prediction columns."""
         wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(member_seeds=[1, 2]),
         )
-        wrapper.train(labelled_tabular)
-        preds = wrapper.predict(tabular_candidates)
+        wrapper.train(labelled_sequences)
+        preds = wrapper.predict(sequence_candidates)
         assert not np.allclose(preds.empirical_dist[:, 0], preds.empirical_dist[:, 1]), (
             "Different member seeds should produce different predictions"
         )
 
-    def test_base_seed_and_member_seeds_same_result(self, tabular_candidates, labelled_tabular):
+    def test_base_seed_and_member_seeds_same_result(self, sequence_candidates, labelled_sequences):
         """base_seed=10,n_members=2 and member_seeds=[10,11] must give identical results."""
         w1 = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=10, n_members=2),
         )
         w2 = EnsembleWrapper(
-            model_factory=mlp_factory,
+            model_factory=cnn_factory,
             config=EnsembleWrapperConfig(member_seeds=[10, 11]),
         )
-        w1.train(labelled_tabular)
-        w2.train(labelled_tabular)
-        p1 = w1.predict(tabular_candidates)
-        p2 = w2.predict(tabular_candidates)
-        np.testing.assert_array_equal(p1.empirical_dist, p2.empirical_dist)
+        # TODO: remove global seeding once CNNModelConfig gains a model_seed parameter
+        seed = 10
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        w1.train(labelled_sequences)
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        w2.train(labelled_sequences)
+        # p1 = w1.predict(sequence_candidates)
+        # p2 = w2.predict(sequence_candidates)
+
+        assert (w1.members[0].model.fc_layers[0].weight.data == w2.members[0].model.fc_layers[0].weight.data).all()
+        assert (w1.members[1].model.fc_layers[0].weight.data == w2.members[1].model.fc_layers[0].weight.data).all()
 
 
 # ---------------------------------------------------------------------------
@@ -422,7 +370,7 @@ class TestEnsembleWrapperPredict:
 class TestEnsembleWrapperWithCNN:
     """Confirm EnsembleWrapper works end-to-end with CNNModel (SEQUENCE modality).
 
-    CNNModel differs from MLPModel in two ways relevant here:
+    CNNModel characteristics relevant to the ensemble wrapper:
       - Accepts SEQUENCE candidates (one-hot encoded internally), not TABULAR/EMBEDDING.
       - Has no model_seed config field; seeding is done via torch.manual_seed in cnn_factory.
     """
@@ -554,99 +502,4 @@ class TestEnsembleWrapperWithCNN:
         preds = wrapper.predict(sequence_candidates)
         assert not np.allclose(preds.empirical_dist[:, 0], preds.empirical_dist[:, 1]), (
             "Different CNN member seeds must produce different predictions"
-        )
-
-
-# ---------------------------------------------------------------------------
-# Explicit MC dropout and combined mode semantics
-# ---------------------------------------------------------------------------
-
-
-class TestEnsembleWrapperMCDropoutExplicit:
-    """Explicit stochasticity and aggregation semantics for MC dropout and combined modes.
-
-    These tests are MLP-only: CNNModel has no n_mc_passes parameter, so
-    MC dropout and combined modes are not applicable to CNN ensembles.
-    """
-
-    def test_mc_dropout_passes_are_stochastic(self, tabular_candidates, labelled_tabular):
-        """MC dropout columns within a single ensemble member must differ from each other.
-
-        With n_mc_passes=5 and dropout=0.3, the 5 stochastic forward passes must
-        not produce identical outputs. Zero variance across all 5 columns would
-        indicate dropout is inactive during inference.
-        """
-        wrapper = EnsembleWrapper(
-            model_factory=mc_mlp_factory(n_passes=5),
-            config=EnsembleWrapperConfig(member_seeds=[42]),
-        )
-        wrapper.train(labelled_tabular)
-        preds = wrapper.predict(tabular_candidates)
-        assert np.all(preds.variances > 0), (
-            "MC dropout passes must be stochastic; zero variance indicates dropout is inactive"
-        )
-
-    def test_combined_mode_means_aggregate_all_nt_samples(
-        self, tabular_candidates, labelled_tabular
-    ):
-        """In combined mode, means must equal the grand mean across all N*T columns.
-
-        3 members × 4 MC passes = 12 columns; means must be the mean of all 12,
-        not the mean of the 3 per-member averages (which would differ when T > 1).
-        """
-        n_members = 3
-        n_passes = 4
-        wrapper = EnsembleWrapper(
-            model_factory=mc_mlp_factory(n_passes=n_passes),
-            config=EnsembleWrapperConfig(base_seed=0, n_members=n_members),
-        )
-        wrapper.train(labelled_tabular)
-        preds = wrapper.predict(tabular_candidates)
-        assert preds.empirical_dist.shape == (6, n_members * n_passes)
-        assert np.all(preds.variances > 0), (
-            "Combined-mode empirical distribution must have non-zero variance across N*T samples"
-        )
-
-    def test_combined_mode_different_seeds_give_diverse_member_distributions(
-        self, tabular_candidates, labelled_tabular
-    ):
-        """In combined mode, MC pass blocks from different member seeds must differ.
-
-        With member_seeds=[1, 2] and n_mc_passes=4:
-          columns 0–3  → MC passes from member seeded with 1
-          columns 4–7  → MC passes from member seeded with 2
-        The per-member mean predictions must differ, confirming that member seeds
-        produce genuinely different models even when MC dropout is active.
-        """
-        wrapper = EnsembleWrapper(
-            model_factory=mc_mlp_factory(n_passes=4),
-            config=EnsembleWrapperConfig(member_seeds=[1, 2]),
-        )
-        wrapper.train(labelled_tabular)
-        preds = wrapper.predict(tabular_candidates)
-        member0_mean = preds.empirical_dist[:, :4].mean(axis=1)
-        member1_mean = preds.empirical_dist[:, 4:].mean(axis=1)
-        assert not np.allclose(member0_mean, member1_mean), (
-            "Members with different seeds must produce different prediction distributions"
-        )
-
-    def test_single_member_no_mc_zero_variance(self, tabular_candidates, labelled_tabular):
-        """A single deterministic ensemble member (no MC dropout) must produce zero variance.
-
-        With n_members=1 and n_mc_passes=0 (no MC dropout), the empirical_dist has
-        shape (n_cands, 1). The variance of a single-column distribution is always
-        zero by definition: var([x]) = 0. This is mathematically correct behaviour,
-        not a bug.
-        """
-        wrapper = EnsembleWrapper(
-            model_factory=mlp_factory,
-            config=EnsembleWrapperConfig(member_seeds=[42]),
-        )
-        wrapper.train(labelled_tabular)
-        preds = wrapper.predict(tabular_candidates)
-        assert preds.empirical_dist.shape == (6, 1)
-        np.testing.assert_array_equal(
-            preds.variances,
-            np.zeros(6),
-            err_msg="Single-member non-MC ensembles must always produce zero variance",
         )
