@@ -55,6 +55,11 @@ class MLPModelConfig:
     dropout_seed: int | None = None
 
     def __post_init__(self) -> None:
+        """Validate that n_mc_passes > 0 requires dropout > 0.
+
+        Raises:
+            ValueError: If n_mc_passes > 0 and dropout is not positive.
+        """
         if self.n_mc_passes > 0 and self.dropout <= 0.0:
             raise ValueError(
                 f"dropout must be > 0 when n_mc_passes > 0, got dropout={self.dropout}"
@@ -96,6 +101,7 @@ class MLP(nn.Module):
         dropout: float,
         model_seed: int = 0,
     ):
+        """Build the hidden block and output layer, seeded deterministically."""
         super().__init__()
         torch.manual_seed(model_seed)
 
@@ -123,6 +129,11 @@ class MLP(nn.Module):
         self.output_layer = nn.Linear(in_dim, 1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Run a forward pass and return scalar predictions of shape (batch,).
+
+        Returns:
+            1-D tensor of scalar predictions, one per input row.
+        """
         return self.output_layer(self.hidden_block(x)).squeeze(-1)
 
 
@@ -140,6 +151,7 @@ class MLPModel(BaseModel):
         train_config: MLPTrainConfig | None = None,
         device: str | None = None,
     ):
+        """Initialise MLPModel with optional config overrides; network is built lazily."""
         self.name = name
         self.model_config = model_config or MLPModelConfig()
         self.train_config = train_config or MLPTrainConfig()
@@ -149,6 +161,19 @@ class MLPModel(BaseModel):
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
 
     def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> torch.Tensor:
+        """Convert TABULAR or EMBEDDING candidates to a float32 tensor.
+
+        Args:
+            inputs: Either LabelledCandidates or a list of Candidates. Each
+                candidate's data must be a numpy array or torch tensor.
+
+        Returns:
+            Float32 tensor of shape (n_candidates, feature_dim).
+
+        Raises:
+            ValueError: If any candidate has an unsupported modality, or if
+                inputs is not a LabelledCandidates or list.
+        """
         if isinstance(inputs, LabelledCandidates):
             candidates = inputs.candidates
         elif isinstance(inputs, list):
@@ -172,12 +197,23 @@ class MLPModel(BaseModel):
         return torch.tensor(np.stack(arrays), dtype=torch.float32)
 
     def sample(self, condition: Any | None = None) -> list[Candidate]:
+        """Not implemented; raises NotImplementedError."""
         raise NotImplementedError("Sampling is not implemented for MLPModel.")
 
     def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
+        """Return per-epoch metrics recorded during the most recent train() call.
+
+        Returns:
+            List of SurrogateEpochMetrics, one per epoch; empty before first train().
+        """
         return self._epoch_metrics
 
     def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
+        """Return scalar summary metrics from the most recent train() call.
+
+        Returns:
+            Dict of metric names to values; empty before first train().
+        """
         return self.training_metrics
 
     def train(
@@ -185,6 +221,15 @@ class MLPModel(BaseModel):
         train_data: LabelledCandidates,
         val_data: LabelledCandidates | None = None,
     ) -> None:
+        """Fit the MLP to train_data, optionally tracking val_data metrics per epoch.
+
+        The network is initialised on the first call and re-used on subsequent calls
+        (warm-start). Epoch metrics are reset at the start of each call.
+
+        Args:
+            train_data: Labelled candidates used for gradient updates.
+            val_data: Optional labelled candidates for per-epoch validation loss.
+        """
         self._epoch_metrics = []
         np.random.seed(self.model_config.model_seed)
         torch.manual_seed(self.model_config.model_seed)
@@ -324,6 +369,18 @@ class MLPModel(BaseModel):
         self.net.eval()
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
+        """Return mean predictions, with MC dropout empirical distribution if configured.
+
+        Args:
+            candidate_points: Candidates to predict for.
+
+        Returns:
+            Predictions with means always set. If n_mc_passes > 0, variances and
+            empirical_dist are also populated from stochastic forward passes.
+
+        Raises:
+            RuntimeError: If train() has not been called yet.
+        """
         if self.net is None:
             raise RuntimeError("Model not trained. Call train() first.")
 
