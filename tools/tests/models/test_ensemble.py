@@ -414,7 +414,6 @@ class TestEnsembleWrapperWithCNN:
     CNNModel differs from MLPModel in two ways relevant here:
       - Accepts SEQUENCE candidates (one-hot encoded internally), not TABULAR/EMBEDDING.
       - Has no model_seed config field; seeding is done via torch.manual_seed in cnn_factory.
-    All three tests below should PASS immediately after adding the class.
     """
 
     def test_cnn_member_count_with_base_seed(self):
@@ -456,7 +455,7 @@ class TestEnsembleWrapperWithCNN:
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
-        with pytest.raises(RuntimeError):
+        with pytest.raises(RuntimeError, match="Model not trained"):
             wrapper.predict(sequence_candidates)
 
     def test_cnn_ensemble_trains_all_members(self, labelled_sequences):
