@@ -44,14 +44,17 @@ class EnsembleWrapperConfig:
     n_members: int | None = None
 
     def __post_init__(self) -> None:
+        """Validate that exactly one seed strategy is specified.
+
+        Raises:
+            ValueError: If neither or both seed strategies are provided, or if
+                base_seed is set without n_members, or if n_members < 1, or if
+                member_seeds is empty.
+        """
         if self.base_seed is None and self.member_seeds is None:
-            raise ValueError(
-                "Exactly one of base_seed or member_seeds must be set; got neither."
-            )
+            raise ValueError("Exactly one of base_seed or member_seeds must be set; got neither.")
         if self.base_seed is not None and self.member_seeds is not None:
-            raise ValueError(
-                "Exactly one of base_seed or member_seeds must be set; got both."
-            )
+            raise ValueError("Exactly one of base_seed or member_seeds must be set; got both.")
         if self.base_seed is not None and self.n_members is None:
             raise ValueError("n_members must be set when base_seed is provided.")
         if self.n_members is not None and self.n_members < 1:
@@ -87,12 +90,18 @@ class EnsembleWrapper(BaseModel):
         config: EnsembleWrapperConfig,
         name: str = "ensemble_wrapper",
     ):
+        """Instantiate members by calling model_factory with each resolved seed."""
         self.name = name
         self.config = config
         seeds = config.resolve_seeds()
         self.members: list[BaseModel] = [model_factory(seed) for seed in seeds]
 
     def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> Any:
+        """Delegate featurisation to the first ensemble member.
+
+        Returns:
+            Feature representation returned by the first member's featurise().
+        """
         return self.members[0].featurise(inputs)
 
     def train(
@@ -100,11 +109,20 @@ class EnsembleWrapper(BaseModel):
         train_data: LabelledCandidates,
         val_data: LabelledCandidates | None = None,
     ) -> None:
+        """Train each member sequentially, logging progress."""
         for i, member in enumerate(self.members):
-            logger.info(f"EnsembleWrapper '{self.name}': training member {i + 1}/{len(self.members)}")
+            logger.info(
+                f"EnsembleWrapper '{self.name}': training member {i + 1}/{len(self.members)}"
+            )
             member.train(train_data, val_data)
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
+        """Aggregate per-member predictions into a single Predictions object.
+
+        Returns:
+            Predictions with means, variances, and empirical_dist assembled from
+            all member outputs concatenated along the sample axis.
+        """
         columns: list[np.ndarray] = []
         for member in self.members:
             p_i = member.predict(candidate_points)
@@ -119,9 +137,11 @@ class EnsembleWrapper(BaseModel):
         return Predictions(means=means, variances=variances, empirical_dist=empirical_dist)
 
     def sample(self, condition: Any | None = None) -> list[Candidate]:
+        """Not implemented; raises NotImplementedError."""
         raise NotImplementedError("Sampling is not implemented for EnsembleWrapper.")
 
     def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
+        """Return per-epoch metrics from all members, tagged with member index."""
         result: list[SurrogateEpochMetrics] = []
         for i, member in enumerate(self.members):
             for em in member.get_epoch_metrics():
@@ -137,6 +157,7 @@ class EnsembleWrapper(BaseModel):
         return result
 
     def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
+        """Return summary metrics from all members, tagged with member index."""
         result: dict[str, Union[float, int, np.number]] = {}
         for i, member in enumerate(self.members):
             for k, v in member.get_training_summary_metrics().items():
@@ -144,5 +165,6 @@ class EnsembleWrapper(BaseModel):
         return result
 
     def cleanup(self) -> None:
+        """Delegate cleanup to each ensemble member."""
         for member in self.members:
             member.cleanup()
