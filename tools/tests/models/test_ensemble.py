@@ -401,3 +401,147 @@ class TestEnsembleWrapperPredict:
         p1 = w1.predict(tabular_candidates)
         p2 = w2.predict(tabular_candidates)
         np.testing.assert_array_equal(p1.empirical_dist, p2.empirical_dist)
+
+
+# ---------------------------------------------------------------------------
+# EnsembleWrapper with CNNModel
+# ---------------------------------------------------------------------------
+
+
+class TestEnsembleWrapperWithCNN:
+    """Confirm EnsembleWrapper works end-to-end with CNNModel (SEQUENCE modality).
+
+    CNNModel differs from MLPModel in two ways relevant here:
+      - Accepts SEQUENCE candidates (one-hot encoded internally), not TABULAR/EMBEDDING.
+      - Has no model_seed config field; seeding is done via torch.manual_seed in cnn_factory.
+    All three tests below should PASS immediately after adding the class.
+    """
+
+    def test_cnn_member_count_with_base_seed(self):
+        """base_seed mode must create exactly n_members CNNModel instances."""
+        wrapper = EnsembleWrapper(
+            model_factory=cnn_factory,
+            config=EnsembleWrapperConfig(base_seed=0, n_members=3),
+        )
+        assert len(wrapper.members) == 3
+        assert all(isinstance(m, CNNModel) for m in wrapper.members)
+
+    def test_cnn_member_count_with_member_seeds(self):
+        """member_seeds mode must create one CNNModel per seed."""
+        wrapper = EnsembleWrapper(
+            model_factory=cnn_factory,
+            config=EnsembleWrapperConfig(member_seeds=[10, 20]),
+        )
+        assert len(wrapper.members) == 2
+        assert all(isinstance(m, CNNModel) for m in wrapper.members)
+
+    def test_cnn_featurise_returns_tensor(self, sequence_candidates):
+        """featurise() must return a float32 tensor of shape (n_candidates, alphabet_size, seq_len).
+
+        The 20-character protein sequence produces shape (6, 20, 20):
+        6 candidates, 20 alphabet characters, 20-position sequence.
+        """
+        wrapper = EnsembleWrapper(
+            model_factory=cnn_factory,
+            config=EnsembleWrapperConfig(base_seed=0, n_members=2),
+        )
+        x = wrapper.featurise(sequence_candidates)
+        assert isinstance(x, torch.Tensor)
+        assert x.shape == (6, 20, 20)
+        assert x.dtype == torch.float32
+
+    def test_cnn_predict_before_train_raises(self, sequence_candidates):
+        """predict() before train() must raise RuntimeError."""
+        wrapper = EnsembleWrapper(
+            model_factory=cnn_factory,
+            config=EnsembleWrapperConfig(base_seed=0, n_members=2),
+        )
+        with pytest.raises(RuntimeError):
+            wrapper.predict(sequence_candidates)
+
+    def test_cnn_ensemble_trains_all_members(self, labelled_sequences):
+        """After train(), every CNNModel member must have an initialised .model attribute."""
+        wrapper = EnsembleWrapper(
+            model_factory=cnn_factory,
+            config=EnsembleWrapperConfig(base_seed=0, n_members=3),
+        )
+        wrapper.train(labelled_sequences)
+        for member in wrapper.members:
+            assert member.model is not None
+
+    def test_cnn_ensemble_epoch_metric_tagging(self, labelled_sequences):
+        """After train(), epoch metric keys must be prefixed 'member_0/' and 'member_1/'."""
+        wrapper = EnsembleWrapper(
+            model_factory=cnn_factory,
+            config=EnsembleWrapperConfig(base_seed=0, n_members=2),
+        )
+        wrapper.train(labelled_sequences)
+        all_keys: set[str] = set()
+        for em in wrapper.get_epoch_metrics():
+            all_keys.update(em.additional_metrics.keys())
+        assert any(k.startswith("member_0/") for k in all_keys)
+        assert any(k.startswith("member_1/") for k in all_keys)
+
+    def test_cnn_ensemble_cleanup_delegates(self, labelled_sequences):
+        """cleanup() must call cleanup() on every CNN member without raising."""
+        wrapper = EnsembleWrapper(
+            model_factory=cnn_factory,
+            config=EnsembleWrapperConfig(base_seed=0, n_members=2),
+        )
+        wrapper.train(labelled_sequences)
+        wrapper.cleanup()  # must not raise
+
+    def test_cnn_ensemble_empirical_dist_shape(self, sequence_candidates, labelled_sequences):
+        """3-member CNN ensemble must produce empirical_dist of shape (6, 3).
+
+        CNNModel.predict() returns means only (no empirical_dist), so
+        EnsembleWrapper stacks each member's means as a single column.
+        """
+        wrapper = EnsembleWrapper(
+            model_factory=cnn_factory,
+            config=EnsembleWrapperConfig(base_seed=0, n_members=3),
+        )
+        wrapper.train(labelled_sequences)
+        preds = wrapper.predict(sequence_candidates)
+        assert preds.empirical_dist.shape == (6, 3)
+        assert preds.means.shape == (6,)
+        assert preds.variances.shape == (6,)
+
+    def test_cnn_ensemble_means_are_rowwise_mean(self, sequence_candidates, labelled_sequences):
+        """Means must equal empirical_dist.mean(axis=1) for a CNN deep ensemble."""
+        wrapper = EnsembleWrapper(
+            model_factory=cnn_factory,
+            config=EnsembleWrapperConfig(base_seed=0, n_members=3),
+        )
+        wrapper.train(labelled_sequences)
+        preds = wrapper.predict(sequence_candidates)
+        np.testing.assert_allclose(preds.means, preds.empirical_dist.mean(axis=1), rtol=1e-5)
+
+    def test_cnn_ensemble_variances_are_rowwise_var(self, sequence_candidates, labelled_sequences):
+        """Variances must equal empirical_dist.var(axis=1) for a CNN deep ensemble."""
+        wrapper = EnsembleWrapper(
+            model_factory=cnn_factory,
+            config=EnsembleWrapperConfig(base_seed=0, n_members=3),
+        )
+        wrapper.train(labelled_sequences)
+        preds = wrapper.predict(sequence_candidates)
+        np.testing.assert_allclose(preds.variances, preds.empirical_dist.var(axis=1), rtol=1e-5)
+
+    def test_cnn_different_seeds_give_different_columns(
+        self, sequence_candidates, labelled_sequences
+    ):
+        """Different member seeds must produce different per-member prediction columns.
+
+        cnn_factory(seed) calls torch.manual_seed(seed) before construction, so
+        different seeds yield different weight initialisations and thus different
+        predictions after identical training data.
+        """
+        wrapper = EnsembleWrapper(
+            model_factory=cnn_factory,
+            config=EnsembleWrapperConfig(member_seeds=[1, 2]),
+        )
+        wrapper.train(labelled_sequences)
+        preds = wrapper.predict(sequence_candidates)
+        assert not np.allclose(preds.empirical_dist[:, 0], preds.empirical_dist[:, 1]), (
+            "Different CNN member seeds must produce different predictions"
+        )
