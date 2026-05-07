@@ -244,7 +244,8 @@ class MLPModel(BaseModel):
             Dict with keys ``loss`` (float) and any additional metrics from
             ``Results.metrics`` (e.g. ``spearman``, ``mse``).
         """
-        assert self.net is not None
+        if self.net is None:
+            raise ValueError("Network not initialised; call train() before _train_epoch.")
         self.net.train()
         train_losses: list[float] = []
         train_preds_list: list[np.ndarray] = []
@@ -284,7 +285,8 @@ class MLPModel(BaseModel):
             Dict with key ``loss`` (float) and any additional metrics from
             ``Results.metrics`` (e.g. ``spearman``, ``mse``).
         """
-        assert self.net is not None
+        if self.net is None:
+            raise ValueError("Network not initialised; call train() before _validate_epoch.")
         self.net.eval()
         val_losses: list[float] = []
         val_preds_list: list[np.ndarray] = []
