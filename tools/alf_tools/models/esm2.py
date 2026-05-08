@@ -173,14 +173,15 @@ class ESM2Model(BaseModel):
         masked = torch.bernoulli(prob_matrix).bool()
 
         # Guarantee at least one token is masked per row so CrossEntropyLoss is never NaN.
-        # For rows where bernoulli masked nothing, force-mask the first eligible token.
+        # Pick a random eligible position to avoid systematic positional bias.
         rows_with_no_mask = ~masked.any(dim=1)
         if rows_with_no_mask.any():
             eligible = ~special_tokens_mask  # (batch, seq_len)
             for row_idx in rows_with_no_mask.nonzero(as_tuple=True)[0]:
                 eligible_positions = eligible[row_idx].nonzero(as_tuple=True)[0]
                 if len(eligible_positions) > 0:
-                    masked[row_idx, eligible_positions[0]] = True
+                    pick = torch.randint(len(eligible_positions), (1,)).item()
+                    masked[row_idx, eligible_positions[pick]] = True
 
         labels[~masked] = -100
 
