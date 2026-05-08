@@ -195,7 +195,6 @@ class ESM2Model(BaseModel):
             Tuple of (masked_input_ids, labels), both of shape (batch, seq_len).
         """
         labels = input_ids.clone()
-        device = input_ids.device
 
         special_ids = {
             self.tokenizer.cls_token_id,
@@ -211,7 +210,7 @@ class ESM2Model(BaseModel):
         eligible = ~special_tokens_mask  # (batch, seq_len)
 
         # Sample masked positions
-        prob_matrix = torch.full(input_ids.shape, self.train_config.mask_probability, device=device)
+        prob_matrix = torch.full(input_ids.shape, self.train_config.mask_probability, device=self.device)
         prob_matrix.masked_fill_(special_tokens_mask, 0.0)
         masked = torch.bernoulli(prob_matrix).bool()
 
@@ -259,7 +258,7 @@ class ESM2Model(BaseModel):
         n_masked = masked_indices.shape[0]
         p_mask, p_random, p_unchanged = self.train_config.mask_splitting
         if n_masked > 0:
-            split = torch.rand(n_masked, device=device)
+            split = torch.rand(n_masked, device=self.device)
 
             # X %: replace with [MASK]
             replace_with_mask = split < p_mask
@@ -275,7 +274,7 @@ class ESM2Model(BaseModel):
                     low=0,
                     high=self.tokenizer.vocab_size,
                     size=(idx.shape[0],),
-                    device=device,
+                    device=self.device,
                 )
                 masked_input_ids[idx[:, 0], idx[:, 1]] = random_ids
 
