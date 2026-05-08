@@ -54,6 +54,8 @@ class ESM2TrainConfig:
         batch_size: Batch size for training.
         num_epochs: Number of epochs to train for.
         mask_probability: Fraction of non-special tokens to randomly mask (MLM).
+        mask_splitting: Tuple of (p_mask, p_random, p_unchanged) probabilities
+            for masked token replacement.
         log_frequency: Record epoch metrics every N epochs.
     """
 
@@ -63,6 +65,7 @@ class ESM2TrainConfig:
     batch_size: int = 8
     num_epochs: int = 10
     mask_probability: float = 0.15
+    mask_splitting: tuple[float, float, float] = (0.8, 0.1, 0.1)  # mask / random / unchanged
     log_frequency: int = 1
 
 
@@ -185,10 +188,14 @@ class ESM2Model(BaseModel):
         Args:
             input_ids: Token IDs of shape (batch, seq_len).
 
+        Raises:
+            ValueError: If the tokenizer does not have a mask token.
+
         Returns:
             Tuple of (masked_input_ids, labels), both of shape (batch, seq_len).
         """
         labels = input_ids.clone()
+        device = input_ids.device
 
         special_ids = {
             self.tokenizer.cls_token_id,
@@ -200,26 +207,80 @@ class ESM2Model(BaseModel):
         for sid in special_ids:
             special_tokens_mask |= input_ids.eq(sid)
 
-        prob_matrix = torch.full(input_ids.shape, self.train_config.mask_probability)
-        prob_matrix.masked_fill_(special_tokens_mask, 0.0)
+        # eligible[i, j] is True when position (i, j) may be masked
+        eligible = ~special_tokens_mask  # (batch, seq_len)
 
+        # Sample masked positions
+        prob_matrix = torch.full(input_ids.shape, self.train_config.mask_probability, device=device)
+        prob_matrix.masked_fill_(special_tokens_mask, 0.0)
         masked = torch.bernoulli(prob_matrix).bool()
 
         # Guarantee at least one token is masked per row so CrossEntropyLoss is never NaN.
         # Pick a random eligible position to avoid systematic positional bias.
         rows_with_no_mask = ~masked.any(dim=1)
         if rows_with_no_mask.any():
-            eligible = ~special_tokens_mask  # (batch, seq_len)
-            for row_idx in rows_with_no_mask.nonzero(as_tuple=True)[0]:
-                eligible_positions = eligible[row_idx].nonzero(as_tuple=True)[0]
-                if len(eligible_positions) > 0:
-                    pick = torch.randint(len(eligible_positions), (1,)).item()
-                    masked[row_idx, eligible_positions[pick]] = True
+            # eligible_float: ineligible positions get 0 weight so they are never picked
+            eligible_float = eligible[rows_with_no_mask].float()  # (n_empty, seq_len)
+
+            if eligible_float.sum(dim=1).eq(0).any():
+                # Every token in this row is a special token — cannot mask anything.
+                # Log a warning; the row's labels will be all -100 (loss contribution = 0).
+                logger.warning(
+                    "One or more sequences consist entirely of special tokens. "
+                    "These rows will contribute zero loss. Check your data pipeline."
+                )
+                # Zero-weight rows would cause multinomial to raise; fall back to no-op.
+                eligible_float = eligible_float.clamp(min=0)  # already 0, kept for clarity
+                has_eligible = eligible_float.sum(dim=1) > 0  # (n_empty,)
+                if has_eligible.any():
+                    picks = torch.multinomial(eligible_float[has_eligible], num_samples=1).squeeze(
+                        1
+                    )  # (n_has_eligible,)
+                    target_rows = rows_with_no_mask.nonzero(as_tuple=True)[0][has_eligible]
+                    masked[target_rows, picks] = True
+            else:
+                picks = torch.multinomial(eligible_float, num_samples=1).squeeze(1)
+                target_rows = rows_with_no_mask.nonzero(as_tuple=True)[0]
+                masked[target_rows, picks] = True
 
         labels[~masked] = -100
 
         masked_input_ids = input_ids.clone()
-        masked_input_ids[masked] = self.tokenizer.mask_token_id
+        if self.tokenizer.mask_token_id is None:
+            raise ValueError(
+                "Tokenizer has no mask token. Cannot perform MLM masking. "
+                "Ensure the tokenizer is initialised with a [MASK] token."
+            )
+        # masked_input_ids[masked] = self.tokenizer.mask_token_id
+
+        # Apply 80 / 10 / 10 (or specified) replacement split
+        masked_indices = masked.nonzero(as_tuple=False)  # (n_masked, 2)
+
+        n_masked = masked_indices.shape[0]
+        p_mask, p_random, p_unchanged = self.train_config.mask_splitting
+        if n_masked > 0:
+            split = torch.rand(n_masked, device=device)
+
+            # X %: replace with [MASK]
+            replace_with_mask = split < p_mask
+            if replace_with_mask.any():
+                idx = masked_indices[replace_with_mask]
+                masked_input_ids[idx[:, 0], idx[:, 1]] = self.tokenizer.mask_token_id
+
+            # Y %: replace with a uniformly random vocabulary token
+            replace_with_random = (split >= p_mask) & (split < (p_mask + p_random))
+            if replace_with_random.any():
+                idx = masked_indices[replace_with_random]
+                random_ids = torch.randint(
+                    low=0,
+                    high=self.tokenizer.vocab_size,
+                    size=(idx.shape[0],),
+                    device=device,
+                )
+                masked_input_ids[idx[:, 0], idx[:, 1]] = random_ids
+
+            # Z %: leave unchanged — no write needed, masked_input_ids is already a
+            # copy of input_ids. Documented explicitly to make the split complete.
 
         return masked_input_ids, labels
 
