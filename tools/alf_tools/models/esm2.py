@@ -20,7 +20,6 @@ import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
-from torch.utils.data import DataLoader, TensorDataset
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 
 from alf_tools.models.utils import get_device
