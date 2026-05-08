@@ -115,7 +115,29 @@ class ESM2Model(BaseModel):
         }
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
-        raise NotImplementedError
+        batch = self.featurise(candidate_points)
+        input_ids = batch["input_ids"].to(self.device)
+        attention_mask = batch["attention_mask"].to(self.device)
+
+        self.esm_model.eval()
+        with torch.no_grad():
+            outputs = self.esm_model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                output_hidden_states=True,
+            )
+
+        hidden_state = outputs.hidden_states[self.model_config.repr_layer]  # (batch, seq_len, hidden_dim)
+
+        if self.model_config.pooling == "mean":
+            mask = attention_mask.unsqueeze(-1).float()  # (batch, seq_len, 1)
+            embeddings = (hidden_state * mask).sum(1) / mask.sum(1)  # (batch, hidden_dim)
+        elif self.model_config.pooling == "cls":
+            embeddings = hidden_state[:, 0, :]  # (batch, hidden_dim)
+        else:  # last_hidden_state
+            embeddings = hidden_state  # (batch, seq_len, hidden_dim)
+
+        return Predictions(means=embeddings.cpu().numpy())
 
     def train(self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None) -> None:
         raise NotImplementedError

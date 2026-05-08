@@ -91,3 +91,43 @@ class TestFeaturise:
         result = esm2_model.featurise(sample_data)
         assert result["input_ids"].device.type == "cpu"
         assert result["attention_mask"].device.type == "cpu"
+
+
+class TestPredict:
+    def test_mean_pooling_shape(self, esm2_model, sample_data):
+        predictions = esm2_model.predict(sample_data.candidates)
+        hidden_dim = esm2_model.esm_model.config.hidden_size
+        assert predictions.means.shape == (len(sample_data), hidden_dim)
+
+    def test_cls_pooling_shape(self, model_config, train_config, sample_data):
+        config = ESM2ModelConfig(model_id=MODEL_ID, pooling="cls")
+        model = ESM2Model(name="cls_model", model_config=config, train_config=train_config, device="cpu")
+        predictions = model.predict(sample_data.candidates)
+        hidden_dim = model.esm_model.config.hidden_size
+        assert predictions.means.shape == (len(sample_data), hidden_dim)
+
+    def test_last_hidden_state_pooling_shape(self, model_config, train_config, sample_data):
+        config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
+        model = ESM2Model(name="lhs_model", model_config=config, train_config=train_config, device="cpu")
+        predictions = model.predict(sample_data.candidates)
+        # Shape: (n_seqs, seq_len, hidden_dim) — seq_len includes special tokens and padding
+        assert predictions.means.ndim == 3
+        assert predictions.means.shape[0] == len(sample_data)
+        assert predictions.means.shape[2] == model.esm_model.config.hidden_size
+
+    def test_variances_are_none(self, esm2_model, sample_data):
+        predictions = esm2_model.predict(sample_data.candidates)
+        assert predictions.variances is None
+
+    def test_embeddings_are_finite(self, esm2_model, sample_data):
+        predictions = esm2_model.predict(sample_data.candidates)
+        assert np.all(np.isfinite(predictions.means))
+
+    def test_repr_layer_produces_different_embeddings(self, train_config, sample_data):
+        config_final = ESM2ModelConfig(model_id=MODEL_ID, repr_layer=-1)
+        config_first = ESM2ModelConfig(model_id=MODEL_ID, repr_layer=1)
+        model_final = ESM2Model(name="final", model_config=config_final, train_config=train_config, device="cpu")
+        model_first = ESM2Model(name="first", model_config=config_first, train_config=train_config, device="cpu")
+        preds_final = model_final.predict(sample_data.candidates)
+        preds_first = model_first.predict(sample_data.candidates)
+        assert not np.allclose(preds_final.means, preds_first.means)
