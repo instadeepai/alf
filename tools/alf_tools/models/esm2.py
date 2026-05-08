@@ -19,6 +19,7 @@ from typing import Any, Literal, Union
 import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
+from torch.utils.data import DataLoader, TensorDataset
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 
@@ -143,6 +144,51 @@ class ESM2Model(BaseModel):
 
         return Predictions(means=embeddings.cpu().numpy())
 
+    def _prepare_data_loader(self, data: LabelledCandidates, shuffle: bool = False) -> DataLoader:
+        batch = self.featurise(data)
+        dataset = TensorDataset(batch["input_ids"], batch["attention_mask"])
+        return DataLoader(dataset, batch_size=self.train_config.batch_size, shuffle=shuffle)
+
+    def _mask_tokens(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Apply random token masking for MLM. Returns (masked_input_ids, labels).
+
+        Non-masked positions in labels are set to -100 so CrossEntropyLoss ignores them.
+        Special tokens (cls, eos, pad) are never masked.
+        """
+        labels = input_ids.clone()
+
+        special_ids = {
+            self.tokenizer.cls_token_id,
+            self.tokenizer.eos_token_id,
+            self.tokenizer.pad_token_id,
+        } - {None}
+
+        special_tokens_mask = torch.zeros_like(input_ids, dtype=torch.bool)
+        for sid in special_ids:
+            special_tokens_mask |= input_ids.eq(sid)
+
+        prob_matrix = torch.full(input_ids.shape, self.train_config.mask_probability)
+        prob_matrix.masked_fill_(special_tokens_mask, 0.0)
+
+        masked = torch.bernoulli(prob_matrix).bool()
+
+        # Guarantee at least one token is masked per row so CrossEntropyLoss is never NaN.
+        # For rows where bernoulli masked nothing, force-mask the first eligible token.
+        rows_with_no_mask = ~masked.any(dim=1)
+        if rows_with_no_mask.any():
+            eligible = ~special_tokens_mask  # (batch, seq_len)
+            for row_idx in rows_with_no_mask.nonzero(as_tuple=True)[0]:
+                eligible_positions = eligible[row_idx].nonzero(as_tuple=True)[0]
+                if len(eligible_positions) > 0:
+                    masked[row_idx, eligible_positions[0]] = True
+
+        labels[~masked] = -100
+
+        masked_input_ids = input_ids.clone()
+        masked_input_ids[masked] = self.tokenizer.mask_token_id
+
+        return masked_input_ids, labels
+
     def train(
         self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None
     ) -> None:
@@ -152,7 +198,77 @@ class ESM2Model(BaseModel):
         if self.train_config.freeze_backbone:
             return
 
-        raise NotImplementedError("Fine-tuning not yet implemented")
+        logger.info(f"Fine-tuning ESM-2 ({self.model_config.model_id}) with {len(train_data)} sequences")
+
+        if self.train_config.optimizer_type == "adamw":
+            optimizer: torch.optim.Optimizer = torch.optim.AdamW(
+                self.esm_model.parameters(), lr=self.train_config.learning_rate
+            )
+        else:
+            optimizer = torch.optim.Adam(
+                self.esm_model.parameters(), lr=self.train_config.learning_rate
+            )
+
+        train_loader = self._prepare_data_loader(train_data, shuffle=True)
+        val_loader = (
+            self._prepare_data_loader(val_data, shuffle=False)
+            if val_data is not None and len(val_data) > 0
+            else None
+        )
+
+        avg_train_loss = 0.0
+        avg_val_loss: float | None = None
+
+        for epoch in range(self.train_config.num_epochs):
+            self.esm_model.train()
+            epoch_losses: list[float] = []
+
+            for batch_ids, batch_mask in train_loader:
+                batch_ids = batch_ids.to(self.device)
+                batch_mask = batch_mask.to(self.device)
+                masked_ids, labels = self._mask_tokens(batch_ids)
+
+                optimizer.zero_grad()
+                outputs = self.esm_model(
+                    input_ids=masked_ids,
+                    attention_mask=batch_mask,
+                    labels=labels,
+                )
+                outputs.loss.backward()
+                optimizer.step()
+                epoch_losses.append(outputs.loss.item())
+
+            avg_train_loss = float(np.mean(epoch_losses))
+
+            if val_loader is not None:
+                self.esm_model.eval()
+                val_losses: list[float] = []
+                with torch.no_grad():
+                    for batch_ids, batch_mask in val_loader:
+                        batch_ids = batch_ids.to(self.device)
+                        batch_mask = batch_mask.to(self.device)
+                        masked_ids, labels = self._mask_tokens(batch_ids)
+                        outputs = self.esm_model(
+                            input_ids=masked_ids,
+                            attention_mask=batch_mask,
+                            labels=labels,
+                        )
+                        val_losses.append(outputs.loss.item())
+                avg_val_loss = float(np.mean(val_losses))
+
+            if (epoch + 1) % self.train_config.log_frequency == 0:
+                self._epoch_metrics.append(
+                    SurrogateEpochMetrics(
+                        epoch=epoch,
+                        train_loss=avg_train_loss,
+                        val_loss=avg_val_loss,
+                    )
+                )
+                logger.info(f"Epoch {epoch + 1}/{self.train_config.num_epochs}: train_loss={avg_train_loss:.4f}")
+
+        self.training_metrics["final_train_loss"] = avg_train_loss
+        if avg_val_loss is not None:
+            self.training_metrics["final_val_loss"] = avg_val_loss
 
     def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
         raise NotImplementedError("Sampling is not implemented for this model.")

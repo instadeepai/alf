@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates
+from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_tools.models.esm2 import ESM2Model, ESM2ModelConfig, ESM2TrainConfig
 
 MODEL_ID = "facebook/esm2_t6_8M_UR50D"
@@ -37,6 +38,20 @@ def esm2_model(model_config, train_config):
     return ESM2Model(
         name="test_esm2", model_config=model_config, train_config=train_config, device="cpu"
     )
+
+
+@pytest.fixture(scope="session")
+def esm2_finetune_model():
+    """ESM-2 model with unfrozen backbone for fine-tuning tests."""
+    config = ESM2ModelConfig(model_id=MODEL_ID)
+    train_cfg = ESM2TrainConfig(
+        freeze_backbone=False,
+        num_epochs=2,
+        batch_size=2,
+        learning_rate=1e-4,
+        log_frequency=1,
+    )
+    return ESM2Model(name="test_esm2_ft", model_config=config, train_config=train_cfg, device="cpu")
 
 
 @pytest.fixture
@@ -159,3 +174,53 @@ class TestTrainFrozen:
     def test_frozen_summary_metrics_empty(self, esm2_model, sample_data):
         esm2_model.train(sample_data)
         assert esm2_model.get_training_summary_metrics() == {}
+
+
+class TestTrainFinetune:
+    def test_finetune_updates_weights(self, esm2_finetune_model, sample_data):
+        initial_params = {
+            name: param.clone()
+            for name, param in esm2_finetune_model.esm_model.named_parameters()
+        }
+        esm2_finetune_model.train(sample_data)
+        params_changed = any(
+            not torch.equal(initial_params[name], param)
+            for name, param in esm2_finetune_model.esm_model.named_parameters()
+        )
+        assert params_changed, "Fine-tuning should update model parameters"
+
+    def test_epoch_metrics_recorded(self, esm2_finetune_model, sample_data):
+        esm2_finetune_model.train(sample_data)
+        metrics = esm2_finetune_model.get_epoch_metrics()
+        assert len(metrics) == esm2_finetune_model.train_config.num_epochs
+        assert all(isinstance(m, SurrogateEpochMetrics) for m in metrics)
+
+    def test_epoch_metrics_train_loss_finite(self, esm2_finetune_model, sample_data):
+        esm2_finetune_model.train(sample_data)
+        for m in esm2_finetune_model.get_epoch_metrics():
+            assert np.isfinite(m.train_loss)
+
+    def test_epoch_metrics_reset_on_retrain(self, esm2_finetune_model, sample_data):
+        esm2_finetune_model.train(sample_data)
+        esm2_finetune_model.train(sample_data)
+        assert len(esm2_finetune_model.get_epoch_metrics()) == esm2_finetune_model.train_config.num_epochs
+
+    def test_summary_metrics_has_final_train_loss(self, esm2_finetune_model, sample_data):
+        esm2_finetune_model.train(sample_data)
+        summary = esm2_finetune_model.get_training_summary_metrics()
+        assert "final_train_loss" in summary
+        assert np.isfinite(summary["final_train_loss"])
+
+    def test_val_loss_recorded_when_val_data_provided(self, esm2_finetune_model, sample_data):
+        val_candidates = [Candidate(data="ACDEFGHIKL", modality="sequence")]
+        val_data = LabelledCandidates(val_candidates, np.array([1.0]))
+        esm2_finetune_model.train(sample_data, val_data=val_data)
+        for m in esm2_finetune_model.get_epoch_metrics():
+            assert m.val_loss is not None
+            assert np.isfinite(m.val_loss)
+        assert "final_val_loss" in esm2_finetune_model.get_training_summary_metrics()
+
+    def test_val_loss_none_without_val_data(self, esm2_finetune_model, sample_data):
+        esm2_finetune_model.train(sample_data)
+        for m in esm2_finetune_model.get_epoch_metrics():
+            assert m.val_loss is None
