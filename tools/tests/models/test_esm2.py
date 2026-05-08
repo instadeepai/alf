@@ -24,17 +24,31 @@ MODEL_ID = "facebook/esm2_t6_8M_UR50D"
 
 @pytest.fixture(scope="session")
 def model_config():
+    """Create a default ESM2ModelConfig for testing.
+
+    Returns:
+        An ESM2ModelConfig using the smallest ESM-2 checkpoint.
+    """
     return ESM2ModelConfig(model_id=MODEL_ID)
 
 
 @pytest.fixture(scope="session")
 def train_config():
+    """Create a frozen ESM2TrainConfig for testing.
+
+    Returns:
+        An ESM2TrainConfig with freeze_backbone=True.
+    """
     return ESM2TrainConfig(freeze_backbone=True)
 
 
 @pytest.fixture(scope="session")
 def esm2_model(model_config, train_config):
-    """Frozen ESM-2 model — downloaded once per test session."""
+    """Frozen ESM-2 model — downloaded once per test session.
+
+    Returns:
+        An ESM2Model with frozen backbone on CPU.
+    """
     return ESM2Model(
         name="test_esm2", model_config=model_config, train_config=train_config, device="cpu"
     )
@@ -42,7 +56,11 @@ def esm2_model(model_config, train_config):
 
 @pytest.fixture(scope="session")
 def esm2_finetune_model():
-    """ESM-2 model with unfrozen backbone for fine-tuning tests."""
+    """ESM-2 model with unfrozen backbone for fine-tuning tests.
+
+    Returns:
+        An ESM2Model with trainable backbone, 2 epochs, batch size 2.
+    """
     config = ESM2ModelConfig(model_id=MODEL_ID)
     train_cfg = ESM2TrainConfig(
         freeze_backbone=False,
@@ -56,6 +74,11 @@ def esm2_finetune_model():
 
 @pytest.fixture
 def sample_data():
+    """Create a small LabelledCandidates dataset for testing.
+
+    Returns:
+        A LabelledCandidates object with three short amino-acid sequences.
+    """
     sequences = ["ACDEFGHIKL", "MNPQRSTVWY", "ACMNPQRST"]
     candidates = [Candidate(data=seq, modality="sequence") for seq in sequences]
     labels = np.array([1.0, 2.0, 1.5])
@@ -63,16 +86,21 @@ def sample_data():
 
 
 class TestConfigs:
+    """Tests for ESM2ModelConfig and ESM2TrainConfig dataclasses."""
+
     def test_model_config_requires_model_id(self):
+        """Test that ESM2ModelConfig stores the model_id correctly."""
         config = ESM2ModelConfig(model_id=MODEL_ID)
         assert config.model_id == MODEL_ID
 
     def test_model_config_defaults(self):
+        """Test that ESM2ModelConfig has the expected default values."""
         config = ESM2ModelConfig(model_id=MODEL_ID)
         assert config.pooling == "mean"
         assert config.repr_layer == -1
 
     def test_train_config_defaults(self):
+        """Test that ESM2TrainConfig has the expected default values."""
         config = ESM2TrainConfig()
         assert config.freeze_backbone is True
         assert config.learning_rate == 1e-4
@@ -84,38 +112,49 @@ class TestConfigs:
 
 
 class TestFeaturise:
+    """Tests for ESM2Model.featurise()."""
+
     def test_returns_dict_with_required_keys(self, esm2_model, sample_data):
+        """Test that featurise returns a dict with input_ids and attention_mask."""
         result = esm2_model.featurise(sample_data)
         assert "input_ids" in result
         assert "attention_mask" in result
 
     def test_tensors_have_correct_batch_size(self, esm2_model, sample_data):
+        """Test that returned tensors have batch size equal to the number of sequences."""
         result = esm2_model.featurise(sample_data)
         assert result["input_ids"].shape[0] == len(sample_data)
         assert result["attention_mask"].shape[0] == len(sample_data)
 
     def test_tensors_are_2d(self, esm2_model, sample_data):
+        """Test that returned tensors are 2D (batch, seq_len)."""
         result = esm2_model.featurise(sample_data)
         assert result["input_ids"].ndim == 2
         assert result["attention_mask"].ndim == 2
 
     def test_accepts_list_of_candidates(self, esm2_model, sample_data):
+        """Test that featurise accepts a plain list of Candidate objects."""
         result = esm2_model.featurise(sample_data.candidates)
         assert result["input_ids"].shape[0] == len(sample_data)
 
     def test_returns_cpu_tensors(self, esm2_model, sample_data):
+        """Test that featurise returns tensors on CPU regardless of model device."""
         result = esm2_model.featurise(sample_data)
         assert result["input_ids"].device.type == "cpu"
         assert result["attention_mask"].device.type == "cpu"
 
 
 class TestPredict:
+    """Tests for ESM2Model.predict()."""
+
     def test_mean_pooling_shape(self, esm2_model, sample_data):
+        """Test that mean pooling produces embeddings of shape (n_seqs, hidden_dim)."""
         predictions = esm2_model.predict(sample_data.candidates)
         hidden_dim = esm2_model.esm_model.config.hidden_size
         assert predictions.means.shape == (len(sample_data), hidden_dim)
 
     def test_cls_pooling_shape(self, model_config, train_config, sample_data):
+        """Test that CLS pooling produces embeddings of shape (n_seqs, hidden_dim)."""
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="cls")
         model = ESM2Model(
             name="cls_model", model_config=config, train_config=train_config, device="cpu"
@@ -125,6 +164,7 @@ class TestPredict:
         assert predictions.means.shape == (len(sample_data), hidden_dim)
 
     def test_last_hidden_state_pooling_shape(self, model_config, train_config, sample_data):
+        """Test that last_hidden_state pooling produces shape (n_seqs, seq_len, hidden_dim)."""
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
         model = ESM2Model(
             name="lhs_model", model_config=config, train_config=train_config, device="cpu"
@@ -136,14 +176,17 @@ class TestPredict:
         assert predictions.means.shape[2] == model.esm_model.config.hidden_size
 
     def test_variances_are_none(self, esm2_model, sample_data):
+        """Test that predict returns Predictions with variances=None."""
         predictions = esm2_model.predict(sample_data.candidates)
         assert predictions.variances is None
 
     def test_embeddings_are_finite(self, esm2_model, sample_data):
+        """Test that all embedding values are finite (no NaN or inf)."""
         predictions = esm2_model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
 
     def test_repr_layer_produces_different_embeddings(self, train_config, sample_data):
+        """Test that extracting from different layers produces different embeddings."""
         config_final = ESM2ModelConfig(model_id=MODEL_ID, repr_layer=-1)
         config_first = ESM2ModelConfig(model_id=MODEL_ID, repr_layer=1)
         model_final = ESM2Model(
@@ -158,8 +201,10 @@ class TestPredict:
 
 
 class TestTrainFrozen:
+    """Tests for ESM2Model.train() when freeze_backbone=True."""
+
     def test_frozen_train_is_noop(self, esm2_model, sample_data):
-        """When freeze_backbone=True, train() must not change any weights."""
+        """Test that train() does not update any weights when freeze_backbone=True."""
         initial_params = {
             name: param.clone() for name, param in esm2_model.esm_model.named_parameters()
         }
@@ -168,19 +213,23 @@ class TestTrainFrozen:
             assert torch.equal(initial_params[name], param), f"Parameter {name} changed"
 
     def test_frozen_epoch_metrics_empty(self, esm2_model, sample_data):
+        """Test that get_epoch_metrics returns an empty list after frozen train()."""
         esm2_model.train(sample_data)
         assert esm2_model.get_epoch_metrics() == []
 
     def test_frozen_summary_metrics_empty(self, esm2_model, sample_data):
+        """Test that get_training_summary_metrics returns an empty dict after frozen train()."""
         esm2_model.train(sample_data)
         assert esm2_model.get_training_summary_metrics() == {}
 
 
 class TestTrainFinetune:
+    """Tests for ESM2Model.train() when freeze_backbone=False."""
+
     def test_finetune_updates_weights(self, esm2_finetune_model, sample_data):
+        """Test that MLM fine-tuning updates at least one model parameter."""
         initial_params = {
-            name: param.clone()
-            for name, param in esm2_finetune_model.esm_model.named_parameters()
+            name: param.clone() for name, param in esm2_finetune_model.esm_model.named_parameters()
         }
         esm2_finetune_model.train(sample_data)
         params_changed = any(
@@ -190,28 +239,36 @@ class TestTrainFinetune:
         assert params_changed, "Fine-tuning should update model parameters"
 
     def test_epoch_metrics_recorded(self, esm2_finetune_model, sample_data):
+        """Test that one SurrogateEpochMetrics is recorded per training epoch."""
         esm2_finetune_model.train(sample_data)
         metrics = esm2_finetune_model.get_epoch_metrics()
         assert len(metrics) == esm2_finetune_model.train_config.num_epochs
         assert all(isinstance(m, SurrogateEpochMetrics) for m in metrics)
 
     def test_epoch_metrics_train_loss_finite(self, esm2_finetune_model, sample_data):
+        """Test that train_loss in each epoch metric is a finite number."""
         esm2_finetune_model.train(sample_data)
         for m in esm2_finetune_model.get_epoch_metrics():
             assert np.isfinite(m.train_loss)
 
     def test_epoch_metrics_reset_on_retrain(self, esm2_finetune_model, sample_data):
+        """Test that epoch metrics are cleared at the start of each train() call."""
         esm2_finetune_model.train(sample_data)
         esm2_finetune_model.train(sample_data)
-        assert len(esm2_finetune_model.get_epoch_metrics()) == esm2_finetune_model.train_config.num_epochs
+        assert (
+            len(esm2_finetune_model.get_epoch_metrics())
+            == esm2_finetune_model.train_config.num_epochs
+        )
 
     def test_summary_metrics_has_final_train_loss(self, esm2_finetune_model, sample_data):
+        """Test that get_training_summary_metrics includes a finite final_train_loss."""
         esm2_finetune_model.train(sample_data)
         summary = esm2_finetune_model.get_training_summary_metrics()
         assert "final_train_loss" in summary
         assert np.isfinite(summary["final_train_loss"])
 
     def test_val_loss_recorded_when_val_data_provided(self, esm2_finetune_model, sample_data):
+        """Test that val_loss is recorded in epoch metrics when val_data is provided."""
         val_candidates = [Candidate(data="ACDEFGHIKL", modality="sequence")]
         val_data = LabelledCandidates(val_candidates, np.array([1.0]))
         esm2_finetune_model.train(sample_data, val_data=val_data)
@@ -221,6 +278,7 @@ class TestTrainFinetune:
         assert "final_val_loss" in esm2_finetune_model.get_training_summary_metrics()
 
     def test_val_loss_none_without_val_data(self, esm2_finetune_model, sample_data):
+        """Test that val_loss is None in epoch metrics when no val_data is provided."""
         esm2_finetune_model.train(sample_data)
         for m in esm2_finetune_model.get_epoch_metrics():
             assert m.val_loss is None
