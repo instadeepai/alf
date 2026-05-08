@@ -81,7 +81,20 @@ class ESM2Model(BaseModel):
         train_config: ESM2TrainConfig | None = None,
         device: str | None = None,
     ):
-        raise NotImplementedError
+        self.name = name
+        self.model_config = model_config
+        self.train_config = train_config or ESM2TrainConfig()
+        self.device = get_device(device)
+
+        self.tokenizer = AutoTokenizer.from_pretrained(model_config.model_id)
+        self.esm_model = AutoModelForMaskedLM.from_pretrained(model_config.model_id)
+        self.esm_model.to(self.device)
+
+        total_params = sum(p.numel() for p in self.esm_model.parameters())
+        logger.info(f"ESM-2 loaded: {model_config.model_id} ({total_params:,} parameters)")
+
+        self._epoch_metrics: list[SurrogateEpochMetrics] = []
+        self.training_metrics: dict[str, Union[float, int, np.number]] = {}
 
     def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> dict[str, torch.Tensor]:
         raise NotImplementedError
