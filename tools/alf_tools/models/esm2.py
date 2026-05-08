@@ -239,8 +239,7 @@ class ESM2Model(BaseModel):
             return
 
         logger.info(
-            f"Fine-tuning ESM-2 ({self.model_config.model_id})"
-            f" with {len(train_data)} sequences"
+            f"Fine-tuning ESM-2 ({self.model_config.model_id}) with {len(train_data)} sequences"
         )
 
         if self.train_config.optimizer_type == "adamw":
