@@ -19,8 +19,8 @@ from typing import Any, Literal, Union
 import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
-from torch.utils.data import DataLoader, TensorDataset
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from torch.utils.data import DataLoader, TensorDataset
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 
 from alf_tools.models.utils import get_device
@@ -81,6 +81,14 @@ class ESM2Model(BaseModel):
         train_config: ESM2TrainConfig | None = None,
         device: str | None = None,
     ):
+        """Initialize the ESM2Model.
+
+        Args:
+            name: Name of the surrogate model.
+            model_config: Configuration for the ESM-2 model architecture.
+            train_config: Configuration for fine-tuning. Defaults to ESM2TrainConfig().
+            device: Device to run on ('cuda', 'cpu', or None for auto-detect).
+        """
         self.name = name
         self.model_config = model_config
         self.train_config = train_config or ESM2TrainConfig()
@@ -99,6 +107,17 @@ class ESM2Model(BaseModel):
     def featurise(
         self, inputs: Union[LabelledCandidates, list[Candidate]]
     ) -> dict[str, torch.Tensor]:
+        """Tokenize sequences into input tensors for the ESM-2 model.
+
+        Args:
+            inputs: Either LabelledCandidates or a list of Candidates to featurise.
+
+        Returns:
+            Dictionary with keys 'input_ids' and 'attention_mask' as tensors.
+
+        Raises:
+            ValueError: If the input is not LabelledCandidates or list of Candidates.
+        """
         if isinstance(inputs, LabelledCandidates):
             sequences = inputs.data
         elif isinstance(inputs, list) and all(isinstance(c, Candidate) for c in inputs):
@@ -118,6 +137,14 @@ class ESM2Model(BaseModel):
         }
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
+        """Compute sequence embeddings for the given candidates.
+
+        Args:
+            candidate_points: List of candidates to generate embeddings for.
+
+        Returns:
+            Predictions whose means are per-sequence embeddings as a numpy array.
+        """
         batch = self.featurise(candidate_points)
         input_ids = batch["input_ids"].to(self.device)
         attention_mask = batch["attention_mask"].to(self.device)
@@ -150,10 +177,16 @@ class ESM2Model(BaseModel):
         return DataLoader(dataset, batch_size=self.train_config.batch_size, shuffle=shuffle)
 
     def _mask_tokens(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """Apply random token masking for MLM. Returns (masked_input_ids, labels).
+        """Apply random token masking for MLM.
 
         Non-masked positions in labels are set to -100 so CrossEntropyLoss ignores them.
         Special tokens (cls, eos, pad) are never masked.
+
+        Args:
+            input_ids: Token IDs of shape (batch, seq_len).
+
+        Returns:
+            Tuple of (masked_input_ids, labels), both of shape (batch, seq_len).
         """
         labels = input_ids.clone()
 
@@ -193,13 +226,22 @@ class ESM2Model(BaseModel):
     def train(
         self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None
     ) -> None:
+        """Fine-tune the ESM-2 backbone with masked language modelling.
+
+        Args:
+            train_data: Training data containing sequences.
+            val_data: Optional validation data for monitoring MLM loss.
+        """
         self._epoch_metrics = []
         self.training_metrics = {}
 
         if self.train_config.freeze_backbone:
             return
 
-        logger.info(f"Fine-tuning ESM-2 ({self.model_config.model_id}) with {len(train_data)} sequences")
+        logger.info(
+            f"Fine-tuning ESM-2 ({self.model_config.model_id})"
+            f" with {len(train_data)} sequences"
+        )
 
         if self.train_config.optimizer_type == "adamw":
             optimizer: torch.optim.Optimizer = torch.optim.AdamW(
@@ -224,9 +266,9 @@ class ESM2Model(BaseModel):
             self.esm_model.train()
             epoch_losses: list[float] = []
 
-            for batch_ids, batch_mask in train_loader:
-                batch_ids = batch_ids.to(self.device)
-                batch_mask = batch_mask.to(self.device)
+            for raw_ids, raw_mask in train_loader:
+                batch_ids = raw_ids.to(self.device)
+                batch_mask = raw_mask.to(self.device)
                 masked_ids, labels = self._mask_tokens(batch_ids)
 
                 optimizer.zero_grad()
@@ -245,9 +287,9 @@ class ESM2Model(BaseModel):
                 self.esm_model.eval()
                 val_losses: list[float] = []
                 with torch.no_grad():
-                    for batch_ids, batch_mask in val_loader:
-                        batch_ids = batch_ids.to(self.device)
-                        batch_mask = batch_mask.to(self.device)
+                    for raw_ids, raw_mask in val_loader:
+                        batch_ids = raw_ids.to(self.device)
+                        batch_mask = raw_mask.to(self.device)
                         masked_ids, labels = self._mask_tokens(batch_ids)
                         outputs = self.esm_model(
                             input_ids=masked_ids,
@@ -265,17 +307,35 @@ class ESM2Model(BaseModel):
                         val_loss=avg_val_loss,
                     )
                 )
-                logger.info(f"Epoch {epoch + 1}/{self.train_config.num_epochs}: train_loss={avg_train_loss:.4f}")
+                logger.info(
+                    f"Epoch {epoch + 1}/{self.train_config.num_epochs}:"
+                    f" train_loss={avg_train_loss:.4f}"
+                )
 
         self.training_metrics["final_train_loss"] = avg_train_loss
         if avg_val_loss is not None:
             self.training_metrics["final_val_loss"] = avg_val_loss
 
     def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
+        """Not implemented for ESM-2.
+
+        Raises:
+            NotImplementedError: Always, as sampling is not supported.
+        """
         raise NotImplementedError("Sampling is not implemented for this model.")
 
     def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
+        """Return per-epoch metrics from the most recent train() call.
+
+        Returns:
+            List of SurrogateEpochMetrics, one per logged epoch.
+        """
         return self._epoch_metrics
 
     def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
+        """Return summary metrics from the most recent train() call.
+
+        Returns:
+            Dictionary of training metrics, e.g. final train and validation losses.
+        """
         return self.training_metrics
