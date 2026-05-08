@@ -95,7 +95,9 @@ class ESM2Model(BaseModel):
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
 
-    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> dict[str, torch.Tensor]:
+    def featurise(
+        self, inputs: Union[LabelledCandidates, list[Candidate]]
+    ) -> dict[str, torch.Tensor]:
         if isinstance(inputs, LabelledCandidates):
             sequences = inputs.data
         elif isinstance(inputs, list) and all(isinstance(c, Candidate) for c in inputs):
@@ -127,7 +129,9 @@ class ESM2Model(BaseModel):
                 output_hidden_states=True,
             )
 
-        hidden_state = outputs.hidden_states[self.model_config.repr_layer]  # (batch, seq_len, hidden_dim)
+        hidden_state = outputs.hidden_states[
+            self.model_config.repr_layer
+        ]  # (batch, seq_len, hidden_dim)
 
         if self.model_config.pooling == "mean":
             mask = attention_mask.unsqueeze(-1).float()  # (batch, seq_len, 1)
@@ -139,14 +143,22 @@ class ESM2Model(BaseModel):
 
         return Predictions(means=embeddings.cpu().numpy())
 
-    def train(self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None) -> None:
-        raise NotImplementedError
+    def train(
+        self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None
+    ) -> None:
+        self._epoch_metrics = []
+        self.training_metrics = {}
+
+        if self.train_config.freeze_backbone:
+            return
+
+        raise NotImplementedError("Fine-tuning not yet implemented")
 
     def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
         raise NotImplementedError("Sampling is not implemented for this model.")
 
     def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
-        raise NotImplementedError
+        return self._epoch_metrics
 
     def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
-        raise NotImplementedError
+        return self.training_metrics
