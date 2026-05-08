@@ -96,7 +96,23 @@ class ESM2Model(BaseModel):
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
 
     def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> dict[str, torch.Tensor]:
-        raise NotImplementedError
+        if isinstance(inputs, LabelledCandidates):
+            sequences = inputs.data
+        elif isinstance(inputs, list) and all(isinstance(c, Candidate) for c in inputs):
+            sequences = [c.data for c in inputs]
+        else:
+            raise ValueError("Input must be LabelledCandidates or list of Candidates")
+
+        encoding = self.tokenizer(
+            sequences,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+        )
+        return {
+            "input_ids": encoding["input_ids"],
+            "attention_mask": encoding["attention_mask"],
+        }
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         raise NotImplementedError

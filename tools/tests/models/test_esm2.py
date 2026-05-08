@@ -65,3 +65,29 @@ class TestConfigs:
         assert config.num_epochs == 10
         assert config.mask_probability == 0.15
         assert config.log_frequency == 1
+
+
+class TestFeaturise:
+    def test_returns_dict_with_required_keys(self, esm2_model, sample_data):
+        result = esm2_model.featurise(sample_data)
+        assert "input_ids" in result
+        assert "attention_mask" in result
+
+    def test_tensors_have_correct_batch_size(self, esm2_model, sample_data):
+        result = esm2_model.featurise(sample_data)
+        assert result["input_ids"].shape[0] == len(sample_data)
+        assert result["attention_mask"].shape[0] == len(sample_data)
+
+    def test_tensors_are_2d(self, esm2_model, sample_data):
+        result = esm2_model.featurise(sample_data)
+        assert result["input_ids"].ndim == 2
+        assert result["attention_mask"].ndim == 2
+
+    def test_accepts_list_of_candidates(self, esm2_model, sample_data):
+        result = esm2_model.featurise(sample_data.candidates)
+        assert result["input_ids"].shape[0] == len(sample_data)
+
+    def test_returns_cpu_tensors(self, esm2_model, sample_data):
+        result = esm2_model.featurise(sample_data)
+        assert result["input_ids"].device.type == "cpu"
+        assert result["attention_mask"].device.type == "cpu"
