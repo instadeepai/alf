@@ -546,7 +546,8 @@ class TestTrainLogLikelihood:
         self, esm2_ll_model, sample_data
     ):
         """Test that each epoch metric has finite train_perplexity, train_token_accuracy,
-        and train_log_likelihood when loss_type='log_likelihood'."""
+        and train_log_likelihood when loss_type='log_likelihood'.
+        """
         esm2_ll_model.train(sample_data)
         for m in esm2_ll_model.get_epoch_metrics():
             assert "train_perplexity" in m.additional_metrics
