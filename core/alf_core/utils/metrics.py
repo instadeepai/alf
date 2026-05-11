@@ -189,14 +189,10 @@ def require_min_samples(n: int) -> Callable:
 
     def decorator(fn: Callable) -> Callable:
         @wraps(fn)
-        def wrapper(
-            means: np.ndarray,
-            variances: np.ndarray | None,
-            targets: np.ndarray,
-        ) -> dict[str, float]:
-            if len(means) < n:
+        def wrapper(*args: Any, **kwargs: Any) -> dict[str, float]:
+            if len(args[0]) < n:
                 return {}
-            return fn(means, variances, targets)
+            return fn(*args, **kwargs)
 
         return wrapper
 
