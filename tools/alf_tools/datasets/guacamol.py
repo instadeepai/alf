@@ -16,15 +16,15 @@ import copy
 import logging
 from pathlib import Path
 from typing import Callable, Final, Literal, Optional, TypedDict, Union, get_args
-from rdkit import Chem
-from rdkit.Chem import QED as RDKitQED
-from rdkit.Chem import Descriptors, GraphDescriptors, rdMolDescriptors
 
 import numpy as np
 import requests
 from alf_core import BaseDataset, Candidate, LabelledCandidates
 from alf_core.dataset.base_dataset import BaseDatasetConfig
 from pydantic import model_validator
+from rdkit import Chem
+from rdkit.Chem import QED as RDKitQED
+from rdkit.Chem import Descriptors, GraphDescriptors, rdMolDescriptors
 
 logger = logging.getLogger("alf-tools")
 
