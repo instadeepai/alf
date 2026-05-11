@@ -451,10 +451,9 @@ class ESM2Model(BaseModel):
         Args:
             epoch: Current epoch index.
             avg_train_loss: Average training loss for the epoch.
-            train_metrics: Dictionary of training metrics (perplexity, token_accuracy,
-                and optionally log_likelihood when loss_type='log_likelihood').
+            train_metrics: Dictionary of training metrics (perplexity, token_accuracy, and optionally log_likelihood when loss_type='log_likelihood').
             avg_val_loss: Average validation loss for the epoch.
-            val_metrics: Dictionary of validation metrics.
+            val_metrics: Dictionary of validation metrics (same keys as train_metrics).
         """
         if (epoch + 1) % self.train_config.log_frequency == 0:
             additional: dict[str, float] = {}
@@ -489,11 +488,11 @@ class ESM2Model(BaseModel):
     def train(
         self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None
     ) -> None:
-        """Fine-tune the ESM-2 backbone with masked language modelling.
+        """Fine-tune the ESM-2 backbone using the configured training objective.
 
         Args:
             train_data: Training data containing sequences.
-            val_data: Optional validation data for monitoring MLM loss.
+            val_data: Optional validation data for monitoring training loss.
         """
         self._epoch_metrics = []
         self.training_metrics = {}
