@@ -306,32 +306,25 @@ class CNNModel(BaseModel):
 
         for batch_x, batch_y in train_loader:
             optimizer.zero_grad()
-            predictions = self.model(batch_x)
-            loss = criterion(predictions, batch_y)
+            logits = self.model(batch_x)
+            loss = criterion(logits, batch_y)
             loss.backward()
             optimizer.step()
             train_losses.append(loss.item())
-            train_predictions_all.append(predictions.detach().cpu().numpy())
+            train_predictions_all.append(
+                _apply_activation(logits, self._problem_type).detach().cpu().numpy()
+            )
             train_targets_all.append(batch_y.detach().cpu().numpy())
 
-        avg_train_loss = np.mean(train_losses)
+        avg_train_loss = float(np.mean(train_losses))
         train_preds = np.concatenate(train_predictions_all)
         train_targets = np.concatenate(train_targets_all)
 
-        # Regression: compute regression metrics from logits == predictions
-        # Classification: skip (logits are not probabilities; metrics computed at eval time)
-        if self._problem_type == ProblemType.REGRESSION and len(train_preds) >= 2:
-            train_predictions_obj = Predictions(means=train_preds, variances=None)
-            train_metrics = Results(
-                predictions=train_predictions_obj,
-                targets=train_targets,
-                problem_type=ProblemType.REGRESSION,
-            ).metrics
-        elif self._problem_type == ProblemType.REGRESSION:
-            mse = float(np.mean((train_preds - train_targets) ** 2))
-            train_metrics = {"mse": mse}
-        else:
-            train_metrics = {}
+        train_metrics = Results(
+            predictions=Predictions(means=train_preds, variances=None),
+            targets=train_targets,
+            problem_type=self._problem_type,
+        ).metrics
 
         return avg_train_loss, train_metrics
 
@@ -360,30 +353,23 @@ class CNNModel(BaseModel):
 
         with torch.no_grad():
             for batch_x, batch_y in val_loader:
-                predictions = self.model(batch_x)
-                loss = criterion(predictions, batch_y)
+                logits = self.model(batch_x)
+                loss = criterion(logits, batch_y)
                 val_losses.append(loss.item())
-                val_predictions_all.append(predictions.cpu().numpy())
+                val_predictions_all.append(
+                    _apply_activation(logits, self._problem_type).cpu().numpy()
+                )
                 val_targets_all.append(batch_y.cpu().numpy())
 
-        avg_val_loss = np.mean(val_losses)
+        avg_val_loss = float(np.mean(val_losses))
         val_preds = np.concatenate(val_predictions_all)
         val_targets = np.concatenate(val_targets_all)
 
-        # Regression: compute regression metrics from logits == predictions
-        # Classification: skip (logits are not probabilities; metrics computed at eval time)
-        if self._problem_type == ProblemType.REGRESSION and len(val_preds) >= 2:
-            val_predictions_obj = Predictions(means=val_preds, variances=None)
-            val_metrics = Results(
-                predictions=val_predictions_obj,
-                targets=val_targets,
-                problem_type=ProblemType.REGRESSION,
-            ).metrics
-        elif self._problem_type == ProblemType.REGRESSION:
-            mse = float(np.mean((val_preds - val_targets) ** 2))
-            val_metrics = {"mse": mse}
-        else:
-            val_metrics = {}
+        val_metrics = Results(
+            predictions=Predictions(means=val_preds, variances=None),
+            targets=val_targets,
+            problem_type=self._problem_type,
+        ).metrics
 
         return avg_val_loss, val_metrics
 

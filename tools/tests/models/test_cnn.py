@@ -252,3 +252,45 @@ class TestApplyActivation:
         result = _apply_activation(t, ProblemType.MULTICLASS)
         assert torch.allclose(result, torch.softmax(t, dim=-1))
         assert torch.allclose(result.sum(dim=-1), torch.ones(2))
+
+
+class TestEpochMetricsClassification:
+    def test_binary_training_produces_nonempty_metrics(self):
+        model_config = CNNModelConfig(num_filters=4, num_conv_layers=1, fc_hidden_dim=8)
+        train_config = CNNTrainConfig(batch_size=4, num_epochs=1)
+        model = CNNModel(
+            name="test_binary",
+            model_config=model_config,
+            train_config=train_config,
+            device="cpu",
+        )
+        sequences = ["ACDEFGHIKLMNPQRSTVWY"] * 8
+        labels = np.array([0, 1, 0, 1, 0, 1, 0, 1], dtype=np.float32)
+        data = LabelledCandidates(
+            [Candidate(data=s, modality="sequence") for s in sequences], labels
+        )
+        model.train(data, problem_type=ProblemType.BINARY)
+
+        summary = model.get_training_summary_metrics()
+        assert "final_train_accuracy" in summary
+        assert "final_train_f1" in summary
+
+    def test_regression_one_sample_omits_pearson_and_spearman(self):
+        model_config = CNNModelConfig(num_filters=4, num_conv_layers=1, fc_hidden_dim=8)
+        train_config = CNNTrainConfig(batch_size=1, num_epochs=1)
+        model = CNNModel(
+            name="test_reg_single",
+            model_config=model_config,
+            train_config=train_config,
+            device="cpu",
+        )
+        data = LabelledCandidates(
+            [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")],
+            np.array([1.0]),
+        )
+        model.train(data)
+
+        summary = model.get_training_summary_metrics()
+        assert "final_train_mse" in summary
+        assert "final_train_pearson" not in summary
+        assert "final_train_spearman" not in summary
