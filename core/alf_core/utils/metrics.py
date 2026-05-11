@@ -173,6 +173,36 @@ def register_no_variance_required(metric_fn: Callable) -> Callable:
     return wrapper
 
 
+def require_min_samples(n: int) -> Callable:
+    """Decorator factory that requires a minimum number of samples.
+
+    If the decorated function is called with fewer than n samples (based on
+    the length of the means array), returns an empty dictionary instead of
+    calling the function.
+
+    Args:
+        n: Minimum number of samples required.
+
+    Returns:
+        A decorator that wraps metric functions.
+    """
+
+    def decorator(fn: Callable) -> Callable:
+        @wraps(fn)
+        def wrapper(
+            means: np.ndarray,
+            variances: np.ndarray | None,
+            targets: np.ndarray,
+        ) -> dict[str, float]:
+            if len(means) < n:
+                return {}
+            return fn(means, variances, targets)
+
+        return wrapper
+
+    return decorator
+
+
 def register_classification_metric(metric_fn: Callable) -> Callable:
     """Decorator to register a classification metric.
 

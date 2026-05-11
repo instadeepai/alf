@@ -23,6 +23,7 @@ from alf_core.utils.metrics import (
     f1,
     precision,
     recall,
+    require_min_samples,
 )
 
 
@@ -206,3 +207,47 @@ class TestClassificationMetricInputValidation:
         targets = np.array([0])
         with pytest.raises(AssertionError, match="probs and targets batch size mismatch"):
             accuracy(probs, targets)
+
+
+class TestRequireMinSamples:
+    """Tests for require_min_samples decorator."""
+
+    def test_zero_samples_returns_empty_dict(self):
+        """Test that zero samples returns empty dict."""
+
+        @require_min_samples(2)
+        def dummy(means, variances, targets):
+            return {"value": 1.0}
+
+        result = dummy(np.array([]), None, np.array([]))
+        assert result == {}
+
+    def test_one_sample_returns_empty_dict(self):
+        """Test that one sample below minimum returns empty dict."""
+
+        @require_min_samples(2)
+        def dummy(means, variances, targets):
+            return {"value": 1.0}
+
+        result = dummy(np.array([1.0]), None, np.array([1.0]))
+        assert result == {}
+
+    def test_two_samples_calls_through(self):
+        """Test that exactly minimum samples calls the underlying function."""
+
+        @require_min_samples(2)
+        def dummy(means, variances, targets):
+            return {"value": 42.0}
+
+        result = dummy(np.array([1.0, 2.0]), None, np.array([1.0, 2.0]))
+        assert result == {"value": 42.0}
+
+    def test_three_samples_calls_through(self):
+        """Test that more than minimum samples calls the underlying function."""
+
+        @require_min_samples(2)
+        def dummy(means, variances, targets):
+            return {"value": float(len(means))}
+
+        result = dummy(np.array([1.0, 2.0, 3.0]), None, np.array([1.0, 2.0, 3.0]))
+        assert result == {"value": 3.0}
