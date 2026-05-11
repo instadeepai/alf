@@ -18,6 +18,7 @@ from typing import Any, Literal, Union
 
 import numpy as np
 import torch
+import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from torch.utils.data import DataLoader, TensorDataset
@@ -210,7 +211,9 @@ class ESM2Model(BaseModel):
         eligible = ~special_tokens_mask  # (batch, seq_len)
 
         # Sample masked positions
-        prob_matrix = torch.full(input_ids.shape, self.train_config.mask_probability, device=self.device)
+        prob_matrix = torch.full(
+            input_ids.shape, self.train_config.mask_probability, device=self.device
+        )
         prob_matrix.masked_fill_(special_tokens_mask, 0.0)
         masked = torch.bernoulli(prob_matrix).bool()
 
@@ -283,6 +286,139 @@ class ESM2Model(BaseModel):
 
         return masked_input_ids, labels
 
+    def _train_epoch(
+        self,
+        train_loader: DataLoader,
+        optimizer: optim.Optimizer,
+    ) -> tuple[float, dict]:
+        """Train for one epoch.
+
+        Args:
+            train_loader: DataLoader for training data.
+            optimizer: Optimizer for training.
+
+        Returns:
+            Tuple of (average_loss, metrics_dict) where metrics_dict contains
+            perplexity and token_accuracy over all masked positions in the epoch.
+        """
+        self.esm_model.train()
+        epoch_losses: list[float] = []
+        all_logits: list[torch.Tensor] = []
+        all_labels: list[torch.Tensor] = []
+
+        for raw_ids, raw_mask in train_loader:
+            batch_ids = raw_ids.to(self.device)
+            batch_mask = raw_mask.to(self.device)
+            masked_ids, labels = self._mask_tokens(batch_ids)
+
+            optimizer.zero_grad()
+            outputs = self.esm_model(
+                input_ids=masked_ids,
+                attention_mask=batch_mask,
+                labels=labels,
+            )
+            outputs.loss.backward()
+            optimizer.step()
+            epoch_losses.append(outputs.loss.item())
+
+            masked_positions = labels != -100
+            all_logits.append(outputs.logits[masked_positions].detach().cpu())
+            all_labels.append(labels[masked_positions].detach().cpu())
+
+        avg_train_loss = float(np.mean(epoch_losses))
+        logits = torch.cat(all_logits, dim=0)  # (N, vocab_size)
+        targets = torch.cat(all_labels, dim=0)  # (N,)
+        token_accuracy = (logits.argmax(dim=-1) == targets).float().mean().item()
+        train_metrics = {
+            "perplexity": float(np.exp(avg_train_loss)),
+            "token_accuracy": token_accuracy,
+        }
+        return avg_train_loss, train_metrics
+
+    def _validate_epoch(self, val_loader: DataLoader) -> tuple[float, dict]:
+        """Validate for one epoch.
+
+        Args:
+            val_loader: DataLoader for validation data.
+
+        Returns:
+            Tuple of (average_loss, metrics_dict) where metrics_dict contains
+            perplexity and token_accuracy over all masked positions.
+        """
+        self.esm_model.eval()
+        val_losses: list[float] = []
+        all_logits: list[torch.Tensor] = []
+        all_labels: list[torch.Tensor] = []
+
+        with torch.no_grad():
+            for raw_ids, raw_mask in val_loader:
+                batch_ids = raw_ids.to(self.device)
+                batch_mask = raw_mask.to(self.device)
+                masked_ids, labels = self._mask_tokens(batch_ids)
+                outputs = self.esm_model(
+                    input_ids=masked_ids,
+                    attention_mask=batch_mask,
+                    labels=labels,
+                )
+                val_losses.append(outputs.loss.item())
+
+                masked_positions = labels != -100
+                all_logits.append(outputs.logits[masked_positions].cpu())
+                all_labels.append(labels[masked_positions].cpu())
+
+        avg_val_loss = float(np.mean(val_losses))
+        logits = torch.cat(all_logits, dim=0)
+        targets = torch.cat(all_labels, dim=0)
+        token_accuracy = (logits.argmax(dim=-1) == targets).float().mean().item()
+        val_metrics = {
+            "perplexity": float(np.exp(avg_val_loss)),
+            "token_accuracy": token_accuracy,
+        }
+        return avg_val_loss, val_metrics
+
+    def _record_epoch_metrics(
+        self,
+        epoch: int,
+        avg_train_loss: float,
+        train_metrics: dict[str, float],
+        avg_val_loss: float | None = None,
+        val_metrics: dict[str, float] | None = None,
+    ) -> None:
+        """Record epoch metrics and log at the configured frequency.
+
+        Args:
+            epoch: Current epoch index.
+            avg_train_loss: Average training loss for the epoch.
+            train_metrics: Dictionary of training metrics (perplexity, token_accuracy).
+            avg_val_loss: Average validation loss for the epoch.
+            val_metrics: Dictionary of validation metrics.
+        """
+        if (epoch + 1) % self.train_config.log_frequency == 0:
+            additional: dict[str, float] = {}
+            if (v := train_metrics.get("perplexity")) is not None:
+                additional["train_perplexity"] = float(v)
+            if (v := train_metrics.get("token_accuracy")) is not None:
+                additional["train_token_accuracy"] = float(v)
+            if val_metrics is not None:
+                if (v := val_metrics.get("perplexity")) is not None:
+                    additional["val_perplexity"] = float(v)
+                if (v := val_metrics.get("token_accuracy")) is not None:
+                    additional["val_token_accuracy"] = float(v)
+            epoch_metric = SurrogateEpochMetrics(
+                epoch=epoch,
+                train_loss=avg_train_loss,
+                val_loss=avg_val_loss,
+                additional_metrics=additional,
+            )
+            self._epoch_metrics.append(epoch_metric)
+
+            log_message = (
+                f"Epoch {epoch + 1}/{self.train_config.num_epochs}: train_loss={avg_train_loss:.4f}"
+            )
+            if avg_val_loss is not None:
+                log_message += f", val_loss={avg_val_loss:.4f}"
+            logger.info(log_message)
+
     def train(
         self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None
     ) -> None:
@@ -302,6 +438,13 @@ class ESM2Model(BaseModel):
             f"Fine-tuning ESM-2 ({self.model_config.model_id}) with {len(train_data)} sequences"
         )
 
+        # Prepare data loaders
+        train_loader = self._prepare_data_loader(train_data, shuffle=True)
+        val_loader = None
+        if val_data is not None and len(val_data) > 0:
+            val_loader = self._prepare_data_loader(val_data, shuffle=False)
+
+        # Setup training
         if self.train_config.optimizer_type == "adamw":
             optimizer: torch.optim.Optimizer = torch.optim.AdamW(
                 self.esm_model.parameters(), lr=self.train_config.learning_rate
@@ -310,70 +453,37 @@ class ESM2Model(BaseModel):
             optimizer = torch.optim.Adam(
                 self.esm_model.parameters(), lr=self.train_config.learning_rate
             )
-
-        train_loader = self._prepare_data_loader(train_data, shuffle=True)
-        val_loader = (
-            self._prepare_data_loader(val_data, shuffle=False)
-            if val_data is not None and len(val_data) > 0
-            else None
-        )
-
         avg_train_loss = 0.0
         avg_val_loss: float | None = None
+        train_metrics: dict[str, float] = {}
+        val_metrics: dict[str, float] = {}
 
         for epoch in range(self.train_config.num_epochs):
-            self.esm_model.train()
-            epoch_losses: list[float] = []
+            # Train
+            avg_train_loss, train_metrics = self._train_epoch(train_loader, optimizer)
 
-            for raw_ids, raw_mask in train_loader:
-                batch_ids = raw_ids.to(self.device)
-                batch_mask = raw_mask.to(self.device)
-                masked_ids, labels = self._mask_tokens(batch_ids)
-
-                optimizer.zero_grad()
-                outputs = self.esm_model(
-                    input_ids=masked_ids,
-                    attention_mask=batch_mask,
-                    labels=labels,
-                )
-                outputs.loss.backward()
-                optimizer.step()
-                epoch_losses.append(outputs.loss.item())
-
-            avg_train_loss = float(np.mean(epoch_losses))
-
+            # Validate
             if val_loader is not None:
-                self.esm_model.eval()
-                val_losses: list[float] = []
-                with torch.no_grad():
-                    for raw_ids, raw_mask in val_loader:
-                        batch_ids = raw_ids.to(self.device)
-                        batch_mask = raw_mask.to(self.device)
-                        masked_ids, labels = self._mask_tokens(batch_ids)
-                        outputs = self.esm_model(
-                            input_ids=masked_ids,
-                            attention_mask=batch_mask,
-                            labels=labels,
-                        )
-                        val_losses.append(outputs.loss.item())
-                avg_val_loss = float(np.mean(val_losses))
-
-            if (epoch + 1) % self.train_config.log_frequency == 0:
-                self._epoch_metrics.append(
-                    SurrogateEpochMetrics(
-                        epoch=epoch,
-                        train_loss=avg_train_loss,
-                        val_loss=avg_val_loss,
-                    )
+                avg_val_loss, val_metrics = self._validate_epoch(val_loader)
+                self._record_epoch_metrics(
+                    epoch,
+                    avg_train_loss,
+                    train_metrics,
+                    avg_val_loss,
+                    val_metrics,
                 )
-                logger.info(
-                    f"Epoch {epoch + 1}/{self.train_config.num_epochs}:"
-                    f" train_loss={avg_train_loss:.4f}"
+            else:
+                self._record_epoch_metrics(
+                    epoch,
+                    avg_train_loss,
+                    train_metrics,
                 )
 
-        self.training_metrics["final_train_loss"] = avg_train_loss
+        self.training_metrics = {"final_train_loss": avg_train_loss}
+        self.training_metrics.update({f"final_train_{k}": v for k, v in train_metrics.items()})
         if avg_val_loss is not None:
             self.training_metrics["final_val_loss"] = avg_val_loss
+            self.training_metrics.update({f"final_val_{k}": v for k, v in val_metrics.items()})
 
     def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
         """Not implemented for ESM-2.

@@ -364,3 +364,51 @@ class TestTrainFinetune:
         esm2_finetune_model.train(sample_data)
         for m in esm2_finetune_model.get_epoch_metrics():
             assert m.val_loss is None
+
+    def test_epoch_metrics_contain_train_perplexity_and_token_accuracy(
+        self, esm2_finetune_model, sample_data
+    ):
+        """Test that each epoch metric includes finite train_perplexity and train_token_accuracy."""
+        esm2_finetune_model.train(sample_data)
+        for m in esm2_finetune_model.get_epoch_metrics():
+            assert "train_perplexity" in m.additional_metrics
+            assert "train_token_accuracy" in m.additional_metrics
+            assert np.isfinite(m.additional_metrics["train_perplexity"])
+            assert 0.0 <= m.additional_metrics["train_token_accuracy"] <= 1.0
+
+    def test_epoch_metrics_contain_val_perplexity_and_token_accuracy(
+        self, esm2_finetune_model, sample_data
+    ):
+        """Test that epoch metrics include val_perplexity and val_token_accuracy."""
+        val_candidates = [Candidate(data="ACDEFGHIKL", modality="sequence")]
+        val_data = LabelledCandidates(val_candidates, np.array([1.0]))
+        esm2_finetune_model.train(sample_data, val_data=val_data)
+        for m in esm2_finetune_model.get_epoch_metrics():
+            assert "val_perplexity" in m.additional_metrics
+            assert "val_token_accuracy" in m.additional_metrics
+            assert np.isfinite(m.additional_metrics["val_perplexity"])
+            assert 0.0 <= m.additional_metrics["val_token_accuracy"] <= 1.0
+
+    def test_summary_metrics_contain_final_perplexity_and_token_accuracy(
+        self, esm2_finetune_model, sample_data
+    ):
+        """Test that summary metrics include final_train_perplexity and token_accuracy."""
+        esm2_finetune_model.train(sample_data)
+        summary = esm2_finetune_model.get_training_summary_metrics()
+        assert "final_train_perplexity" in summary
+        assert "final_train_token_accuracy" in summary
+        assert np.isfinite(summary["final_train_perplexity"])
+        assert 0.0 <= summary["final_train_token_accuracy"] <= 1.0
+
+    def test_summary_metrics_contain_val_perplexity_and_token_accuracy_with_val_data(
+        self, esm2_finetune_model, sample_data
+    ):
+        """Test that summary metrics include final_val_perplexity and token_accuracy."""
+        val_candidates = [Candidate(data="ACDEFGHIKL", modality="sequence")]
+        val_data = LabelledCandidates(val_candidates, np.array([1.0]))
+        esm2_finetune_model.train(sample_data, val_data=val_data)
+        summary = esm2_finetune_model.get_training_summary_metrics()
+        assert "final_val_perplexity" in summary
+        assert "final_val_token_accuracy" in summary
+        assert np.isfinite(summary["final_val_perplexity"])
+        assert 0.0 <= summary["final_val_token_accuracy"] <= 1.0
