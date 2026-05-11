@@ -17,7 +17,7 @@ import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
-from alf_core.enums import ProblemType
+from alf_core.utils.enums import ProblemType
 from alf_tools.models.cnn import (
     CNNModel,
     CNNModelConfig,

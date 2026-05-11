@@ -20,7 +20,7 @@ from alf_core.dataclasses import Candidate, LabelledCandidates
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataset.base_dataset import BaseDatasetConfig
 from alf_core.dataset.splitting_utils import split_dataset, split_stratified
-from alf_core.enums import ProblemType
+from alf_core.utils.enums import ProblemType
 from pydantic import ValidationError
 
 

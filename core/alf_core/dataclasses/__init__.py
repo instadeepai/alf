@@ -24,4 +24,3 @@ from alf_core.dataclasses.results import Results
 from alf_core.dataclasses.round_metrics import RoundMetrics
 from alf_core.dataclasses.state import State
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
-from alf_core.enums import ProblemType

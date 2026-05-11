@@ -19,7 +19,7 @@ from typing import Any, Optional
 import numpy as np
 import pandas as pd
 from alf_core.dataclasses.candidate import Candidate
-from alf_core.enums import ProblemType
+from alf_core.utils.enums import ProblemType
 
 
 @dataclass

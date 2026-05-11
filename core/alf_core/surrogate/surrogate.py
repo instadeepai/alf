@@ -18,8 +18,8 @@ from typing import Union
 import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
-from alf_core.enums import ProblemType
 from alf_core.model.base_model import BaseModel
+from alf_core.utils.enums import ProblemType
 
 
 class Surrogate:

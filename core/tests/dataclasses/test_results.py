@@ -18,7 +18,7 @@ import numpy as np
 import pytest
 import torch
 from alf_core.dataclasses import Predictions, Results
-from alf_core.enums import ProblemType
+from alf_core.utils.enums import ProblemType
 from beartype.roar import BeartypeCallHintParamViolation
 
 

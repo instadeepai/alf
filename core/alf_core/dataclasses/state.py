@@ -18,8 +18,8 @@ from dataclasses import dataclass, field
 from alf_core.dataclasses import LabelledCandidates, Predictions
 from alf_core.dataclasses.round_metrics import RoundMetrics
 from alf_core.dataset.base_dataset import BaseDataset
-from alf_core.enums import ProblemType
 from alf_core.surrogate.surrogate import Surrogate
+from alf_core.utils.enums import ProblemType
 
 
 @dataclass

@@ -17,7 +17,7 @@
 import numpy as np
 import pytest
 from alf_core import Candidate, LabelledCandidates
-from alf_core.enums import ProblemType
+from alf_core.utils.enums import ProblemType
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 
 SEQ = "ACDEFGHIKLMNPQRSTVWY"  # 20-char sequence (protein alphabet)

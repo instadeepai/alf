@@ -25,7 +25,7 @@ import numpy as np
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataclasses.labelled_candidates import Candidate, LabelledCandidates
 from alf_core.dataset.splitting_utils import split_dataset
-from alf_core.enums import ProblemType
+from alf_core.utils.enums import ProblemType
 from pydantic import BaseModel, Field, model_validator
 
 FloatBetweenZeroAndOne = Annotated[float, Field(ge=0, le=1)]

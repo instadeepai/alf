@@ -17,7 +17,7 @@ import pytest
 import torch
 from alf_core.dataclasses.candidate import Candidate, Modality
 from alf_core.dataclasses.predictions import Predictions
-from alf_core.enums import ProblemType
+from alf_core.utils.enums import ProblemType
 from beartype.roar import BeartypeCallHintParamViolation
 
 

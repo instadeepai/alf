@@ -18,7 +18,7 @@ import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, State
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
-from alf_core.enums import ProblemType
+from alf_core.utils.enums import ProblemType
 
 
 def _make_minimal_dataset(problem_type: ProblemType) -> BaseDataset:

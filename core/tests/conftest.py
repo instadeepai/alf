@@ -20,13 +20,13 @@ import numpy as np
 import pytest
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions, State
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
-from alf_core.enums import ProblemType
 from alf_core.model.base_model import BaseModel
 from alf_core.optimizer.acquisition_function import AcquisitionFunction
 from alf_core.optimizer.optimizer import Optimizer
 from alf_core.optimizer.search import DatasetSearch
 from alf_core.oracle.oracle import Oracle
 from alf_core.surrogate.surrogate import Surrogate
+from alf_core.utils.enums import ProblemType
 
 
 class DummyDatasetConfig(BaseDatasetConfig):
