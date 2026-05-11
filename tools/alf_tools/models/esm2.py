@@ -451,7 +451,8 @@ class ESM2Model(BaseModel):
         Args:
             epoch: Current epoch index.
             avg_train_loss: Average training loss for the epoch.
-            train_metrics: Dictionary of training metrics (perplexity, token_accuracy, and optionally log_likelihood when loss_type='log_likelihood').
+            train_metrics: Dictionary of training metrics (perplexity, token_accuracy,
+                and optionally log_likelihood when loss_type='log_likelihood').
             avg_val_loss: Average validation loss for the epoch.
             val_metrics: Dictionary of validation metrics (same keys as train_metrics).
         """
