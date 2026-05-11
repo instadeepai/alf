@@ -292,6 +292,47 @@ class ESM2Model(BaseModel):
 
         return masked_input_ids, labels
 
+    def _compute_log_likelihood_labels(
+        self, input_ids: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Prepare inputs for log-likelihood training.
+
+        All non-special positions are replaced with [MASK] in the input and
+        labeled with the original token ID. Special positions (CLS, EOS, PAD)
+        receive label -100 so the loss ignores them.
+
+        Args:
+            input_ids: Token IDs of shape (batch, seq_len).
+
+        Raises:
+            ValueError: If the tokenizer does not have a mask token.
+
+        Returns:
+            Tuple of (masked_input_ids, labels), both of shape (batch, seq_len).
+        """
+        special_ids = {
+            self.tokenizer.cls_token_id,
+            self.tokenizer.eos_token_id,
+            self.tokenizer.pad_token_id,
+        } - {None}
+
+        special_tokens_mask = torch.zeros_like(input_ids, dtype=torch.bool)
+        for sid in special_ids:
+            special_tokens_mask |= input_ids.eq(sid)
+
+        labels = input_ids.clone()
+        labels[special_tokens_mask] = -100
+
+        if self.tokenizer.mask_token_id is None:
+            raise ValueError(
+                "Tokenizer has no mask token. Cannot perform log-likelihood masking. "
+                "Ensure the tokenizer is initialised with a [MASK] token."
+            )
+        masked_input_ids = input_ids.clone()
+        masked_input_ids[~special_tokens_mask] = self.tokenizer.mask_token_id
+
+        return masked_input_ids, labels
+
     def _train_epoch(
         self,
         train_loader: DataLoader,
