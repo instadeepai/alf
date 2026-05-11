@@ -107,6 +107,8 @@ class ESM2Model(BaseModel):
         self.tokenizer = AutoTokenizer.from_pretrained(model_config.model_id)
         self.esm_model = AutoModelForMaskedLM.from_pretrained(model_config.model_id)
         self.esm_model.to(self.device)
+        
+        self.criterion = self._mask_tokens if self.train_config.loss_type == "mlm" else self._compute_log_likelihood_labels
 
         total_params = sum(p.numel() for p in self.esm_model.parameters())
         logger.info(f"ESM-2 loaded: {model_config.model_id} ({total_params:,} parameters)")
@@ -358,10 +360,7 @@ class ESM2Model(BaseModel):
             batch_ids = raw_ids.to(self.device)
             batch_mask = raw_mask.to(self.device)
 
-            if self.train_config.loss_type == "mlm":
-                masked_ids, labels = self._mask_tokens(batch_ids)
-            else:
-                masked_ids, labels = self._compute_log_likelihood_labels(batch_ids)
+            masked_ids, labels = self.criterion(batch_ids)
 
             optimizer.zero_grad()
             outputs = self.esm_model(
@@ -410,10 +409,7 @@ class ESM2Model(BaseModel):
                 batch_ids = raw_ids.to(self.device)
                 batch_mask = raw_mask.to(self.device)
 
-                if self.train_config.loss_type == "mlm":
-                    masked_ids, labels = self._mask_tokens(batch_ids)
-                else:
-                    masked_ids, labels = self._compute_log_likelihood_labels(batch_ids)
+                masked_ids, labels = self.criterion(batch_ids)
 
                 outputs = self.esm_model(
                     input_ids=masked_ids,
