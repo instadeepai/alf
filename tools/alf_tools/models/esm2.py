@@ -346,7 +346,8 @@ class ESM2Model(BaseModel):
 
         Returns:
             Tuple of (average_loss, metrics_dict) where metrics_dict contains
-            perplexity and token_accuracy over all masked positions in the epoch.
+            perplexity and token_accuracy over all labeled positions in the epoch.
+            When loss_type='log_likelihood', also includes log_likelihood = -avg_loss.
         """
         self.esm_model.train()
         epoch_losses: list[float] = []
@@ -356,7 +357,11 @@ class ESM2Model(BaseModel):
         for raw_ids, raw_mask in train_loader:
             batch_ids = raw_ids.to(self.device)
             batch_mask = raw_mask.to(self.device)
-            masked_ids, labels = self._mask_tokens(batch_ids)
+
+            if self.train_config.loss_type == "mlm":
+                masked_ids, labels = self._mask_tokens(batch_ids)
+            else:
+                masked_ids, labels = self._compute_log_likelihood_labels(batch_ids)
 
             optimizer.zero_grad()
             outputs = self.esm_model(
@@ -368,18 +373,20 @@ class ESM2Model(BaseModel):
             optimizer.step()
             epoch_losses.append(outputs.loss.item())
 
-            masked_positions = labels != -100
-            all_logits.append(outputs.logits[masked_positions].detach().cpu())
-            all_labels.append(labels[masked_positions].detach().cpu())
+            labeled_positions = labels != -100
+            all_logits.append(outputs.logits[labeled_positions].detach().cpu())
+            all_labels.append(labels[labeled_positions].detach().cpu())
 
         avg_train_loss = float(np.mean(epoch_losses))
         logits = torch.cat(all_logits, dim=0)  # (N, vocab_size)
         targets = torch.cat(all_labels, dim=0)  # (N,)
         token_accuracy = (logits.argmax(dim=-1) == targets).float().mean().item()
-        train_metrics = {
+        train_metrics: dict[str, float] = {
             "perplexity": float(np.exp(avg_train_loss)),
             "token_accuracy": token_accuracy,
         }
+        if self.train_config.loss_type == "log_likelihood":
+            train_metrics["log_likelihood"] = -avg_train_loss
         return avg_train_loss, train_metrics
 
     def _validate_epoch(self, val_loader: DataLoader) -> tuple[float, dict]:
@@ -390,7 +397,8 @@ class ESM2Model(BaseModel):
 
         Returns:
             Tuple of (average_loss, metrics_dict) where metrics_dict contains
-            perplexity and token_accuracy over all masked positions.
+            perplexity and token_accuracy over all labeled positions.
+            When loss_type='log_likelihood', also includes log_likelihood = -avg_loss.
         """
         self.esm_model.eval()
         val_losses: list[float] = []
@@ -401,7 +409,12 @@ class ESM2Model(BaseModel):
             for raw_ids, raw_mask in val_loader:
                 batch_ids = raw_ids.to(self.device)
                 batch_mask = raw_mask.to(self.device)
-                masked_ids, labels = self._mask_tokens(batch_ids)
+
+                if self.train_config.loss_type == "mlm":
+                    masked_ids, labels = self._mask_tokens(batch_ids)
+                else:
+                    masked_ids, labels = self._compute_log_likelihood_labels(batch_ids)
+
                 outputs = self.esm_model(
                     input_ids=masked_ids,
                     attention_mask=batch_mask,
@@ -409,18 +422,20 @@ class ESM2Model(BaseModel):
                 )
                 val_losses.append(outputs.loss.item())
 
-                masked_positions = labels != -100
-                all_logits.append(outputs.logits[masked_positions].cpu())
-                all_labels.append(labels[masked_positions].cpu())
+                labeled_positions = labels != -100
+                all_logits.append(outputs.logits[labeled_positions].cpu())
+                all_labels.append(labels[labeled_positions].cpu())
 
         avg_val_loss = float(np.mean(val_losses))
         logits = torch.cat(all_logits, dim=0)
         targets = torch.cat(all_labels, dim=0)
         token_accuracy = (logits.argmax(dim=-1) == targets).float().mean().item()
-        val_metrics = {
+        val_metrics: dict[str, float] = {
             "perplexity": float(np.exp(avg_val_loss)),
             "token_accuracy": token_accuracy,
         }
+        if self.train_config.loss_type == "log_likelihood":
+            val_metrics["log_likelihood"] = -avg_val_loss
         return avg_val_loss, val_metrics
 
     def _record_epoch_metrics(
@@ -436,7 +451,8 @@ class ESM2Model(BaseModel):
         Args:
             epoch: Current epoch index.
             avg_train_loss: Average training loss for the epoch.
-            train_metrics: Dictionary of training metrics (perplexity, token_accuracy).
+            train_metrics: Dictionary of training metrics (perplexity, token_accuracy,
+                and optionally log_likelihood when loss_type='log_likelihood').
             avg_val_loss: Average validation loss for the epoch.
             val_metrics: Dictionary of validation metrics.
         """
@@ -446,11 +462,15 @@ class ESM2Model(BaseModel):
                 additional["train_perplexity"] = float(v)
             if (v := train_metrics.get("token_accuracy")) is not None:
                 additional["train_token_accuracy"] = float(v)
+            if (v := train_metrics.get("log_likelihood")) is not None:
+                additional["train_log_likelihood"] = float(v)
             if val_metrics is not None:
                 if (v := val_metrics.get("perplexity")) is not None:
                     additional["val_perplexity"] = float(v)
                 if (v := val_metrics.get("token_accuracy")) is not None:
                     additional["val_token_accuracy"] = float(v)
+                if (v := val_metrics.get("log_likelihood")) is not None:
+                    additional["val_log_likelihood"] = float(v)
             epoch_metric = SurrogateEpochMetrics(
                 epoch=epoch,
                 train_loss=avg_train_loss,

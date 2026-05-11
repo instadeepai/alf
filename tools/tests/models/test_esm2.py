@@ -72,6 +72,25 @@ def esm2_finetune_model():
     return ESM2Model(name="test_esm2_ft", model_config=config, train_config=train_cfg, device="cpu")
 
 
+@pytest.fixture(scope="session")
+def esm2_ll_model():
+    """ESM-2 model configured for log-likelihood training.
+
+    Returns:
+        An ESM2Model with loss_type='log_likelihood', trainable backbone, 2 epochs.
+    """
+    config = ESM2ModelConfig(model_id=MODEL_ID)
+    train_cfg = ESM2TrainConfig(
+        freeze_backbone=False,
+        loss_type="log_likelihood",
+        num_epochs=2,
+        batch_size=2,
+        learning_rate=1e-4,
+        log_frequency=1,
+    )
+    return ESM2Model(name="test_esm2_ll", model_config=config, train_config=train_cfg, device="cpu")
+
+
 @pytest.fixture
 def sample_data():
     """Create a small LabelledCandidates dataset for testing.
@@ -486,3 +505,95 @@ class TestTrainFinetune:
         assert "final_val_token_accuracy" in summary
         assert np.isfinite(summary["final_val_perplexity"])
         assert 0.0 <= summary["final_val_token_accuracy"] <= 1.0
+
+
+class TestTrainLogLikelihood:
+    """Tests for ESM2Model.train() when loss_type='log_likelihood'."""
+
+    def test_ll_finetune_updates_weights(self, esm2_ll_model, sample_data):
+        """Test that log-likelihood fine-tuning updates at least one model parameter."""
+        initial_params = {
+            name: param.clone() for name, param in esm2_ll_model.esm_model.named_parameters()
+        }
+        esm2_ll_model.train(sample_data)
+        params_changed = any(
+            not torch.equal(initial_params[name], param)
+            for name, param in esm2_ll_model.esm_model.named_parameters()
+        )
+        assert params_changed, "Log-likelihood fine-tuning should update model parameters"
+
+    def test_ll_epoch_metrics_recorded(self, esm2_ll_model, sample_data):
+        """Test that one SurrogateEpochMetrics is recorded per training epoch."""
+        esm2_ll_model.train(sample_data)
+        metrics = esm2_ll_model.get_epoch_metrics()
+        assert len(metrics) == esm2_ll_model.train_config.num_epochs
+        assert all(isinstance(m, SurrogateEpochMetrics) for m in metrics)
+
+    def test_ll_epoch_metrics_train_loss_finite(self, esm2_ll_model, sample_data):
+        """Test that train_loss in each epoch metric is a finite number."""
+        esm2_ll_model.train(sample_data)
+        for m in esm2_ll_model.get_epoch_metrics():
+            assert np.isfinite(m.train_loss)
+
+    def test_ll_summary_metrics_has_final_train_loss(self, esm2_ll_model, sample_data):
+        """Test that get_training_summary_metrics includes a finite final_train_loss."""
+        esm2_ll_model.train(sample_data)
+        summary = esm2_ll_model.get_training_summary_metrics()
+        assert "final_train_loss" in summary
+        assert np.isfinite(summary["final_train_loss"])
+
+    def test_ll_epoch_metrics_contain_train_perplexity_token_accuracy_and_log_likelihood(
+        self, esm2_ll_model, sample_data
+    ):
+        """Test that each epoch metric has finite train_perplexity, train_token_accuracy,
+        and train_log_likelihood when loss_type='log_likelihood'."""
+        esm2_ll_model.train(sample_data)
+        for m in esm2_ll_model.get_epoch_metrics():
+            assert "train_perplexity" in m.additional_metrics
+            assert "train_token_accuracy" in m.additional_metrics
+            assert "train_log_likelihood" in m.additional_metrics
+            assert np.isfinite(m.additional_metrics["train_perplexity"])
+            assert 0.0 <= m.additional_metrics["train_token_accuracy"] <= 1.0
+            assert np.isfinite(m.additional_metrics["train_log_likelihood"])
+
+    def test_ll_val_loss_recorded_when_val_data_provided(self, esm2_ll_model, sample_data):
+        """Test that val_loss is recorded when val_data is provided."""
+        val_candidates = [Candidate(data="ACDEFGHIKL", modality="sequence")]
+        val_data = LabelledCandidates(val_candidates, np.array([1.0]))
+        esm2_ll_model.train(sample_data, val_data=val_data)
+        for m in esm2_ll_model.get_epoch_metrics():
+            assert m.val_loss is not None
+            assert np.isfinite(m.val_loss)
+        assert "final_val_loss" in esm2_ll_model.get_training_summary_metrics()
+
+    def test_ll_epoch_metrics_contain_val_log_likelihood(self, esm2_ll_model, sample_data):
+        """Test that val_log_likelihood is recorded in epoch metrics when val_data provided."""
+        val_candidates = [Candidate(data="ACDEFGHIKL", modality="sequence")]
+        val_data = LabelledCandidates(val_candidates, np.array([1.0]))
+        esm2_ll_model.train(sample_data, val_data=val_data)
+        for m in esm2_ll_model.get_epoch_metrics():
+            assert "val_log_likelihood" in m.additional_metrics
+            assert np.isfinite(m.additional_metrics["val_log_likelihood"])
+
+    def test_ll_summary_metrics_contain_final_train_log_likelihood(
+        self, esm2_ll_model, sample_data
+    ):
+        """Test that summary metrics include finite final_train_log_likelihood."""
+        esm2_ll_model.train(sample_data)
+        summary = esm2_ll_model.get_training_summary_metrics()
+        assert "final_train_log_likelihood" in summary
+        assert np.isfinite(summary["final_train_log_likelihood"])
+
+    def test_ll_log_likelihood_is_negative_of_loss(self, esm2_ll_model, sample_data):
+        """Test that train_log_likelihood == -train_loss in each epoch metric."""
+        esm2_ll_model.train(sample_data)
+        for m in esm2_ll_model.get_epoch_metrics():
+            assert np.isclose(
+                m.additional_metrics["train_log_likelihood"], -m.train_loss, rtol=1e-5
+            )
+
+    def test_mlm_mode_does_not_emit_log_likelihood_metric(self, esm2_finetune_model, sample_data):
+        """Test that MLM training (default loss_type) does NOT add log_likelihood to metrics."""
+        esm2_finetune_model.train(sample_data)
+        for m in esm2_finetune_model.get_epoch_metrics():
+            assert "train_log_likelihood" not in m.additional_metrics
