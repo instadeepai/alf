@@ -110,6 +110,7 @@ class TestConfigs:
         assert config.mask_probability == 0.15
         assert config.mask_splitting == (0.8, 0.1, 0.1)
         assert config.log_frequency == 1
+        assert config.loss_type == "mlm"
 
 
 class TestFeaturise:

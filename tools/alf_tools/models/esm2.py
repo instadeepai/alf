@@ -58,6 +58,11 @@ class ESM2TrainConfig:
         mask_splitting: Tuple of (p_mask, p_random, p_unchanged) probabilities
             for masked token replacement.
         log_frequency: Record epoch metrics every N epochs.
+        loss_type: Training objective. 'mlm' masks a random fraction of tokens
+            (controlled by mask_probability and mask_splitting) and computes
+            cross-entropy over those positions. 'log_likelihood' masks ALL
+            non-special tokens with [MASK] and computes cross-entropy over
+            all of them, approximating the pseudo-log-likelihood of the sequence.
     """
 
     freeze_backbone: bool = True
@@ -68,6 +73,7 @@ class ESM2TrainConfig:
     mask_probability: float = 0.15
     mask_splitting: tuple[float, float, float] = (0.8, 0.1, 0.1)  # mask / random / unchanged
     log_frequency: int = 1
+    loss_type: Literal["mlm", "log_likelihood"] = "mlm"
 
 
 class ESM2Model(BaseModel):
