@@ -37,20 +37,6 @@ logger = logging.getLogger("alf-tools")
 
 
 def _apply_activation(logits: torch.Tensor, problem_type: ProblemType) -> torch.Tensor:
-    """Apply activation function based on problem type.
-
-    For BINARY classification, converts scalar logits to 2-class probabilities.
-    For MULTICLASS, applies softmax to produce class probabilities.
-    For REGRESSION, returns logits unchanged.
-
-    Args:
-        logits: Raw model output tensor.
-        problem_type: The type of problem (REGRESSION, BINARY, or MULTICLASS).
-
-    Returns:
-        Activated tensor. For BINARY, shape is (n, 2). For MULTICLASS, shape matches
-        logits' last dimension as class probabilities. For REGRESSION, shape unchanged.
-    """
     if problem_type == ProblemType.BINARY:
         pos_prob = torch.sigmoid(logits)
         return torch.stack([1.0 - pos_prob, pos_prob], dim=-1)
