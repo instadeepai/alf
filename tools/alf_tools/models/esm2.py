@@ -107,8 +107,12 @@ class ESM2Model(BaseModel):
         self.tokenizer = AutoTokenizer.from_pretrained(model_config.model_id)
         self.esm_model = AutoModelForMaskedLM.from_pretrained(model_config.model_id)
         self.esm_model.to(self.device)
-        
-        self.criterion = self._mask_tokens if self.train_config.loss_type == "mlm" else self._compute_log_likelihood_labels
+
+        self.criterion = (
+            self._mask_tokens
+            if self.train_config.loss_type == "mlm"
+            else self._compute_log_likelihood_labels
+        )
 
         total_params = sum(p.numel() for p in self.esm_model.parameters())
         logger.info(f"ESM-2 loaded: {model_config.model_id} ({total_params:,} parameters)")
