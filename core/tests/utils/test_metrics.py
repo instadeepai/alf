@@ -270,6 +270,11 @@ class TestPearsonGuard:
         assert "pearson" in result
         assert np.isfinite(result["pearson"])
 
+    def test_zero_samples_raises(self):
+        """Test that zero samples raises AssertionError from check_inputs."""
+        with pytest.raises(AssertionError):
+            pearson(np.array([]), None, np.array([]))
+
 
 class TestSpearmanGuard:
     def test_one_sample_returns_empty_dict(self):
@@ -285,3 +290,8 @@ class TestSpearmanGuard:
         result = spearman(np.array([1.0, 2.0, 3.0]), None, np.array([1.0, 2.0, 3.0]))
         assert "spearman" in result
         assert np.isfinite(result["spearman"])
+
+    def test_zero_samples_raises(self):
+        """Test that zero samples raises AssertionError from check_inputs."""
+        with pytest.raises(AssertionError):
+            spearman(np.array([]), None, np.array([]))
