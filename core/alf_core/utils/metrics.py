@@ -295,6 +295,7 @@ def mse(
 
 
 @register_no_variance_required
+@require_min_samples(2)
 def spearman(
     means: Float[np.ndarray, " b"],
     _: Float[np.ndarray, " b"] | None,
@@ -320,6 +321,7 @@ def spearman(
 
 
 @register_no_variance_required
+@require_min_samples(2)
 def pearson(
     means: Float[np.ndarray, " b"],
     _: Float[np.ndarray, " b"] | None,

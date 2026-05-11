@@ -21,9 +21,11 @@ from alf_core.utils.metrics import (
     auc_roc,
     classification_metric_registry,
     f1,
+    pearson,
     precision,
     recall,
     require_min_samples,
+    spearman,
 )
 
 
@@ -251,3 +253,35 @@ class TestRequireMinSamples:
 
         result = dummy(np.array([1.0, 2.0, 3.0]), None, np.array([1.0, 2.0, 3.0]))
         assert result == {"value": 3.0}
+
+
+class TestPearsonGuard:
+    def test_one_sample_returns_empty_dict(self):
+        result = pearson(np.array([1.0]), None, np.array([1.0]))
+        assert result == {}
+
+    def test_two_samples_returns_pearson_key(self):
+        result = pearson(np.array([1.0, 2.0]), None, np.array([1.0, 2.0]))
+        assert "pearson" in result
+        assert isinstance(result["pearson"], float)
+
+    def test_three_samples_returns_finite_value(self):
+        result = pearson(np.array([1.0, 2.0, 3.0]), None, np.array([1.0, 2.0, 3.0]))
+        assert "pearson" in result
+        assert np.isfinite(result["pearson"])
+
+
+class TestSpearmanGuard:
+    def test_one_sample_returns_empty_dict(self):
+        result = spearman(np.array([1.0]), None, np.array([1.0]))
+        assert result == {}
+
+    def test_two_samples_returns_spearman_key(self):
+        result = spearman(np.array([1.0, 2.0]), None, np.array([1.0, 2.0]))
+        assert "spearman" in result
+        assert isinstance(result["spearman"], float)
+
+    def test_three_samples_returns_finite_value(self):
+        result = spearman(np.array([1.0, 2.0, 3.0]), None, np.array([1.0, 2.0, 3.0]))
+        assert "spearman" in result
+        assert np.isfinite(result["spearman"])
