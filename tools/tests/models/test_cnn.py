@@ -22,7 +22,7 @@ from alf_tools.models.cnn import (
     CNNModel,
     CNNModelConfig,
     CNNTrainConfig,
-    _apply_activation,
+    _apply_activation,  # noqa: PLC2701
 )
 
 
@@ -235,12 +235,16 @@ class TestCNNModelReproducibility:
 
 
 class TestApplyActivation:
+    """Tests for the _apply_activation module-level helper."""
+
     def test_regression_returns_tensor_unchanged(self):
+        """Test that regression logits are returned as-is."""
         t = torch.tensor([1.0, -1.0, 0.5])
         result = _apply_activation(t, ProblemType.REGRESSION)
         assert torch.equal(result, t)
 
     def test_binary_returns_two_class_probs(self):
+        """Test that binary logits are converted to (n, 2) probability matrix."""
         t = torch.tensor([0.0, 2.0, -2.0])
         result = _apply_activation(t, ProblemType.BINARY)
         assert result.shape == (3, 2)
@@ -248,6 +252,7 @@ class TestApplyActivation:
         assert torch.allclose(result.sum(dim=-1), torch.ones(3))
 
     def test_multiclass_applies_softmax(self):
+        """Test that multiclass logits are converted to softmax probabilities."""
         t = torch.tensor([[1.0, 2.0, 3.0], [0.5, 0.5, 0.5]])
         result = _apply_activation(t, ProblemType.MULTICLASS)
         assert torch.allclose(result, torch.softmax(t, dim=-1))
@@ -255,7 +260,10 @@ class TestApplyActivation:
 
 
 class TestEpochMetricsClassification:
+    """Integration tests for epoch metric computation across problem types."""
+
     def test_binary_training_produces_nonempty_metrics(self):
+        """Test that binary training populates accuracy and f1 in the summary."""
         model_config = CNNModelConfig(num_filters=4, num_conv_layers=1, fc_hidden_dim=8)
         train_config = CNNTrainConfig(batch_size=4, num_epochs=1)
         model = CNNModel(
@@ -276,6 +284,7 @@ class TestEpochMetricsClassification:
         assert "final_train_f1" in summary
 
     def test_regression_one_sample_omits_pearson_and_spearman(self):
+        """Test that single-sample regression omits pearson and spearman from summary."""
         model_config = CNNModelConfig(num_filters=4, num_conv_layers=1, fc_hidden_dim=8)
         train_config = CNNTrainConfig(batch_size=1, num_epochs=1)
         model = CNNModel(

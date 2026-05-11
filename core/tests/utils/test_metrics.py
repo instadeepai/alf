@@ -256,16 +256,21 @@ class TestRequireMinSamples:
 
 
 class TestPearsonGuard:
+    """Tests for the require_min_samples guard applied to pearson."""
+
     def test_one_sample_returns_empty_dict(self):
+        """Test that a single sample returns {} instead of NaN."""
         result = pearson(np.array([1.0]), None, np.array([1.0]))
         assert result == {}
 
     def test_two_samples_returns_pearson_key(self):
+        """Test that two samples computes and returns the pearson key."""
         result = pearson(np.array([1.0, 2.0]), None, np.array([1.0, 2.0]))
         assert "pearson" in result
         assert isinstance(result["pearson"], float)
 
     def test_three_samples_returns_finite_value(self):
+        """Test that three samples returns a finite pearson value."""
         result = pearson(np.array([1.0, 2.0, 3.0]), None, np.array([1.0, 2.0, 3.0]))
         assert "pearson" in result
         assert np.isfinite(result["pearson"])
@@ -277,16 +282,21 @@ class TestPearsonGuard:
 
 
 class TestSpearmanGuard:
+    """Tests for the require_min_samples guard applied to spearman."""
+
     def test_one_sample_returns_empty_dict(self):
+        """Test that a single sample returns {} instead of NaN."""
         result = spearman(np.array([1.0]), None, np.array([1.0]))
         assert result == {}
 
     def test_two_samples_returns_spearman_key(self):
+        """Test that two samples computes and returns the spearman key."""
         result = spearman(np.array([1.0, 2.0]), None, np.array([1.0, 2.0]))
         assert "spearman" in result
         assert isinstance(result["spearman"], float)
 
     def test_three_samples_returns_finite_value(self):
+        """Test that three samples returns a finite spearman value."""
         result = spearman(np.array([1.0, 2.0, 3.0]), None, np.array([1.0, 2.0, 3.0]))
         assert "spearman" in result
         assert np.isfinite(result["spearman"])
