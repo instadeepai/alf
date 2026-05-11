@@ -17,10 +17,12 @@ import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_core.enums import ProblemType
 from alf_tools.models.cnn import (
     CNNModel,
     CNNModelConfig,
     CNNTrainConfig,
+    _apply_activation,
 )
 
 
@@ -230,3 +232,23 @@ class TestCNNModelReproducibility:
         # Parameters should be identical (or very close due to floating point)
         for p1, p2 in zip(params1, params2):
             torch.testing.assert_close(p1, p2, rtol=1e-5, atol=1e-7)
+
+
+class TestApplyActivation:
+    def test_regression_returns_tensor_unchanged(self):
+        t = torch.tensor([1.0, -1.0, 0.5])
+        result = _apply_activation(t, ProblemType.REGRESSION)
+        assert torch.equal(result, t)
+
+    def test_binary_returns_two_class_probs(self):
+        t = torch.tensor([0.0, 2.0, -2.0])
+        result = _apply_activation(t, ProblemType.BINARY)
+        assert result.shape == (3, 2)
+        assert torch.allclose(result[:, 1], torch.sigmoid(t))
+        assert torch.allclose(result.sum(dim=-1), torch.ones(3))
+
+    def test_multiclass_applies_softmax(self):
+        t = torch.tensor([[1.0, 2.0, 3.0], [0.5, 0.5, 0.5]])
+        result = _apply_activation(t, ProblemType.MULTICLASS)
+        assert torch.allclose(result, torch.softmax(t, dim=-1))
+        assert torch.allclose(result.sum(dim=-1), torch.ones(2))
