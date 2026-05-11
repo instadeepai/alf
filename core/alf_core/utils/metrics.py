@@ -854,6 +854,7 @@ def recall(
 
 
 @register_classification_metric
+@require_min_samples(2)
 def auc_roc(
     probs: Float[np.ndarray, "n_samples num_classes"],
     targets: Int[np.ndarray, " n_samples"],
@@ -872,6 +873,4 @@ def auc_roc(
     """
     if probs.shape[1] == 2:
         return {"auc_roc": float(roc_auc_score(targets, probs[:, 1]))}
-    elif len(np.unique(targets)) < 2:
-        return {"auc_roc": float("nan")}
     return {"auc_roc": float(roc_auc_score(targets, probs, multi_class="ovr"))}
