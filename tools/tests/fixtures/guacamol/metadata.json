@@ -1,0 +1,6 @@
+{
+  "name": "guacamol_synthetic",
+  "version": "0.0.0-synthetic",
+  "num_valid_samples": 35,
+  "description": "Synthetic fixture for testing \u2014 not real chemistry data."
+}
