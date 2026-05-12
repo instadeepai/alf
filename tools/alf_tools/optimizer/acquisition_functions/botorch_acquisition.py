@@ -48,8 +48,8 @@ AcquisitionType = Literal["qEI", "qNEI", "qUCB", "qKG"]
 
 
 class AcquitionOptimizationConfig:
-    """Configuration for acquisition function optimization.
-    """
+    """Configuration for acquisition function optimization."""
+
     batch_limit: int = 64
     maxiter: int = 300
     nonnegative: bool = False
