@@ -12,119 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Shared pytest fixtures for tools tests.
+"""Shared pytest fixtures for all tools tests.
 
-This module provides fixtures needed by the data-conversion utility tests
-(test_botorch_utils.py) and GP model tests (test_botorch_exact_gp_model.py,
-test_botorch_model_adapter.py). Acquisition and dataset fixtures are added
-in later PRs.
+This module provides commonly used fixtures that can be reused across all test
+files in the tools/tests directory, including:
+- Mock ALF models (with and without variances)
+- BoTorch model fixtures (SingleTaskGP, training data)
+- Dataset fixtures (Branin synthetic datasets)
+- Surrogate and task state fixtures
+- Common test data (candidates, tensors)
 """
 
-import math
-from dataclasses import dataclass
 from typing import Any, Union
 
 import numpy as np
 import pytest
 import torch
 from alf_core import (
+    BaseDatasetConfig,
     Candidate,
     LabelledCandidates,
     Modality,
+    Optimizer,
+    Oracle,
     Predictions,
     Surrogate,
 )
+from alf_core.dataclasses.state import State
 from alf_core.model.base_model import BaseModel
+from alf_tools.datasets.botorch_synthetic_dataset import BoTorchSyntheticDataset
 from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
+from alf_tools.optimizer.acquisition_functions.botorch_acquisition import BoTorchAcquisition
+from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
+from alf_tools.optimizer.search.botorch_search_functions import ContinuousSearch
 from botorch.models import SingleTaskGP
-
-
-@pytest.fixture
-def test_candidates_2d():
-    """Create 2D test candidates (tabular data).
-
-    Returns:
-        List of 3 Candidate objects with 2D numpy arrays.
-
-    Example:
-        >>> def test_with_candidates(test_candidates_2d):
-        ...     assert len(test_candidates_2d) == 3
-        ...     assert test_candidates_2d[0].data.shape == (2,)
-    """
-    return [
-        Candidate(data=np.array([0.5, 0.5], dtype=np.float32), modality=Modality.TABULAR),
-        Candidate(data=np.array([0.3, 0.7], dtype=np.float32), modality=Modality.TABULAR),
-        Candidate(data=np.array([0.8, 0.2], dtype=np.float32), modality=Modality.TABULAR),
-    ]
-
-
-@pytest.fixture
-def test_tensor_2d():
-    """Create 2D test tensor for BoTorch operations.
-
-    Returns:
-        Torch tensor of shape (3, 2) with float32 dtype.
-
-    Example:
-        >>> def test_with_tensor(test_tensor_2d):
-        ...     posterior = model.posterior(test_tensor_2d)
-        ...     assert posterior.mean.shape[0] == 3
-    """
-    return torch.tensor([[0.5, 0.5], [0.3, 0.7], [0.8, 0.2]], dtype=torch.float32)
-
-
-@pytest.fixture
-def test_bounds_2d():
-    """Create 2D bounds for optimization problems.
-
-    Returns:
-        List of tuples representing bounds: [(0.0, 1.0), (0.0, 1.0)].
-
-    Example:
-        >>> def test_optimization(test_bounds_2d):
-        ...     bounds_tensor = get_bounds_tensor(test_bounds_2d)
-        ...     assert bounds_tensor.shape == torch.Size([2, 2])
-    """
-    return [(0.0, 1.0), (0.0, 1.0)]
-
-
-@pytest.fixture
-def test_tensor_3d():
-    """Create 3D test tensor (batch format) for BoTorch operations.
-
-    Returns:
-        Torch tensor of shape (2, 3, 2) representing 2 batches of 3 points each.
-
-    Example:
-        >>> def test_batched_posterior(test_tensor_3d):
-        ...     posterior = model.posterior(test_tensor_3d)
-    """
-    return torch.tensor(
-        [
-            [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
-            [[0.7, 0.8], [0.9, 0.1], [0.2, 0.3]],
-        ],
-        dtype=torch.float32,
-    )
-
-
-@pytest.fixture
-def random_seed():
-    """Set a fixed random seed for reproducibility.
-
-    Yields:
-        The seed value (42), and resets numpy/torch random state after test.
-
-    Example:
-        >>> def test_reproducible(random_seed):
-        ...     data = np.random.randn(100)
-    """
-    seed = 42
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    yield seed
-    np.random.seed(None)
-
 
 # =============================================================================
 # Mock ALF Models
@@ -133,6 +54,10 @@ def random_seed():
 
 class MockALFModelWithVariances(BaseModel):
     """Mock ALF BaseModel that provides variances for testing.
+
+    This model is useful for testing code that requires uncertainty estimates.
+    Predictions return sequential means (0, 1, 2, ...) plus an offset, and
+    constant variances.
 
     Attributes:
         mean_offset: Offset to add to predictions (default: 0.0).
@@ -179,6 +104,9 @@ class MockALFModelWithVariances(BaseModel):
 class MockALFModelWithoutVariances(BaseModel):
     """Mock ALF BaseModel that does NOT provide variances (deterministic).
 
+    This model is useful for testing error handling when models don't provide
+    uncertainty estimates. Some models like CNNs may not provide variances.
+
     Predictions return sequential means (0, 1, 2, ...) with no variances.
     """
 
@@ -214,6 +142,11 @@ def mock_alf_model_with_variances():
 
     Returns:
         MockALFModelWithVariances with offset=5.0 and variance=0.2.
+
+    Example:
+        >>> def test_something(mock_alf_model_with_variances):
+        ...     predictions = mock_alf_model_with_variances.predict(candidates)
+        ...     assert predictions.variances is not None
     """
     return MockALFModelWithVariances(mean_offset=5.0, variance_value=0.2)
 
@@ -224,6 +157,11 @@ def mock_alf_model_without_variances():
 
     Returns:
         MockALFModelWithoutVariances instance.
+
+    Example:
+        >>> def test_error_handling(mock_alf_model_without_variances):
+        ...     predictions = mock_alf_model_without_variances.predict(candidates)
+        ...     assert predictions.variances is None
     """
     return MockALFModelWithoutVariances()
 
@@ -241,11 +179,16 @@ def simple_train_data():
         Tuple of (train_X, train_Y) tensors where:
         - train_X: (10, 2) tensor of random inputs in [0, 1]
         - train_Y: (10, 1) tensor of sin/cos function outputs
+
+    Example:
+        >>> def test_model(simple_train_data):
+        ...     train_X, train_Y = simple_train_data
+        ...     model = SingleTaskGP(train_X, train_Y)
     """
     torch.manual_seed(42)
     train_X = torch.rand(10, 2, dtype=torch.float32)
     train_Y = torch.sin(train_X[:, 0] * 3.14159) + torch.cos(train_X[:, 1] * 3.14159)
-    train_Y = train_Y.unsqueeze(-1)
+    train_Y = train_Y.unsqueeze(-1)  # Shape (10, 1)
     return train_X, train_Y
 
 
@@ -258,9 +201,15 @@ def botorch_gp_model(simple_train_data):
 
     Returns:
         Trained SingleTaskGP model.
+
+    Example:
+        >>> def test_botorch_integration(botorch_gp_model):
+        ...     posterior = botorch_gp_model.posterior(test_X)
+        ...     assert posterior.mean.shape[0] == len(test_X)
     """
     train_X, train_Y = simple_train_data
-    return SingleTaskGP(train_X, train_Y)
+    model = SingleTaskGP(train_X, train_Y)
+    return model
 
 
 # =============================================================================
@@ -268,68 +217,115 @@ def botorch_gp_model(simple_train_data):
 # =============================================================================
 
 
-@dataclass
-class _SimpleBraninDataset:
-    """Minimal dataset container with train and test splits for GP tests."""
-
-    train_dataset: LabelledCandidates
-    test_dataset: LabelledCandidates
-
-
-def _branin(x1: float, x2: float) -> float:
-    """Evaluate the Branin function at (x1, x2).
-
-    Args:
-        x1: First input, typically in [-5, 10].
-        x2: Second input, typically in [0, 15].
+@pytest.fixture
+def base_dataset_config():
+    """Create a base dataset configuration for testing.
 
     Returns:
-        Branin function value.
+        BaseDatasetConfig with standard test parameters.
+
+    Example:
+        >>> def test_dataset(base_dataset_config):
+        ...     config = base_dataset_config
+        ...     assert config.seed == 42
     """
-    return (
-        (x2 - (5.1 / (4 * math.pi**2)) * x1**2 + (5 / math.pi) * x1 - 6) ** 2
-        + 10 * (1 - 1 / (8 * math.pi)) * math.cos(x1)
-        + 10
+    return BaseDatasetConfig(
+        name="test_dataset",
+        modality=Modality.TABULAR,
+        seed=42,
+        train_ratio=0.1,
+        validation_frac=0.2,
+        test_ratio=0.1,
+        split_type="random",
     )
 
 
 @pytest.fixture
 def branin_dataset():
-    """Create inline Branin evaluations for GP training tests.
-
-    Generates 20 evaluations on a grid spanning the Branin domain
-    (x1 in [-5, 10], x2 in [0, 15]) without using BoTorchSyntheticDataset.
+    """Create a Branin synthetic dataset for testing.
 
     Returns:
-        _SimpleBraninDataset with train_dataset (25 points) and
-        test_dataset (10 points), both as LabelledCandidates.
+        BoTorchSyntheticDataset configured for Branin function with 500 samples.
+
+    Example:
+        >>> def test_with_branin(branin_dataset):
+        ...     train_data = branin_dataset.train_dataset
+        ...     assert len(train_data.candidates) > 0
     """
-    x1_train = np.linspace(-5.0, 10.0, 5)
-    x2_train = np.linspace(0.0, 15.0, 5)
-    inputs = [(x1, x2) for x1 in x1_train for x2 in x2_train]  # 25 train points
-
-    x1_test = np.linspace(-4.0, 9.0, 5)
-    x2_test = np.linspace(1.0, 14.0, 5)
-    test_inputs = [(x1, x2) for x1, x2 in zip(x1_test, x2_test)] + [
-        (x1, x2) for x1, x2 in zip(x1_test, reversed(x2_test))
-    ]  # 10 test points
-
-    def make_labelled(pts: list[tuple[float, float]]) -> LabelledCandidates:
-        candidates = [
-            Candidate(data=np.array([x1, x2], dtype=np.float32), modality=Modality.TABULAR)
-            for x1, x2 in pts
-        ]
-        labels = np.array([_branin(x1, x2) for x1, x2 in pts], dtype=np.float32)
-        return LabelledCandidates(candidates=candidates, labels=labels)
-
-    return _SimpleBraninDataset(
-        train_dataset=make_labelled(inputs),
-        test_dataset=make_labelled(test_inputs),
+    config = BaseDatasetConfig(
+        name="test_branin",
+        modality=Modality.TABULAR,
+        seed=42,
+        train_ratio=0.05,
+        validation_frac=0.2,
+        test_ratio=0.1,
+        split_type="random",
     )
+
+    dataset = BoTorchSyntheticDataset(
+        config=config,
+        function_name="branin",
+        noise_std=0.0,
+        n_initial_samples=500,
+    )
+    dataset.setup()
+    return dataset
+
+
+@pytest.fixture
+def branin_dataset_factory():
+    """Factory for creating Branin datasets with custom configurations.
+
+    Returns:
+        Function that creates BoTorchSyntheticDataset instances.
+
+    Example:
+        >>> def test_custom_branin(branin_dataset_factory):
+        ...     dataset = branin_dataset_factory(n_samples=100, noise_std=0.1)
+        ...     assert dataset.noise_std == 0.1
+    """
+
+    def _create_branin_dataset(
+        n_samples: int = 500,
+        noise_std: float = 0.0,
+        train_ratio: float = 0.05,
+        seed: int = 42,
+    ) -> BoTorchSyntheticDataset:
+        """Create a Branin dataset with specified parameters.
+
+        Args:
+            n_samples: Number of initial samples.
+            noise_std: Standard deviation of observation noise.
+            train_ratio: Fraction of data for training.
+            seed: Random seed for reproducibility.
+
+        Returns:
+            Configured and setup BoTorchSyntheticDataset.
+        """
+        config = BaseDatasetConfig(
+            name="test_branin",
+            modality=Modality.TABULAR,
+            seed=seed,
+            train_ratio=train_ratio,
+            validation_frac=0.2,
+            test_ratio=0.1,
+            split_type="random",
+        )
+
+        dataset = BoTorchSyntheticDataset(
+            config=config,
+            function_name="branin",
+            noise_std=noise_std,
+            n_initial_samples=n_samples,
+        )
+        dataset.setup()
+        return dataset
+
+    return _create_branin_dataset
 
 
 # =============================================================================
-# Surrogate Fixtures
+# Surrogate and Task State Fixtures
 # =============================================================================
 
 
@@ -342,8 +338,226 @@ def trained_surrogate(branin_dataset):
 
     Returns:
         Surrogate with trained BoTorchGPModel.
+
+    Example:
+        >>> def test_surrogate(trained_surrogate):
+        ...     predictions = trained_surrogate.predict(test_candidates)
+        ...     assert predictions.means is not None
     """
     gp_model = BoTorchGPModel(num_iterations=50, learning_rate=0.1)
     surrogate = Surrogate(model=gp_model)
-    surrogate.fit(branin_dataset.train_dataset)
+    surrogate.fit(branin_dataset.train_dataset, branin_dataset.validation_dataset)
     return surrogate
+
+
+@pytest.fixture
+def task_state(branin_dataset, trained_surrogate):
+    """Create a task state for testing.
+
+    Args:
+        branin_dataset: Fixture providing a Branin dataset.
+        trained_surrogate: Fixture providing a trained surrogate.
+
+    Returns:
+        State with dataset and surrogate.
+
+    Example:
+        >>> def test_task_state(task_state):
+        ...     predictions = task_state.surrogate.predict(candidates)
+        ...     best_label = np.max(task_state.dataset.train_dataset.labels)
+    """
+    return State(dataset=branin_dataset, surrogate=trained_surrogate)
+
+
+@pytest.fixture
+def state(branin_dataset, trained_surrogate):
+    """Create a task state for testing acquisition functions.
+
+    Alias for task_state, used in discrete acquisition scoring tests.
+
+    Args:
+        branin_dataset: Fixture providing a Branin dataset.
+        trained_surrogate: Fixture providing a trained surrogate.
+
+    Returns:
+        State with dataset and trained surrogate.
+
+    Example:
+        >>> def test_scoring(state):
+        ...     result = acq_fn(candidates, state)
+        ...     assert result.means is not None
+    """
+    return State(dataset=branin_dataset, surrogate=trained_surrogate)
+
+
+@pytest.fixture
+def gp_surrogate():
+    """Create an untrained BoTorch GP surrogate for design-task testing.
+
+    Returns:
+        Surrogate with BoTorchGPModel (untrained, reduced iterations for fast tests).
+
+    Example:
+        >>> def test_design_task(gp_surrogate, branin_dataset):
+        ...     task = DesignTask(num_acq_rounds=3, acq_batch_size=2)
+        ...     state = task.setup(dataset=branin_dataset, surrogate=gp_surrogate)
+        ...     task.run(...)  # GP will be trained by run_initial_train_round
+    """
+    return Surrogate(
+        model=BoTorchGPModel(
+            normalize_inputs=True,
+            standardize_outputs=True,
+            num_iterations=30,
+            optimizer="scipy",
+        )
+    )
+
+
+@pytest.fixture
+def qei_acquisition(branin_dataset) -> BoTorchAcquisition:
+    """Create BoTorch qEI acquisition function with bounds from Branin dataset.
+
+    Args:
+        branin_dataset: Fixture providing a Branin dataset (for bounds).
+
+    Returns:
+        BoTorchAcquisition configured for qEI with continuous optimization.
+    """
+    bounds_list = branin_dataset.bounds.tolist()
+    sampler = BoTorchMCSampler(sampler_type="sobol", num_samples=64, seed=42)
+    return BoTorchAcquisition(
+        acquisition_type="qEI",
+        batch_size=2,
+        bounds=bounds_list,
+        num_restarts=5,
+        raw_samples=128,
+        sampler=sampler,
+    )
+
+
+@pytest.fixture
+def botorch_optimizer(qei_acquisition) -> Optimizer:
+    """Create optimizer with BoTorch qEI acquisition and continuous search.
+
+    Args:
+        qei_acquisition: BoTorch qEI acquisition function fixture.
+
+    Returns:
+        Optimizer with BoTorch qEI acquisition and continuous search.
+    """
+    return Optimizer(
+        acquisition_fn=qei_acquisition,
+        search_fn=ContinuousSearch(),
+    )
+
+
+@pytest.fixture
+def branin_oracle(branin_dataset) -> Oracle:
+    """Create oracle using Branin dataset's query method for evaluation.
+
+    Args:
+        branin_dataset: Fixture providing a Branin dataset (implements query).
+
+    Returns:
+        Oracle using Branin dataset's query method for evaluation.
+    """
+    return Oracle(scorer=branin_dataset)
+
+
+# =============================================================================
+# Common Test Data Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def test_candidates_2d():
+    """Create 2D test candidates (tabular data).
+
+    Returns:
+        List of 3 Candidate objects with 2D numpy arrays.
+
+    Example:
+        >>> def test_with_candidates(test_candidates_2d):
+        ...     assert len(test_candidates_2d) == 3
+        ...     assert test_candidates_2d[0].data.shape == (2,)
+    """
+    return [
+        Candidate(data=np.array([0.5, 0.5], dtype=np.float32), modality=Modality.TABULAR),
+        Candidate(data=np.array([0.3, 0.7], dtype=np.float32), modality=Modality.TABULAR),
+        Candidate(data=np.array([0.8, 0.2], dtype=np.float32), modality=Modality.TABULAR),
+    ]
+
+
+@pytest.fixture
+def test_tensor_2d():
+    """Create 2D test tensor for BoTorch operations.
+
+    Returns:
+        Torch tensor of shape (3, 2) with float32 dtype.
+
+    Example:
+        >>> def test_with_tensor(test_tensor_2d):
+        ...     posterior = model.posterior(test_tensor_2d)
+        ...     assert posterior.mean.shape[0] == 3
+    """
+    return torch.tensor([[0.5, 0.5], [0.3, 0.7], [0.8, 0.2]], dtype=torch.float32)
+
+
+@pytest.fixture
+def test_tensor_3d():
+    """Create 3D test tensor (batch format) for BoTorch operations.
+
+    Returns:
+        Torch tensor of shape (2, 3, 2) representing 2 batches of 3 points each.
+
+    Example:
+        >>> def test_batched_posterior(test_tensor_3d):
+        ...     # Shape: (batch_size=2, q=3, d=2)
+        ...     posterior = model.posterior(test_tensor_3d)
+    """
+    # Shape: (2, 3, 2) - 2 batches, 3 points each, 2 dimensions
+    return torch.tensor(
+        [
+            [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
+            [[0.7, 0.8], [0.9, 0.1], [0.2, 0.3]],
+        ],
+        dtype=torch.float32,
+    )
+
+
+@pytest.fixture
+def test_bounds_2d():
+    """Create 2D bounds for optimization problems.
+
+    Returns:
+        List of tuples representing bounds: [(0.0, 1.0), (0.0, 1.0)].
+
+    Example:
+        >>> def test_optimization(test_bounds_2d):
+        ...     bounds_tensor = get_bounds_tensor(test_bounds_2d)
+        ...     assert bounds_tensor.shape == torch.Size([2, 2])
+    """
+    return [(0.0, 1.0), (0.0, 1.0)]
+
+
+# =============================================================================
+# Utility Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def random_seed():
+    """Set a fixed random seed for reproducibility.
+
+    Yields:
+        The seed value (42), and resets numpy/torch random state after test.
+
+    Example:
+        >>> def test_reproducible(random_seed):
+        ...     data = np.random.randn(100)
+    """
+    seed = 42
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    yield seed
+    np.random.seed(None)
