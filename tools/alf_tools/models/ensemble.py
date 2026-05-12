@@ -153,17 +153,46 @@ class EnsembleWrapper(BaseModel):
         """
         return self.members[model_index].featurise(inputs)
 
+    def _subsample(self, data: LabelledCandidates, seed: int) -> LabelledCandidates:
+        """Return a random subset of data using the given seed.
+
+        Args:
+            data: Full training dataset.
+            seed: RNG seed for reproducible sampling.
+
+        Returns:
+            A new LabelledCandidates containing k = max(1, round(fraction * n)) samples.
+        """
+        cfg = self.config.subsample
+        assert cfg is not None
+        rng = np.random.default_rng(seed)
+        n = len(data)
+        k = max(1, round(cfg.fraction * n))
+        indices = rng.choice(n, size=k, replace=cfg.replace)
+        candidates, labels = data[indices]
+        return LabelledCandidates(candidates=candidates, labels=labels)
+
     def train(
         self,
         train_data: LabelledCandidates,
         val_data: LabelledCandidates | None = None,
     ) -> None:
-        """Train each member sequentially, logging progress."""
+        """Train each member sequentially, optionally on a per-member data subset."""
+        resolved_seeds = self.config.resolve_seeds()
         for i, member in enumerate(self.members):
+            if self.config.subsample is not None:
+                subsample_seed = (
+                    self.config.subsample.seeds[i]
+                    if self.config.subsample.seeds is not None
+                    else resolved_seeds[i]
+                )
+                data = self._subsample(train_data, subsample_seed)
+            else:
+                data = train_data
             logger.info(
                 f"EnsembleWrapper '{self.name}': training member {i + 1}/{len(self.members)}"
             )
-            member.train(train_data, val_data)
+            member.train(data, val_data)
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Aggregate per-member predictions into a single Predictions object.

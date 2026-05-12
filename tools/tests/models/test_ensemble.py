@@ -18,6 +18,7 @@ import torch
 from alf_core import Candidate, LabelledCandidates
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, SubsampleConfig
+from unittest.mock import MagicMock
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -335,6 +336,137 @@ class TestEnsembleWrapperTrain:
         for em in wrapper.get_epoch_metrics():
             assert em.val_loss is not None
             assert np.isfinite(em.val_loss)
+
+    def test_subsample_none_passes_full_data(self, labelled_sequences):
+        """subsample=None must pass the original train_data object to every member."""
+        wrapper = EnsembleWrapper(
+            model_factory=lambda s: MagicMock(),
+            config=EnsembleWrapperConfig(base_seed=0, n_members=2),
+        )
+        wrapper.train(labelled_sequences)
+        for member in wrapper.members:
+            received = member.train.call_args[0][0]
+            assert received is labelled_sequences
+
+    def test_subsample_sizes_match_fraction(self, labelled_sequences):
+        """_subsample must return round(fraction * n) candidates."""
+        # len(labelled_sequences) == 6, fraction=0.5 → k = round(0.5 * 6) = 3
+        cfg = EnsembleWrapperConfig(
+            member_seeds=[0],
+            subsample=SubsampleConfig(fraction=0.5, seeds=[42]),
+        )
+        wrapper = EnsembleWrapper(model_factory=lambda s: MagicMock(), config=cfg)
+        subset = wrapper._subsample(labelled_sequences, 42)
+        assert len(subset) == 3
+
+    def test_subsample_without_replacement_unique_indices(self, labelled_sequences):
+        """replace=False must produce a subset with no repeated candidates."""
+        cfg = EnsembleWrapperConfig(
+            member_seeds=[0],
+            subsample=SubsampleConfig(fraction=0.5, replace=False, seeds=[0]),
+        )
+        wrapper = EnsembleWrapper(model_factory=lambda s: MagicMock(), config=cfg)
+        subset = wrapper._subsample(labelled_sequences, 0)
+        # Labels are distinct floats from np.random.RandomState(2).randn(6),
+        # so duplicate labels mean duplicate indices.
+        assert len(set(subset.labels.tolist())) == len(subset)
+
+    def test_subsample_with_replacement_correct_size(self, labelled_sequences):
+        """replace=True must still return the correct number of candidates."""
+        cfg = EnsembleWrapperConfig(
+            member_seeds=[0],
+            subsample=SubsampleConfig(fraction=1.0, replace=True, seeds=[0]),
+        )
+        wrapper = EnsembleWrapper(model_factory=lambda s: MagicMock(), config=cfg)
+        subset = wrapper._subsample(labelled_sequences, 0)
+        # fraction=1.0, n=6 → k=6
+        assert len(subset) == 6
+
+    def test_subsample_reproducible(self, labelled_sequences):
+        """Same config and seed must produce identical subsets across calls."""
+        cfg = EnsembleWrapperConfig(
+            member_seeds=[7],
+            subsample=SubsampleConfig(fraction=0.5, seeds=[99]),
+        )
+        w1 = EnsembleWrapper(model_factory=lambda s: MagicMock(), config=cfg)
+        w2 = EnsembleWrapper(model_factory=lambda s: MagicMock(), config=cfg)
+        s1 = w1._subsample(labelled_sequences, 99)
+        s2 = w2._subsample(labelled_sequences, 99)
+        np.testing.assert_array_equal(s1.labels, s2.labels)
+
+    def test_subsample_members_receive_different_subsets(self, labelled_sequences):
+        """Explicit subsample seeds must produce different subsets per member."""
+        wrapper = EnsembleWrapper(
+            model_factory=lambda s: MagicMock(),
+            config=EnsembleWrapperConfig(
+                member_seeds=[1, 2],
+                subsample=SubsampleConfig(fraction=0.5, seeds=[10, 20]),
+            ),
+        )
+        wrapper.train(labelled_sequences)
+        subset_0 = wrapper.members[0].train.call_args[0][0]
+        subset_1 = wrapper.members[1].train.call_args[0][0]
+        assert not np.array_equal(subset_0.labels, subset_1.labels)
+
+    def test_subsample_diversity_from_member_seeds(self, labelled_sequences):
+        """Distinct member seeds with no subsample.seeds must produce different subsets.
+
+        This is the core diversity property: different model-init seeds drive
+        different data sampling when no explicit subsample seeds are provided.
+        """
+        wrapper = EnsembleWrapper(
+            model_factory=lambda s: MagicMock(),
+            config=EnsembleWrapperConfig(
+                member_seeds=[10, 20, 30],
+                subsample=SubsampleConfig(fraction=0.5),
+            ),
+        )
+        wrapper.train(labelled_sequences)
+        subsets = [member.train.call_args[0][0] for member in wrapper.members]
+        labels = [s.labels for s in subsets]
+        # At least one pair of members must have received different subsets
+        assert not all(np.array_equal(labels[0], lb) for lb in labels[1:])
+
+    def test_val_data_passed_through_unmodified(self, labelled_sequences, sequence_candidates):
+        """val_data must always be the original object, regardless of subsample config."""
+        val_data = LabelledCandidates(
+            sequence_candidates[:3],
+            np.array([1.0, 2.0, 3.0]),
+        )
+        wrapper = EnsembleWrapper(
+            model_factory=lambda s: MagicMock(),
+            config=EnsembleWrapperConfig(
+                member_seeds=[1, 2],
+                subsample=SubsampleConfig(fraction=0.5),
+            ),
+        )
+        wrapper.train(labelled_sequences, val_data=val_data)
+        for member in wrapper.members:
+            received_val = member.train.call_args[0][1]
+            assert received_val is val_data
+
+    def test_explicit_subsample_seeds_override_member_seeds(self, labelled_sequences):
+        """When subsample.seeds is set, member seeds must not affect subsampling.
+
+        Two wrappers with different member seeds but identical subsample.seeds
+        must produce identical subsets.
+        """
+        def make_wrapper(member_seed: int) -> EnsembleWrapper:
+            return EnsembleWrapper(
+                model_factory=lambda s: MagicMock(),
+                config=EnsembleWrapperConfig(
+                    member_seeds=[member_seed],
+                    subsample=SubsampleConfig(fraction=0.5, seeds=[42]),
+                ),
+            )
+
+        w1 = make_wrapper(100)
+        w2 = make_wrapper(999)
+        w1.train(labelled_sequences)
+        w2.train(labelled_sequences)
+        subset_1 = w1.members[0].train.call_args[0][0]
+        subset_2 = w2.members[0].train.call_args[0][0]
+        np.testing.assert_array_equal(subset_1.labels, subset_2.labels)
 
 
 # ---------------------------------------------------------------------------
