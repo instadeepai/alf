@@ -177,7 +177,13 @@ class EnsembleWrapper(BaseModel):
         train_data: LabelledCandidates,
         val_data: LabelledCandidates | None = None,
     ) -> None:
-        """Train each member sequentially, optionally on a per-member data subset."""
+        """Train each member sequentially on full or subsampled training data.
+
+        When subsample is configured, each member receives a random subset of
+        train_data. The subsample seed is taken from subsample.seeds[i] if
+        provided, otherwise from the member's model-init seed. val_data is
+        always passed through unchanged.
+        """
         resolved_seeds = self.config.resolve_seeds()
         for i, member in enumerate(self.members):
             if self.config.subsample is not None:

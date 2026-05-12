@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unittest.mock import MagicMock
+
 import numpy as np
 import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, SubsampleConfig
-from unittest.mock import MagicMock
 
 # ---------------------------------------------------------------------------
 # Fixtures
