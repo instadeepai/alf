@@ -452,6 +452,7 @@ class TestEnsembleWrapperTrain:
         Two wrappers with different member seeds but identical subsample.seeds
         must produce identical subsets.
         """
+
         def make_wrapper(member_seed: int) -> EnsembleWrapper:
             return EnsembleWrapper(
                 model_factory=lambda s: MagicMock(),
