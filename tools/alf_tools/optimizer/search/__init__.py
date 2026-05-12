@@ -12,4 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from alf_tools.optimizer.search.botorch_search_functions import ContinuousSearch
 from alf_tools.optimizer.search.single_mutant_search import SingleMutantSearch
+
+__all__ = ["ContinuousSearch", "SingleMutantSearch"]
