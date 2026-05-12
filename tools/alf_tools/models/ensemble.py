@@ -97,13 +97,19 @@ class EnsembleWrapper(BaseModel):
         seeds = config.resolve_seeds()
         self.members: list[BaseModel] = [model_factory(seed) for seed in seeds]
 
-    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> Any:
-        """Delegate featurisation to the first ensemble member.
+    def featurise(
+        self, inputs: Union[LabelledCandidates, list[Candidate]], model_index: int
+    ) -> Any:
+        """Delegate featurisation to the specified ensemble member.
+
+        Args:
+            inputs (Union[LabelledCandidates, list[Candidate]]): Input samples (training data)
+            model_index (int): Index of the ensemble member to use for featurisation
 
         Returns:
-            Feature representation returned by the first member's featurise().
+            Feature representation returned by the specified member's featurise().
         """
-        return self.members[0].featurise(inputs)
+        return self.members[model_index].featurise(inputs)
 
     def train(
         self,
