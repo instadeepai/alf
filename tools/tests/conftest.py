@@ -20,13 +20,14 @@ test_botorch_model_adapter.py). Acquisition and dataset fixtures are added
 in later PRs.
 """
 
+import math
+from dataclasses import dataclass
 from typing import Any, List, Union
 
 import numpy as np
 import pytest
 import torch
 from alf_core import (
-    BaseDatasetConfig,
     Candidate,
     LabelledCandidates,
     Modality,
@@ -34,7 +35,6 @@ from alf_core import (
     Surrogate,
 )
 from alf_core.model.base_model import BaseModel
-from alf_tools.datasets.botorch_synthetic_dataset import BoTorchSyntheticDataset
 from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
 from botorch.models import SingleTaskGP
 
@@ -268,30 +268,64 @@ def botorch_gp_model(simple_train_data):
 # =============================================================================
 
 
-@pytest.fixture
-def branin_dataset():
-    """Create a Branin synthetic dataset for testing.
+@dataclass
+class _SimpleBraninDataset:
+    """Minimal dataset container with train and test splits for GP tests."""
+
+    train_dataset: LabelledCandidates
+    test_dataset: LabelledCandidates
+
+
+def _branin(x1: float, x2: float) -> float:
+    """Evaluate the Branin function at (x1, x2).
+
+    Args:
+        x1: First input, typically in [-5, 10].
+        x2: Second input, typically in [0, 15].
 
     Returns:
-        BoTorchSyntheticDataset configured for Branin function with 500 samples.
+        Branin function value.
     """
-    config = BaseDatasetConfig(
-        name="test_branin",
-        modality=Modality.TABULAR,
-        seed=42,
-        train_ratio=0.05,
-        validation_frac=0.2,
-        test_ratio=0.1,
-        split_type="random",
+    return (
+        (x2 - (5.1 / (4 * math.pi**2)) * x1**2 + (5 / math.pi) * x1 - 6) ** 2
+        + 10 * (1 - 1 / (8 * math.pi)) * math.cos(x1)
+        + 10
     )
-    dataset = BoTorchSyntheticDataset(
-        config=config,
-        function_name="branin",
-        noise_std=0.0,
-        n_initial_samples=500,
+
+
+@pytest.fixture
+def branin_dataset():
+    """Create inline Branin evaluations for GP training tests.
+
+    Generates 20 evaluations on a grid spanning the Branin domain
+    (x1 in [-5, 10], x2 in [0, 15]) without using BoTorchSyntheticDataset.
+
+    Returns:
+        _SimpleBraninDataset with train_dataset (15 points) and
+        test_dataset (5 points), both as LabelledCandidates.
+    """
+    x1_train = np.linspace(-5.0, 10.0, 5)
+    x2_train = np.linspace(0.0, 15.0, 5)
+    inputs = [(x1, x2) for x1 in x1_train for x2 in x2_train]  # 25 train points
+
+    x1_test = np.linspace(-4.0, 9.0, 5)
+    x2_test = np.linspace(1.0, 14.0, 5)
+    test_inputs = [(x1, x2) for x1, x2 in zip(x1_test, x2_test)] + [
+        (x1, x2) for x1, x2 in zip(x1_test, reversed(x2_test))
+    ]  # 10 test points
+
+    def make_labelled(pts: list[tuple[float, float]]) -> LabelledCandidates:
+        candidates = [
+            Candidate(data=np.array([x1, x2], dtype=np.float32), modality=Modality.TABULAR)
+            for x1, x2 in pts
+        ]
+        labels = np.array([_branin(x1, x2) for x1, x2 in pts], dtype=np.float32)
+        return LabelledCandidates(candidates=candidates, labels=labels)
+
+    return _SimpleBraninDataset(
+        train_dataset=make_labelled(inputs),
+        test_dataset=make_labelled(test_inputs),
     )
-    dataset.setup()
-    return dataset
 
 
 # =============================================================================
@@ -311,5 +345,5 @@ def trained_surrogate(branin_dataset):
     """
     gp_model = BoTorchGPModel(num_iterations=50, learning_rate=0.1)
     surrogate = Surrogate(model=gp_model)
-    surrogate.fit(branin_dataset.train_dataset, branin_dataset.validation_dataset)
+    surrogate.fit(branin_dataset.train_dataset)
     return surrogate
