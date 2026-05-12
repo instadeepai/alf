@@ -16,7 +16,7 @@
 
 This module provides sampler configurations used by BoTorch acquisition functions
 to approximate expectations via Monte Carlo sampling. These samplers are used
-by the BoTorch aquisiotn functions
+by the BoTorch acquisition functions
 """
 
 from typing import Literal, Optional

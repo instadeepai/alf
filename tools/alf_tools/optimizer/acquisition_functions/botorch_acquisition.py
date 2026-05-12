@@ -48,7 +48,28 @@ AcquisitionType = Literal["qEI", "qNEI", "qUCB", "qKG"]
 
 
 class BoTorchAcquisitionOptConfig:
-    """Configuration for acquisition function optimization."""
+    """Configuration for acquisition function optimization.
+
+    These options are passed directly to BoTorch's ``optimize_acqf`` via the
+    ``options`` dict, which is forwarded to the underlying scipy optimizer
+    (``gen_candidates_scipy``).
+
+    Attributes:
+        batch_limit: Maximum number of candidate points processed in a single
+            batch during optimization. Smaller values reduce memory usage at
+            the cost of more iterations. Default: 64.
+        maxiter: Maximum number of scipy L-BFGS-B iterations per restart.
+            Default: 300.
+        nonnegative: If ``True``, constrain candidate values to be
+            non-negative during optimization. Default: ``False``.
+        sample_around_best: If ``True``, draw initial raw samples concentrated
+            around the current best observed point in addition to global
+            random samples. Improves warm-starting of local optimization.
+            Default: ``True``.
+        sample_around_best_sigma: Standard deviation of the Gaussian noise
+            added around the best point when ``sample_around_best`` is
+            ``True``. Default: 0.1.
+    """
 
     batch_limit: int = 64
     maxiter: int = 300
@@ -73,8 +94,9 @@ class BoTorchAcquisition(AcquisitionFunction):
     - **qKG** (qKnowledgeGradient): More sophisticated but expensive
 
     Example - Switching acquisition functions:
-        >>> from alf_tools.optimizer.acquisition_functions import BoTorchAcquisition,
-        BoTorchMCSampler
+        >>> from alf_tools.optimizer.acquisition_functions import (
+        ...     BoTorchAcquisition, BoTorchMCSampler
+        ... )
         >>> from alf_tools.optimizer.search import ContinuousSearch
         >>>
         >>> # Create sampler configuration
