@@ -335,7 +335,7 @@ class BoTorchGPModel(BaseModel):
         )
 
     @property
-    def botroch_model(self) -> Optional[SingleTaskGP]:
+    def botorch_model(self) -> Optional[SingleTaskGP]:
         """Get the underlying BoTorch model.
 
         Returns:

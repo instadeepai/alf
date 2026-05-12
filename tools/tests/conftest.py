@@ -22,7 +22,7 @@ in later PRs.
 
 import math
 from dataclasses import dataclass
-from typing import Any, List, Union
+from typing import Any, Union
 
 import numpy as np
 import pytest
@@ -149,7 +149,7 @@ class MockALFModelWithVariances(BaseModel):
         self.mean_offset = mean_offset
         self.variance_value = variance_value
 
-    def predict(self, candidate_points: List[Candidate]) -> Predictions:
+    def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Generate predictions with variances.
 
         Args:
@@ -163,7 +163,7 @@ class MockALFModelWithVariances(BaseModel):
         variances = np.full(n, self.variance_value, dtype=np.float32)
         return Predictions(means=means, variances=variances)
 
-    def featurise(self, inputs: Union[LabelledCandidates, List[Candidate]]) -> Any:
+    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> None:
         """Not implemented for mock model."""
         pass
 
@@ -171,7 +171,7 @@ class MockALFModelWithVariances(BaseModel):
         """Not implemented for mock model."""
         pass
 
-    def sample(self, *args: Any, **kwargs: Any) -> List[Candidate]:
+    def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
         """Not implemented for mock model."""
         raise NotImplementedError()
 
@@ -182,7 +182,7 @@ class MockALFModelWithoutVariances(BaseModel):
     Predictions return sequential means (0, 1, 2, ...) with no variances.
     """
 
-    def predict(self, candidate_points: List[Candidate]) -> Predictions:
+    def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Generate predictions WITHOUT variances.
 
         Args:
@@ -195,7 +195,7 @@ class MockALFModelWithoutVariances(BaseModel):
         means = np.arange(n, dtype=np.float32)
         return Predictions(means=means, variances=None)
 
-    def featurise(self, inputs: Union[LabelledCandidates, List[Candidate]]) -> Any:
+    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> None:
         """Not implemented for mock model."""
         pass
 
@@ -203,7 +203,7 @@ class MockALFModelWithoutVariances(BaseModel):
         """Not implemented for mock model."""
         pass
 
-    def sample(self, *args: Any, **kwargs: Any) -> List[Candidate]:
+    def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
         """Not implemented for mock model."""
         raise NotImplementedError()
 
@@ -301,8 +301,8 @@ def branin_dataset():
     (x1 in [-5, 10], x2 in [0, 15]) without using BoTorchSyntheticDataset.
 
     Returns:
-        _SimpleBraninDataset with train_dataset (15 points) and
-        test_dataset (5 points), both as LabelledCandidates.
+        _SimpleBraninDataset with train_dataset (25 points) and
+        test_dataset (10 points), both as LabelledCandidates.
     """
     x1_train = np.linspace(-5.0, 10.0, 5)
     x2_train = np.linspace(0.0, 15.0, 5)
