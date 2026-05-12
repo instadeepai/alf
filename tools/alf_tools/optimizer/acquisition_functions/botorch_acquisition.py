@@ -47,7 +47,7 @@ logger = logging.getLogger("alf-tools")
 AcquisitionType = Literal["qEI", "qNEI", "qUCB", "qKG"]
 
 
-class AcquitionOptimizationConfig:
+class BoTorchAcquisitionOptConfig:
     """Configuration for acquisition function optimization."""
 
     batch_limit: int = 64
@@ -152,7 +152,7 @@ class BoTorchAcquisition(AcquisitionFunction):
         self.sequential = sequential
         self.beta = beta
         self.kwargs = kwargs
-        self.optimization_config = AcquitionOptimizationConfig(**kwargs)
+        self.optimization_config = BoTorchAcquisitionOptConfig(**kwargs)
 
         # Validate acquisition type
         if acquisition_type not in ["qEI", "qLogEI", "qNEI", "qUCB", "qKG"]:
