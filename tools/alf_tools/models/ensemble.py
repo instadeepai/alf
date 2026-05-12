@@ -24,6 +24,35 @@ logger = logging.getLogger("alf-tools")
 
 
 @dataclass
+class SubsampleConfig:
+    """Per-member training data subsampling strategy.
+
+    Args:
+        fraction: Fraction of training samples to use per member. Must be in (0, 1].
+            1.0 with replace=False is a no-op (full dataset, no shuffle).
+        replace: Sample with replacement when True (bootstrap), without when False.
+        seeds: Explicit per-member seeds for the sampler. Length must match the
+            number of ensemble members when provided. When None, each member's
+            model-init seed is used for data sampling.
+    """
+
+    fraction: float
+    replace: bool = False
+    seeds: list[int] | None = None
+
+    def __post_init__(self) -> None:
+        """Validate fraction and seeds.
+
+        Raises:
+            ValueError: If fraction not in (0, 1], or if seeds is an empty list.
+        """
+        if not (0.0 < self.fraction <= 1.0):
+            raise ValueError(f"fraction must be in (0, 1], got {self.fraction}")
+        if self.seeds is not None and len(self.seeds) == 0:
+            raise ValueError("seeds must not be empty when provided.")
+
+
+@dataclass
 class EnsembleWrapperConfig:
     """Configuration for the generic ensemble wrapper.
 

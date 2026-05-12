@@ -17,7 +17,7 @@ import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
-from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig
+from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, SubsampleConfig
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -71,6 +71,52 @@ def cnn_factory(seed: int) -> CNNModel:
         train_config=CNNTrainConfig(batch_size=4, num_epochs=2),
         device="cpu",
     )
+
+
+# ---------------------------------------------------------------------------
+# Task 1: SubsampleConfig tests
+# ---------------------------------------------------------------------------
+
+
+class TestSubsampleConfig:
+    """Tests for SubsampleConfig validation."""
+
+    def test_fraction_only(self):
+        """Defaults: replace=False, seeds=None."""
+        cfg = SubsampleConfig(fraction=0.8)
+        assert cfg.fraction == 0.8
+        assert cfg.replace is False
+        assert cfg.seeds is None
+
+    def test_with_replace(self):
+        """replace=True is stored correctly."""
+        cfg = SubsampleConfig(fraction=0.5, replace=True)
+        assert cfg.replace is True
+
+    def test_with_seeds(self):
+        """Explicit seeds list is stored correctly."""
+        cfg = SubsampleConfig(fraction=0.7, seeds=[1, 2, 3])
+        assert cfg.seeds == [1, 2, 3]
+
+    def test_fraction_zero_raises(self):
+        """fraction=0.0 must raise ValueError."""
+        with pytest.raises(ValueError, match="fraction"):
+            SubsampleConfig(fraction=0.0)
+
+    def test_fraction_negative_raises(self):
+        """Negative fraction must raise ValueError."""
+        with pytest.raises(ValueError, match="fraction"):
+            SubsampleConfig(fraction=-0.1)
+
+    def test_fraction_above_one_raises(self):
+        """Fraction > 1.0 must raise ValueError."""
+        with pytest.raises(ValueError, match="fraction"):
+            SubsampleConfig(fraction=1.1)
+
+    def test_empty_seeds_raises(self):
+        """seeds=[] must raise ValueError."""
+        with pytest.raises(ValueError, match="seeds"):
+            SubsampleConfig(fraction=0.5, seeds=[])
 
 
 # ---------------------------------------------------------------------------
