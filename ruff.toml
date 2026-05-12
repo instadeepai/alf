@@ -49,7 +49,7 @@ target-version = "py311"
 select = ["E", "F", "D", "W", "I", "PLC", "PLE", "PLW", "A", "D", "DOC"]
 # F722: Syntax error in forward annotation (jaxtyping uses strings with spaces)
 # F821: Undefined name in annotation (jaxtyping dimension names are not actual variables)
-ignore = ["D100", "D205", "DOC502", "F722", "F821", "F722", "F821"]
+ignore = ["D100", "D205", "DOC502", "F722", "F821"]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
