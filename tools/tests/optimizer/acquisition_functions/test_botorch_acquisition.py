@@ -397,8 +397,11 @@ def test_requires_trained_surrogate(simple_dataset):
     """Test that calling without trained surrogate raises RuntimeError."""
     acq_fn = BoTorchAcquisition(acquisition_type="qEI")
 
-    # Create state without surrogate
-    state = State(dataset=simple_dataset, surrogate=None)
+    # State requires a Surrogate at construction time (beartype-enforced); set to None
+    # afterward so the acquisition function's own guard is what raises the error.
+    placeholder = Surrogate(model=BoTorchGPModel())
+    state = State(dataset=simple_dataset, surrogate=placeholder)
+    state.surrogate = None  # type: ignore
 
     test_candidates = [
         Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR),
