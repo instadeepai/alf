@@ -66,11 +66,14 @@ class EnsembleWrapperConfig:
             len(member_seeds) determines the number of members.
             n_members is ignored when this is set.
         n_members: Number of ensemble members. Only used when base_seed is set.
+        subsample: Optional per-member subsampling config. When None (default),
+            each member trains on the full training dataset.
     """
 
     base_seed: int | None = None
     member_seeds: list[int] | None = None
     n_members: int | None = None
+    subsample: SubsampleConfig | None = None
     _resolved_seeds: list[int] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -100,6 +103,16 @@ class EnsembleWrapperConfig:
             self._resolved_seeds = [self.base_seed + i for i in range(self.n_members)]
         else:
             raise AssertionError("unreachable: validation above guarantees one branch is taken")
+
+        if (
+            self.subsample is not None
+            and self.subsample.seeds is not None
+            and len(self.subsample.seeds) != len(self._resolved_seeds)
+        ):
+            raise ValueError(
+                f"subsample.seeds length ({len(self.subsample.seeds)}) must equal "
+                f"the number of ensemble members ({len(self._resolved_seeds)})."
+            )
 
     def resolve_seeds(self) -> list[int]:
         """Return the ordered list of per-member seeds."""

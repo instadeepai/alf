@@ -172,6 +172,14 @@ class TestEnsembleWrapperConfig:
         cfg = EnsembleWrapperConfig(member_seeds=[1, 2], n_members=0)
         assert cfg.resolve_seeds() == [1, 2]
 
+    def test_subsample_seeds_length_mismatch_raises(self):
+        """subsample.seeds length != member count must raise ValueError."""
+        with pytest.raises(ValueError, match="subsample.seeds"):
+            EnsembleWrapperConfig(
+                member_seeds=[1, 2, 3],
+                subsample=SubsampleConfig(fraction=0.8, seeds=[10, 20]),  # 2 seeds, 3 members
+            )
+
 
 # ---------------------------------------------------------------------------
 # Task 8: EnsembleWrapper construction, featurise, train, metrics tests
