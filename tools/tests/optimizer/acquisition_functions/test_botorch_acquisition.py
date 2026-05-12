@@ -17,7 +17,7 @@
 import numpy as np
 import pytest
 from alf_core import BaseDatasetConfig, Candidate, Modality, Surrogate
-from alf_core.dataclasses.task_state import TaskState
+from alf_core.dataclasses.state import State
 from alf_tools.datasets.botorch_synthetic_dataset import (
     BoTorchSyntheticDataset,
 )
@@ -82,9 +82,9 @@ def task_state(simple_dataset, trained_surrogate):
         trained_surrogate: Fixture providing a trained surrogate.
 
     Returns:
-        TaskState: A task state for testing.
+        State: A task state for testing.
     """
-    return TaskState(dataset=simple_dataset, surrogate=trained_surrogate)
+    return State(dataset=simple_dataset, surrogate=trained_surrogate)
 
 
 # =============================================================================
@@ -398,7 +398,7 @@ def test_requires_trained_surrogate(simple_dataset):
     acq_fn = BoTorchAcquisition(acquisition_type="qEI")
 
     # Create state without surrogate
-    state = TaskState(dataset=simple_dataset, surrogate=None)
+    state = State(dataset=simple_dataset, surrogate=None)
 
     test_candidates = [
         Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR),
@@ -469,7 +469,7 @@ def test_high_dimensional_input(trained_surrogate):
     surrogate = Surrogate(model=gp_model)
     surrogate.fit(dataset.train_dataset, dataset.validation_dataset)
 
-    state = TaskState(dataset=dataset, surrogate=surrogate)
+    state = State(dataset=dataset, surrogate=surrogate)
 
     # Test with qEI
     bounds = [[b[0], b[1]] for b in dataset.bounds.T]

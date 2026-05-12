@@ -27,11 +27,11 @@ import pytest
 from alf_core import (
     Candidate,
     DesignTask,
-    FileTaskStateLogger,
+    FileStateLogger,
     LabelledCandidates,
     Optimizer,
-    TaskState,
-    TerminalTaskStateLogger,
+    State,
+    TerminalStateLogger,
 )
 from alf_core.optimizer.search import BaseSearch
 from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
@@ -61,7 +61,7 @@ class DiscretePoolSearch(BaseSearch):
         self.candidate_pool = candidate_pool
         self.pool_size = pool_size if pool_size is not None else len(candidate_pool)
 
-    def __call__(self, task_state: TaskState, **kwargs) -> list[Candidate]:
+    def __call__(self, task_state: State, **kwargs) -> list[Candidate]:
         """Return discrete pool of candidates for scoring.
 
         Args:
@@ -73,7 +73,7 @@ class DiscretePoolSearch(BaseSearch):
         """
         return self.candidate_pool[: self.pool_size]
 
-    def get_metrics(self, task_state: TaskState) -> dict[str, float]:
+    def get_metrics(self, task_state: State) -> dict[str, float]:
         """Return search metrics.
 
         Args:
@@ -108,8 +108,8 @@ class TestDesignBoTorchSurrogate:
         save_path.mkdir()
 
         task_state_loggers = [
-            TerminalTaskStateLogger(),
-            FileTaskStateLogger(output_path=save_path),
+            TerminalStateLogger(),
+            FileStateLogger(output_path=save_path),
         ]
 
         task = DesignTask(num_acq_rounds=3, acq_batch_size=2)
@@ -228,6 +228,10 @@ class TestDesignBoTorchDiscretePool:
         5. Best value improves over rounds
 
         Args:
+            branin_dataset: Fixture providing the Branin dataset for tests.
+            gp_surrogate: Fixture returning an (untrained) GP surrogate instance.
+            branin_oracle: Fixture oracle used to evaluate selected candidates.
+            tmp_path: pytest temporary path for creating output files.
             q_batch_size: Batch size for acquisition (q parameter).
             pool_size: Number of candidates in discrete pool.
             num_acq_rounds: Number of acquisition rounds.
@@ -237,8 +241,8 @@ class TestDesignBoTorchDiscretePool:
         save_path.mkdir()
 
         task_state_loggers = [
-            TerminalTaskStateLogger(),
-            FileTaskStateLogger(output_path=save_path),
+            TerminalStateLogger(),
+            FileStateLogger(output_path=save_path),
         ]
 
         # Create discrete pool from test dataset (size must be divisible by q)
@@ -343,6 +347,9 @@ class TestBoTorchAcquisitionDiscreteScoring:
         5. Scores vary across different batches
 
         Args:
+            branin_dataset: Fixture providing the Branin dataset.
+            trained_surrogate: Fixture that provides a trained GP surrogate.
+            task_state: Fixture representing current task state used by acquisition.
             q_batch_size: Batch size for acquisition (q parameter).
             num_candidates: Number of candidates to score (must be divisible by q).
         """

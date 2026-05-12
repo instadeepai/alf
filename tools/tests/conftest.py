@@ -38,7 +38,7 @@ from alf_core import (
     Predictions,
     Surrogate,
 )
-from alf_core.dataclasses.task_state import TaskState
+from alf_core.dataclasses.state import State
 from alf_core.model.base_model import BaseModel
 from alf_tools.datasets.botorch_synthetic_dataset import BoTorchSyntheticDataset
 from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
@@ -359,14 +359,14 @@ def task_state(branin_dataset, trained_surrogate):
         trained_surrogate: Fixture providing a trained surrogate.
 
     Returns:
-        TaskState with dataset and surrogate.
+        State with dataset and surrogate.
 
     Example:
         >>> def test_task_state(task_state):
         ...     predictions = task_state.surrogate.predict(candidates)
         ...     best_label = np.max(task_state.dataset.train_dataset.labels)
     """
-    return TaskState(dataset=branin_dataset, surrogate=trained_surrogate)
+    return State(dataset=branin_dataset, surrogate=trained_surrogate)
 
 
 @pytest.fixture

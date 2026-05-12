@@ -31,12 +31,12 @@ from alf_tools.utils.botorch_utils import (
     get_bounds_tensor,
     tensor_to_candidates,
 )
+from botorch.acquisition.logei import qLogExpectedImprovement
 from botorch.acquisition.monte_carlo import (
     qExpectedImprovement,
     qNoisyExpectedImprovement,
     qUpperConfidenceBound,
 )
-from botorch.acquisition.logei import qLogExpectedImprovement
 from botorch.generation import gen_candidates_scipy
 from botorch.optim import optimize_acqf
 from jaxtyping import Float
@@ -369,10 +369,13 @@ class BoTorchAcquisition(AcquisitionFunction):
             num_restarts=self.num_restarts,
             raw_samples=self.raw_samples,
             gen_candidates=gen_candidates_scipy,
-            options={"batch_limit": 64, "maxiter": 300, \
-                     "nonnegative": False, "sample_around_best": True, \
-                     "sample_around_best_sigma": 0.1
-                    },
+            options={
+                "batch_limit": 64,
+                "maxiter": 300,
+                "nonnegative": False,
+                "sample_around_best": True,
+                "sample_around_best_sigma": 0.1,
+            },
             sequential=self.sequential,
         )
 
