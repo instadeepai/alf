@@ -61,11 +61,11 @@ class DiscretePoolSearch(BaseSearch):
         self.candidate_pool = candidate_pool
         self.pool_size = pool_size if pool_size is not None else len(candidate_pool)
 
-    def __call__(self, task_state: State, **kwargs) -> list[Candidate]:
+    def __call__(self, state: State, **kwargs) -> list[Candidate]:
         """Return discrete pool of candidates for scoring.
 
         Args:
-            task_state: Current task state (not used).
+            state: Current task state (not used).
             **kwargs: Additional keyword arguments (not used).
 
         Returns:
@@ -73,11 +73,11 @@ class DiscretePoolSearch(BaseSearch):
         """
         return self.candidate_pool[: self.pool_size]
 
-    def get_metrics(self, task_state: State) -> dict[str, float]:
+    def get_metrics(self, state: State) -> dict[str, float]:
         """Return search metrics.
 
         Args:
-            task_state: Current task state.
+            state: Current task state.
 
         Returns:
             Dictionary with pool size metric.
@@ -107,7 +107,7 @@ class TestDesignBoTorchSurrogate:
         save_path = tmp_path / "design_botorch_surrogate"
         save_path.mkdir()
 
-        task_state_loggers = [
+        state_loggers = [
             TerminalStateLogger(),
             FileStateLogger(output_path=save_path),
         ]
@@ -124,7 +124,7 @@ class TestDesignBoTorchSurrogate:
         # Run design task (includes initial train round + acquisition rounds)
         task.run(
             state=state,
-            task_state_loggers=task_state_loggers,
+            state_loggers=state_loggers,
             optimizer=botorch_optimizer,
             oracle=branin_oracle,
         )
@@ -240,7 +240,7 @@ class TestDesignBoTorchDiscretePool:
         save_path = tmp_path / f"design_discrete_pool_q{q_batch_size}"
         save_path.mkdir()
 
-        task_state_loggers = [
+        state_loggers = [
             TerminalStateLogger(),
             FileStateLogger(output_path=save_path),
         ]
@@ -277,7 +277,7 @@ class TestDesignBoTorchDiscretePool:
         # Run full pipeline
         task.run(
             state=state,
-            task_state_loggers=task_state_loggers,
+            state_loggers=state_loggers,
             optimizer=discrete_optimizer,
             oracle=branin_oracle,
         )
@@ -331,7 +331,7 @@ class TestBoTorchAcquisitionDiscreteScoring:
         self,
         branin_dataset,
         trained_surrogate,
-        task_state,
+        state,
         q_batch_size,
         num_candidates,
     ):
@@ -349,7 +349,7 @@ class TestBoTorchAcquisitionDiscreteScoring:
         Args:
             branin_dataset: Fixture providing the Branin dataset.
             trained_surrogate: Fixture that provides a trained GP surrogate.
-            task_state: Fixture representing current task state used by acquisition.
+            state: Fixture representing current task state used by acquisition.
             q_batch_size: Batch size for acquisition (q parameter).
             num_candidates: Number of candidates to score (must be divisible by q).
         """
@@ -365,7 +365,7 @@ class TestBoTorchAcquisitionDiscreteScoring:
         discrete_candidates = branin_dataset.test_dataset.candidates[:num_candidates]
 
         # Score candidates
-        result = acq_fn(discrete_candidates, task_state)
+        result = acq_fn(discrete_candidates, state)
 
         # Verify output structure
         assert isinstance(result, LabelledCandidates)
@@ -397,7 +397,7 @@ class TestBoTorchAcquisitionDiscreteScoring:
         self,
         branin_dataset,
         trained_surrogate,
-        task_state,
+        state,
     ):
         """Test error handling when q is larger than number of candidates.
 
@@ -416,13 +416,13 @@ class TestBoTorchAcquisitionDiscreteScoring:
 
         # Should raise ValueError
         with pytest.raises(ValueError, match="batch_size.*greater than.*length of candidates"):
-            acq_fn(discrete_candidates, task_state)
+            acq_fn(discrete_candidates, state)
 
     def test_score_discrete_error_candidates_not_divisible_by_q(
         self,
         branin_dataset,
         trained_surrogate,
-        task_state,
+        state,
     ):
         """Test error handling when candidates count is not divisible by q.
 
@@ -441,4 +441,4 @@ class TestBoTorchAcquisitionDiscreteScoring:
 
         # Should raise ValueError
         with pytest.raises(ValueError, match="not a multiple of batch_size"):
-            acq_fn(discrete_candidates, task_state)
+            acq_fn(discrete_candidates, state)
