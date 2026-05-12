@@ -217,7 +217,7 @@ class TestEnsembleWrapperConstruction:
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
-        x = wrapper.featurise(sequence_candidates)
+        x = wrapper.featurise(sequence_candidates, model_index=0)
         assert x.shape == (6, 20, 20)
 
     def test_featurise_with_labelled_candidates(self, labelled_sequences):
@@ -226,7 +226,7 @@ class TestEnsembleWrapperConstruction:
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
-        x = wrapper.featurise(labelled_sequences)
+        x = wrapper.featurise(labelled_sequences, model_index=0)
         assert x.shape == (6, 20, 20)
 
     def test_get_epoch_metrics_before_train_returns_empty(self):
@@ -597,7 +597,7 @@ class TestEnsembleWrapperWithCNN:
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
-        x = wrapper.featurise(sequence_candidates)
+        x = wrapper.featurise(sequence_candidates, model_index=0)
         assert isinstance(x, torch.Tensor)
         assert x.shape == (6, 20, 20)
         assert x.dtype == torch.float32
