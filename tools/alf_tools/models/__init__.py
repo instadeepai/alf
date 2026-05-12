@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
-from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig
+from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, SubsampleConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.utils import (
     create_char_to_idx_mapping,
@@ -36,4 +36,5 @@ __all__ = [
     "GPTrainConfig",
     "EnsembleWrapper",
     "EnsembleWrapperConfig",
+    "SubsampleConfig",
 ]
