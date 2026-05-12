@@ -19,7 +19,7 @@ from typing import Union
 import numpy as np
 from alf_core.dataclasses.predictions import Predictions
 from alf_core.utils.enums import ProblemType
-from alf_core.utils.metrics import classification_metric_registry, metric_registry
+from alf_core.utils.metrics import classification_metric_registry, regression_metric_registry
 
 
 @dataclass
@@ -63,9 +63,9 @@ class Results:
 
         if self.problem_type == ProblemType.REGRESSION:
             metrics_dict = (
-                metric_registry.get_metrics_not_requiring_variance()
+                regression_metric_registry.get_metrics_not_requiring_variance()
                 if self.predictions.variances is None
-                else metric_registry.get_metrics_requiring_variance()
+                else regression_metric_registry.get_metrics_requiring_variance()
             )
             for _, metric_fn in metrics_dict.items():
                 metrics.update(

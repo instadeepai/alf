@@ -110,7 +110,7 @@ class MetricRegistry:
 
 
 # Create the global registry instances
-metric_registry = MetricRegistry()
+regression_metric_registry = MetricRegistry()
 classification_metric_registry = MetricRegistry()
 
 
@@ -140,7 +140,7 @@ def register_requires_variance(metric_fn: Callable) -> Callable:
         return metric_fn(means, variances, targets, *args, **kwargs)
 
     # Register the metric with variance requirement
-    metric_registry.register(metric_fn.__name__, wrapper, requires_variance=True)
+    regression_metric_registry.register(metric_fn.__name__, wrapper, requires_variance=True)
     return wrapper
 
 
@@ -169,7 +169,7 @@ def register_no_variance_required(metric_fn: Callable) -> Callable:
         return metric_fn(means, variances, targets, *args, **kwargs)
 
     # Register the metric without variance requirement
-    metric_registry.register(metric_fn.__name__, wrapper, requires_variance=False)
+    regression_metric_registry.register(metric_fn.__name__, wrapper, requires_variance=False)
     return wrapper
 
 
