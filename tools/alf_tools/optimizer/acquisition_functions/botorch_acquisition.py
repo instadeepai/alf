@@ -31,11 +31,13 @@ from alf_tools.utils.botorch_utils import (
     get_bounds_tensor,
     tensor_to_candidates,
 )
+from botorch.acquisition.logei import qLogExpectedImprovement
 from botorch.acquisition.monte_carlo import (
     qExpectedImprovement,
     qNoisyExpectedImprovement,
     qUpperConfidenceBound,
 )
+from botorch.generation import gen_candidates_scipy
 from botorch.optim import optimize_acqf
 from jaxtyping import Float
 
@@ -43,6 +45,16 @@ logger = logging.getLogger("alf-tools")
 
 # Type alias for supported acquisition function types
 AcquisitionType = Literal["qEI", "qNEI", "qUCB", "qKG"]
+
+
+class BoTorchAcquisitionOptConfig:
+    """Configuration for acquisition function optimization."""
+
+    batch_limit: int = 64
+    maxiter: int = 300
+    nonnegative: bool = False
+    sample_around_best: bool = True
+    sample_around_best_sigma: float = 0.1
 
 
 class BoTorchAcquisition(AcquisitionFunction):
@@ -55,6 +67,7 @@ class BoTorchAcquisition(AcquisitionFunction):
 
     Supported acquisition functions:
     - **qEI** (qExpectedImprovement): Standard batch expected improvement
+    - **qLogEI** (qLogExpectedImprovement): Log batch expected improvement
     - **qNEI** (qNoisyExpectedImprovement): For noisy observations
     - **qUCB** (qUpperConfidenceBound): Upper confidence bound with exploration bonus
     - **qKG** (qKnowledgeGradient): More sophisticated but expensive
@@ -91,6 +104,7 @@ class BoTorchAcquisition(AcquisitionFunction):
     Args:
         acquisition_type: Type of acquisition function. Options:
             - "qEI": Expected Improvement (general purpose)
+            - "qLogEI": Log Expected Improvement (See [Ament2023logei]_ for details.)
             - "qNEI": Noisy Expected Improvement (for noisy observations)
             - "qUCB": Upper Confidence Bound (tunable exploration)
             - "qKG": Knowledge Gradient (expensive but sophisticated)
@@ -138,12 +152,13 @@ class BoTorchAcquisition(AcquisitionFunction):
         self.sequential = sequential
         self.beta = beta
         self.kwargs = kwargs
+        self.optimization_config = BoTorchAcquisitionOptConfig(**kwargs)
 
         # Validate acquisition type
-        if acquisition_type not in ["qEI", "qNEI", "qUCB", "qKG"]:
+        if acquisition_type not in ["qEI", "qLogEI", "qNEI", "qUCB", "qKG"]:
             raise ValueError(
                 f"Unsupported acquisition_type: {acquisition_type}. "
-                f"Must be one of: qEI, qNEI, qUCB, qKG"
+                f"Must be one of: qEI, qLogEI, qNEI, qUCB, qKG"
             )
 
         # Set up sampler
@@ -183,6 +198,13 @@ class BoTorchAcquisition(AcquisitionFunction):
         # Create acquisition function based on type
         if self.acquisition_type == "qEI":
             return qExpectedImprovement(
+                model=model,
+                best_f=best_f,
+                sampler=sampler,
+                **self.kwargs,
+            )
+        if self.acquisition_type == "qLogEI":
+            return qLogExpectedImprovement(
                 model=model,
                 best_f=best_f,
                 sampler=sampler,
@@ -357,7 +379,14 @@ class BoTorchAcquisition(AcquisitionFunction):
             q=self.batch_size,
             num_restarts=self.num_restarts,
             raw_samples=self.raw_samples,
-            options={"batch_limit": 5, "maxiter": 200},
+            gen_candidates=gen_candidates_scipy,
+            options={
+                "batch_limit": self.optimization_config.batch_limit,
+                "maxiter": self.optimization_config.maxiter,
+                "nonnegative": self.optimization_config.nonnegative,
+                "sample_around_best": self.optimization_config.sample_around_best,
+                "sample_around_best_sigma": self.optimization_config.sample_around_best_sigma,
+            },
             sequential=self.sequential,
         )
 
