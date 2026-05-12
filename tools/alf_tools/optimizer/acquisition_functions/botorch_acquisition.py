@@ -47,6 +47,15 @@ logger = logging.getLogger("alf-tools")
 AcquisitionType = Literal["qEI", "qNEI", "qUCB", "qKG"]
 
 
+class AcquitionOptimizationConfig:
+    
+    batch_limit: int = 64
+    maxiter: int = 300
+    nonnegative: bool = False
+    sample_around_best: bool = True
+    sample_around_best_sigma: float = 0.1
+
+
 class BoTorchAcquisition(AcquisitionFunction):
     """Generic wrapper for BoTorch acquisition functions.
 
@@ -142,6 +151,7 @@ class BoTorchAcquisition(AcquisitionFunction):
         self.sequential = sequential
         self.beta = beta
         self.kwargs = kwargs
+        self.optimization_config = AcquitionOptimizationConfig(**kwargs)
 
         # Validate acquisition type
         if acquisition_type not in ["qEI", "qLogEI", "qNEI", "qUCB", "qKG"]:
@@ -370,11 +380,11 @@ class BoTorchAcquisition(AcquisitionFunction):
             raw_samples=self.raw_samples,
             gen_candidates=gen_candidates_scipy,
             options={
-                "batch_limit": 64,
-                "maxiter": 300,
-                "nonnegative": False,
-                "sample_around_best": True,
-                "sample_around_best_sigma": 0.1,
+                "batch_limit": self.optimization_config.batch_limit,
+                "maxiter": self.optimization_config.maxiter,
+                "nonnegative": self.optimization_config.nonnegative,
+                "sample_around_best": self.optimization_config.sample_around_best,
+                "sample_around_best_sigma": self.optimization_config.sample_around_best_sigma,
             },
             sequential=self.sequential,
         )
