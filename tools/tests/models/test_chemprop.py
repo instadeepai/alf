@@ -151,3 +151,33 @@ class TestTrainAndPredict:
         summary = fast_model.get_training_summary_metrics()
         assert "final_train_loss" in summary
         assert isinstance(summary["final_train_loss"], float)
+
+
+class TestValidation:
+    """Tests for ChempropModel training with validation data."""
+
+    def test_train_with_validation(
+        self,
+        fast_model: ChempropModel,
+        train_data: LabelledCandidates,
+        val_data: LabelledCandidates,
+    ) -> None:
+        """All epoch metrics should have non-None val_loss when val_data is provided."""
+        fast_model.train(train_data, val_data=val_data)
+        metrics = fast_model.get_epoch_metrics()
+        assert len(metrics) == fast_model.train_config.num_epochs
+        for m in metrics:
+            assert m.val_loss is not None
+            assert isinstance(m.val_loss, float)
+
+    def test_training_summary_includes_val_metrics(
+        self,
+        fast_model: ChempropModel,
+        train_data: LabelledCandidates,
+        val_data: LabelledCandidates,
+    ) -> None:
+        """Training summary should include final_val_loss when val_data is provided."""
+        fast_model.train(train_data, val_data=val_data)
+        summary = fast_model.get_training_summary_metrics()
+        assert "final_val_loss" in summary
+        assert isinstance(summary["final_val_loss"], float)

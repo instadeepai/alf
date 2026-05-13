@@ -254,12 +254,12 @@ class ChempropModel(BaseModel):
     ) -> None:
         """Train the MPNN with MSE loss.
 
-        Lazy-initialises the model on the first call. Tracks per-epoch train loss
-        and train Spearman correlation. val_data is accepted but ignored (added in Task 4).
+        Lazy-initialises the model on the first call. Tracks per-epoch train loss,
+        train Spearman, and (when val_data is provided) val loss and val Spearman.
 
         Args:
             train_data: Training molecules and labels.
-            val_data: Optional validation molecules and labels (ignored in this task).
+            val_data: Optional validation molecules and labels.
         """
         self._epoch_metrics = []
 
@@ -271,6 +271,11 @@ class ChempropModel(BaseModel):
 
         train_smiles = self.featurise(train_data)
         train_loader = self._build_dataloader(train_smiles, train_data.labels, shuffle=True)
+
+        val_loader = None
+        if val_data is not None and len(val_data) > 0:
+            val_smiles = self.featurise(val_data)
+            val_loader = self._build_dataloader(val_smiles, val_data.labels, shuffle=False)
 
         optimizer = _OPTIMIZERS[self.train_config.optimizer](
             model.parameters(),
@@ -309,10 +314,40 @@ class ChempropModel(BaseModel):
                 if spearman is not None:
                     additional["train_spearman"] = float(spearman)
 
+            avg_val_loss = None
+            if val_loader is not None:
+                model.eval()
+                val_preds_all: list[np.ndarray] = []
+                val_targets_all: list[np.ndarray] = []
+                val_losses: list[float] = []
+
+                with torch.no_grad():
+                    for batch in val_loader:
+                        preds = model(batch.bmg, batch.V_d, batch.X_d).squeeze(-1)
+                        targets_1d = batch.Y.squeeze(-1).to(self.device)
+                        loss = criterion(preds, targets_1d)
+                        val_losses.append(loss.item())
+                        val_preds_all.append(preds.cpu().numpy())
+                        val_targets_all.append(targets_1d.cpu().numpy())
+
+                avg_val_loss = float(np.mean(val_losses))
+                val_preds_np = np.concatenate(val_preds_all)
+                val_targets_np = np.concatenate(val_targets_all)
+
+                if len(val_preds_np) >= 2:
+                    val_results = Results(
+                        targets=val_targets_np,
+                        predictions=Predictions(means=val_preds_np),
+                    )
+                    val_spearman = val_results.metrics.get("spearman")
+                    if val_spearman is not None:
+                        additional["val_spearman"] = float(val_spearman)
+
             self._epoch_metrics.append(
                 SurrogateEpochMetrics(
                     epoch=epoch,
                     train_loss=avg_train_loss,
+                    val_loss=avg_val_loss,
                     additional_metrics=additional,
                 )
             )
@@ -320,9 +355,11 @@ class ChempropModel(BaseModel):
         last = self._epoch_metrics[-1]
         self._training_metrics = {"final_train_loss": last.train_loss}
         if "train_spearman" in last.additional_metrics:
-            self._training_metrics["final_train_spearman"] = last.additional_metrics[
-                "train_spearman"
-            ]
+            self._training_metrics["final_train_spearman"] = last.additional_metrics["train_spearman"]
+        if last.val_loss is not None:
+            self._training_metrics["final_val_loss"] = last.val_loss
+        if "val_spearman" in last.additional_metrics:
+            self._training_metrics["final_val_spearman"] = last.additional_metrics["val_spearman"]
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Predict fitness means for a list of candidates.
