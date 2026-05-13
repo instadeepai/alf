@@ -13,15 +13,12 @@
 # limitations under the License.
 
 import logging
-import random
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, Union
 
 import numpy as np
-import torch
-import torch.nn as nn
 import torch.optim as optim
-from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
+from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from torch.utils.data import DataLoader
 
@@ -81,7 +78,7 @@ def _get_aggregations() -> dict[str, type]:
     Returns:
         Dictionary mapping aggregation name strings to aggregation classes.
     """
-    from chemprop.nn import MeanAggregation, NormAggregation, SumAggregation
+    from chemprop.nn import MeanAggregation, NormAggregation, SumAggregation  # noqa: PLC0415
 
     return {
         "mean": MeanAggregation,
@@ -184,9 +181,6 @@ class ChempropModel(BaseModel):
 
         Args:
             candidate_points: Candidates to predict.
-
-        Returns:
-            Predictions with means only.
 
         Raises:
             RuntimeError: If called before train().
