@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal, Union
+from typing import TYPE_CHECKING, Literal, Union
 
 import numpy as np
 import torch.optim as optim
@@ -85,6 +85,11 @@ def _get_aggregations() -> dict[str, type]:
         "sum": SumAggregation,
         "norm": NormAggregation,
     }
+
+
+# Callable alias for deferred aggregation lookup in Task 3.
+# Use: _AGGREGATIONS()[cfg.aggregation]() to avoid top-level chemprop import.
+_AGGREGATIONS = _get_aggregations  # noqa: N816
 
 
 _OPTIMIZERS: dict[str, type] = {
@@ -160,6 +165,7 @@ class ChempropModel(BaseModel):
         """Instantiate the Chemprop MPNN and move it to device.
 
         Applies weight initialisation if configured by train_config.weight_init.
+        Use _AGGREGATIONS()[cfg.aggregation]() to retrieve the aggregation class.
         """
         raise NotImplementedError  # completed in Task 3
 
@@ -189,7 +195,7 @@ class ChempropModel(BaseModel):
             raise RuntimeError("Model not trained. Call train() first.")
         raise NotImplementedError  # completed in Task 3
 
-    def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
+    def sample(self, condition: object | None = None) -> list[Candidate]:
         """Not implemented for mean-only MPNN."""
         raise NotImplementedError("Sampling is not implemented for ChempropModel.")
 
