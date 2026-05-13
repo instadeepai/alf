@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Literal, Union
+from typing import Literal, Union
 
 import numpy as np
 import torch
@@ -183,6 +183,7 @@ class ChempropModel(BaseModel):
         Applies weight initialisation if configured by train_config.weight_init.
         Use _AGGREGATIONS()[cfg.aggregation]() to retrieve the aggregation class.
         """
+        from chemprop.data import BatchMolGraph  # noqa: PLC0415
         from chemprop.nn import BondMessagePassing  # noqa: PLC0415
         from chemprop.nn.predictors import RegressionFFN  # noqa: PLC0415
 
@@ -211,7 +212,12 @@ class ChempropModel(BaseModel):
                 self.agg = agg
                 self.predictor = predictor
 
-            def forward(self, bmg: Any, V_d: Any = None, X_d: Any = None) -> Any:
+            def forward(
+                self,
+                bmg: "BatchMolGraph",
+                V_d: torch.Tensor | None = None,
+                X_d: torch.Tensor | None = None,
+            ) -> torch.Tensor:
                 """Run message passing, aggregate, and predict.
 
                 Args:
@@ -259,9 +265,9 @@ class ChempropModel(BaseModel):
 
         if self._model is None:
             self._init_model()
-
+        if self._model is None:
+            raise RuntimeError("Model initialisation failed unexpectedly.")
         model = self._model
-        assert model is not None
 
         train_smiles = self.featurise(train_data)
         train_loader = self._build_dataloader(train_smiles, train_data.labels, shuffle=True)
@@ -279,10 +285,9 @@ class ChempropModel(BaseModel):
             train_losses: list[float] = []
 
             for batch in train_loader:
-                b: Any = batch
                 optimizer.zero_grad()
-                preds = model(b.bmg, b.V_d, b.X_d).squeeze(-1)
-                targets_1d = b.Y.squeeze(-1).to(self.device)
+                preds = model(batch.bmg, batch.V_d, batch.X_d).squeeze(-1)
+                targets_1d = batch.Y.squeeze(-1).to(self.device)
                 loss = criterion(preds, targets_1d)
                 loss.backward()
                 optimizer.step()
@@ -342,8 +347,7 @@ class ChempropModel(BaseModel):
         preds_all: list[np.ndarray] = []
         with torch.no_grad():
             for batch in loader:
-                b: Any = batch
-                preds = model(b.bmg, b.V_d, b.X_d).squeeze(-1)
+                preds = model(batch.bmg, batch.V_d, batch.X_d).squeeze(-1)
                 preds_all.append(preds.cpu().numpy())
 
         return Predictions(means=np.concatenate(preds_all))
