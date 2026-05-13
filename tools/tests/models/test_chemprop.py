@@ -128,7 +128,11 @@ class TestTrainAndPredict:
 
     def test_config_defaults_runnable(self, train_data: LabelledCandidates) -> None:
         """A ChempropModel with all default config values should train and predict without error."""
-        model = ChempropModel(device="cpu")
+        model = ChempropModel(
+            model_config=ChempropModelConfig(),
+            train_config=ChempropTrainConfig(num_epochs=2),
+            device="cpu",
+        )
         model.train(train_data)
         candidates = [Candidate(data=smi, modality="graph") for smi in SMILES]
         predictions = model.predict(candidates)
@@ -151,6 +155,24 @@ class TestTrainAndPredict:
         summary = fast_model.get_training_summary_metrics()
         assert "final_train_loss" in summary
         assert isinstance(summary["final_train_loss"], float)
+
+    def test_epoch_metrics_contain_train_mse(
+        self, fast_model: ChempropModel, train_data: LabelledCandidates
+    ) -> None:
+        """Each epoch's additional_metrics should contain train_mse alongside train_spearman."""
+        fast_model.train(train_data)
+        for m in fast_model.get_epoch_metrics():
+            assert "train_mse" in m.additional_metrics
+            assert isinstance(m.additional_metrics["train_mse"], float)
+
+    def test_training_summary_includes_train_mse(
+        self, fast_model: ChempropModel, train_data: LabelledCandidates
+    ) -> None:
+        """Training summary should include final_train_mse as a float."""
+        fast_model.train(train_data)
+        summary = fast_model.get_training_summary_metrics()
+        assert "final_train_mse" in summary
+        assert isinstance(summary["final_train_mse"], float)
 
 
 class TestValidation:

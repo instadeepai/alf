@@ -86,11 +86,6 @@ def _get_aggregations() -> dict[str, type]:
     }
 
 
-# Callable alias for deferred aggregation lookup in Task 3.
-# Use: _AGGREGATIONS()[cfg.aggregation]() to avoid top-level chemprop import.
-_AGGREGATIONS = _get_aggregations  # noqa: N816
-
-
 _OPTIMIZERS: dict[str, type] = {
     "adam": optim.Adam,
     "sgd": optim.SGD,
@@ -98,11 +93,49 @@ _OPTIMIZERS: dict[str, type] = {
 }
 
 
+class _MPNNWrapper(nn.Module):
+    """Lightweight nn.Module combining message passing, aggregation, and FFN."""
+
+    def __init__(self, message_passing: nn.Module, agg: nn.Module, predictor: nn.Module) -> None:
+        """Initialise the MPNN wrapper.
+
+        Args:
+            message_passing: Chemprop message passing module.
+            agg: Graph-level aggregation module.
+            predictor: Feed-forward prediction head.
+        """
+        super().__init__()
+        self.message_passing = message_passing
+        self.agg = agg
+        self.predictor = predictor
+
+    def forward(
+        self,
+        bmg: "BatchMolGraph",  # type: ignore[name-defined]
+        V_d: torch.Tensor | None = None,
+        X_d: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Run message passing, aggregate, and predict.
+
+        Args:
+            bmg: Batched molecular graph (already on the correct device).
+            V_d: Optional node-level descriptors.
+            X_d: Optional molecule-level descriptors.
+
+        Returns:
+            Predictions tensor of shape (batch_size, 1).
+        """
+        H_v = self.message_passing(bmg, V_d)
+        H = self.agg(H_v, bmg.batch)
+        return self.predictor(H)
+
+
 class ChempropModel(BaseModel):
     """Mean-only MPNN surrogate model using Chemprop v2.x as backbone.
 
     Accepts SMILES strings via Candidate.data and returns scalar fitness predictions.
-    Model is initialised lazily on the first train() call.
+    The network is initialised lazily on the first train() call. Subsequent train()
+    calls fine-tune from the current weights rather than resetting them.
     """
 
     def __init__(
@@ -126,7 +159,7 @@ class ChempropModel(BaseModel):
         self.device = get_device(device)
         self._model: nn.Module | None = None
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
-        self._training_metrics: dict[str, Union[float, int, np.number]] = {}
+        self.training_metrics: dict[str, Union[float, int, np.number]] = {}
 
     def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> list[str]:
         """Extract SMILES strings from inputs.
@@ -181,58 +214,27 @@ class ChempropModel(BaseModel):
         Builds a plain nn.Module wrapping BondMessagePassing, aggregation, and
         RegressionFFN without depending on lightning.LightningModule.
         Applies weight initialisation if configured by train_config.weight_init.
-        Use _AGGREGATIONS()[cfg.aggregation]() to retrieve the aggregation class.
         """
-        from chemprop.data import BatchMolGraph  # noqa: PLC0415
         from chemprop.nn import BondMessagePassing  # noqa: PLC0415
         from chemprop.nn.predictors import RegressionFFN  # noqa: PLC0415
 
         cfg = self.model_config
         mp = BondMessagePassing(d_h=cfg.hidden_size, depth=cfg.depth)
-        agg = _AGGREGATIONS()[cfg.aggregation]()
+        agg = _get_aggregations()[cfg.aggregation]()
         ffn = RegressionFFN(
             input_dim=mp.output_dim, n_layers=cfg.ffn_num_layers, dropout=cfg.dropout
         )
 
-        class _MPNNWrapper(nn.Module):
-            """Lightweight nn.Module combining message passing, aggregation, and FFN."""
-
-            def __init__(
-                self, message_passing: nn.Module, agg: nn.Module, predictor: nn.Module
-            ) -> None:
-                """Initialise the MPNN wrapper.
-
-                Args:
-                    message_passing: Chemprop message passing module.
-                    agg: Graph-level aggregation module.
-                    predictor: Feed-forward prediction head.
-                """
-                super().__init__()
-                self.message_passing = message_passing
-                self.agg = agg
-                self.predictor = predictor
-
-            def forward(
-                self,
-                bmg: "BatchMolGraph",
-                V_d: torch.Tensor | None = None,
-                X_d: torch.Tensor | None = None,
-            ) -> torch.Tensor:
-                """Run message passing, aggregate, and predict.
-
-                Args:
-                    bmg: Batched molecular graph.
-                    V_d: Optional node-level descriptors.
-                    X_d: Optional molecule-level descriptors.
-
-                Returns:
-                    Predictions tensor.
-                """
-                H_v = self.message_passing(bmg, V_d)
-                H = self.agg(H_v, bmg.batch)
-                return self.predictor(H)
-
         self._model = _MPNNWrapper(mp, agg, ffn).to(self.device)
+        total_params = sum(p.numel() for p in self._model.parameters())
+        logger.info(
+            "ChempropModel initialised: hidden=%d depth=%d ffn_layers=%d params=%d device=%s",
+            cfg.hidden_size,
+            cfg.depth,
+            cfg.ffn_num_layers,
+            total_params,
+            self.device,
+        )
 
         if self.train_config.weight_init == "xavier_uniform":
             for m in self._model.modules():
@@ -254,8 +256,10 @@ class ChempropModel(BaseModel):
     ) -> None:
         """Train the MPNN with MSE loss.
 
-        Lazy-initialises the model on the first call. Tracks per-epoch train loss,
-        train Spearman, and (when val_data is provided) val loss and val Spearman.
+        Lazy-initialises the network on the first call. Subsequent calls fine-tune
+        from the existing weights rather than resetting them. Tracks per-epoch train
+        loss, train MSE, train Spearman, and (when val_data is provided) val loss,
+        val MSE, and val Spearman.
 
         Args:
             train_data: Training molecules and labels.
@@ -265,6 +269,7 @@ class ChempropModel(BaseModel):
             RuntimeError: If model initialisation fails unexpectedly.
         """
         self._epoch_metrics = []
+        logger.info("Training ChempropModel on %d samples", len(train_data))
 
         if self.train_config.seed is not None:
             import random  # noqa: PLC0415
@@ -272,6 +277,7 @@ class ChempropModel(BaseModel):
             random.seed(self.train_config.seed)
             np.random.seed(self.train_config.seed)
             torch.manual_seed(self.train_config.seed)
+            torch.cuda.manual_seed_all(self.train_config.seed)
 
         if self._model is None:
             self._init_model()
@@ -300,9 +306,14 @@ class ChempropModel(BaseModel):
             train_losses: list[float] = []
 
             for batch in train_loader:
-                optimizer.zero_grad()
-                preds = model(batch.bmg, batch.V_d, batch.X_d).squeeze(-1)
+                # BatchMolGraph.to() mutates in-place (no return value); Tensor.to() returns new
+                batch.bmg.to(self.device)
+                V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
+                X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
                 targets_1d = batch.Y.squeeze(-1).to(self.device)
+
+                optimizer.zero_grad()
+                preds = model(batch.bmg, V_d, X_d).squeeze(-1)
                 loss = criterion(preds, targets_1d)
                 loss.backward()
                 optimizer.step()
@@ -320,9 +331,11 @@ class ChempropModel(BaseModel):
                     targets=train_targets_np,
                     predictions=Predictions(means=train_preds_np),
                 )
-                spearman = train_results.metrics.get("spearman")
-                if spearman is not None:
-                    additional["train_spearman"] = float(spearman)
+                train_metrics = train_results.metrics
+                if (v := train_metrics.get("spearman")) is not None:
+                    additional["train_spearman"] = float(v)
+                if (v := train_metrics.get("mse")) is not None:
+                    additional["train_mse"] = float(v)
 
             avg_val_loss = None
             if val_loader is not None:
@@ -333,8 +346,12 @@ class ChempropModel(BaseModel):
 
                 with torch.no_grad():
                     for batch in val_loader:
-                        preds = model(batch.bmg, batch.V_d, batch.X_d).squeeze(-1)
+                        batch.bmg.to(self.device)
+                        V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
+                        X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
                         targets_1d = batch.Y.squeeze(-1).to(self.device)
+
+                        preds = model(batch.bmg, V_d, X_d).squeeze(-1)
                         loss = criterion(preds, targets_1d)
                         val_losses.append(loss.item())
                         val_preds_all.append(preds.cpu().numpy())
@@ -349,9 +366,11 @@ class ChempropModel(BaseModel):
                         targets=val_targets_np,
                         predictions=Predictions(means=val_preds_np),
                     )
-                    val_spearman = val_results.metrics.get("spearman")
-                    if val_spearman is not None:
-                        additional["val_spearman"] = float(val_spearman)
+                    val_metrics = val_results.metrics
+                    if (v := val_metrics.get("spearman")) is not None:
+                        additional["val_spearman"] = float(v)
+                    if (v := val_metrics.get("mse")) is not None:
+                        additional["val_mse"] = float(v)
 
             self._epoch_metrics.append(
                 SurrogateEpochMetrics(
@@ -363,16 +382,15 @@ class ChempropModel(BaseModel):
             )
 
         last = self._epoch_metrics[-1]
-        self._training_metrics = {"final_train_loss": last.train_loss}
-        if "train_spearman" in last.additional_metrics:
-            self._training_metrics["final_train_spearman"] = last.additional_metrics[
-                "train_spearman"
-            ]
+        self.training_metrics = {"final_train_loss": last.train_loss}
+        for key in ("train_spearman", "train_mse"):
+            if key in last.additional_metrics:
+                self.training_metrics[f"final_{key}"] = last.additional_metrics[key]
         if last.val_loss is not None:
-            self._training_metrics["final_val_loss"] = last.val_loss
-        if "val_spearman" in last.additional_metrics:
-            val_spearman = last.additional_metrics["val_spearman"]
-            self._training_metrics["final_val_spearman"] = val_spearman
+            self.training_metrics["final_val_loss"] = last.val_loss
+        for key in ("val_spearman", "val_mse"):
+            if key in last.additional_metrics:
+                self.training_metrics[f"final_{key}"] = last.additional_metrics[key]
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Predict fitness means for a list of candidates.
@@ -397,7 +415,10 @@ class ChempropModel(BaseModel):
         preds_all: list[np.ndarray] = []
         with torch.no_grad():
             for batch in loader:
-                preds = model(batch.bmg, batch.V_d, batch.X_d).squeeze(-1)
+                batch.bmg.to(self.device)
+                V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
+                X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
+                preds = model(batch.bmg, V_d, X_d).squeeze(-1)
                 preds_all.append(preds.cpu().numpy())
 
         return Predictions(means=np.concatenate(preds_all))
@@ -418,6 +439,6 @@ class ChempropModel(BaseModel):
         """Return summary metrics from the most recent train() call.
 
         Returns:
-            Dictionary of final train/val losses and Spearman correlations.
+            Dictionary of final train/val losses, MSE, and Spearman correlations.
         """
-        return self._training_metrics
+        return self.training_metrics
