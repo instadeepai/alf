@@ -181,3 +181,23 @@ class TestValidation:
         summary = fast_model.get_training_summary_metrics()
         assert "final_val_loss" in summary
         assert isinstance(summary["final_val_loss"], float)
+
+
+class TestSeed:
+    """Tests for ChempropModel seed reproducibility."""
+
+    def test_seed_reproducibility(self, train_data: LabelledCandidates) -> None:
+        """Two models with identical seeds should produce identical predictions."""
+        model_cfg = ChempropModelConfig(hidden_size=32, depth=1, ffn_num_layers=1)
+        train_cfg = ChempropTrainConfig(batch_size=4, num_epochs=3, seed=42)
+
+        model_a = ChempropModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
+        model_b = ChempropModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
+
+        candidates = [Candidate(data=smi, modality="graph") for smi in SMILES]
+        model_a.train(train_data)
+        model_b.train(train_data)
+
+        preds_a = model_a.predict(candidates).means
+        preds_b = model_b.predict(candidates).means
+        np.testing.assert_array_almost_equal(preds_a, preds_b)

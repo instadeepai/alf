@@ -260,8 +260,18 @@ class ChempropModel(BaseModel):
         Args:
             train_data: Training molecules and labels.
             val_data: Optional validation molecules and labels.
+
+        Raises:
+            RuntimeError: If model initialisation fails unexpectedly.
         """
         self._epoch_metrics = []
+
+        if self.train_config.seed is not None:
+            import random  # noqa: PLC0415
+
+            random.seed(self.train_config.seed)
+            np.random.seed(self.train_config.seed)
+            torch.manual_seed(self.train_config.seed)
 
         if self._model is None:
             self._init_model()
@@ -355,11 +365,14 @@ class ChempropModel(BaseModel):
         last = self._epoch_metrics[-1]
         self._training_metrics = {"final_train_loss": last.train_loss}
         if "train_spearman" in last.additional_metrics:
-            self._training_metrics["final_train_spearman"] = last.additional_metrics["train_spearman"]
+            self._training_metrics["final_train_spearman"] = last.additional_metrics[
+                "train_spearman"
+            ]
         if last.val_loss is not None:
             self._training_metrics["final_val_loss"] = last.val_loss
         if "val_spearman" in last.additional_metrics:
-            self._training_metrics["final_val_spearman"] = last.additional_metrics["val_spearman"]
+            val_spearman = last.additional_metrics["val_spearman"]
+            self._training_metrics["final_val_spearman"] = val_spearman
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Predict fitness means for a list of candidates.
