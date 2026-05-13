@@ -14,7 +14,8 @@
 
 import numpy as np
 import pytest
-from alf_core import Candidate, LabelledCandidates
+from alf_core import Candidate, LabelledCandidates, Predictions
+from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_tools.models.chemprop import ChempropModel, ChempropModelConfig, ChempropTrainConfig
 
 SMILES = ["C", "CC", "CCC", "c1ccccc1", "CCO", "CC(=O)O"]
@@ -109,3 +110,44 @@ class TestGuards:
         """sample() should always raise NotImplementedError."""
         with pytest.raises(NotImplementedError):
             fast_model.sample()
+
+
+class TestTrainAndPredict:
+    """Tests for ChempropModel.train() and ChempropModel.predict()."""
+
+    def test_train_and_predict(
+        self, fast_model: ChempropModel, train_data: LabelledCandidates
+    ) -> None:
+        """train() then predict() should return Predictions with correct shape and no variances."""
+        fast_model.train(train_data)
+        candidates = [Candidate(data=smi, modality="graph") for smi in SMILES]
+        predictions = fast_model.predict(candidates)
+        assert isinstance(predictions, Predictions)
+        assert predictions.means.shape == (len(SMILES),)
+        assert predictions.variances is None
+
+    def test_config_defaults_runnable(self, train_data: LabelledCandidates) -> None:
+        """A ChempropModel with all default config values should train and predict without error."""
+        model = ChempropModel(device="cpu")
+        model.train(train_data)
+        candidates = [Candidate(data=smi, modality="graph") for smi in SMILES]
+        predictions = model.predict(candidates)
+        assert predictions.means.shape == (len(SMILES),)
+
+    def test_get_epoch_metrics_length(
+        self, fast_model: ChempropModel, train_data: LabelledCandidates
+    ) -> None:
+        """get_epoch_metrics() should return one SurrogateEpochMetrics per training epoch."""
+        fast_model.train(train_data)
+        metrics = fast_model.get_epoch_metrics()
+        assert len(metrics) == fast_model.train_config.num_epochs
+        assert all(isinstance(m, SurrogateEpochMetrics) for m in metrics)
+
+    def test_get_training_summary_metrics(
+        self, fast_model: ChempropModel, train_data: LabelledCandidates
+    ) -> None:
+        """get_training_summary_metrics() should contain 'final_train_loss' as a float."""
+        fast_model.train(train_data)
+        summary = fast_model.get_training_summary_metrics()
+        assert "final_train_loss" in summary
+        assert isinstance(summary["final_train_loss"], float)
