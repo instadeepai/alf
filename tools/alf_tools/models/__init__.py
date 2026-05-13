@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from alf_tools.models.chemprop import ChempropModel, ChempropModelConfig, ChempropTrainConfig
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.utils import (
@@ -22,15 +23,18 @@ from alf_tools.models.utils import (
 )
 
 __all__ = [
+    "ChempropModel",
+    "ChempropModelConfig",
+    "ChempropTrainConfig",
     "CNNModel",
     "CNNModelConfig",
     "CNNTrainConfig",
     "create_char_to_idx_mapping",
     "extract_sequences_from_inputs",
-    "get_device",
-    "one_hot_encode",
     "FeaturizerConfig",
-    "GPModelConfig",
+    "get_device",
     "GPModel",
+    "GPModelConfig",
     "GPTrainConfig",
+    "one_hot_encode",
 ]
