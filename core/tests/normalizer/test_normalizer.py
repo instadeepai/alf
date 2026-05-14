@@ -211,12 +211,12 @@ class _ConstantModel(BaseModel):
         """
         return inputs
 
-    def train(self, train_data, val_data=None):
+    def train(self, train_data: LabelledCandidates, val_data: LabelledCandidates) -> None:
         """Store train labels for inspection.
 
         Args:
-            train_data: Labelled candidates for training.
-            val_data: Ignored.
+            train_data: Training data.
+            val_data: Validation data (unused by this test double).
         """
         self._train_labels = train_data.labels.copy()
 

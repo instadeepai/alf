@@ -43,7 +43,7 @@ class Surrogate:
     def _normalise(self, data: LabelledCandidates) -> LabelledCandidates:
         """Return a new LabelledCandidates with transformed labels.
 
-        Does not mutate the input.
+        Does not share mutable references with the input.
 
         Args:
             data: Original labelled candidates.
@@ -52,7 +52,7 @@ class Surrogate:
             New LabelledCandidates with normalised labels.
         """
         return LabelledCandidates(
-            candidates=data.candidates,
+            candidates=list(data.candidates),
             labels=self.normalizer.transform(data.labels),
         )
 
