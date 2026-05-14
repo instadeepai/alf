@@ -246,11 +246,13 @@ class TestESMFoldModelPredict:
         cand = Candidate(data="ACDE", modality="sequence")
         result = default_model.predict([cand])
         assert result.means.shape == (1,)
+        assert result.means.dtype in (np.float32, np.float64)
 
     def test_batch_5_returns_shape_5(self, mock_components, protein_candidates, default_model):
         """5 candidates -> Predictions with means shape (5,)."""
         result = default_model.predict(protein_candidates)
         assert result.means.shape == (5,)
+        assert result.means.dtype in (np.float32, np.float64)
 
     def test_returns_predictions_instance(self, mock_components, default_model):
         """predict() returns a Predictions object."""
@@ -269,28 +271,10 @@ class TestESMFoldModelPredict:
         result = default_model.predict(protein_candidates)
         assert np.all(np.isfinite(result.means))
 
-    def test_metric_ptm_values_in_range(self, mock_components, protein_candidates):
-        """scoring_metric='ptm' -> values in [0, 1]."""
-        mock_mdl, mock_tok, mock_cls, mock_tok_cls = mock_components
-        config = ESMFoldConfig(scoring_metric="ptm")
-        model = ESMFoldModel(config)
-        result = model.predict(protein_candidates)
-        assert np.all(result.means >= 0.0)
-        assert np.all(result.means <= 1.0)
-
-    def test_metric_mean_plddt_values_in_range(self, mock_components, protein_candidates):
-        """scoring_metric='mean_plddt' -> values in [0, 1] after rescaling."""
-        mock_mdl, mock_tok, mock_cls, mock_tok_cls = mock_components
-        config = ESMFoldConfig(scoring_metric="mean_plddt")
-        model = ESMFoldModel(config)
-        result = model.predict(protein_candidates)
-        assert np.all(result.means >= 0.0)
-        assert np.all(result.means <= 1.0)
-
-    def test_metric_combined_values_in_range(self, mock_components, protein_candidates):
-        """scoring_metric='combined' -> values in [0, 1]."""
-        mock_mdl, mock_tok, mock_cls, mock_tok_cls = mock_components
-        config = ESMFoldConfig(scoring_metric="combined")
+    @pytest.mark.parametrize("metric", ["ptm", "mean_plddt", "combined"])
+    def test_metric_values_in_range(self, mock_components, protein_candidates, metric):
+        """All scoring metrics produce values in [0, 1]."""
+        config = ESMFoldConfig(scoring_metric=metric)
         model = ESMFoldModel(config)
         result = model.predict(protein_candidates)
         assert np.all(result.means >= 0.0)
@@ -298,12 +282,10 @@ class TestESMFoldModelPredict:
 
     def test_combined_weight_0_equals_mean_plddt(self, mock_components, protein_candidates):
         """combined_ptm_weight=0.0 -> means equal to mean_plddt/100."""
-        mock_mdl, mock_tok, mock_cls, mock_tok_cls = mock_components
         config_combined = ESMFoldConfig(scoring_metric="combined", combined_ptm_weight=0.0)
         model_combined = ESMFoldModel(config_combined)
         result_combined = model_combined.predict(protein_candidates)
 
-        mock_mdl, mock_tok, mock_cls, mock_tok_cls = mock_components
         config_plddt = ESMFoldConfig(scoring_metric="mean_plddt")
         model_plddt = ESMFoldModel(config_plddt)
         result_plddt = model_plddt.predict(protein_candidates)
@@ -312,12 +294,10 @@ class TestESMFoldModelPredict:
 
     def test_combined_weight_1_equals_ptm(self, mock_components, protein_candidates):
         """combined_ptm_weight=1.0 -> means equal to ptm."""
-        mock_mdl, mock_tok, mock_cls, mock_tok_cls = mock_components
         config_combined = ESMFoldConfig(scoring_metric="combined", combined_ptm_weight=1.0)
         model_combined = ESMFoldModel(config_combined)
         result_combined = model_combined.predict(protein_candidates)
 
-        mock_mdl, mock_tok, mock_cls, mock_tok_cls = mock_components
         config_ptm = ESMFoldConfig(scoring_metric="ptm")
         model_ptm = ESMFoldModel(config_ptm)
         result_ptm = model_ptm.predict(protein_candidates)
@@ -332,7 +312,6 @@ class TestESMFoldModelPredict:
 
     def test_mean_plddt_output_matches_mock_value(self, mock_components, protein_candidates):
         """mean_plddt scores match the mocked value (60.0/100 = 0.6)."""
-        mock_mdl, mock_tok, mock_cls, mock_tok_cls = mock_components
         config = ESMFoldConfig(scoring_metric="mean_plddt")
         model = ESMFoldModel(config)
         result = model.predict(protein_candidates)
