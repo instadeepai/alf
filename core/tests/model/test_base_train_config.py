@@ -1,5 +1,4 @@
 from dataclasses import fields
-import pytest
 from alf_core.model.base_train_config import BaseTrainConfig
 
 

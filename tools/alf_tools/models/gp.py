@@ -500,6 +500,10 @@ class GPModel(BaseModel):
 
             losses.append(loss_value)
 
+            # Log at configured frequency
+            if i % self.train_config.log_frequency == 0:
+                logger.info(f"Iteration {i}/{self.train_config.num_iterations} — loss={loss_value:.4f}")
+
             # Record per-iteration metrics
             self._epoch_metrics.append(
                 SurrogateEpochMetrics(

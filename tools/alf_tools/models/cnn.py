@@ -419,7 +419,7 @@ class CNNModel(BaseModel):
             # Train
             avg_train_loss, train_metrics = self._train_epoch(train_loader, optimizer, criterion)
 
-            # Validate
+            # Record metrics
             if val_loader is not None:
                 avg_val_loss, val_metrics = self._validate_epoch(val_loader, criterion)
                 self._record_epoch_metrics(
@@ -435,6 +435,10 @@ class CNNModel(BaseModel):
                     avg_train_loss,
                     train_metrics,
                 )
+
+            # Log at configured frequency
+            if epoch % self.train_config.log_frequency == 0:
+                logger.info(f"Epoch {epoch}/{self.train_config.num_epochs} — train_loss={avg_train_loss:.4f}")
 
         # Store final metrics
         self.training_metrics = {
