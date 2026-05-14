@@ -317,3 +317,76 @@ class TestESMFoldModelPredict:
         result = model.predict(protein_candidates)
         expected = MOCK_PLDDT / 100.0
         np.testing.assert_array_almost_equal(result.means, [expected] * len(protein_candidates))
+
+
+class TestESMFoldModelEdgeCases:
+    """Tests for ESMFoldModel.predict() error handling on invalid inputs."""
+
+    def test_predict_empty_list_raises(self, mock_components, default_model):
+        """predict([]) raises ValueError."""
+        with pytest.raises(ValueError, match="No candidates provided"):
+            default_model.predict([])
+
+    def test_predict_empty_sequence_raises(self, mock_components, default_model):
+        """Candidate with data='' raises ValueError naming the index."""
+        cand = Candidate(data="", modality="sequence")
+        with pytest.raises(ValueError, match="index 0"):
+            default_model.predict([cand])
+
+    def test_predict_invalid_aa_char_X_raises(self, mock_components, default_model):
+        """Sequence containing 'X' (not a standard AA) raises ValueError."""
+        cand = Candidate(data="ACDEFX", modality="sequence")
+        with pytest.raises(ValueError, match="X"):
+            default_model.predict([cand])
+
+    def test_predict_invalid_aa_digit_raises(self, mock_components, default_model):
+        """Sequence containing a digit raises ValueError."""
+        cand = Candidate(data="ACD3E", modality="sequence")
+        with pytest.raises(ValueError, match="3"):
+            default_model.predict([cand])
+
+    def test_predict_invalid_aa_whitespace_raises(self, mock_components, default_model):
+        """Sequence containing whitespace raises ValueError."""
+        cand = Candidate(data="ACD E", modality="sequence")
+        with pytest.raises(ValueError, match="invalid amino acid character"):
+            default_model.predict([cand])
+
+    def test_predict_wrong_modality_raises(self, mock_components, default_model):
+        """Candidate with modality != SEQUENCE raises ValueError."""
+        cand = Candidate(data="ACDE", modality="graph")
+        with pytest.raises(ValueError, match="Modality.SEQUENCE"):
+            default_model.predict([cand])
+
+    def test_predict_error_message_names_index(self, mock_components, default_model):
+        """Error for invalid AA names the sequence index."""
+        candidates = [
+            Candidate(data="ACDE", modality="sequence"),
+            Candidate(data="GHIK", modality="sequence"),
+            Candidate(data="MNP2R", modality="sequence"),
+        ]
+        with pytest.raises(ValueError, match="index 2"):
+            default_model.predict(candidates)
+
+    def test_predict_combined_weight_0_equals_mean_plddt(self, mock_components, protein_candidates):
+        """combined_ptm_weight=0.0 -> means equal to mean_plddt/100 exactly."""
+        config_combined = ESMFoldConfig(scoring_metric="combined", combined_ptm_weight=0.0)
+        model_combined = ESMFoldModel(config_combined)
+        result_combined = model_combined.predict(protein_candidates)
+
+        config_plddt = ESMFoldConfig(scoring_metric="mean_plddt")
+        model_plddt = ESMFoldModel(config_plddt)
+        result_plddt = model_plddt.predict(protein_candidates)
+
+        np.testing.assert_array_almost_equal(result_combined.means, result_plddt.means)
+
+    def test_predict_combined_weight_1_equals_ptm(self, mock_components, protein_candidates):
+        """combined_ptm_weight=1.0 -> means equal to ptm exactly."""
+        config_combined = ESMFoldConfig(scoring_metric="combined", combined_ptm_weight=1.0)
+        model_combined = ESMFoldModel(config_combined)
+        result_combined = model_combined.predict(protein_candidates)
+
+        config_ptm = ESMFoldConfig(scoring_metric="ptm")
+        model_ptm = ESMFoldModel(config_ptm)
+        result_ptm = model_ptm.predict(protein_candidates)
+
+        np.testing.assert_array_almost_equal(result_combined.means, result_ptm.means)
