@@ -17,6 +17,8 @@ class TestBaseTrainConfig:
         assert config.log_frequency == 5
 
     def test_is_dataclass(self):
+        from dataclasses import is_dataclass
+        assert is_dataclass(BaseTrainConfig)
         config = BaseTrainConfig()
         field_names = {f.name for f in fields(config)}
         assert "learning_rate" in field_names
