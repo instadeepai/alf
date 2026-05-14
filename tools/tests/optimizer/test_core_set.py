@@ -133,8 +133,8 @@ class MockDataset(BaseDataset):
             name="mock_dataset",
             modality="sequence",
             seed=42,
-            train_ratio=0.8,
-            validation_frac=0.2,
+            train_ratio=1.0,
+            validation_frac=0.0,
             test_ratio=0.0,
         )
         super().__init__(config)

@@ -100,7 +100,7 @@ class CoreSet(AcquisitionFunction):
             best_idx = int(np.argmax(masked))
             acquisition_values[best_idx] = min_dists[best_idx]
             selected_mask[best_idx] = True
-            dists_to_new = np.linalg.norm(candidate_embs - candidate_embs[best_idx], axis=1)
+            dists_to_new = cdist(candidate_embs, candidate_embs[[best_idx]])[:, 0]
             min_dists = np.minimum(min_dists, dists_to_new)
 
         return LabelledCandidates(candidates=search_candidates, labels=acquisition_values)
