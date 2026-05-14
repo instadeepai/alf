@@ -439,3 +439,39 @@ class TestESMFoldBatching:
         seqs = [Candidate(data="ACDE", modality="sequence")] * 5
         model.predict(seqs)
         assert mock_mdl.call_count == 1
+
+
+class TestESMFoldSequenceLengths:
+    """Tests for single-residue, long, and mixed-length sequences."""
+
+    def test_single_residue_sequence(self, mock_components):
+        """Single 'A' residue -> valid Predictions with shape (1,)."""
+        config = ESMFoldConfig()
+        model = ESMFoldModel(config)
+        cand = Candidate(data="A", modality="sequence")
+        result = model.predict([cand])
+        assert result.means.shape == (1,)
+        assert np.all(np.isfinite(result.means))
+
+    def test_long_sequence_with_chunk_size(self, mock_components):
+        """1024-AA sequence with chunk_size=64 -> set_chunk_size called, prediction completes."""
+        mock_mdl, _, _, _ = mock_components
+        config = ESMFoldConfig(chunk_size=64)
+        model = ESMFoldModel(config)
+        mock_mdl.esm.encoder.set_chunk_size.assert_called_once_with(64)
+        cand = Candidate(data="A" * 1024, modality="sequence")
+        result = model.predict([cand])
+        assert result.means.shape == (1,)
+        assert np.all(np.isfinite(result.means))
+
+    def test_mixed_length_batch(self, mock_components):
+        """Batch with 5-AA and 50-AA sequences -> both results valid and independent."""
+        config = ESMFoldConfig()
+        model = ESMFoldModel(config)
+        cands = [
+            Candidate(data="ACDEF", modality="sequence"),
+            Candidate(data="A" * 50, modality="sequence"),
+        ]
+        result = model.predict(cands)
+        assert result.means.shape == (2,)
+        assert np.all(np.isfinite(result.means))
