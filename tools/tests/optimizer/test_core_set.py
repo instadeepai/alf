@@ -17,6 +17,7 @@ from typing import Any
 import numpy as np
 import pytest
 from alf_core import Candidate, LabelledCandidates, Predictions, State
+from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.model.base_model import BaseModel
 from alf_core.surrogate.surrogate import Surrogate
 
@@ -118,8 +119,8 @@ class NullFeaturiseModel(BaseModel):
         raise NotImplementedError
 
 
-class MockDataset:
-    """Minimal dataset-like object exposing only train_dataset."""
+class MockDataset(BaseDataset):
+    """Minimal dataset subclass exposing only train_dataset for testing."""
 
     def __init__(self, train_candidates: list[Candidate], train_labels: np.ndarray) -> None:
         """Initialise with training candidates and labels.
@@ -128,10 +129,27 @@ class MockDataset:
             train_candidates: List of training candidates.
             train_labels: Labels for training candidates.
         """
-        self.train_dataset = LabelledCandidates(
+        config = BaseDatasetConfig(
+            name="mock_dataset",
+            modality="sequence",
+            seed=42,
+            train_ratio=0.8,
+            validation_frac=0.2,
+            test_ratio=0.0,
+        )
+        super().__init__(config)
+        self.splits["train"] = LabelledCandidates(
             candidates=train_candidates,
             labels=train_labels,
         )
+
+    def load_dataset(self) -> LabelledCandidates:
+        """Not used in testing.
+
+        Returns:
+            Empty LabelledCandidates.
+        """
+        return LabelledCandidates(candidates=[], labels=np.array([]))
 
 
 def _make_state(
