@@ -81,6 +81,18 @@ class TestZScoreNormalizer:
         with pytest.raises(RuntimeError, match="fit"):
             n.transform(np.array([1.0]))
 
+    def test_constant_labels_inverse_transform_returns_constant(self, constant_labels):
+        n = ZScoreNormalizer()
+        n.fit(constant_labels)
+        recovered = n.inverse_transform(np.zeros(3))
+        np.testing.assert_array_almost_equal(recovered, constant_labels)
+
+    def test_constant_labels_inverse_transform_variance_returns_zeros(self, constant_labels):
+        n = ZScoreNormalizer()
+        n.fit(constant_labels)
+        result = n.inverse_transform_variance(np.array([1.0, 2.0]))
+        np.testing.assert_array_equal(result, np.zeros(2))
+
 
 class TestMinMaxNormalizer:
     """Tests for MinMaxNormalizer."""
@@ -112,3 +124,29 @@ class TestMinMaxNormalizer:
         n = MinMaxNormalizer()
         with pytest.raises(RuntimeError, match="fit"):
             n.transform(np.array([1.0]))
+
+    def test_transform_interior_values(self, labels):
+        n = MinMaxNormalizer()
+        n.fit(labels)
+        transformed = n.transform(labels)
+        np.testing.assert_array_almost_equal(transformed, np.array([0.0, 0.25, 0.5, 0.75, 1.0]))
+
+    def test_constant_labels_inverse_transform_returns_constant(self, constant_labels):
+        n = MinMaxNormalizer()
+        n.fit(constant_labels)
+        recovered = n.inverse_transform(np.zeros(3))
+        np.testing.assert_array_almost_equal(recovered, constant_labels)
+
+    def test_inverse_variance_scales_by_range_squared(self, labels):
+        n = MinMaxNormalizer()
+        n.fit(labels)
+        variances = np.array([1.0])
+        scale = labels.max() - labels.min()
+        expected = variances * (scale ** 2)
+        np.testing.assert_array_almost_equal(n.inverse_transform_variance(variances), expected)
+
+    def test_constant_labels_inverse_transform_variance_returns_zeros(self, constant_labels):
+        n = MinMaxNormalizer()
+        n.fit(constant_labels)
+        result = n.inverse_transform_variance(np.array([1.0, 2.0]))
+        np.testing.assert_array_equal(result, np.zeros(2))

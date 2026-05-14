@@ -137,7 +137,7 @@ class ZScoreNormalizer(Normalizer):
         """
         if self._mean is None or self._std is None:
             raise RuntimeError("ZScoreNormalizer.fit() must be called before transform().")
-        if self._std == 0.0:
+        if self._std < 1e-10:
             return np.zeros_like(labels, dtype=float)
         return (labels - self._mean) / self._std
 
@@ -155,7 +155,7 @@ class ZScoreNormalizer(Normalizer):
         """
         if self._mean is None or self._std is None:
             raise RuntimeError("ZScoreNormalizer.fit() must be called before inverse_transform().")
-        if self._std == 0.0:
+        if self._std < 1e-10:
             return np.full_like(values, fill_value=self._mean, dtype=float)
         return values * self._std + self._mean
 
@@ -175,6 +175,8 @@ class ZScoreNormalizer(Normalizer):
             raise RuntimeError(
                 "ZScoreNormalizer.fit() must be called before inverse_transform_variance()."
             )
+        if self._std < 1e-10:
+            return np.zeros_like(variances, dtype=float)
         return variances * (self._std ** 2)
 
 
@@ -212,7 +214,7 @@ class MinMaxNormalizer(Normalizer):
         """
         if self._min is None or self._max is None:
             raise RuntimeError("MinMaxNormalizer.fit() must be called before transform().")
-        if self._max == self._min:
+        if (self._max - self._min) < 1e-10:
             return np.zeros_like(labels, dtype=float)
         return (labels - self._min) / (self._max - self._min)
 
@@ -223,7 +225,8 @@ class MinMaxNormalizer(Normalizer):
             values: 1-D array of normalised predictions in [0, 1].
 
         Returns:
-            Predictions in original label space.
+            Predictions in original label space. Returns a constant array equal
+            to _min when min == max (constant training labels).
 
         Raises:
             RuntimeError: If fit() has not been called.
@@ -232,4 +235,28 @@ class MinMaxNormalizer(Normalizer):
             raise RuntimeError(
                 "MinMaxNormalizer.fit() must be called before inverse_transform()."
             )
+        if (self._max - self._min) < 1e-10:
+            return np.full_like(values, fill_value=self._min, dtype=float)
         return values * (self._max - self._min) + self._min
+
+    def inverse_transform_variance(self, variances: np.ndarray) -> np.ndarray:
+        """Denormalise predictive variances by scaling by (max - min)^2.
+
+        Args:
+            variances: 1-D array of normalised predictive variances.
+
+        Returns:
+            Variances in original label space. Returns zeros when min == max
+            (constant training labels).
+
+        Raises:
+            RuntimeError: If fit() has not been called.
+        """
+        if self._min is None or self._max is None:
+            raise RuntimeError(
+                "MinMaxNormalizer.fit() must be called before inverse_transform_variance()."
+            )
+        scale = self._max - self._min
+        if scale < 1e-10:
+            return np.zeros_like(variances, dtype=float)
+        return variances * (scale ** 2)
