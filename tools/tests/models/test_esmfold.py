@@ -597,3 +597,36 @@ class TestESMFoldOracle:
         oracle = Oracle(scorer=model)
         _, new_state = oracle.evaluate(protein_candidates, esmfold_state)
         assert "oracle_time" in new_state.round_metrics.metrics
+
+
+@pytest.mark.integration
+class TestESMFoldGoldenSequences:
+    """Integration tests with real ESMFold model and known reference sequences."""
+
+    def test_high_ptm_helical_peptide(self):
+        """Short alpha-helical peptide → pTM in [0.6, 1.0]."""
+        # AAAAAKAAAAKAAAAK — poly-Ala helical-like peptide; known to fold
+        config = ESMFoldConfig(device="cpu", scoring_metric="ptm")
+        model = ESMFoldModel(config)
+        cand = Candidate(data="AAAAAKAAAAKAAAAK", modality="sequence")
+        result = model.predict([cand])
+        assert 0.6 <= result.means[0] <= 1.0, f"Expected ptm in [0.6, 1.0], got {result.means[0]}"
+
+    def test_low_ptm_disordered_peptide(self):
+        """Short disordered sequence → pTM in [0.0, 0.4]."""
+        # GSGSGSGSGS — Gly-Ser repeats, intrinsically disordered
+        config = ESMFoldConfig(device="cpu", scoring_metric="ptm")
+        model = ESMFoldModel(config)
+        cand = Candidate(data="GSGSGSGSGS", modality="sequence")
+        result = model.predict([cand])
+        assert 0.0 <= result.means[0] <= 0.4, f"Expected ptm in [0.0, 0.4], got {result.means[0]}"
+
+    def test_gfp_fragment_high_plddt(self):
+        """GFP first 50 AA → mean pLDDT/100 in [0.7, 1.0]."""
+        # GFP (PDB 1EMA), first 50 residues
+        GFP_50 = "MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTT"
+        config = ESMFoldConfig(device="cpu", scoring_metric="mean_plddt")
+        model = ESMFoldModel(config)
+        cand = Candidate(data=GFP_50, modality="sequence")
+        result = model.predict([cand])
+        assert 0.7 <= result.means[0] <= 1.0, f"Expected mean_plddt/100 in [0.7, 1.0], got {result.means[0]}"

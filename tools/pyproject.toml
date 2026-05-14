@@ -40,6 +40,11 @@ torch = [
   { index = "pytorch-cpu" },
 ]
 
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests requiring the real model (deselect with '-m not integration')",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
