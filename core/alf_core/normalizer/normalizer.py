@@ -177,7 +177,7 @@ class ZScoreNormalizer(Normalizer):
             )
         if self._std < 1e-10:
             return np.zeros_like(variances, dtype=float)
-        return variances * (self._std ** 2)
+        return variances * (self._std**2)
 
 
 class MinMaxNormalizer(Normalizer):
@@ -232,9 +232,7 @@ class MinMaxNormalizer(Normalizer):
             RuntimeError: If fit() has not been called.
         """
         if self._min is None or self._max is None:
-            raise RuntimeError(
-                "MinMaxNormalizer.fit() must be called before inverse_transform()."
-            )
+            raise RuntimeError("MinMaxNormalizer.fit() must be called before inverse_transform().")
         if (self._max - self._min) < 1e-10:
             return np.full_like(values, fill_value=self._min, dtype=float)
         return values * (self._max - self._min) + self._min
@@ -259,4 +257,4 @@ class MinMaxNormalizer(Normalizer):
         scale = self._max - self._min
         if scale < 1e-10:
             return np.zeros_like(variances, dtype=float)
-        return variances * (scale ** 2)
+        return variances * (scale**2)

@@ -21,8 +21,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
-from alf_core.model.base_train_config import BaseTrainConfig
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_core.model.base_train_config import BaseTrainConfig
 from torch.utils.data import DataLoader, TensorDataset
 
 from alf_tools.models.utils import (
@@ -438,7 +438,10 @@ class CNNModel(BaseModel):
 
             # Log at configured frequency
             if epoch % self.train_config.log_frequency == 0:
-                logger.info(f"Epoch {epoch}/{self.train_config.num_epochs} — train_loss={avg_train_loss:.4f}")
+                logger.info(
+                    f"Epoch {epoch}/{self.train_config.num_epochs}"
+                    f" - train_loss={avg_train_loss:.4f}"
+                )
 
         # Store final metrics
         self.training_metrics = {

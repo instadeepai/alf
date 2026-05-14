@@ -22,8 +22,8 @@ import gpytorch
 import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
-from alf_core.model.base_train_config import BaseTrainConfig
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_core.model.base_train_config import BaseTrainConfig
 from jaxtyping import Float
 
 from alf_tools.models.utils.sequence_utils import (
@@ -502,7 +502,9 @@ class GPModel(BaseModel):
 
             # Log at configured frequency
             if i % self.train_config.log_frequency == 0:
-                logger.info(f"Iteration {i}/{self.train_config.num_iterations} — loss={loss_value:.4f}")
+                logger.info(
+                    f"Iteration {i}/{self.train_config.num_iterations} — loss={loss_value:.4f}"
+                )
 
             # Record per-iteration metrics
             self._epoch_metrics.append(

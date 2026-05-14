@@ -1,4 +1,19 @@
-from dataclasses import fields
+# Copyright 2023 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from dataclasses import dataclass, fields, is_dataclass
+
 from alf_core.model.base_train_config import BaseTrainConfig
 
 
@@ -6,17 +21,19 @@ class TestBaseTrainConfig:
     """Tests for BaseTrainConfig."""
 
     def test_default_values(self):
+        """Default learning_rate and log_frequency must match expected values."""
         config = BaseTrainConfig()
         assert config.learning_rate == 1e-3
         assert config.log_frequency == 10
 
     def test_custom_values(self):
+        """Custom values must be stored on the config instance."""
         config = BaseTrainConfig(learning_rate=0.01, log_frequency=5)
         assert config.learning_rate == 0.01
         assert config.log_frequency == 5
 
     def test_is_dataclass(self):
-        from dataclasses import is_dataclass
+        """BaseTrainConfig must be a dataclass with learning_rate and log_frequency fields."""
         assert is_dataclass(BaseTrainConfig)
         config = BaseTrainConfig()
         field_names = {f.name for f in fields(config)}
@@ -24,7 +41,7 @@ class TestBaseTrainConfig:
         assert "log_frequency" in field_names
 
     def test_subclass_inherits_fields(self):
-        from dataclasses import dataclass
+        """Subclass must inherit learning_rate and log_frequency from BaseTrainConfig."""
 
         @dataclass
         class ConcreteTrainConfig(BaseTrainConfig):
