@@ -383,6 +383,11 @@ class TestGPModel:
 
 
 class TestGPNormalisation:
+    def test_gp_train_config_default_normalises_inputs(self) -> None:
+        """GPTrainConfig must default normalise_inputs to True."""
+        config = GPTrainConfig()
+        assert config.normalise_inputs is True
+
     def test_output_standardization_on_by_default(self, sample_data):
         """standardise_outputs=True by default; predictions must be in original label scale."""
         model = GPModel(

@@ -77,9 +77,15 @@ class GPModelConfig:
 class GPTrainConfig(BaseTrainConfig):
     """Configuration for Gaussian Process training.
 
-    Inherits standardise_outputs and normalise_inputs from BaseTrainConfig.
+    Inherits ``standardise_outputs`` and ``normalise_inputs`` from
+    :class:`BaseTrainConfig`. Overrides ``normalise_inputs`` to ``True``
+    because GP kernels measure distances between inputs; scaling continuous
+    features to [0, 1] improves marginal log-likelihood optimisation.
 
     Args:
+        normalise_inputs: Whether to apply min-max normalisation to input
+            features before training. Defaults to True (override of
+            BaseTrainConfig which defaults to False).
         learning_rate: Learning rate for the optimizer.
         num_iterations: Number of optimisation iterations.
         optimizer_type: Type of optimizer to use ('adam' or 'lbfgs').
@@ -90,6 +96,7 @@ class GPTrainConfig(BaseTrainConfig):
             improvement. If None, no early stopping is used.
     """
 
+    normalise_inputs: bool = True
     learning_rate: float = 0.01
     num_iterations: int = 100
     optimizer_type: Literal["adam", "lbfgs"] = "adam"
