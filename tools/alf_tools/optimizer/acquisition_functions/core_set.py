@@ -13,9 +13,8 @@
 # limitations under the License.
 
 import numpy as np
-from scipy.spatial.distance import cdist
-
 from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
+from scipy.spatial.distance import cdist
 
 try:
     import torch
