@@ -112,8 +112,8 @@ def mock_components():
         n = tokens["input_ids"].shape[0]
         seq_len = tokens["input_ids"].shape[1]
         out = MagicMock()
-        out.ptm = torch.tensor([MOCK_PTM] * n, dtype=torch.float32)
-        out.plddt = torch.full((n, seq_len), MOCK_PLDDT, dtype=torch.float32)
+        out.ptm = torch.tensor(MOCK_PTM, dtype=torch.float32)  # 0-dim scalar
+        out.plddt = torch.full((n, seq_len, 37), MOCK_PLDDT, dtype=torch.float32)  # (B, L, 37)
         return out
 
     with (
@@ -237,6 +237,16 @@ class TestESMFoldModelInit:
         """batch_size=0 raises ValueError."""
         with pytest.raises(ValueError, match="batch_size"):
             ESMFoldModel(ESMFoldConfig(batch_size=0))
+
+    def test_batch_size_gt_1_with_ptm_raises(self, mock_components):
+        """batch_size > 1 with scoring_metric='ptm' raises ValueError."""
+        with pytest.raises(ValueError, match="batch_size > 1 is not supported"):
+            ESMFoldModel(ESMFoldConfig(batch_size=2, scoring_metric="ptm"))
+
+    def test_batch_size_gt_1_with_combined_raises(self, mock_components):
+        """batch_size > 1 with scoring_metric='combined' raises ValueError."""
+        with pytest.raises(ValueError, match="batch_size > 1 is not supported"):
+            ESMFoldModel(ESMFoldConfig(batch_size=2, scoring_metric="combined"))
 
     def test_not_implemented_methods_raise(self, default_model, protein_candidates):
         """featurise, train, sample, and get_training_summary_metrics raise NotImplementedError."""
@@ -410,7 +420,7 @@ class TestESMFoldBatching:
     def test_7_seqs_batch3_calls_3_times(self, mock_components):
         """7 sequences with batch_size=3 -> exactly 3 forward-pass calls (ceil(7/3)=3)."""
         mock_mdl, _, _, _ = mock_components
-        config = ESMFoldConfig(batch_size=3)
+        config = ESMFoldConfig(batch_size=3, scoring_metric="mean_plddt")
         model = ESMFoldModel(config)
         seqs = [Candidate(data="ACDE", modality="sequence")] * 7
         model.predict(seqs)
@@ -419,7 +429,7 @@ class TestESMFoldBatching:
     def test_7_seqs_batch3_returns_7_results(self, mock_components):
         """7 sequences with batch_size=3 -> output has 7 elements."""
         _, _, _, _ = mock_components
-        config = ESMFoldConfig(batch_size=3)
+        config = ESMFoldConfig(batch_size=3, scoring_metric="mean_plddt")
         model = ESMFoldModel(config)
         seqs = [Candidate(data="ACDE", modality="sequence")] * 7
         result = model.predict(seqs)
@@ -428,7 +438,7 @@ class TestESMFoldBatching:
     def test_partial_last_batch_handled(self, mock_components):
         """The final batch of 1 (in 7 seqs with batch_size=3) is handled correctly."""
         _, _, _, _ = mock_components
-        config = ESMFoldConfig(batch_size=3)
+        config = ESMFoldConfig(batch_size=3, scoring_metric="mean_plddt")
         model = ESMFoldModel(config)
         seqs = [Candidate(data="ACDE", modality="sequence")] * 7
         result = model.predict(seqs)
@@ -446,7 +456,7 @@ class TestESMFoldBatching:
     def test_batch_size_n_calls_1_time(self, mock_components):
         """batch_size >= N -> 1 forward call for N sequences."""
         mock_mdl, _, _, _ = mock_components
-        config = ESMFoldConfig(batch_size=10)
+        config = ESMFoldConfig(batch_size=10, scoring_metric="mean_plddt")
         model = ESMFoldModel(config)
         seqs = [Candidate(data="ACDE", modality="sequence")] * 5
         model.predict(seqs)

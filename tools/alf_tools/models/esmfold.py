@@ -84,6 +84,12 @@ class ESMFoldModel(BaseModel):
             raise ValueError(f"chunk_size must be > 0, got {config.chunk_size}")
         if config.batch_size < 1:
             raise ValueError(f"batch_size must be >= 1, got {config.batch_size}")
+        if config.batch_size > 1 and config.scoring_metric in ("ptm", "combined"):
+            raise ValueError(
+                f"batch_size > 1 is not supported with scoring_metric='{config.scoring_metric}'. "
+                "ESMFold's pTM score is a single scalar per batch, not per-sequence. "
+                "Use batch_size=1 or scoring_metric='mean_plddt'."
+            )
 
         self.config = config
         self.device = torch.device(config.device)
@@ -162,8 +168,8 @@ class ESMFoldModel(BaseModel):
             tokens = {k: v.to(self.device) for k, v in tokens.items()}
             with torch.no_grad():
                 output = self.model(**tokens)
-            ptm_scores.extend(output.ptm.cpu().tolist())
-            plddt_means.extend(output.plddt.mean(dim=-1).cpu().tolist())
+            ptm_scores.append(output.ptm.item())  # scalar → single float per batch
+            plddt_means.extend(output.plddt.mean(dim=(-1, -2)).cpu().tolist())  # (B,L,37) → (B,)
 
         ptm_arr = np.array(ptm_scores, dtype=np.float64)
         plddt_arr = np.array(plddt_means, dtype=np.float64) / 100.0
@@ -213,9 +219,7 @@ class ESMFoldModel(BaseModel):
         Raises:
             NotImplementedError: Always.
         """
-        raise NotImplementedError(
-            "Training metrics are not implemented for ESMFoldModel."
-        )
+        raise NotImplementedError("Training metrics are not implemented for ESMFoldModel.")
 
     def cleanup(self) -> None:
         """Move model to CPU and clear CUDA cache to free GPU memory."""
