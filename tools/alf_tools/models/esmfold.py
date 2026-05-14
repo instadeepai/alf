@@ -20,19 +20,12 @@ import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.candidate import Modality
+from transformers import AutoTokenizer, EsmForProteinFolding
 
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 logger = logging.getLogger("alf-tools")
 
-try:
-    from transformers import AutoTokenizer, EsmForProteinFolding
-
-    _TRANSFORMERS_AVAILABLE = True
-except ImportError:
-    _TRANSFORMERS_AVAILABLE = False
-    AutoTokenizer = None  # type: ignore[assignment]
-    EsmForProteinFolding = None  # type: ignore[assignment]
 
 _VALID_AA: frozenset[str] = frozenset(PROTEIN_ALPHABET)
 
@@ -79,11 +72,6 @@ class ESMFoldModel(BaseModel):
             ImportError: If transformers or accelerate is not installed.
             ValueError: If config parameters are out of valid ranges.
         """
-        if not _TRANSFORMERS_AVAILABLE:
-            raise ImportError(
-                "transformers is not installed. Install it with:\n"
-                "  pip install 'transformers>=4.36.0' 'accelerate>=0.26.0'"
-            )
         if not 0.0 <= config.combined_ptm_weight <= 1.0:
             raise ValueError(
                 f"combined_ptm_weight must be in [0, 1], got {config.combined_ptm_weight}"
@@ -114,6 +102,10 @@ class ESMFoldModel(BaseModel):
             self.model.esm.encoder.set_chunk_size(config.chunk_size)
 
         if config.device == "cpu":
+            # EsmForProteinFolding casts the ESM backbone to fp16 by default (fp16_esm=True).
+            # CPU lacks native fp16 hardware, so emulated fp16 produces noisy representations
+            # that corrupt pTM and pLDDT scores. Converting to fp32 restores accuracy.
+            self.model.esm.float()
             logger.warning(
                 "ESMFoldModel is running on CPU. Inference will be very slow for real proteins."
                 " Use device='cuda' for production workloads."
@@ -252,5 +244,7 @@ class ESMFoldModel(BaseModel):
         """Move model to CPU and clear CUDA cache to free GPU memory."""
         self.model = self.model.to("cpu")
         self.device = torch.device("cpu")
+        # ESM backbone was fp16 on GPU; restore fp32 so the model is usable on CPU after cleanup.
+        self.model.esm.float()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
