@@ -737,8 +737,9 @@ class TestESMFoldGoldenSequences:
     """
 
     @pytest.mark.skipif(
-        not torch.cuda.is_available(), 
-        reason="Requires GPU for reasonable runtime; skip on CPU-only environments.")
+        not torch.cuda.is_available(),
+        reason="Requires GPU for reasonable runtime; skip on CPU-only environments.",
+    )
     def test_high_plddt_helical_peptide(self, _golden_esmfold):
         """Poly-Ala helical peptide → mean pLDDT ≥ 0.7: short but locally well-structured."""
         # AAAAAKAAAAKAAAAK — helical propensity peptide; ESMFold gives mean_pLDDT ≈ 0.80 on CPU.
@@ -750,8 +751,9 @@ class TestESMFoldGoldenSequences:
         assert result.means[0] >= 0.7, f"Expected mean_plddt >= 0.7, got {result.means[0]}"
 
     @pytest.mark.skipif(
-        not torch.cuda.is_available(), 
-        reason="Requires GPU for reasonable runtime; skip on CPU-only environments.")
+        not torch.cuda.is_available(),
+        reason="Requires GPU for reasonable runtime; skip on CPU-only environments.",
+    )
     def test_low_ptm_disordered_peptide(self, _golden_esmfold):
         """Gly-Ser repeat → pTM in [0.0, 0.1]: intrinsically disordered, low global confidence."""
         # GSGSGSGSGS — canonical disordered linker; ESMFold gives pTM ≈ 0.028 on CPU
@@ -761,8 +763,9 @@ class TestESMFoldGoldenSequences:
         assert 0.0 <= result.means[0] <= 0.1, f"Expected ptm in [0.0, 0.1], got {result.means[0]}"
 
     @pytest.mark.skipif(
-        not torch.cuda.is_available(), 
-        reason="Requires GPU for reasonable runtime; skip on CPU-only environments.")
+        not torch.cuda.is_available(),
+        reason="Requires GPU for reasonable runtime; skip on CPU-only environments.",
+    )
     def test_gfp_fragment_high_plddt(self, _golden_esmfold):
         """GFP first 50 AA → mean pLDDT ≥ 0.65: known structured region."""
         # GFP (PDB 1EMA), first 50 residues; ESMFold gives mean_pLDDT ≈ 0.71 on CPU
