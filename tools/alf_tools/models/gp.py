@@ -22,6 +22,7 @@ import gpytorch
 import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
+from alf_core.model.base_train_config import BaseTrainConfig
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from jaxtyping import Float
 
@@ -72,24 +73,23 @@ class GPModelConfig:
 
 
 @dataclass
-class GPTrainConfig:
+class GPTrainConfig(BaseTrainConfig):
     """Configuration for Gaussian Process training.
 
     Args:
-        learning_rate: Learning rate for the optimizer.
         num_iterations: Number of optimization iterations.
         optimizer_type: Type of optimizer to use ('adam' or 'lbfgs').
-        log_frequency: Frequency of logging training metrics (in iterations).
         early_stopping_patience: Number of iterations without improvement
             before stopping. If None, no early stopping is used.
         early_stopping_delta: Minimum change in loss to qualify as an
-            improvement. If None, no early stopping is used.
+            improvement.
+        learning_rate: Inherited from BaseTrainConfig. Default overridden to 0.01.
+        log_frequency: Inherited from BaseTrainConfig. Default: 10.
     """
 
-    learning_rate: float = 0.01
+    learning_rate: float = 0.01  # override BaseTrainConfig default
     num_iterations: int = 100
     optimizer_type: Literal["adam", "lbfgs"] = "adam"
-    log_frequency: int = 10
     early_stopping_patience: int | None = None
     early_stopping_delta: float = 1e-4
 

@@ -21,6 +21,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
+from alf_core.model.base_train_config import BaseTrainConfig
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -54,20 +55,18 @@ class CNNModelConfig:
 
 
 @dataclass
-class CNNTrainConfig:
+class CNNTrainConfig(BaseTrainConfig):
     """Configuration for CNN training.
 
     Args:
-        learning_rate: Learning rate for the optimizer.
         batch_size: Batch size for training.
         num_epochs: Number of epochs to train for.
-        log_frequency: Frequency of logging training metrics.
+        learning_rate: Inherited from BaseTrainConfig. Default: 1e-3.
+        log_frequency: Inherited from BaseTrainConfig. Default: 10.
     """
 
-    learning_rate: float = 1e-3
     batch_size: int = 32
     num_epochs: int = 50
-    log_frequency: int = 10
 
 
 class SequenceCNN(nn.Module):
