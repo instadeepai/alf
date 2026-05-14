@@ -184,8 +184,18 @@ class ESMFoldModel(BaseModel):
                     # output.ptm is a 0-dim scalar (single TM score for the batch)
                     ptm_batch_scores.append(output.ptm.item())
                 if metric != "ptm":
-                    # output.plddt has shape (B, L, 37); mean over residues and atoms → (B,)
-                    plddt_means.extend(output.plddt.mean(dim=(-1, -2)).cpu().tolist())
+                    # output.plddt has shape (B, L, n_atoms). The tokenizer pads shorter
+                    # sequences in a batch to the length of the longest one; a simple mean
+                    # over all L positions would include those padding positions and bias
+                    # the per-sequence pLDDT relative to a solo-sequence run. We exclude
+                    # padding by weighting with the attention mask before averaging.
+                    non_padding_mask = tokens["attention_mask"]  # (B, L): 1=real, 0=pad
+                    n_atoms = output.plddt.shape[-1]
+                    masked_plddt_sum = (output.plddt * non_padding_mask.unsqueeze(-1)).sum(
+                        dim=(1, 2)
+                    )  # (B,)
+                    real_position_count = non_padding_mask.sum(dim=1) * n_atoms  # (B,)
+                    plddt_means.extend((masked_plddt_sum / real_position_count).cpu().tolist())
 
         if metric == "ptm":
             means = np.array(ptm_batch_scores, dtype=np.float64)
