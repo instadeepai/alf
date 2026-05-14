@@ -18,9 +18,12 @@ import numpy as np
 import pytest
 import torch
 from alf_core import Candidate, Predictions
-from alf_core.dataclasses import LabelledCandidates
+from alf_core.dataclasses import LabelledCandidates, State
 from alf_core.dataclasses.candidate import Modality
+from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
+from alf_core.model.base_model import BaseModel
 from alf_core.oracle.oracle import Oracle
+from alf_core.surrogate.surrogate import Surrogate
 
 from alf_tools.models.esmfold import ESMFoldConfig, ESMFoldModel
 
@@ -529,3 +532,68 @@ class TestESMFoldCleanup:
         ):
             model.cleanup()
         assert mock_cache.call_count == 1
+
+
+class _StubModel(BaseModel):
+    """Minimal BaseModel stub for State construction in Oracle tests."""
+
+    def predict(self, candidates):
+        """Return zero predictions."""
+        return Predictions(means=np.zeros(len(candidates)))
+
+    def featurise(self, inputs):
+        """No-op featurisation."""
+
+    def train(self, train_data, val_data):
+        """No-op training."""
+
+    def sample(self, condition=None):
+        """Not implemented."""
+        raise NotImplementedError
+
+
+class _StubDataset(BaseDataset):
+    """Minimal BaseDataset stub for State construction in Oracle tests."""
+
+    def load_dataset(self) -> LabelledCandidates:
+        """Return a trivial empty dataset."""
+        return LabelledCandidates(candidates=[], labels=np.array([]))
+
+
+@pytest.fixture
+def esmfold_state():
+    """Minimal State instance for Oracle integration tests.
+
+    Returns:
+        A State with stub dataset and surrogate instances.
+    """
+    config = BaseDatasetConfig(
+        name="stub",
+        modality="sequence",
+        seed=0,
+        train_ratio=0.6,
+        validation_frac=0.2,
+        test_ratio=0.2,
+    )
+    dataset = _StubDataset(config)
+    surrogate = Surrogate(model=_StubModel())
+    return State(dataset=dataset, surrogate=surrogate)
+
+
+class TestESMFoldOracle:
+    """Integration of ESMFoldModel with the Oracle wrapper."""
+
+    def test_oracle_evaluate_returns_labelled_candidates(self, mock_components, protein_candidates, esmfold_state):
+        """Oracle.evaluate() returns LabelledCandidates with correct length."""
+        model = ESMFoldModel(ESMFoldConfig())
+        oracle = Oracle(scorer=model)
+        result, _ = oracle.evaluate(protein_candidates, esmfold_state)
+        assert isinstance(result, LabelledCandidates)
+        assert len(result.candidates) == len(protein_candidates)
+
+    def test_oracle_evaluate_records_oracle_time(self, mock_components, protein_candidates, esmfold_state):
+        """oracle_time is recorded in state.round_metrics after evaluate()."""
+        model = ESMFoldModel(ESMFoldConfig())
+        oracle = Oracle(scorer=model)
+        _, new_state = oracle.evaluate(protein_candidates, esmfold_state)
+        assert "oracle_time" in new_state.round_metrics.metrics
