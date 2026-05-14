@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import logging
 from dataclasses import dataclass
 from typing import Literal, Union
@@ -249,6 +250,103 @@ class ChempropModel(BaseModel):
                     if m.bias is not None:
                         nn.init.zeros_(m.bias)
 
+    def _train_epoch(
+        self,
+        loader: DataLoader,
+        criterion: nn.Module,
+        optimizer: optim.Optimizer | None = None,
+    ) -> tuple[float, dict[str, float]]:
+        """Run one full pass over a DataLoader.
+
+        When ``optimizer`` is provided the model is set to train mode and gradients are
+        computed; otherwise eval mode with ``torch.no_grad()``.  Output tensors are
+        pre-allocated by dataset size and filled by index slice to avoid per-batch
+        allocations and a final concatenation.
+
+        Args:
+            loader: DataLoader to iterate over.
+            criterion: Loss function.
+            optimizer: Optimizer for the training pass; ``None`` for evaluation.
+
+        Returns:
+            Tuple of (average loss weighted by batch size, metrics dict).
+        """
+        assert self._model is not None
+        model = self._model
+        n = len(loader.dataset)  # type: ignore[arg-type]
+        all_preds = torch.empty(n, device="cpu")
+        all_targets = torch.empty(n, device="cpu")
+        total_loss = 0.0
+        idx = 0
+
+        is_train = optimizer is not None
+        model.train(is_train)
+        ctx = contextlib.nullcontext() if is_train else torch.no_grad()
+        with ctx:
+            for batch in loader:
+                # BatchMolGraph.to() mutates in-place (no return value); Tensor.to() returns new
+                batch.bmg.to(self.device)
+                V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
+                X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
+                targets = batch.Y.squeeze(-1).to(self.device)
+                preds = model(batch.bmg, V_d, X_d).squeeze(-1)
+                loss = criterion(preds, targets)
+
+                if optimizer is not None:
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+
+                b = targets.shape[0]
+                total_loss += loss.item() * b
+                all_preds[idx : idx + b] = preds.detach().cpu()
+                all_targets[idx : idx + b] = targets.detach().cpu()
+                idx += b
+
+        avg_loss = total_loss / n
+        preds_np = all_preds.numpy()
+        targets_np = all_targets.numpy()
+        if len(preds_np) >= 2:
+            raw = Results(targets=targets_np, predictions=Predictions(means=preds_np)).metrics
+            metrics = {k: float(v) for k in ("spearman", "mse") if (v := raw.get(k)) is not None}
+        else:
+            metrics = {"mse": float(np.mean((preds_np - targets_np) ** 2))}
+        return avg_loss, metrics
+
+    def _record_epoch_metrics(
+        self,
+        epoch: int,
+        avg_train_loss: float,
+        train_metrics: dict[str, float],
+        avg_val_loss: float | None = None,
+        val_metrics: dict[str, float] | None = None,
+    ) -> None:
+        """Assemble and append a SurrogateEpochMetrics for one epoch.
+
+        Args:
+            epoch: Zero-based epoch index.
+            avg_train_loss: Average training loss for the epoch.
+            train_metrics: Metrics dict from the training pass.
+            avg_val_loss: Average validation loss, or ``None`` if no validation set.
+            val_metrics: Metrics dict from the validation pass, or ``None``.
+        """
+        additional: dict[str, float] = {}
+        for key in ("spearman", "mse"):
+            if (v := train_metrics.get(key)) is not None:
+                additional[f"train_{key}"] = v
+        if val_metrics is not None:
+            for key in ("spearman", "mse"):
+                if (v := val_metrics.get(key)) is not None:
+                    additional[f"val_{key}"] = v
+        self._epoch_metrics.append(
+            SurrogateEpochMetrics(
+                epoch=epoch,
+                train_loss=avg_train_loss,
+                val_loss=avg_val_loss,
+                additional_metrics=additional,
+            )
+        )
+
     def train(
         self,
         train_data: LabelledCandidates,
@@ -283,114 +381,35 @@ class ChempropModel(BaseModel):
             self._init_model()
         if self._model is None:
             raise RuntimeError("Model initialisation failed unexpectedly.")
-        model = self._model
 
-        train_smiles = self.featurise(train_data)
-        train_loader = self._build_dataloader(train_smiles, train_data.labels, shuffle=True)
-
-        val_loader = None
-        if val_data is not None and len(val_data) > 0:
-            val_smiles = self.featurise(val_data)
-            val_loader = self._build_dataloader(val_smiles, val_data.labels, shuffle=False)
-
+        train_loader = self._build_dataloader(
+            self.featurise(train_data), train_data.labels, shuffle=True
+        )
+        val_loader = (
+            self._build_dataloader(self.featurise(val_data), val_data.labels, shuffle=False)
+            if val_data is not None and len(val_data) > 0
+            else None
+        )
         optimizer = _OPTIMIZERS[self.train_config.optimizer](
-            model.parameters(),
-            lr=self.train_config.learning_rate,
+            self._model.parameters(), lr=self.train_config.learning_rate
         )
         criterion = nn.MSELoss()
 
         for epoch in range(self.train_config.num_epochs):
-            model.train()
-            train_preds_all: list[np.ndarray] = []
-            train_targets_all: list[np.ndarray] = []
-            train_losses: list[float] = []
-
-            for batch in train_loader:
-                # BatchMolGraph.to() mutates in-place (no return value); Tensor.to() returns new
-                batch.bmg.to(self.device)
-                V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
-                X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
-                targets_1d = batch.Y.squeeze(-1).to(self.device)
-
-                optimizer.zero_grad()
-                preds = model(batch.bmg, V_d, X_d).squeeze(-1)
-                loss = criterion(preds, targets_1d)
-                loss.backward()
-                optimizer.step()
-                train_losses.append(loss.item())
-                train_preds_all.append(preds.detach().cpu().numpy())
-                train_targets_all.append(targets_1d.detach().cpu().numpy())
-
-            avg_train_loss = float(np.mean(train_losses))
-            train_preds_np = np.concatenate(train_preds_all)
-            train_targets_np = np.concatenate(train_targets_all)
-
-            additional: dict[str, float] = {}
-            if len(train_preds_np) >= 2:
-                train_results = Results(
-                    targets=train_targets_np,
-                    predictions=Predictions(means=train_preds_np),
-                )
-                train_metrics = train_results.metrics
-                if (v := train_metrics.get("spearman")) is not None:
-                    additional["train_spearman"] = float(v)
-                if (v := train_metrics.get("mse")) is not None:
-                    additional["train_mse"] = float(v)
-
-            avg_val_loss = None
+            avg_train_loss, train_metrics = self._train_epoch(train_loader, criterion, optimizer)
             if val_loader is not None:
-                model.eval()
-                val_preds_all: list[np.ndarray] = []
-                val_targets_all: list[np.ndarray] = []
-                val_losses: list[float] = []
-
-                with torch.no_grad():
-                    for batch in val_loader:
-                        batch.bmg.to(self.device)
-                        V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
-                        X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
-                        targets_1d = batch.Y.squeeze(-1).to(self.device)
-
-                        preds = model(batch.bmg, V_d, X_d).squeeze(-1)
-                        loss = criterion(preds, targets_1d)
-                        val_losses.append(loss.item())
-                        val_preds_all.append(preds.cpu().numpy())
-                        val_targets_all.append(targets_1d.cpu().numpy())
-
-                avg_val_loss = float(np.mean(val_losses))
-                val_preds_np = np.concatenate(val_preds_all)
-                val_targets_np = np.concatenate(val_targets_all)
-
-                if len(val_preds_np) >= 2:
-                    val_results = Results(
-                        targets=val_targets_np,
-                        predictions=Predictions(means=val_preds_np),
-                    )
-                    val_metrics = val_results.metrics
-                    if (v := val_metrics.get("spearman")) is not None:
-                        additional["val_spearman"] = float(v)
-                    if (v := val_metrics.get("mse")) is not None:
-                        additional["val_mse"] = float(v)
-
-            self._epoch_metrics.append(
-                SurrogateEpochMetrics(
-                    epoch=epoch,
-                    train_loss=avg_train_loss,
-                    val_loss=avg_val_loss,
-                    additional_metrics=additional,
+                avg_val_loss, val_metrics = self._train_epoch(val_loader, criterion)
+                self._record_epoch_metrics(
+                    epoch, avg_train_loss, train_metrics, avg_val_loss, val_metrics
                 )
-            )
+            else:
+                self._record_epoch_metrics(epoch, avg_train_loss, train_metrics)
 
-        last = self._epoch_metrics[-1]
-        self.training_metrics = {"final_train_loss": last.train_loss}
-        for key in ("train_spearman", "train_mse"):
-            if key in last.additional_metrics:
-                self.training_metrics[f"final_{key}"] = last.additional_metrics[key]
-        if last.val_loss is not None:
-            self.training_metrics["final_val_loss"] = last.val_loss
-        for key in ("val_spearman", "val_mse"):
-            if key in last.additional_metrics:
-                self.training_metrics[f"final_{key}"] = last.additional_metrics[key]
+        self.training_metrics = {"final_train_loss": avg_train_loss}
+        self.training_metrics.update({f"final_train_{k}": v for k, v in train_metrics.items()})
+        if val_loader is not None:
+            self.training_metrics["final_val_loss"] = avg_val_loss
+            self.training_metrics.update({f"final_val_{k}": v for k, v in val_metrics.items()})
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Predict fitness means for a list of candidates.
@@ -410,18 +429,22 @@ class ChempropModel(BaseModel):
         model = self._model
         smiles = self.featurise(candidate_points)
         loader = self._build_dataloader(smiles, labels=None, shuffle=False)
+        n = len(smiles)
+        all_preds = torch.empty(n, device="cpu")
+        idx = 0
 
         model.eval()
-        preds_all: list[np.ndarray] = []
         with torch.no_grad():
             for batch in loader:
                 batch.bmg.to(self.device)
                 V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
                 X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
                 preds = model(batch.bmg, V_d, X_d).squeeze(-1)
-                preds_all.append(preds.cpu().numpy())
+                b = preds.shape[0]
+                all_preds[idx : idx + b] = preds.cpu()
+                idx += b
 
-        return Predictions(means=np.concatenate(preds_all))
+        return Predictions(means=all_preds.numpy())
 
     def sample(self, condition: object | None = None) -> list[Candidate]:
         """Not implemented for mean-only MPNN."""
