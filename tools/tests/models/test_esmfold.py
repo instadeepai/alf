@@ -390,3 +390,52 @@ class TestESMFoldModelEdgeCases:
         result_ptm = model_ptm.predict(protein_candidates)
 
         np.testing.assert_array_almost_equal(result_combined.means, result_ptm.means)
+
+
+class TestESMFoldBatching:
+    """Tests for ESMFoldModel batching behavior."""
+
+    def test_7_seqs_batch3_calls_3_times(self, mock_components):
+        """7 sequences with batch_size=3 -> exactly 3 forward-pass calls (ceil(7/3)=3)."""
+        mock_mdl, _, _, _ = mock_components
+        config = ESMFoldConfig(batch_size=3)
+        model = ESMFoldModel(config)
+        seqs = [Candidate(data="ACDE", modality="sequence")] * 7
+        model.predict(seqs)
+        assert mock_mdl.call_count == 3
+
+    def test_7_seqs_batch3_returns_7_results(self, mock_components):
+        """7 sequences with batch_size=3 -> output has 7 elements."""
+        _, _, _, _ = mock_components
+        config = ESMFoldConfig(batch_size=3)
+        model = ESMFoldModel(config)
+        seqs = [Candidate(data="ACDE", modality="sequence")] * 7
+        result = model.predict(seqs)
+        assert result.means.shape == (7,)
+
+    def test_partial_last_batch_handled(self, mock_components):
+        """The final batch of 1 (in 7 seqs with batch_size=3) is handled correctly."""
+        _, _, _, _ = mock_components
+        config = ESMFoldConfig(batch_size=3)
+        model = ESMFoldModel(config)
+        seqs = [Candidate(data="ACDE", modality="sequence")] * 7
+        result = model.predict(seqs)
+        assert np.all(np.isfinite(result.means))
+
+    def test_batch_size_1_calls_n_times(self, mock_components):
+        """batch_size=1 -> N forward calls for N sequences."""
+        mock_mdl, _, _, _ = mock_components
+        config = ESMFoldConfig(batch_size=1)
+        model = ESMFoldModel(config)
+        seqs = [Candidate(data="ACDE", modality="sequence")] * 5
+        model.predict(seqs)
+        assert mock_mdl.call_count == 5
+
+    def test_batch_size_n_calls_1_time(self, mock_components):
+        """batch_size >= N -> 1 forward call for N sequences."""
+        mock_mdl, _, _, _ = mock_components
+        config = ESMFoldConfig(batch_size=10)
+        model = ESMFoldModel(config)
+        seqs = [Candidate(data="ACDE", modality="sequence")] * 5
+        model.predict(seqs)
+        assert mock_mdl.call_count == 1
