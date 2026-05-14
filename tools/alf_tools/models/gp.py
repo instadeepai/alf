@@ -23,10 +23,10 @@ import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_core.model.base_train_config import BaseTrainConfig
 from jaxtyping import Float
 
-from alf_tools.models.base_train_config import BaseTrainConfig
-from alf_tools.models.utils.normaliser import InputNormaliser, OutputStandardiser
+from alf_tools.models.utils.normaliser import InputNormaliser
 from alf_tools.models.utils.sequence_utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
@@ -77,30 +77,28 @@ class GPModelConfig:
 class GPTrainConfig(BaseTrainConfig):
     """Configuration for Gaussian Process training.
 
-    Inherits ``standardise_outputs`` and ``normalise_inputs`` from
-    :class:`BaseTrainConfig`. Overrides ``normalise_inputs`` to ``True``
-    because GP kernels measure distances between inputs; scaling continuous
-    features to [0, 1] improves marginal log-likelihood optimisation.
+    Overrides ``normalise_inputs`` to ``True`` because GP kernels measure
+    distances between inputs; scaling continuous features to [0, 1]
+    improves marginal log-likelihood optimisation.
 
     Args:
         normalise_inputs: Whether to apply min-max normalisation to input
-            features before training. Defaults to True (override of
-            BaseTrainConfig which defaults to False).
-        learning_rate: Learning rate for the optimizer.
+            features before training. Defaults to True; GP kernels measure
+            distances so scaling continuous features to [0, 1] improves MLL.
         num_iterations: Number of optimisation iterations.
         optimizer_type: Type of optimizer to use ('adam' or 'lbfgs').
-        log_frequency: Frequency of logging training metrics (in iterations).
         early_stopping_patience: Number of iterations without improvement
             before stopping. If None, no early stopping is used.
         early_stopping_delta: Minimum change in loss to qualify as an
-            improvement. If None, no early stopping is used.
+            improvement.
+        learning_rate: Inherited from BaseTrainConfig. Default overridden to 0.01.
+        log_frequency: Inherited from BaseTrainConfig. Default: 10.
     """
 
     normalise_inputs: bool = True
-    learning_rate: float = 0.01
+    learning_rate: float = 0.01  # override BaseTrainConfig default
     num_iterations: int = 100
     optimizer_type: Literal["adam", "lbfgs"] = "adam"
-    log_frequency: int = 10
     early_stopping_patience: int | None = None
     early_stopping_delta: float = 1e-4
 
@@ -328,7 +326,6 @@ class GPModel(BaseModel):
         self.train_y: Float[torch.Tensor, "n_samples"] | None = None
 
         # Normalisers — fitted on each train() call, used at predict() time
-        self._output_standardiser: OutputStandardiser | None = None
         self._input_normaliser: InputNormaliser | None = None
 
         # Track metrics
@@ -515,6 +512,12 @@ class GPModel(BaseModel):
 
             losses.append(loss_value)
 
+            # Log at configured frequency
+            if i % self.train_config.log_frequency == 0:
+                logger.info(
+                    f"Iteration {i}/{self.train_config.num_iterations} — loss={loss_value:.4f}"
+                )
+
             # Record per-iteration metrics
             self._epoch_metrics.append(
                 SurrogateEpochMetrics(
@@ -571,14 +574,6 @@ class GPModel(BaseModel):
         else:
             self._input_normaliser = None
 
-        # Fit and apply output standardiser
-        if self.train_config.standardise_outputs:
-            self._output_standardiser = OutputStandardiser()
-            self._output_standardiser.fit(train_y)
-            train_y = self._output_standardiser.transform(train_y)
-        else:
-            self._output_standardiser = None
-
         train_y = torch.tensor(train_y, dtype=torch.float32).to(self.device)
 
         return train_x, train_y
@@ -632,11 +627,6 @@ class GPModel(BaseModel):
             train_means = train_preds.mean.cpu().numpy()
             train_vars = train_preds.variance.cpu().numpy()
 
-        if self._output_standardiser is not None:
-            train_means, train_vars = self._output_standardiser.inverse_transform(
-                train_means, train_vars
-            )
-
         train_predictions_obj = Predictions(means=train_means, variances=train_vars)
         train_results = Results(predictions=train_predictions_obj, targets=train_data.labels)
         self.training_metrics.update({
@@ -686,10 +676,6 @@ class GPModel(BaseModel):
             predictions = self.likelihood(self.gp_model(test_x))
             means = predictions.mean.cpu().numpy()
             variances = predictions.variance.cpu().numpy()
-
-        # Inverse-transform to original label scale
-        if self._output_standardiser is not None:
-            means, variances = self._output_standardiser.inverse_transform(means, variances)
 
         return Predictions(means=means, variances=variances)
 

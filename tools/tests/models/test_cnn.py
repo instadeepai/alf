@@ -233,31 +233,6 @@ class TestCNNModelReproducibility:
 
 
 class TestCNNNormalisation:
-    def test_output_standardization_on_by_default(self, sample_data):
-        """standardise_outputs=True by default; predictions must be in original label scale."""
-        model = CNNModel(
-            train_config=CNNTrainConfig(num_epochs=2),
-            device="cpu",
-        )
-        model.train(sample_data)
-        assert model._output_standardiser is not None
-        assert model._output_standardiser.is_fitted
-
-        predictions = model.predict(sample_data.candidates)
-        assert np.all(np.isfinite(predictions.means))
-
-    def test_output_standardization_disabled_preserves_behaviour(self, sample_data):
-        """standardise_outputs=False must produce finite, valid predictions."""
-        model = CNNModel(
-            train_config=CNNTrainConfig(num_epochs=2, standardise_outputs=False),
-            device="cpu",
-        )
-        model.train(sample_data)
-        assert model._output_standardiser is None
-
-        predictions = model.predict(sample_data.candidates)
-        assert np.all(np.isfinite(predictions.means))
-
     def test_input_normalisation_enabled(self, sample_data):
         """normalise_inputs=True must run without error."""
         model = CNNModel(
@@ -270,19 +245,3 @@ class TestCNNNormalisation:
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
-
-    def test_normalisers_refitted_on_retrain(self, sample_data):
-        """Normalisers must be re-fitted on each train() call."""
-        model = CNNModel(
-            train_config=CNNTrainConfig(num_epochs=2),
-            device="cpu",
-        )
-        model.train(sample_data)
-        first_mean = model._output_standardiser._mean
-        first_std = model._output_standardiser._std
-
-        shifted_labels = sample_data.labels + 100.0
-        shifted_data = LabelledCandidates(candidates=sample_data.candidates, labels=shifted_labels)
-        model.train(shifted_data)
-        assert model._output_standardiser._mean != first_mean
-        assert abs(model._output_standardiser._std - first_std) < 1.0

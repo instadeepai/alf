@@ -22,12 +22,11 @@ import torch.nn as nn
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_core.model.base_train_config import BaseTrainConfig
 from torch.utils.data import DataLoader, TensorDataset
 
-from alf_tools.models.base_train_config import BaseTrainConfig
 from alf_tools.models.utils import (
     InputNormaliser,
-    OutputStandardiser,
     create_char_to_idx_mapping,
     get_device,
     one_hot_encode,
@@ -60,19 +59,18 @@ class CNNModelConfig:
 class CNNTrainConfig(BaseTrainConfig):
     """Configuration for CNN training.
 
-    Inherits standardise_outputs and normalise_inputs from BaseTrainConfig.
-
     Args:
-        learning_rate: Learning rate for the optimizer.
         batch_size: Batch size for training.
         num_epochs: Number of epochs to train for.
-        log_frequency: Frequency of logging training metrics.
+        normalise_inputs: Whether to apply min-max normalisation to input
+            features before training. Defaults to False.
+        learning_rate: Inherited from BaseTrainConfig. Default: 1e-3.
+        log_frequency: Inherited from BaseTrainConfig. Default: 10.
     """
 
-    learning_rate: float = 1e-3
     batch_size: int = 32
     num_epochs: int = 50
-    log_frequency: int = 10
+    normalise_inputs: bool = False
 
 
 class SequenceCNN(nn.Module):
@@ -187,8 +185,7 @@ class CNNModel(BaseModel):
         self.model: SequenceCNN | None = None
         self.seq_length: int | None = None
 
-        # Normalisers — fitted on each train() call, used at predict() time
-        self._output_standardiser: OutputStandardiser | None = None
+        # Input normaliser — fitted on each train() call, applied at predict() time
         self._input_normaliser: InputNormaliser | None = None
 
         # Track metrics
@@ -279,13 +276,6 @@ class CNNModel(BaseModel):
         else:
             self._input_normaliser = None
 
-        if self.train_config.standardise_outputs:
-            self._output_standardiser = OutputStandardiser()
-            self._output_standardiser.fit(train_y)
-            train_y = self._output_standardiser.transform(train_y)
-        else:
-            self._output_standardiser = None
-
         train_y = torch.tensor(train_y, dtype=torch.float32).to(self.device)
         train_loader = DataLoader(
             TensorDataset(train_x, train_y),
@@ -300,8 +290,6 @@ class CNNModel(BaseModel):
             val_y_np = val_data.labels.astype(np.float64)
             if self._input_normaliser is not None:
                 val_x = self._input_normaliser.transform(val_x)
-            if self._output_standardiser is not None:
-                val_y_np = self._output_standardiser.transform(val_y_np)
             val_y = torch.tensor(val_y_np, dtype=torch.float32).to(self.device)
             val_loader = DataLoader(
                 TensorDataset(val_x, val_y),
@@ -487,7 +475,7 @@ class CNNModel(BaseModel):
             # Train
             avg_train_loss, train_metrics = self._train_epoch(train_loader, optimizer, criterion)
 
-            # Validate
+            # Record metrics
             if val_loader is not None:
                 avg_val_loss, val_metrics = self._validate_epoch(val_loader, criterion)
                 self._record_epoch_metrics(
@@ -502,6 +490,13 @@ class CNNModel(BaseModel):
                     epoch,
                     avg_train_loss,
                     train_metrics,
+                )
+
+            # Log at configured frequency
+            if epoch % self.train_config.log_frequency == 0:
+                logger.info(
+                    f"Epoch {epoch}/{self.train_config.num_epochs}"
+                    f" - train_loss={avg_train_loss:.4f}"
                 )
 
         # Store final metrics
@@ -540,9 +535,6 @@ class CNNModel(BaseModel):
 
         with torch.no_grad():
             means = self.model(x).cpu().numpy()
-
-        if self._output_standardiser is not None:
-            means, _ = self._output_standardiser.inverse_transform(means)
 
         return Predictions(means=means)
 

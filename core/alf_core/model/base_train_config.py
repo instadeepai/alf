@@ -12,18 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.models.utils.normaliser import InputNormaliser
-from alf_tools.models.utils.sequence_utils import (
-    create_char_to_idx_mapping,
-    extract_sequences_from_inputs,
-    one_hot_encode,
-)
-from alf_tools.models.utils.torch_utils import get_device
+from dataclasses import dataclass
 
-__all__ = [
-    "create_char_to_idx_mapping",
-    "extract_sequences_from_inputs",
-    "get_device",
-    "InputNormaliser",
-    "one_hot_encode",
-]
+
+@dataclass
+class BaseTrainConfig:
+    """Base configuration shared by all model training configs.
+
+    Args:
+        learning_rate: Learning rate for the optimizer.
+        log_frequency: How often (in epochs/iterations) to log training metrics.
+    """
+
+    learning_rate: float = 1e-3
+    log_frequency: int = 10
