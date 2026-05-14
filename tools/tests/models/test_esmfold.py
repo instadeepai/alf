@@ -248,16 +248,24 @@ class TestESMFoldModelInit:
         with pytest.raises(ValueError, match="batch_size > 1 is not supported"):
             ESMFoldModel(ESMFoldConfig(batch_size=2, scoring_metric="combined"))
 
-    def test_not_implemented_methods_raise(self, default_model, protein_candidates):
-        """featurise, train, sample, and get_training_summary_metrics raise NotImplementedError."""
+    def test_featurise_raises_not_implemented(self, default_model, protein_candidates):
+        """featurise() raises NotImplementedError."""
         with pytest.raises(NotImplementedError):
             default_model.featurise(protein_candidates)
+
+    def test_train_raises_not_implemented(self, default_model):
+        """train() raises NotImplementedError."""
         with pytest.raises(NotImplementedError):
             default_model.train(MagicMock(), MagicMock())
+
+    def test_sample_raises_not_implemented(self, default_model):
+        """sample() raises NotImplementedError."""
         with pytest.raises(NotImplementedError):
             default_model.sample()
-        with pytest.raises(NotImplementedError):
-            default_model.get_training_summary_metrics()
+
+    def test_get_training_summary_metrics_returns_empty_dict(self, default_model):
+        """get_training_summary_metrics() returns empty dict (inference-only model)."""
+        assert default_model.get_training_summary_metrics() == {}
 
 
 class TestESMFoldModelPredict:
@@ -326,6 +334,16 @@ class TestESMFoldModelPredict:
 
         np.testing.assert_array_almost_equal(result_combined.means, result_ptm.means)
 
+    def test_combined_weight_intermediate_interpolates(self, mock_components):
+        """combined_ptm_weight=0.3 -> means = 0.3*ptm + 0.7*(plddt/100)."""
+        w = 0.3
+        config = ESMFoldConfig(scoring_metric="combined", combined_ptm_weight=w)
+        model = ESMFoldModel(config)
+        cand = Candidate(data="ACDE", modality="sequence")
+        result = model.predict([cand])
+        expected = w * MOCK_PTM + (1.0 - w) * (MOCK_PLDDT / 100.0)
+        np.testing.assert_almost_equal(result.means[0], expected, decimal=6)
+
     def test_ptm_output_matches_mock_value(self, mock_components, default_model):
         """Ptm scores match the mocked value (0.7)."""
         cand = Candidate(data="ACDE", modality="sequence")
@@ -389,30 +407,6 @@ class TestESMFoldModelEdgeCases:
         with pytest.raises(ValueError, match="index 2"):
             default_model.predict(candidates)
 
-    def test_predict_combined_weight_0_equals_mean_plddt(self, mock_components, protein_candidates):
-        """combined_ptm_weight=0.0 -> means equal to mean_plddt/100 exactly."""
-        config_combined = ESMFoldConfig(scoring_metric="combined", combined_ptm_weight=0.0)
-        model_combined = ESMFoldModel(config_combined)
-        result_combined = model_combined.predict(protein_candidates)
-
-        config_plddt = ESMFoldConfig(scoring_metric="mean_plddt")
-        model_plddt = ESMFoldModel(config_plddt)
-        result_plddt = model_plddt.predict(protein_candidates)
-
-        np.testing.assert_array_almost_equal(result_combined.means, result_plddt.means)
-
-    def test_predict_combined_weight_1_equals_ptm(self, mock_components, protein_candidates):
-        """combined_ptm_weight=1.0 -> means equal to ptm exactly."""
-        config_combined = ESMFoldConfig(scoring_metric="combined", combined_ptm_weight=1.0)
-        model_combined = ESMFoldModel(config_combined)
-        result_combined = model_combined.predict(protein_candidates)
-
-        config_ptm = ESMFoldConfig(scoring_metric="ptm")
-        model_ptm = ESMFoldModel(config_ptm)
-        result_ptm = model_ptm.predict(protein_candidates)
-
-        np.testing.assert_array_almost_equal(result_combined.means, result_ptm.means)
-
 
 class TestESMFoldBatching:
     """Tests for ESMFoldModel batching behavior."""
@@ -428,7 +422,6 @@ class TestESMFoldBatching:
 
     def test_7_seqs_batch3_returns_7_results(self, mock_components):
         """7 sequences with batch_size=3 -> output has 7 elements."""
-        _, _, _, _ = mock_components
         config = ESMFoldConfig(batch_size=3, scoring_metric="mean_plddt")
         model = ESMFoldModel(config)
         seqs = [Candidate(data="ACDE", modality="sequence")] * 7
@@ -437,7 +430,6 @@ class TestESMFoldBatching:
 
     def test_partial_last_batch_handled(self, mock_components):
         """The final batch of 1 (in 7 seqs with batch_size=3) is handled correctly."""
-        _, _, _, _ = mock_components
         config = ESMFoldConfig(batch_size=3, scoring_metric="mean_plddt")
         model = ESMFoldModel(config)
         seqs = [Candidate(data="ACDE", modality="sequence")] * 7
@@ -498,6 +490,51 @@ class TestESMFoldSequenceLengths:
         assert result.means.shape == (2,)
         assert np.all(np.isfinite(result.means))
 
+    def test_plddt_aggregation_uses_correct_axes(self):
+        """Plddt mean over (L, 37) axes is verified with a non-uniform tensor."""
+
+        # Use a custom fixture that gives different plddt values across residues
+        # so the mean is only correct if (B, L, 37) is reduced correctly.
+        def _tok_call(seqs, return_tensors="pt", padding=True):
+            n, seq_len = len(seqs), max(len(s) for s in seqs)
+            return {
+                "input_ids": torch.ones(n, seq_len, dtype=torch.long),
+                "attention_mask": torch.ones(n, seq_len, dtype=torch.long),
+            }
+
+        with (
+            patch("alf_tools.models.esmfold.EsmForProteinFolding") as mock_cls,
+            patch("alf_tools.models.esmfold.AutoTokenizer") as mock_tok_cls,
+        ):
+            mock_tok = MagicMock()
+            mock_tok.side_effect = _tok_call
+            mock_tok_cls.from_pretrained.return_value = mock_tok
+
+            def _model_call(**tokens):
+                n = tokens["input_ids"].shape[0]
+                seq_len = tokens["input_ids"].shape[1]
+                out = MagicMock()
+                out.ptm = torch.tensor(0.5, dtype=torch.float32)
+                # plddt varies across residue dim: position 0 = 80, rest = 40
+                plddt = torch.full((n, seq_len, 37), 40.0, dtype=torch.float32)
+                plddt[:, 0, :] = 80.0
+                out.plddt = plddt
+                return out
+
+            mock_mdl = MagicMock()
+            mock_mdl.to.return_value = mock_mdl
+            mock_mdl.side_effect = _model_call
+            mock_cls.from_pretrained.return_value = mock_mdl
+
+            config = ESMFoldConfig(scoring_metric="mean_plddt")
+            model = ESMFoldModel(config)
+            cand = Candidate(data="ACG", modality="sequence")  # 3 residues
+            result = model.predict([cand])
+
+        # expected: (80 + 40 + 40) / 3 / 100 = 53.33.../100 ≈ 0.5333
+        expected = (80.0 + 40.0 * 2) / 3.0 / 100.0
+        np.testing.assert_almost_equal(result.means[0], expected, decimal=5)
+
 
 class TestESMFoldDuplicates:
     """Duplicate sequences are each processed independently."""
@@ -552,6 +589,23 @@ class TestESMFoldCleanup:
             model.cleanup()
         assert mock_cache.call_count == 1
 
+    def test_cleanup_does_not_call_empty_cache_when_cuda_unavailable(self, mock_components):
+        """torch.cuda.empty_cache() is not called when CUDA is unavailable."""
+        model = ESMFoldModel(ESMFoldConfig())
+        with (
+            patch("alf_tools.models.esmfold.torch.cuda.is_available", return_value=False),
+            patch("alf_tools.models.esmfold.torch.cuda.empty_cache") as mock_cache,
+        ):
+            model.cleanup()
+        mock_cache.assert_not_called()
+
+    def test_cleanup_updates_device_to_cpu(self, mock_components):
+        """After cleanup(), self.device is torch.device('cpu')."""
+        model = ESMFoldModel(ESMFoldConfig())
+        with patch("alf_tools.models.esmfold.torch.cuda.is_available", return_value=False):
+            model.cleanup()
+        assert model.device == torch.device("cpu")
+
 
 class _StubModel(BaseModel):
     """Minimal BaseModel stub for State construction in Oracle tests."""
@@ -569,6 +623,10 @@ class _StubModel(BaseModel):
     def sample(self, condition=None):
         """Not implemented."""
         raise NotImplementedError
+
+    def get_training_summary_metrics(self):
+        """Return empty training metrics."""
+        return {}
 
 
 class _StubDataset(BaseDataset):

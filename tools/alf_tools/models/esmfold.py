@@ -27,11 +27,12 @@ logger = logging.getLogger("alf-tools")
 
 try:
     from transformers import AutoTokenizer, EsmForProteinFolding
+
+    _TRANSFORMERS_AVAILABLE = True
 except ImportError:
-    raise ImportError(
-        "transformers is not installed. Install it with:\n"
-        "  pip install 'transformers>=4.36.0' 'accelerate>=0.26.0'"
-    )
+    _TRANSFORMERS_AVAILABLE = False
+    AutoTokenizer = None  # type: ignore[assignment]
+    EsmForProteinFolding = None  # type: ignore[assignment]
 
 _VALID_AA: frozenset[str] = frozenset(PROTEIN_ALPHABET)
 
@@ -47,7 +48,8 @@ class ESMFoldConfig:
         combined_ptm_weight: Weight of pTM in the combined metric; (1-w) applied to mean_plddt.
         batch_size: Number of sequences processed per forward pass.
         chunk_size: Axial-attention chunk size for long sequences; None disables chunking.
-        low_memory: Offload encoder layers to CPU between forward passes to reduce VRAM usage.
+        low_memory: Pass low_cpu_mem_usage=True to from_pretrained, deferring weight
+            materialization to the first forward pass (latency spike on first call).
     """
 
     model_name: str = "facebook/esmfold_v1"
@@ -74,8 +76,14 @@ class ESMFoldModel(BaseModel):
             config: Model source, device, and scoring configuration.
 
         Raises:
+            ImportError: If transformers or accelerate is not installed.
             ValueError: If config parameters are out of valid ranges.
         """
+        if not _TRANSFORMERS_AVAILABLE:
+            raise ImportError(
+                "transformers is not installed. Install it with:\n"
+                "  pip install 'transformers>=4.36.0' 'accelerate>=0.26.0'"
+            )
         if not 0.0 <= config.combined_ptm_weight <= 1.0:
             raise ValueError(
                 f"combined_ptm_weight must be in [0, 1], got {config.combined_ptm_weight}"
@@ -155,12 +163,16 @@ class ESMFoldModel(BaseModel):
 
         Raises:
             ValueError: If any candidate fails validation.
+            RuntimeError: If the forward pass fails (e.g., GPU OOM).
         """
         self._validate_candidates(candidate_points)
 
         sequences = [c.data for c in candidate_points]
-        ptm_scores: list[float] = []
-        plddt_means: list[float] = []
+        metric = self.config.scoring_metric
+        # ptm_batch_scores: one float per *batch* (pTM is a scalar for the whole batch).
+        # batch_size=1 is enforced in __init__ for ptm/combined, so one float per sequence.
+        ptm_batch_scores: list[float] = []
+        plddt_means: list[float] = []  # one float per sequence
 
         for i in range(0, len(sequences), self.config.batch_size):
             batch = sequences[i : i + self.config.batch_size]
@@ -168,24 +180,26 @@ class ESMFoldModel(BaseModel):
             tokens = {k: v.to(self.device) for k, v in tokens.items()}
             with torch.no_grad():
                 output = self.model(**tokens)
-            ptm_scores.append(output.ptm.item())  # scalar → single float per batch
-            plddt_means.extend(output.plddt.mean(dim=(-1, -2)).cpu().tolist())  # (B,L,37) → (B,)
+                if metric != "mean_plddt":
+                    # output.ptm is a 0-dim scalar (single TM score for the batch)
+                    ptm_batch_scores.append(output.ptm.item())
+                if metric != "ptm":
+                    # output.plddt has shape (B, L, 37); mean over residues and atoms → (B,)
+                    plddt_means.extend(output.plddt.mean(dim=(-1, -2)).cpu().tolist())
 
-        ptm_arr = np.array(ptm_scores, dtype=np.float64)
-        plddt_arr = np.array(plddt_means, dtype=np.float64) / 100.0
-
-        metric = self.config.scoring_metric
         if metric == "ptm":
-            means = ptm_arr
+            means = np.array(ptm_batch_scores, dtype=np.float64)
         elif metric == "mean_plddt":
-            means = plddt_arr
+            means = np.array(plddt_means, dtype=np.float64) / 100.0
         else:  # combined
+            ptm_arr = np.array(ptm_batch_scores, dtype=np.float64)
+            plddt_arr = np.array(plddt_means, dtype=np.float64) / 100.0
             w = self.config.combined_ptm_weight
             means = w * ptm_arr + (1.0 - w) * plddt_arr
 
         return Predictions(means=means)
 
-    def featurise(self, inputs: Any) -> None:
+    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> None:
         """Not implemented for ESMFoldModel.
 
         Raises:
@@ -213,16 +227,17 @@ class ESMFoldModel(BaseModel):
         """
         raise NotImplementedError("Sampling is not implemented for ESMFoldModel.")
 
-    def get_training_summary_metrics(self) -> dict[str, Any]:
-        """Not implemented for ESMFoldModel.
+    def get_training_summary_metrics(self) -> dict[str, float]:
+        """Return empty metrics dict (ESMFoldModel is inference-only).
 
-        Raises:
-            NotImplementedError: Always.
+        Returns:
+            Empty dict; ESMFoldModel does not produce training metrics.
         """
-        raise NotImplementedError("Training metrics are not implemented for ESMFoldModel.")
+        return {}
 
     def cleanup(self) -> None:
         """Move model to CPU and clear CUDA cache to free GPU memory."""
         self.model = self.model.to("cpu")
+        self.device = torch.device("cpu")
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
