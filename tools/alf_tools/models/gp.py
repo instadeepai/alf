@@ -26,7 +26,7 @@ from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from jaxtyping import Float
 
 from alf_tools.models.base_train_config import BaseTrainConfig
-from alf_tools.models.utils.normalizer import InputNormalizer, OutputStandardizer
+from alf_tools.models.utils.normaliser import InputNormaliser, OutputStandardiser
 from alf_tools.models.utils.sequence_utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
@@ -77,11 +77,11 @@ class GPModelConfig:
 class GPTrainConfig(BaseTrainConfig):
     """Configuration for Gaussian Process training.
 
-    Inherits standardize_outputs and normalize_inputs from BaseTrainConfig.
+    Inherits standardise_outputs and normalise_inputs from BaseTrainConfig.
 
     Args:
         learning_rate: Learning rate for the optimizer.
-        num_iterations: Number of optimization iterations.
+        num_iterations: Number of optimisation iterations.
         optimizer_type: Type of optimizer to use ('adam' or 'lbfgs').
         log_frequency: Frequency of logging training metrics (in iterations).
         early_stopping_patience: Number of iterations without improvement
@@ -320,9 +320,9 @@ class GPModel(BaseModel):
         self.train_x: Float[torch.Tensor, "n_samples n_features"] | None = None
         self.train_y: Float[torch.Tensor, "n_samples"] | None = None
 
-        # Normalizers — fitted on each train() call, used at predict() time
-        self._output_standardizer: OutputStandardizer | None = None
-        self._input_normalizer: InputNormalizer | None = None
+        # Normalisers — fitted on each train() call, used at predict() time
+        self._output_standardiser: OutputStandardiser | None = None
+        self._input_normaliser: InputNormaliser | None = None
 
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
@@ -457,7 +457,7 @@ class GPModel(BaseModel):
             ValueError: If GP model or likelihood is not initialized.
         """
         if self.gp_model is None or self.likelihood is None:
-            raise ValueError("GP model and likelihood must be initialized before optimization")
+            raise ValueError("GP model and likelihood must be initialized before optimisation")
 
         # Set to training mode
         self.gp_model.train()
@@ -543,7 +543,7 @@ class GPModel(BaseModel):
         train_data: LabelledCandidates,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Prepare the training data by featurising inputs x,
-        normalizing x, and standardizing outputs y. Transform
+        normalising x, and standardizing outputs y. Transform
         numpy arrays into tensors and put on the current device.
 
         Args:
@@ -556,21 +556,21 @@ class GPModel(BaseModel):
         train_x = self.featurise(train_data).to(self.device)
         train_y = train_data.labels.astype(np.float64)
 
-        # Fit and apply input normalizer
-        if self.train_config.normalize_inputs:
-            self._input_normalizer = InputNormalizer()
-            self._input_normalizer.fit(train_x)
-            train_x = self._input_normalizer.transform(train_x)
+        # Fit and apply input normaliser
+        if self.train_config.normalise_inputs:
+            self._input_normaliser = InputNormaliser()
+            self._input_normaliser.fit(train_x)
+            train_x = self._input_normaliser.transform(train_x)
         else:
-            self._input_normalizer = None
+            self._input_normaliser = None
 
-        # Fit and apply output standardizer
-        if self.train_config.standardize_outputs:
-            self._output_standardizer = OutputStandardizer()
-            self._output_standardizer.fit(train_y)
-            train_y = self._output_standardizer.transform(train_y)
+        # Fit and apply output standardiser
+        if self.train_config.standardise_outputs:
+            self._output_standardiser = OutputStandardiser()
+            self._output_standardiser.fit(train_y)
+            train_y = self._output_standardiser.transform(train_y)
         else:
-            self._output_standardizer = None
+            self._output_standardiser = None
 
         train_y = torch.tensor(train_y, dtype=torch.float32).to(self.device)
 
@@ -625,8 +625,8 @@ class GPModel(BaseModel):
             train_means = train_preds.mean.cpu().numpy()
             train_vars = train_preds.variance.cpu().numpy()
 
-        if self._output_standardizer is not None:
-            train_means, train_vars = self._output_standardizer.inverse_transform(
+        if self._output_standardiser is not None:
+            train_means, train_vars = self._output_standardiser.inverse_transform(
                 train_means, train_vars
             )
 
@@ -671,8 +671,8 @@ class GPModel(BaseModel):
         test_x = self.featurise(candidate_points).to(self.device)
 
         # Apply input normalization if fitted
-        if self._input_normalizer is not None:
-            test_x = self._input_normalizer.transform(test_x)
+        if self._input_normaliser is not None:
+            test_x = self._input_normaliser.transform(test_x)
 
         # Make predictions with fast predictive variance computation
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
@@ -681,8 +681,8 @@ class GPModel(BaseModel):
             variances = predictions.variance.cpu().numpy()
 
         # Inverse-transform to original label scale
-        if self._output_standardizer is not None:
-            means, variances = self._output_standardizer.inverse_transform(means, variances)
+        if self._output_standardiser is not None:
+            means, variances = self._output_standardiser.inverse_transform(means, variances)
 
         return Predictions(means=means, variances=variances)
 
@@ -718,7 +718,7 @@ class GPModel(BaseModel):
         return self.training_metrics
 
     def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
-        """Return per-epoch training metrics recorded during hyperparameter optimization.
+        """Return per-epoch training metrics recorded during hyperparameter optimisation.
 
         Returns:
             list[SurrogateEpochMetrics]: List of metrics for each epoch, including training

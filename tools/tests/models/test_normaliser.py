@@ -15,13 +15,13 @@
 import numpy as np
 import pytest
 import torch
-from alf_tools.models.utils.normalizer import InputNormalizer, OutputStandardizer
+from alf_tools.models.utils.normaliser import InputNormaliser, OutputStandardiser
 
 
-class TestOutputStandardizer:
+class TestOutputStandardiser:
     def test_transform_produces_zero_mean_unit_variance(self):
         Y = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-        s = OutputStandardizer()
+        s = OutputStandardiser()
         s.fit(Y)
         Y_t = s.transform(Y)
         assert abs(Y_t.mean()) < 1e-6
@@ -29,7 +29,7 @@ class TestOutputStandardizer:
 
     def test_inverse_transform_round_trips_mean(self):
         Y = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
-        s = OutputStandardizer()
+        s = OutputStandardiser()
         s.fit(Y)
         Y_t = s.transform(Y)
         mean_orig, _ = s.inverse_transform(Y_t)
@@ -37,9 +37,9 @@ class TestOutputStandardizer:
 
     def test_inverse_transform_scales_variance_correctly(self):
         Y = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-        s = OutputStandardizer()
+        s = OutputStandardiser()
         s.fit(Y)
-        # Variance of 1.0 in standardized space should become std² in original space
+        # Variance of 1.0 in standardised space should become std² in original space
         var_std = np.array([1.0, 1.0, 1.0])
         _, var_orig = s.inverse_transform(np.zeros(3), var_std)
         expected = var_std * (s._std**2)
@@ -47,14 +47,14 @@ class TestOutputStandardizer:
 
     def test_inverse_transform_none_variance_returns_none(self):
         Y = np.array([1.0, 2.0, 3.0])
-        s = OutputStandardizer()
+        s = OutputStandardiser()
         s.fit(Y)
         _, var_out = s.inverse_transform(np.zeros(3), None)
         assert var_out is None
 
     def test_constant_labels_does_not_divide_by_zero(self):
         Y = np.array([5.0, 5.0, 5.0, 5.0])
-        s = OutputStandardizer()
+        s = OutputStandardiser()
         s.fit(Y)
         assert s._std >= s._MIN_STD
         Y_t = s.transform(Y)
@@ -62,7 +62,7 @@ class TestOutputStandardizer:
 
     def test_single_sample(self):
         Y = np.array([42.0])
-        s = OutputStandardizer()
+        s = OutputStandardiser()
         s.fit(Y)
         Y_t = s.transform(Y)
         assert np.isfinite(Y_t[0])
@@ -70,26 +70,26 @@ class TestOutputStandardizer:
         np.testing.assert_allclose(mean_orig, Y, rtol=1e-5)
 
     def test_transform_before_fit_raises(self):
-        s = OutputStandardizer()
+        s = OutputStandardiser()
         with pytest.raises(RuntimeError, match="fitted"):
             s.transform(np.array([1.0, 2.0]))
 
     def test_inverse_transform_before_fit_raises(self):
-        s = OutputStandardizer()
+        s = OutputStandardiser()
         with pytest.raises(RuntimeError, match="fitted"):
             s.inverse_transform(np.array([1.0, 2.0]))
 
     def test_is_fitted(self):
-        s = OutputStandardizer()
+        s = OutputStandardiser()
         assert not s.is_fitted
         s.fit(np.array([1.0, 2.0, 3.0]))
         assert s.is_fitted
 
 
-class TestInputNormalizer:
+class TestInputNormaliser:
     def test_transform_produces_values_in_zero_one(self):
         X = torch.tensor([[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]])
-        n = InputNormalizer()
+        n = InputNormaliser()
         n.fit(X)
         X_t = n.transform(X)
         assert X_t.min().item() >= 0.0 - 1e-6
@@ -97,7 +97,7 @@ class TestInputNormalizer:
 
     def test_transform_round_trip_min_max(self):
         X = torch.tensor([[0.0, 5.0], [5.0, 10.0], [10.0, 15.0]])
-        n = InputNormalizer()
+        n = InputNormaliser()
         n.fit(X)
         X_t = n.transform(X)
         # Min should transform to 0, max to 1 per feature
@@ -106,7 +106,7 @@ class TestInputNormalizer:
 
     def test_constant_feature_does_not_divide_by_zero(self):
         X = torch.tensor([[3.0, 1.0], [3.0, 2.0], [3.0, 3.0]])
-        n = InputNormalizer()
+        n = InputNormaliser()
         n.fit(X)
         X_t = n.transform(X)
         assert torch.all(torch.isfinite(X_t))
@@ -115,26 +115,26 @@ class TestInputNormalizer:
 
     def test_single_sample(self):
         X = torch.tensor([[1.0, 2.0, 3.0]])
-        n = InputNormalizer()
+        n = InputNormaliser()
         n.fit(X)
         X_t = n.transform(X)
         assert torch.all(torch.isfinite(X_t))
 
     def test_transform_before_fit_raises(self):
-        n = InputNormalizer()
+        n = InputNormaliser()
         with pytest.raises(RuntimeError, match="fitted"):
             n.transform(torch.tensor([[1.0, 2.0]]))
 
     def test_is_fitted(self):
-        n = InputNormalizer()
+        n = InputNormaliser()
         assert not n.is_fitted
         n.fit(torch.tensor([[1.0, 2.0], [3.0, 4.0]]))
         assert n.is_fitted
 
     def test_fit_on_3d_tensor(self):
-        """InputNormalizer must handle CNN's 3D one-hot tensors (batch, alphabet, seq_len)."""
+        """InputNormaliser must handle CNN's 3D one-hot tensors (batch, alphabet, seq_len)."""
         X = torch.rand(8, 20, 10)  # (batch, alphabet_size, seq_len)
-        n = InputNormalizer()
+        n = InputNormaliser()
         n.fit(X)
         X_t = n.transform(X)
         assert torch.all(torch.isfinite(X_t))

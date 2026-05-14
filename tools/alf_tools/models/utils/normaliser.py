@@ -19,15 +19,15 @@ import torch
 from jaxtyping import Float
 
 
-class OutputStandardizer:
-    """Standardizes output labels to zero mean and unit variance.
+class OutputStandardiser:
+    """Standardises output labels to zero mean and unit variance.
 
     Fit on training labels, then use transform/inverse_transform to convert
-    between original and standardized space. The model always returns predictions
+    between original and standardised space. The model always returns predictions
     in the original label scale via inverse_transform.
 
     Handles the variance inverse transform correctly:
-        var_orig = var_standardized * std²
+        var_orig = var_standardised * std²
 
     Edge case: if the training labels have near-zero standard deviation
     (constant targets), std is clamped to _MIN_STD to avoid division by zero.
@@ -55,19 +55,19 @@ class OutputStandardizer:
         self._std = max(float(np.std(Y)), self._MIN_STD)
 
     def transform(self, Y: Float[np.ndarray, "n_samples"]) -> Float[np.ndarray, "n_samples"]:
-        """Standardize labels to zero mean, unit variance.
+        """Standardise labels to zero mean, unit variance.
 
         Args:
             Y: Array of labels to transform, shape (n_samples,).
 
         Returns:
-            Standardized labels, shape (n_samples,).
+            Standardised labels, shape (n_samples,).
 
         Raises:
             RuntimeError: If called before fit().
         """
         if not self.is_fitted:
-            raise RuntimeError("OutputStandardizer must be fitted before calling transform.")
+            raise RuntimeError("OutputStandardiser must be fitted before calling transform.")
         return (Y - self._mean) / self._std
 
     def inverse_transform(
@@ -77,11 +77,11 @@ class OutputStandardizer:
     ) -> Tuple[Float[np.ndarray, "n_samples"], Optional[Float[np.ndarray, "n_samples"]]]:
         """Transform predictions back to the original label scale.
 
-        Applies the correct variance scaling: var_orig = var_standardized * std².
+        Applies the correct variance scaling: var_orig = var_standardised * std².
 
         Args:
-            mean: Predicted means in standardized space, shape (n_samples,).
-            var: Predicted variances in standardized space, shape (n_samples,), or None.
+            mean: Predicted means in standardised space, shape (n_samples,).
+            var: Predicted variances in standardised space, shape (n_samples,), or None.
 
         Returns:
             Tuple of (mean_original, var_original). var_original is None if var is None.
@@ -91,7 +91,7 @@ class OutputStandardizer:
         """
         if not self.is_fitted:
             raise RuntimeError(
-                "OutputStandardizer must be fitted before calling inverse_transform."
+                "OutputStandardiser must be fitted before calling inverse_transform."
             )
         assert self._std is not None and self._mean is not None
         mean_orig = mean * self._std + self._mean
@@ -99,8 +99,8 @@ class OutputStandardizer:
         return mean_orig, var_orig
 
 
-class InputNormalizer:
-    """Normalizes input features to the [0, 1] range via min-max scaling.
+class InputNormaliser:
+    """Normalises input features to the [0, 1] range via min-max scaling.
 
     Fit on training features, then apply transform at both train and predict time.
     Each feature dimension is scaled independently.
@@ -116,12 +116,12 @@ class InputNormalizer:
         Min-max scaling is well suited for GP models, where the kernel computes
         distances between input points and benefits from inputs spanning the unit
         cube [0, 1]. For deep neural networks (e.g. CNNModel), Z-score
-        standardization (zero mean, unit variance) is generally preferred as it
+        standardisation (zero mean, unit variance) is generally preferred as it
         zero-centres inputs and avoids the gradient bias that arises from
         non-zero-centred activations.
 
-    TODO: Add an InputStandardizer (Z-score) and expose a
-        normalize_inputs_strategy: Literal["minmax", "zscore"] field in
+    TODO: Add an InputStandardiser (Z-score) and expose a
+        normalise_inputs_strategy: Literal["minmax", "zscore"] field in
         BaseTrainConfig so that GPTrainConfig and CNNTrainConfig can each default
         to the strategy best suited to their architecture.
     """
@@ -165,11 +165,11 @@ class InputNormalizer:
                of the data passed to fit().
 
         Returns:
-            Normalized feature tensor, same shape as input, values in [0, 1].
+            Normalised feature tensor, same shape as input, values in [0, 1].
 
         Raises:
             RuntimeError: If called before fit().
         """
         if not self.is_fitted:
-            raise RuntimeError("InputNormalizer must be fitted before calling transform.")
+            raise RuntimeError("InputNormaliser must be fitted before calling transform.")
         return (X - self._min) / self._range

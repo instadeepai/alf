@@ -382,73 +382,73 @@ class TestGPModel:
         assert np.all(predictions.variances >= 0)
 
 
-class TestGPNormalization:
+class TestGPNormalisation:
     def test_output_standardization_on_by_default(self, sample_data):
-        """standardize_outputs=True by default; predictions must be in original label scale."""
+        """standardise_outputs=True by default; predictions must be in original label scale."""
         model = GPModel(
             train_config=GPTrainConfig(num_iterations=5),
             featurizer_config=FeaturizerConfig(featurizer_type="one_hot"),
             device="cpu",
         )
         model.train(sample_data)
-        assert model._output_standardizer is not None
-        assert model._output_standardizer.is_fitted
+        assert model._output_standardiser is not None
+        assert model._output_standardiser.is_fitted
 
         predictions = model.predict(sample_data.candidates)
         # Predictions should be in original label scale — same order of magnitude as labels
         label_range = sample_data.labels.max() - sample_data.labels.min()
         pred_range = predictions.means.max() - predictions.means.min()
-        # The predicted range should not be collapsed to near-zero (standardized space ~unit scale)
+        # The predicted range should not be collapsed to near-zero (standardised space ~unit scale)
         # We just verify predictions are finite and variances are non-negative
         assert np.all(np.isfinite(predictions.means))
         assert np.all(predictions.variances >= 0)
-        # Means should be in original scale: close to label range, not ~0-1 standardized range
+        # Means should be in original scale: close to label range, not ~0-1 standardised range
         if label_range > 1.0:
             assert pred_range > 0.1 * label_range or True  # sanity check, not strict
 
     def test_output_standardization_disabled_preserves_behaviour(self, sample_data):
-        """standardize_outputs=False must produce finite, valid predictions."""
+        """standardise_outputs=False must produce finite, valid predictions."""
         model = GPModel(
-            train_config=GPTrainConfig(num_iterations=5, standardize_outputs=False),
+            train_config=GPTrainConfig(num_iterations=5, standardise_outputs=False),
             featurizer_config=FeaturizerConfig(featurizer_type="one_hot"),
             device="cpu",
         )
         model.train(sample_data)
-        assert model._output_standardizer is None
+        assert model._output_standardiser is None
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
         assert np.all(predictions.variances >= 0)
 
-    def test_input_normalization_enabled(self, sample_data):
-        """normalize_inputs=True must run without error; predictions in original label scale."""
+    def test_input_normalisation_enabled(self, sample_data):
+        """normalise_inputs=True must run without error; predictions in original label scale."""
         model = GPModel(
-            train_config=GPTrainConfig(num_iterations=5, normalize_inputs=True),
+            train_config=GPTrainConfig(num_iterations=5, normalise_inputs=True),
             featurizer_config=FeaturizerConfig(featurizer_type="one_hot"),
             device="cpu",
         )
         model.train(sample_data)
-        assert model._input_normalizer is not None
-        assert model._input_normalizer.is_fitted
+        assert model._input_normaliser is not None
+        assert model._input_normaliser.is_fitted
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
         assert np.all(predictions.variances >= 0)
 
-    def test_normalizers_refitted_on_retrain(self, sample_data):
-        """Normalizers must be re-fitted on each train() call."""
+    def test_normalisers_refitted_on_retrain(self, sample_data):
+        """Normalisers must be re-fitted on each train() call."""
         model = GPModel(
             train_config=GPTrainConfig(num_iterations=5),
             featurizer_config=FeaturizerConfig(featurizer_type="one_hot"),
             device="cpu",
         )
         model.train(sample_data)
-        first_mean = model._output_standardizer._mean
-        first_std = model._output_standardizer._std
+        first_mean = model._output_standardiser._mean
+        first_std = model._output_standardiser._std
 
         # Retrain with labels shifted by 100
         shifted_labels = sample_data.labels + 100.0
         shifted_data = LabelledCandidates(candidates=sample_data.candidates, labels=shifted_labels)
         model.train(shifted_data)
-        assert model._output_standardizer._mean != first_mean
-        assert abs(model._output_standardizer._std - first_std) < 1.0  # std shouldn't change much
+        assert model._output_standardiser._mean != first_mean
+        assert abs(model._output_standardiser._std - first_std) < 1.0  # std shouldn't change much

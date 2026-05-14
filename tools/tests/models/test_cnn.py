@@ -232,57 +232,57 @@ class TestCNNModelReproducibility:
             torch.testing.assert_close(p1, p2, rtol=1e-5, atol=1e-7)
 
 
-class TestCNNNormalization:
+class TestCNNNormalisation:
     def test_output_standardization_on_by_default(self, sample_data):
-        """standardize_outputs=True by default; predictions must be in original label scale."""
+        """standardise_outputs=True by default; predictions must be in original label scale."""
         model = CNNModel(
             train_config=CNNTrainConfig(num_epochs=2),
             device="cpu",
         )
         model.train(sample_data)
-        assert model._output_standardizer is not None
-        assert model._output_standardizer.is_fitted
+        assert model._output_standardiser is not None
+        assert model._output_standardiser.is_fitted
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
 
     def test_output_standardization_disabled_preserves_behaviour(self, sample_data):
-        """standardize_outputs=False must produce finite, valid predictions."""
+        """standardise_outputs=False must produce finite, valid predictions."""
         model = CNNModel(
-            train_config=CNNTrainConfig(num_epochs=2, standardize_outputs=False),
+            train_config=CNNTrainConfig(num_epochs=2, standardise_outputs=False),
             device="cpu",
         )
         model.train(sample_data)
-        assert model._output_standardizer is None
+        assert model._output_standardiser is None
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
 
-    def test_input_normalization_enabled(self, sample_data):
-        """normalize_inputs=True must run without error."""
+    def test_input_normalisation_enabled(self, sample_data):
+        """normalise_inputs=True must run without error."""
         model = CNNModel(
-            train_config=CNNTrainConfig(num_epochs=2, normalize_inputs=True),
+            train_config=CNNTrainConfig(num_epochs=2, normalise_inputs=True),
             device="cpu",
         )
         model.train(sample_data)
-        assert model._input_normalizer is not None
-        assert model._input_normalizer.is_fitted
+        assert model._input_normaliser is not None
+        assert model._input_normaliser.is_fitted
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
 
-    def test_normalizers_refitted_on_retrain(self, sample_data):
-        """Normalizers must be re-fitted on each train() call."""
+    def test_normalisers_refitted_on_retrain(self, sample_data):
+        """Normalisers must be re-fitted on each train() call."""
         model = CNNModel(
             train_config=CNNTrainConfig(num_epochs=2),
             device="cpu",
         )
         model.train(sample_data)
-        first_mean = model._output_standardizer._mean
-        first_std = model._output_standardizer._std
+        first_mean = model._output_standardiser._mean
+        first_std = model._output_standardiser._std
 
         shifted_labels = sample_data.labels + 100.0
         shifted_data = LabelledCandidates(candidates=sample_data.candidates, labels=shifted_labels)
         model.train(shifted_data)
-        assert model._output_standardizer._mean != first_mean
-        assert abs(model._output_standardizer._std - first_std) < 1.0
+        assert model._output_standardiser._mean != first_mean
+        assert abs(model._output_standardiser._std - first_std) < 1.0

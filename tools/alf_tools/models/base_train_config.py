@@ -20,15 +20,15 @@ class BaseTrainConfig:
     """Shared training configuration for all models.
 
     Attributes:
-        standardize_outputs: Whether to standardize training labels to zero mean
+        standardise_outputs: Whether to standardise training labels to zero mean
             and unit variance before training. The inverse transform is applied
             automatically at prediction time so predictions are always returned
             in the original label scale. Defaults to True.
-        normalize_inputs: Whether to normalize input features to the [0, 1] range
-            (min-max normalization) before training. Useful for precomputed
+        normalise_inputs: Whether to normalise input features to the [0, 1] range
+            (min-max normalisation) before training. Useful for precomputed
             continuous features with heterogeneous scales. Has little effect on
             one-hot encoded features which are already in {0, 1}. Defaults to False.
     """
 
-    standardize_outputs: bool = True
-    normalize_inputs: bool = False
+    standardise_outputs: bool = True
+    normalise_inputs: bool = False
