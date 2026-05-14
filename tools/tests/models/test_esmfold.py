@@ -84,3 +84,155 @@ class TestESMFoldConfig:
         """model_name can be a local filesystem path."""
         cfg = ESMFoldConfig(model_name="/models/esmfold_v1")
         assert cfg.model_name == "/models/esmfold_v1"
+
+
+# ─── Shared mock fixture ────────────────────────────────────────────────────
+
+
+@pytest.fixture
+def mock_components():
+    """Patch HuggingFace ESMFold components. Yields (mock_model, mock_tok, mock_cls, mock_tok_cls).
+
+    Forward pass returns ptm=0.7, plddt=60.0 per residue (scaled mean pLDDT = 0.6).
+    """
+
+    def _tok_call(seqs, return_tensors="pt", padding=True):
+        n = len(seqs)
+        seq_len = max(len(s) for s in seqs) if seqs else 1
+        return {
+            "input_ids": torch.ones(n, seq_len, dtype=torch.long),
+            "attention_mask": torch.ones(n, seq_len, dtype=torch.long),
+        }
+
+    def _model_call(**tokens):
+        n = tokens["input_ids"].shape[0]
+        seq_len = tokens["input_ids"].shape[1]
+        out = MagicMock()
+        out.ptm = torch.tensor([MOCK_PTM] * n, dtype=torch.float32)
+        out.plddt = torch.full((n, seq_len), MOCK_PLDDT, dtype=torch.float32)
+        return out
+
+    with (
+        patch("alf_tools.models.esmfold.EsmForProteinFolding") as mock_cls,
+        patch("alf_tools.models.esmfold.AutoTokenizer") as mock_tok_cls,
+    ):
+        mock_tok = MagicMock()
+        mock_tok.side_effect = _tok_call
+        mock_tok_cls.from_pretrained.return_value = mock_tok
+
+        mock_mdl = MagicMock()
+        mock_mdl.to.return_value = mock_mdl
+        mock_mdl.eval.return_value = mock_mdl
+        mock_mdl.esm = MagicMock()
+        mock_mdl.esm.encoder = MagicMock()
+        mock_mdl.side_effect = _model_call
+        mock_cls.from_pretrained.return_value = mock_mdl
+
+        yield mock_mdl, mock_tok, mock_cls, mock_tok_cls
+
+
+@pytest.fixture
+def default_model(mock_components):
+    """ESMFoldModel with default ESMFoldConfig and mocked HuggingFace components."""
+    return ESMFoldModel(ESMFoldConfig())
+
+
+@pytest.fixture
+def protein_candidates():
+    """Five short valid protein sequence candidates."""
+    return [
+        Candidate(data="ACDEF", modality="sequence"),
+        Candidate(data="GHIKL", modality="sequence"),
+        Candidate(data="MNPQR", modality="sequence"),
+        Candidate(data="STVWY", modality="sequence"),
+        Candidate(data="ACGHI", modality="sequence"),
+    ]
+
+
+# ─── Tests ──────────────────────────────────────────────────────────────────
+
+
+class TestESMFoldModelInit:
+    """Tests for ESMFoldModel.__init__ with mocked HuggingFace components."""
+
+    def test_tokenizer_loaded_from_model_name(self, mock_components):
+        """Tokenizer is loaded using the configured model_name."""
+        _, _, _, mock_tok_cls = mock_components
+        ESMFoldModel(ESMFoldConfig(model_name="facebook/esmfold_v1"))
+        mock_tok_cls.from_pretrained.assert_called_once_with("facebook/esmfold_v1")
+
+    def test_model_loaded_from_model_name(self, mock_components):
+        """EsmForProteinFolding is loaded using the configured model_name."""
+        _, _, mock_cls, _ = mock_components
+        ESMFoldModel(ESMFoldConfig(model_name="facebook/esmfold_v1"))
+        mock_cls.from_pretrained.assert_called_once_with(
+            "facebook/esmfold_v1", low_cpu_mem_usage=False
+        )
+
+    def test_model_moved_to_configured_device(self, mock_components):
+        """Model tensor is moved to the configured device."""
+        mock_mdl, _, _, _ = mock_components
+        ESMFoldModel(ESMFoldConfig(device="cpu"))
+        mock_mdl.to.assert_called_once_with(torch.device("cpu"))
+
+    def test_model_set_to_eval_mode(self, mock_components):
+        """Model is placed in eval() mode after loading."""
+        mock_mdl, _, _, _ = mock_components
+        ESMFoldModel(ESMFoldConfig())
+        mock_mdl.eval.assert_called_once()
+
+    def test_chunk_size_applied_to_encoder(self, mock_components):
+        """set_chunk_size() is called on the encoder when chunk_size is configured."""
+        mock_mdl, _, _, _ = mock_components
+        ESMFoldModel(ESMFoldConfig(chunk_size=64))
+        mock_mdl.esm.encoder.set_chunk_size.assert_called_once_with(64)
+
+    def test_chunk_size_not_applied_when_none(self, mock_components):
+        """set_chunk_size() is not called when chunk_size is None."""
+        mock_mdl, _, _, _ = mock_components
+        ESMFoldModel(ESMFoldConfig(chunk_size=None))
+        mock_mdl.esm.encoder.set_chunk_size.assert_not_called()
+
+    def test_low_memory_passed_as_low_cpu_mem_usage(self, mock_components):
+        """low_memory=True sets low_cpu_mem_usage=True in from_pretrained."""
+        _, _, mock_cls, _ = mock_components
+        ESMFoldModel(ESMFoldConfig(low_memory=True))
+        mock_cls.from_pretrained.assert_called_once_with(
+            "facebook/esmfold_v1", low_cpu_mem_usage=True
+        )
+
+    def test_invalid_combined_ptm_weight_raises(self, mock_components):
+        """combined_ptm_weight > 1 raises ValueError before model loading."""
+        with pytest.raises(ValueError, match="combined_ptm_weight"):
+            ESMFoldModel(ESMFoldConfig(combined_ptm_weight=1.5))
+
+    def test_negative_combined_ptm_weight_raises(self, mock_components):
+        """combined_ptm_weight < 0 raises ValueError."""
+        with pytest.raises(ValueError, match="combined_ptm_weight"):
+            ESMFoldModel(ESMFoldConfig(combined_ptm_weight=-0.1))
+
+    def test_zero_chunk_size_raises(self, mock_components):
+        """chunk_size=0 raises ValueError."""
+        with pytest.raises(ValueError, match="chunk_size"):
+            ESMFoldModel(ESMFoldConfig(chunk_size=0))
+
+    def test_negative_chunk_size_raises(self, mock_components):
+        """chunk_size=-1 raises ValueError."""
+        with pytest.raises(ValueError, match="chunk_size"):
+            ESMFoldModel(ESMFoldConfig(chunk_size=-1))
+
+    def test_zero_batch_size_raises(self, mock_components):
+        """batch_size=0 raises ValueError."""
+        with pytest.raises(ValueError, match="batch_size"):
+            ESMFoldModel(ESMFoldConfig(batch_size=0))
+
+    def test_not_implemented_methods_raise(self, default_model, protein_candidates):
+        """featurise, train, sample, and get_training_summary_metrics raise NotImplementedError."""
+        with pytest.raises(NotImplementedError):
+            default_model.featurise(protein_candidates)
+        with pytest.raises(NotImplementedError):
+            default_model.train(MagicMock(), MagicMock())
+        with pytest.raises(NotImplementedError):
+            default_model.sample()
+        with pytest.raises(NotImplementedError):
+            default_model.get_training_summary_metrics()

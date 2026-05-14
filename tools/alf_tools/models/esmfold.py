@@ -60,38 +60,165 @@ class ESMFoldConfig:
 
 
 class ESMFoldModel(BaseModel):
-    """ESMFold protein structure prediction oracle model.
+    """ESMFold protein structure prediction oracle for active learning.
 
-    Uses the ESMFold model from Meta to predict protein structure and
-    return confidence scores (pTM and/or mean pLDDT) as oracle scores.
+    Predicts pTM and/or mean pLDDT for amino acid sequence candidates using
+    HuggingFace EsmForProteinFolding. Plugs into Oracle via:
+        Oracle(scorer=ESMFoldModel(ESMFoldConfig(...)))
     """
 
-    def featurise(self, inputs: list[Candidate]) -> Any:
-        """Convert candidates to sequence strings for ESMFold input.
+    def __init__(self, config: ESMFoldConfig) -> None:
+        """Load ESMFold tokenizer and model from HuggingFace or a local path.
 
         Args:
-            inputs: List of Candidate objects to featurize.
+            config: Model source, device, and scoring configuration.
+
+        Raises:
+            ValueError: If config parameters are out of valid ranges.
+        """
+        if not 0.0 <= config.combined_ptm_weight <= 1.0:
+            raise ValueError(
+                f"combined_ptm_weight must be in [0, 1], got {config.combined_ptm_weight}"
+            )
+        if config.chunk_size is not None and config.chunk_size <= 0:
+            raise ValueError(f"chunk_size must be > 0, got {config.chunk_size}")
+        if config.batch_size < 1:
+            raise ValueError(f"batch_size must be >= 1, got {config.batch_size}")
+
+        self.config = config
+        self.device = torch.device(config.device)
+
+        self.tokenizer = AutoTokenizer.from_pretrained(config.model_name)
+        self.model = EsmForProteinFolding.from_pretrained(
+            config.model_name,
+            low_cpu_mem_usage=config.low_memory,
+        )
+        self.model = self.model.to(self.device)
+        self.model.eval()
+
+        if config.chunk_size is not None:
+            self.model.esm.encoder.set_chunk_size(config.chunk_size)
+
+        if config.device == "cpu":
+            logger.warning(
+                "ESMFoldModel is running on CPU. Inference will be very slow for real proteins."
+                " Use device='cuda' for production workloads."
+            )
+
+        logger.info(
+            "ESMFoldModel loaded: model=%s device=%s scoring_metric=%s",
+            config.model_name,
+            config.device,
+            config.scoring_metric,
+        )
+
+    def _validate_candidates(self, candidates: list[Candidate]) -> None:
+        """Validate candidates before prediction.
+
+        Args:
+            candidates: Candidates to validate.
+
+        Raises:
+            ValueError: If empty list, wrong modality, empty sequence, or invalid AA chars.
+        """
+        if not candidates:
+            raise ValueError("No candidates provided to predict().")
+        for i, cand in enumerate(candidates):
+            if cand.modality != Modality.SEQUENCE:
+                raise ValueError(
+                    f"ESMFoldModel only accepts Modality.SEQUENCE. "
+                    f"Got {cand.modality} at index {i}."
+                )
+            if not cand.data:
+                raise ValueError(f"Candidate at index {i} has an empty sequence.")
+            invalid = [c for c in cand.data if c not in _VALID_AA]
+            if invalid:
+                raise ValueError(
+                    f"Candidate at index {i} contains invalid amino acid character(s): "
+                    f"{sorted(set(invalid))}. Valid characters: {PROTEIN_ALPHABET}"
+                )
+
+    def predict(self, candidate_points: list[Candidate]) -> Predictions:
+        """Run ESMFold inference and return structure confidence scores.
+
+        Args:
+            candidate_points: Protein sequence candidates (Modality.SEQUENCE).
 
         Returns:
-            List of amino acid sequence strings.
+            Predictions with means containing the configured scoring_metric per candidate.
+
+        Raises:
+            ValueError: If any candidate fails validation.
         """
-        raise NotImplementedError
+        self._validate_candidates(candidate_points)
 
-    def predict(self, inputs: list[Candidate]) -> Predictions:
-        """Run ESMFold forward pass and return structure confidence scores.
+        sequences = [c.data for c in candidate_points]
+        ptm_scores: list[float] = []
+        plddt_means: list[float] = []
 
-        Args:
-            inputs: List of Candidate objects containing protein sequences.
+        for i in range(0, len(sequences), self.config.batch_size):
+            batch = sequences[i : i + self.config.batch_size]
+            tokens = self.tokenizer(batch, return_tensors="pt", padding=True)
+            tokens = {k: v.to(self.device) for k, v in tokens.items()}
+            with torch.no_grad():
+                output = self.model(**tokens)
+            ptm_scores.extend(output.ptm.cpu().tolist())
+            plddt_means.extend(output.plddt.mean(dim=-1).cpu().tolist())
 
-        Returns:
-            Predictions containing oracle scores derived from pTM/pLDDT.
+        ptm_arr = np.array(ptm_scores, dtype=np.float64)
+        plddt_arr = np.array(plddt_means, dtype=np.float64) / 100.0
+
+        metric = self.config.scoring_metric
+        if metric == "ptm":
+            means = ptm_arr
+        elif metric == "mean_plddt":
+            means = plddt_arr
+        else:  # combined
+            w = self.config.combined_ptm_weight
+            means = w * ptm_arr + (1.0 - w) * plddt_arr
+
+        return Predictions(means=means)
+
+    def featurise(self, inputs: Any) -> None:
+        """Not implemented for ESMFoldModel.
+
+        Raises:
+            NotImplementedError: Always.
         """
-        raise NotImplementedError
+        raise NotImplementedError("Featurisation is not implemented for ESMFoldModel.")
 
-    def train(self, labelled_candidates: LabelledCandidates) -> None:
-        """ESMFold is a pretrained model and does not support fine-tuning.
+    def train(
+        self,
+        train_data: LabelledCandidates,
+        val_data: LabelledCandidates | None = None,
+    ) -> None:
+        """Not implemented for ESMFoldModel.
 
-        Args:
-            labelled_candidates: Labelled candidates (unused).
+        Raises:
+            NotImplementedError: Always.
         """
-        raise NotImplementedError
+        raise NotImplementedError("Training is not implemented for ESMFoldModel.")
+
+    def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
+        """Not implemented for ESMFoldModel.
+
+        Raises:
+            NotImplementedError: Always.
+        """
+        raise NotImplementedError("Sampling is not implemented for ESMFoldModel.")
+
+    def get_training_summary_metrics(self) -> dict[str, Any]:
+        """Not implemented for ESMFoldModel.
+
+        Raises:
+            NotImplementedError: Always.
+        """
+        raise NotImplementedError(
+            "Training metrics are not implemented for ESMFoldModel."
+        )
+
+    def cleanup(self) -> None:
+        """Move model to CPU and clear CUDA cache to free GPU memory."""
+        self.model = self.model.to("cpu")
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
