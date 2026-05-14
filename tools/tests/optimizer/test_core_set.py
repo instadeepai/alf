@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, List, Union
+from typing import Any
 
 import numpy as np
 import pytest
@@ -34,7 +34,7 @@ class EmbeddingModel(BaseModel):
         """
         self._embeddings = embeddings
 
-    def featurise(self, inputs: Union[LabelledCandidates, List[Candidate]]) -> np.ndarray:
+    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> np.ndarray:
         """Return the first n rows of the pre-set embeddings.
 
         Args:
@@ -46,7 +46,7 @@ class EmbeddingModel(BaseModel):
         n = len(inputs) if isinstance(inputs, list) else len(inputs.candidates)
         return self._embeddings[:n]
 
-    def predict(self, candidate_points: List[Candidate]) -> Predictions:
+    def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Return zero-mean predictions.
 
         Args:
@@ -66,7 +66,7 @@ class EmbeddingModel(BaseModel):
         """
         pass
 
-    def sample(self, *args: Any, **kwargs: Any) -> List[Candidate]:
+    def sample(self, condition: Any | None = None) -> list[Candidate]:
         """Not implemented for this test model.
 
         Raises:
@@ -78,7 +78,7 @@ class EmbeddingModel(BaseModel):
 class NullFeaturiseModel(BaseModel):
     """Test model whose featurise returns None."""
 
-    def featurise(self, inputs: Union[LabelledCandidates, List[Candidate]]) -> None:
+    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> None:
         """Return None to trigger the ValueError path.
 
         Args:
@@ -89,7 +89,7 @@ class NullFeaturiseModel(BaseModel):
         """
         return None
 
-    def predict(self, candidate_points: List[Candidate]) -> Predictions:
+    def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Return zero-mean predictions.
 
         Args:
@@ -109,7 +109,7 @@ class NullFeaturiseModel(BaseModel):
         """
         pass
 
-    def sample(self, *args: Any, **kwargs: Any) -> List[Candidate]:
+    def sample(self, condition: Any | None = None) -> list[Candidate]:
         """Not implemented for this test model.
 
         Raises:
