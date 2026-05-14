@@ -19,26 +19,26 @@ import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.model.base_model import BaseModel
-from alf_core.normalizer.normalizer import IdentityNormalizer, Normalizer
+from alf_core.normaliser.normaliser import IdentityNormaliser, Normaliser
 
 
 class Surrogate:
     """Surrogate model fine-tuned during the active learning process.
 
-    Wraps a BaseModel and an optional Normalizer. Labels are normalised
+    Wraps a BaseModel and an optional Normaliser. Labels are normalised
     before training and predictions are inverse-transformed before returning.
     """
 
-    def __init__(self, model: BaseModel, normalizer: Normalizer | None = None):
+    def __init__(self, model: BaseModel, normaliser: Normaliser | None = None):
         """Initialize the Surrogate.
 
         Args:
             model: The BaseModel instance to use as the surrogate model.
-            normalizer: Optional normalizer for target labels. Defaults to
-                IdentityNormalizer (no-op).
+            normaliser: Optional normaliser for target labels. Defaults to
+                IdentityNormaliser (no-op).
         """
         self.model = model
-        self.normalizer: Normalizer = normalizer if normalizer is not None else IdentityNormalizer()
+        self.normaliser: Normaliser = normaliser if normaliser is not None else IdentityNormaliser()
 
     def _normalise(self, data: LabelledCandidates) -> LabelledCandidates:
         """Return a new LabelledCandidates with transformed labels.
@@ -53,7 +53,7 @@ class Surrogate:
         """
         return LabelledCandidates(
             candidates=list(data.candidates),
-            labels=self.normalizer.transform(data.labels),
+            labels=self.normaliser.transform(data.labels),
         )
 
     def fit(
@@ -63,7 +63,7 @@ class Surrogate:
     ) -> list[SurrogateEpochMetrics]:
         """Fit the surrogate model on training and validation data.
 
-        Fits the normalizer on training labels, then trains the model on
+        Fits the normaliser on training labels, then trains the model on
         normalised data.
 
         Args:
@@ -73,7 +73,7 @@ class Surrogate:
         Returns:
             List of SurrogateEpochMetrics, one per epoch trained.
         """
-        self.normalizer.fit(train_data.labels)
+        self.normaliser.fit(train_data.labels)
         self.model.train(self._normalise(train_data), self._normalise(val_data))
         return self.model.get_epoch_metrics()
 
@@ -90,9 +90,9 @@ class Surrogate:
             Predictions in the original (un-normalised) label space.
         """
         raw = self.model.predict(candidates)
-        means = self.normalizer.inverse_transform(raw.means)
+        means = self.normaliser.inverse_transform(raw.means)
         variances = (
-            self.normalizer.inverse_transform_variance(raw.variances)
+            self.normaliser.inverse_transform_variance(raw.variances)
             if raw.variances is not None
             else None
         )

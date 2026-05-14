@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_core.normalizer.normalizer import (
-    IdentityNormalizer,
-    MinMaxNormalizer,
-    Normalizer,
-    ZScoreNormalizer,
+from alf_core.normaliser.normaliser import (
+    IdentityNormaliser,
+    MinMaxNormaliser,
+    Normaliser,
+    ZScoreNormaliser,
 )
 
-__all__ = ["Normalizer", "IdentityNormalizer", "ZScoreNormalizer", "MinMaxNormalizer"]
+__all__ = ["Normaliser", "IdentityNormaliser", "ZScoreNormaliser", "MinMaxNormaliser"]

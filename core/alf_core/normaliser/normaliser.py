@@ -17,10 +17,10 @@ import abc
 import numpy as np
 
 
-class Normalizer(abc.ABC):
-    """Abstract base class for label normalizers.
+class Normaliser(abc.ABC):
+    """Abstract base class for label normalisers.
 
-    Normalizers fit statistics from training labels, transform labels to a
+    Normalisers fit statistics from training labels, transform labels to a
     normalised space, and invert predictions back for reporting. Used by
     Surrogate to pre-process training labels and post-process predictions.
     """
@@ -59,7 +59,7 @@ class Normalizer(abc.ABC):
         """Denormalise predictive variances back to the original label space.
 
         Default implementation returns variances unchanged. Override for
-        normalizers that scale labels (e.g. ZScoreNormalizer scales by std^2).
+        normalisers that scale labels (e.g. ZScoreNormaliser scales by std^2).
 
         Args:
             variances: 1-D array of normalised predictive variances.
@@ -70,8 +70,8 @@ class Normalizer(abc.ABC):
         return variances
 
 
-class IdentityNormalizer(Normalizer):
-    """No-op normalizer — passes labels through unchanged."""
+class IdentityNormaliser(Normaliser):
+    """No-op normaliser — passes labels through unchanged."""
 
     def fit(self, labels: np.ndarray) -> None:
         """No-op fit.
@@ -103,14 +103,14 @@ class IdentityNormalizer(Normalizer):
         return values
 
 
-class ZScoreNormalizer(Normalizer):
-    """Normalizes labels to zero mean and unit standard deviation.
+class ZScoreNormaliser(Normaliser):
+    """Normalises labels to zero mean and unit standard deviation.
 
     If standard deviation is zero (constant labels), outputs zeros.
     """
 
     def __init__(self) -> None:
-        """Initialize ZScoreNormalizer with unset statistics."""
+        """Initialize ZScoreNormaliser with unset statistics."""
         self._mean: float | None = None
         self._std: float | None = None
 
@@ -136,7 +136,7 @@ class ZScoreNormalizer(Normalizer):
             RuntimeError: If fit() has not been called.
         """
         if self._mean is None or self._std is None:
-            raise RuntimeError("ZScoreNormalizer.fit() must be called before transform().")
+            raise RuntimeError("ZScoreNormaliser.fit() must be called before transform().")
         if self._std < 1e-10:
             return np.zeros_like(labels, dtype=float)
         return (labels - self._mean) / self._std
@@ -154,7 +154,7 @@ class ZScoreNormalizer(Normalizer):
             RuntimeError: If fit() has not been called.
         """
         if self._mean is None or self._std is None:
-            raise RuntimeError("ZScoreNormalizer.fit() must be called before inverse_transform().")
+            raise RuntimeError("ZScoreNormaliser.fit() must be called before inverse_transform().")
         if self._std < 1e-10:
             return np.full_like(values, fill_value=self._mean, dtype=float)
         return values * self._std + self._mean
@@ -173,21 +173,21 @@ class ZScoreNormalizer(Normalizer):
         """
         if self._std is None:
             raise RuntimeError(
-                "ZScoreNormalizer.fit() must be called before inverse_transform_variance()."
+                "ZScoreNormaliser.fit() must be called before inverse_transform_variance()."
             )
         if self._std < 1e-10:
             return np.zeros_like(variances, dtype=float)
         return variances * (self._std**2)
 
 
-class MinMaxNormalizer(Normalizer):
-    """Normalizes labels to the [0, 1] range.
+class MinMaxNormaliser(Normaliser):
+    """Normalises labels to the [0, 1] range.
 
     If min == max (constant labels), outputs zeros.
     """
 
     def __init__(self) -> None:
-        """Initialize MinMaxNormalizer with unset statistics."""
+        """Initialize MinMaxNormaliser with unset statistics."""
         self._min: float | None = None
         self._max: float | None = None
 
@@ -213,7 +213,7 @@ class MinMaxNormalizer(Normalizer):
             RuntimeError: If fit() has not been called.
         """
         if self._min is None or self._max is None:
-            raise RuntimeError("MinMaxNormalizer.fit() must be called before transform().")
+            raise RuntimeError("MinMaxNormaliser.fit() must be called before transform().")
         if (self._max - self._min) < 1e-10:
             return np.zeros_like(labels, dtype=float)
         return (labels - self._min) / (self._max - self._min)
@@ -232,7 +232,7 @@ class MinMaxNormalizer(Normalizer):
             RuntimeError: If fit() has not been called.
         """
         if self._min is None or self._max is None:
-            raise RuntimeError("MinMaxNormalizer.fit() must be called before inverse_transform().")
+            raise RuntimeError("MinMaxNormaliser.fit() must be called before inverse_transform().")
         if (self._max - self._min) < 1e-10:
             return np.full_like(values, fill_value=self._min, dtype=float)
         return values * (self._max - self._min) + self._min
@@ -252,7 +252,7 @@ class MinMaxNormalizer(Normalizer):
         """
         if self._min is None or self._max is None:
             raise RuntimeError(
-                "MinMaxNormalizer.fit() must be called before inverse_transform_variance()."
+                "MinMaxNormaliser.fit() must be called before inverse_transform_variance()."
             )
         scale = self._max - self._min
         if scale < 1e-10:

@@ -16,11 +16,11 @@ import numpy as np
 import pytest
 from alf_core import Candidate, LabelledCandidates, Predictions, Surrogate
 from alf_core.model.base_model import BaseModel
-from alf_core.normalizer.normalizer import (
-    IdentityNormalizer,
-    MinMaxNormalizer,
-    Normalizer,
-    ZScoreNormalizer,
+from alf_core.normaliser.normaliser import (
+    IdentityNormaliser,
+    MinMaxNormaliser,
+    Normaliser,
+    ZScoreNormaliser,
 )
 
 
@@ -44,39 +44,39 @@ def constant_labels():
     return np.array([3.0, 3.0, 3.0])
 
 
-class TestIdentityNormalizer:
-    """Tests for IdentityNormalizer."""
+class TestIdentityNormaliser:
+    """Tests for IdentityNormaliser."""
 
     def test_transform_is_identity(self, labels):
         """Transform must return the input labels unchanged."""
-        n = IdentityNormalizer()
+        n = IdentityNormaliser()
         n.fit(labels)
         np.testing.assert_array_equal(n.transform(labels), labels)
 
     def test_inverse_transform_is_identity(self, labels):
         """Inverse transform must return the input values unchanged."""
-        n = IdentityNormalizer()
+        n = IdentityNormaliser()
         n.fit(labels)
         np.testing.assert_array_equal(n.inverse_transform(labels), labels)
 
-    def test_is_normalizer(self):
-        """IdentityNormalizer must be an instance of Normalizer."""
-        assert isinstance(IdentityNormalizer(), Normalizer)
+    def test_is_normaliser(self):
+        """IdentityNormaliser must be an instance of Normaliser."""
+        assert isinstance(IdentityNormaliser(), Normaliser)
 
     def test_inverse_variance_scale_is_one(self, labels):
         """Inverse variance transform must return variances unchanged."""
-        n = IdentityNormalizer()
+        n = IdentityNormaliser()
         n.fit(labels)
         variances = np.array([1.0, 2.0])
         np.testing.assert_array_equal(n.inverse_transform_variance(variances), variances)
 
 
-class TestZScoreNormalizer:
-    """Tests for ZScoreNormalizer."""
+class TestZScoreNormaliser:
+    """Tests for ZScoreNormaliser."""
 
     def test_transform_zero_mean_unit_std(self, labels):
         """Transformed labels must have zero mean and unit standard deviation."""
-        n = ZScoreNormalizer()
+        n = ZScoreNormaliser()
         n.fit(labels)
         transformed = n.transform(labels)
         np.testing.assert_almost_equal(transformed.mean(), 0.0, decimal=10)
@@ -84,7 +84,7 @@ class TestZScoreNormalizer:
 
     def test_inverse_transform_recovers_original(self, labels):
         """Inverse transform must recover the original labels after standardisation."""
-        n = ZScoreNormalizer()
+        n = ZScoreNormaliser()
         n.fit(labels)
         transformed = n.transform(labels)
         recovered = n.inverse_transform(transformed)
@@ -92,7 +92,7 @@ class TestZScoreNormalizer:
 
     def test_inverse_variance_scales_by_std_squared(self, labels):
         """Inverse variance must scale by the squared standard deviation."""
-        n = ZScoreNormalizer()
+        n = ZScoreNormaliser()
         n.fit(labels)
         variances = np.array([1.0])
         expected = variances * (labels.std() ** 2)
@@ -100,42 +100,42 @@ class TestZScoreNormalizer:
 
     def test_constant_labels_does_not_divide_by_zero(self, constant_labels):
         """Transform of constant labels must return zeros without dividing by zero."""
-        n = ZScoreNormalizer()
+        n = ZScoreNormaliser()
         n.fit(constant_labels)
         transformed = n.transform(constant_labels)
         np.testing.assert_array_equal(transformed, np.zeros(3))
 
-    def test_is_normalizer(self):
-        """ZScoreNormalizer must be an instance of Normalizer."""
-        assert isinstance(ZScoreNormalizer(), Normalizer)
+    def test_is_normaliser(self):
+        """ZScoreNormaliser must be an instance of Normaliser."""
+        assert isinstance(ZScoreNormaliser(), Normaliser)
 
     def test_fit_required_before_transform(self):
         """Transform must raise RuntimeError if fit has not been called."""
-        n = ZScoreNormalizer()
+        n = ZScoreNormaliser()
         with pytest.raises(RuntimeError, match="fit"):
             n.transform(np.array([1.0]))
 
     def test_constant_labels_inverse_transform_returns_constant(self, constant_labels):
         """Inverse transform of zeros must return the constant label value."""
-        n = ZScoreNormalizer()
+        n = ZScoreNormaliser()
         n.fit(constant_labels)
         recovered = n.inverse_transform(np.zeros(3))
         np.testing.assert_array_almost_equal(recovered, constant_labels)
 
     def test_constant_labels_inverse_transform_variance_returns_zeros(self, constant_labels):
         """Inverse variance of constant labels must return zeros."""
-        n = ZScoreNormalizer()
+        n = ZScoreNormaliser()
         n.fit(constant_labels)
         result = n.inverse_transform_variance(np.array([1.0, 2.0]))
         np.testing.assert_array_equal(result, np.zeros(2))
 
 
-class TestMinMaxNormalizer:
-    """Tests for MinMaxNormalizer."""
+class TestMinMaxNormaliser:
+    """Tests for MinMaxNormaliser."""
 
     def test_transform_to_zero_one_range(self, labels):
         """Transformed labels must span the [0, 1] range."""
-        n = MinMaxNormalizer()
+        n = MinMaxNormaliser()
         n.fit(labels)
         transformed = n.transform(labels)
         np.testing.assert_almost_equal(transformed.min(), 0.0)
@@ -143,7 +143,7 @@ class TestMinMaxNormalizer:
 
     def test_inverse_transform_recovers_original(self, labels):
         """Inverse transform must recover the original labels after min-max scaling."""
-        n = MinMaxNormalizer()
+        n = MinMaxNormaliser()
         n.fit(labels)
         transformed = n.transform(labels)
         recovered = n.inverse_transform(transformed)
@@ -151,38 +151,38 @@ class TestMinMaxNormalizer:
 
     def test_constant_labels_does_not_divide_by_zero(self, constant_labels):
         """Transform of constant labels must return zeros without dividing by zero."""
-        n = MinMaxNormalizer()
+        n = MinMaxNormaliser()
         n.fit(constant_labels)
         transformed = n.transform(constant_labels)
         np.testing.assert_array_equal(transformed, np.zeros(3))
 
-    def test_is_normalizer(self):
-        """MinMaxNormalizer must be an instance of Normalizer."""
-        assert isinstance(MinMaxNormalizer(), Normalizer)
+    def test_is_normaliser(self):
+        """MinMaxNormaliser must be an instance of Normaliser."""
+        assert isinstance(MinMaxNormaliser(), Normaliser)
 
     def test_fit_required_before_transform(self):
         """Transform must raise RuntimeError if fit has not been called."""
-        n = MinMaxNormalizer()
+        n = MinMaxNormaliser()
         with pytest.raises(RuntimeError, match="fit"):
             n.transform(np.array([1.0]))
 
     def test_transform_interior_values(self, labels):
         """Transformed values must follow the linear [0, 1] mapping."""
-        n = MinMaxNormalizer()
+        n = MinMaxNormaliser()
         n.fit(labels)
         transformed = n.transform(labels)
         np.testing.assert_array_almost_equal(transformed, np.array([0.0, 0.25, 0.5, 0.75, 1.0]))
 
     def test_constant_labels_inverse_transform_returns_constant(self, constant_labels):
         """Inverse transform of zeros must return the constant label value."""
-        n = MinMaxNormalizer()
+        n = MinMaxNormaliser()
         n.fit(constant_labels)
         recovered = n.inverse_transform(np.zeros(3))
         np.testing.assert_array_almost_equal(recovered, constant_labels)
 
     def test_inverse_variance_scales_by_range_squared(self, labels):
         """Inverse variance must scale by the squared label range."""
-        n = MinMaxNormalizer()
+        n = MinMaxNormaliser()
         n.fit(labels)
         variances = np.array([1.0])
         scale = labels.max() - labels.min()
@@ -191,7 +191,7 @@ class TestMinMaxNormalizer:
 
     def test_constant_labels_inverse_transform_variance_returns_zeros(self, constant_labels):
         """Inverse variance of constant labels must return zeros."""
-        n = MinMaxNormalizer()
+        n = MinMaxNormaliser()
         n.fit(constant_labels)
         result = n.inverse_transform_variance(np.array([1.0, 2.0]))
         np.testing.assert_array_equal(result, np.zeros(2))
@@ -256,25 +256,25 @@ def labelled_data():
 
 
 class TestSurrogateNormalization:
-    """Tests for Surrogate normalizer integration."""
+    """Tests for Surrogate normaliser integration."""
 
-    def test_default_normalizer_is_identity(self, labelled_data):
-        """Surrogate without explicit normalizer must use IdentityNormalizer."""
+    def test_default_normaliser_is_identity(self, labelled_data):
+        """Surrogate without explicit normaliser must use IdentityNormaliser."""
         surrogate = Surrogate(model=_ConstantModel())
-        assert isinstance(surrogate.normalizer, IdentityNormalizer)
+        assert isinstance(surrogate.normaliser, IdentityNormaliser)
 
-    def test_zscore_normalizer_inverse_transforms_predictions(self, labelled_data):
+    def test_zscore_normaliser_inverse_transforms_predictions(self, labelled_data):
         """Means predicted in normalised space must be inverse-transformed to label space."""
-        surrogate = Surrogate(model=_ConstantModel(), normalizer=ZScoreNormalizer())
+        surrogate = Surrogate(model=_ConstantModel(), normaliser=ZScoreNormaliser())
         surrogate.fit(labelled_data, labelled_data)
         preds = surrogate.predict(labelled_data.candidates)
         # Model predicts 0 in normalised space; inverse of 0 with z-score = mean of labels
         expected_mean = float(np.mean(labelled_data.labels))
         np.testing.assert_almost_equal(preds.means[0], expected_mean)
 
-    def test_zscore_normalizer_inverse_transforms_variances(self, labelled_data):
+    def test_zscore_normaliser_inverse_transforms_variances(self, labelled_data):
         """Variances predicted in normalised space must be inverse-transformed to label space."""
-        surrogate = Surrogate(model=_ConstantModel(), normalizer=ZScoreNormalizer())
+        surrogate = Surrogate(model=_ConstantModel(), normaliser=ZScoreNormaliser())
         surrogate.fit(labelled_data, labelled_data)
         preds = surrogate.predict(labelled_data.candidates)
         # Model predicts variance=1 in normalised space; inverse = std^2
@@ -284,6 +284,6 @@ class TestSurrogateNormalization:
     def test_original_labels_not_mutated(self, labelled_data):
         """fit() must not mutate the labels of the input LabelledCandidates."""
         original_labels = labelled_data.labels.copy()
-        surrogate = Surrogate(model=_ConstantModel(), normalizer=ZScoreNormalizer())
+        surrogate = Surrogate(model=_ConstantModel(), normaliser=ZScoreNormaliser())
         surrogate.fit(labelled_data, labelled_data)
         np.testing.assert_array_equal(labelled_data.labels, original_labels)

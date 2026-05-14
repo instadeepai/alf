@@ -24,11 +24,11 @@ from alf_core.dataclasses import (
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.model.base_model import BaseModel
 from alf_core.model.base_train_config import BaseTrainConfig
-from alf_core.normalizer import (
-    IdentityNormalizer,
-    MinMaxNormalizer,
-    Normalizer,
-    ZScoreNormalizer,
+from alf_core.normaliser import (
+    IdentityNormaliser,
+    MinMaxNormaliser,
+    Normaliser,
+    ZScoreNormaliser,
 )
 from alf_core.optimizer.acquisition_function import AcquisitionFunction
 from alf_core.optimizer.optimizer import Optimizer
