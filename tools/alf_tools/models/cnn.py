@@ -26,6 +26,7 @@ from alf_core.model.base_train_config import BaseTrainConfig
 from torch.utils.data import DataLoader, TensorDataset
 
 from alf_tools.models.utils import (
+    InputNormaliser,
     create_char_to_idx_mapping,
     get_device,
     one_hot_encode,
@@ -61,12 +62,15 @@ class CNNTrainConfig(BaseTrainConfig):
     Args:
         batch_size: Batch size for training.
         num_epochs: Number of epochs to train for.
+        normalise_inputs: Whether to apply min-max normalisation to input
+            features before training. Defaults to False.
         learning_rate: Inherited from BaseTrainConfig. Default: 1e-3.
         log_frequency: Inherited from BaseTrainConfig. Default: 10.
     """
 
     batch_size: int = 32
     num_epochs: int = 50
+    normalise_inputs: bool = False
 
 
 class SequenceCNN(nn.Module):
@@ -181,6 +185,9 @@ class CNNModel(BaseModel):
         self.model: SequenceCNN | None = None
         self.seq_length: int | None = None
 
+        # Input normaliser — fitted on each train() call, applied at predict() time
+        self._input_normaliser: InputNormaliser | None = None
+
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
@@ -239,7 +246,59 @@ class CNNModel(BaseModel):
             dataset,
             batch_size=self.train_config.batch_size,
             shuffle=shuffle,
+            num_workers=0,
         )
+
+    def _build_data_loaders(
+        self,
+        train_data: LabelledCandidates,
+        val_data: LabelledCandidates | None,
+    ) -> tuple[DataLoader, DataLoader | None]:
+        """Fit normalisers on training data and build DataLoaders for train and val.
+
+        Normalisers are fitted exclusively on training data. Val data is transformed
+        using train statistics to avoid data leakage.
+
+        Args:
+            train_data: Training data.
+            val_data: Optional validation data.
+
+        Returns:
+            Tuple of (train_loader, val_loader). val_loader is None if val_data is None.
+        """
+        train_x = self.featurise(train_data).to(self.device)
+        train_y = train_data.labels.astype(np.float64)
+
+        if self.train_config.normalise_inputs:
+            self._input_normaliser = InputNormaliser()
+            self._input_normaliser.fit(train_x)
+            train_x = self._input_normaliser.transform(train_x)
+        else:
+            self._input_normaliser = None
+
+        train_y = torch.tensor(train_y, dtype=torch.float32).to(self.device)
+        train_loader = DataLoader(
+            TensorDataset(train_x, train_y),
+            batch_size=self.train_config.batch_size,
+            shuffle=True,
+            num_workers=0,
+        )
+
+        val_loader = None
+        if val_data is not None and len(val_data) > 0:
+            val_x = self.featurise(val_data).to(self.device)
+            val_y_np = val_data.labels.astype(np.float64)
+            if self._input_normaliser is not None:
+                val_x = self._input_normaliser.transform(val_x)
+            val_y = torch.tensor(val_y_np, dtype=torch.float32).to(self.device)
+            val_loader = DataLoader(
+                TensorDataset(val_x, val_y),
+                batch_size=self.train_config.batch_size,
+                shuffle=False,
+                num_workers=0,
+            )
+
+        return train_loader, val_loader
 
     def _train_epoch(
         self,
@@ -404,11 +463,8 @@ class CNNModel(BaseModel):
             total_params = sum(p.numel() for p in self.model.parameters())
             logger.info(f"CNN initialized with {total_params:,} parameters")
 
-        # Prepare data loaders
-        train_loader = self._prepare_data_loader(train_data, shuffle=True)
-        val_loader = None
-        if val_data is not None and len(val_data) > 0:
-            val_loader = self._prepare_data_loader(val_data, shuffle=False)
+        # Featurize, fit normalisers on train, and build DataLoaders
+        train_loader, val_loader = self._build_data_loaders(train_data, val_data)
 
         # Setup training
         optimizer = optim.Adam(self.model.parameters(), lr=self.train_config.learning_rate)
@@ -474,10 +530,13 @@ class CNNModel(BaseModel):
         self.model.eval()
         x = self.featurise(candidate_points).to(self.device)
 
-        with torch.no_grad():
-            predictions = self.model(x).cpu().numpy()
+        if self._input_normaliser is not None:
+            x = self._input_normaliser.transform(x)
 
-        return Predictions(means=predictions)
+        with torch.no_grad():
+            means = self.model(x).cpu().numpy()
+
+        return Predictions(means=means)
 
     def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
         """Sample candidate points from the model."""

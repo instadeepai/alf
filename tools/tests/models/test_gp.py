@@ -380,3 +380,25 @@ class TestGPModel:
         assert np.all(np.isfinite(predictions.variances))
         # Variances must be non-negative
         assert np.all(predictions.variances >= 0)
+
+
+class TestGPNormalisation:
+    def test_gp_train_config_default_normalises_inputs(self) -> None:
+        """GPTrainConfig must default normalise_inputs to True."""
+        config = GPTrainConfig()
+        assert config.normalise_inputs is True
+
+    def test_input_normalisation_enabled(self, sample_data):
+        """normalise_inputs=True must run without error; predictions in original label scale."""
+        model = GPModel(
+            train_config=GPTrainConfig(num_iterations=5, normalise_inputs=True),
+            featurizer_config=FeaturizerConfig(featurizer_type="one_hot"),
+            device="cpu",
+        )
+        model.train(sample_data)
+        assert model._input_normaliser is not None
+        assert model._input_normaliser.is_fitted
+
+        predictions = model.predict(sample_data.candidates)
+        assert np.all(np.isfinite(predictions.means))
+        assert np.all(predictions.variances >= 0)

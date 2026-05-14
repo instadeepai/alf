@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Callable, Literal, TypeAlias, Union
+from typing import Any, Callable, Literal, Optional, TypeAlias, Union
 
 import gpytorch
 import numpy as np
@@ -26,6 +26,7 @@ from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.model.base_train_config import BaseTrainConfig
 from jaxtyping import Float
 
+from alf_tools.models.utils.normaliser import InputNormaliser
 from alf_tools.models.utils.sequence_utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
@@ -76,8 +77,15 @@ class GPModelConfig:
 class GPTrainConfig(BaseTrainConfig):
     """Configuration for Gaussian Process training.
 
+    Overrides ``normalise_inputs`` to ``True`` because GP kernels measure
+    distances between inputs; scaling continuous features to [0, 1]
+    improves marginal log-likelihood optimisation.
+
     Args:
-        num_iterations: Number of optimization iterations.
+        normalise_inputs: Whether to apply min-max normalisation to input
+            features before training. Defaults to True; GP kernels measure
+            distances so scaling continuous features to [0, 1] improves MLL.
+        num_iterations: Number of optimisation iterations.
         optimizer_type: Type of optimizer to use ('adam' or 'lbfgs').
         early_stopping_patience: Number of iterations without improvement
             before stopping. If None, no early stopping is used.
@@ -87,6 +95,7 @@ class GPTrainConfig(BaseTrainConfig):
         log_frequency: Inherited from BaseTrainConfig. Default: 10.
     """
 
+    normalise_inputs: bool = True
     learning_rate: float = 0.01  # override BaseTrainConfig default
     num_iterations: int = 100
     optimizer_type: Literal["adam", "lbfgs"] = "adam"
@@ -316,6 +325,9 @@ class GPModel(BaseModel):
         self.train_x: Float[torch.Tensor, "n_samples n_features"] | None = None
         self.train_y: Float[torch.Tensor, "n_samples"] | None = None
 
+        # Normalisers — fitted on each train() call, used at predict() time
+        self._input_normaliser: InputNormaliser | None = None
+
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
@@ -449,7 +461,7 @@ class GPModel(BaseModel):
             ValueError: If GP model or likelihood is not initialized.
         """
         if self.gp_model is None or self.likelihood is None:
-            raise ValueError("GP model and likelihood must be initialized before optimization")
+            raise ValueError("GP model and likelihood must be initialized before optimisation")
 
         # Set to training mode
         self.gp_model.train()
@@ -536,10 +548,40 @@ class GPModel(BaseModel):
 
         return metrics
 
+    def _prepare_train_data(
+        self,
+        train_data: LabelledCandidates,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Prepare the training data by featurising inputs x,
+        normalising x, and standardizing outputs y. Transform
+        numpy arrays into tensors and put on the current device.
+
+        Args:
+            train_data: Training data containing sequences and oracle values.
+
+        Returns:
+            A tuple of training features and targets as tensors on the current device.
+        """
+        # Featurize training data
+        train_x = self.featurise(train_data).to(self.device)
+        train_y = train_data.labels.astype(np.float64)
+
+        # Fit and apply input normaliser
+        if self.train_config.normalise_inputs:
+            self._input_normaliser = InputNormaliser()
+            self._input_normaliser.fit(train_x)
+            train_x = self._input_normaliser.transform(train_x)
+        else:
+            self._input_normaliser = None
+
+        train_y = torch.tensor(train_y, dtype=torch.float32).to(self.device)
+
+        return train_x, train_y
+
     def train(
         self,
         train_data: LabelledCandidates,
-        val_data: LabelledCandidates | None = None,
+        val_data: Optional[LabelledCandidates] = None,
     ) -> None:
         """Train the GP model by optimizing hyperparameters.
 
@@ -554,9 +596,7 @@ class GPModel(BaseModel):
         self._epoch_metrics = []
         logger.info(f"Training GP with {len(train_data)} samples")
 
-        # Featurize training data
-        train_x = self.featurise(train_data).to(self.device)
-        train_y = torch.tensor(train_data.labels, dtype=torch.float32).to(self.device)
+        train_x, train_y = self._prepare_train_data(train_data)
 
         # Store training data for later predictions
         self.train_x = train_x
@@ -579,7 +619,7 @@ class GPModel(BaseModel):
         # Store training metrics
         self.training_metrics = train_metrics
 
-        # Evaluate on training data
+        # Evaluate on training data — inverse-transform to original scale for metrics
         self.gp_model.eval()
         self.likelihood.eval()
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
@@ -627,6 +667,10 @@ class GPModel(BaseModel):
         # Featurize input
         test_x = self.featurise(candidate_points).to(self.device)
 
+        # Apply input normalization if fitted
+        if self._input_normaliser is not None:
+            test_x = self._input_normaliser.transform(test_x)
+
         # Make predictions with fast predictive variance computation
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
             predictions = self.likelihood(self.gp_model(test_x))
@@ -667,7 +711,7 @@ class GPModel(BaseModel):
         return self.training_metrics
 
     def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
-        """Return per-epoch training metrics recorded during hyperparameter optimization.
+        """Return per-epoch training metrics recorded during hyperparameter optimisation.
 
         Returns:
             list[SurrogateEpochMetrics]: List of metrics for each epoch, including training

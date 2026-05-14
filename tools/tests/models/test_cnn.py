@@ -230,3 +230,18 @@ class TestCNNModelReproducibility:
         # Parameters should be identical (or very close due to floating point)
         for p1, p2 in zip(params1, params2):
             torch.testing.assert_close(p1, p2, rtol=1e-5, atol=1e-7)
+
+
+class TestCNNNormalisation:
+    def test_input_normalisation_enabled(self, sample_data):
+        """normalise_inputs=True must run without error."""
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=2, normalise_inputs=True),
+            device="cpu",
+        )
+        model.train(sample_data)
+        assert model._input_normaliser is not None
+        assert model._input_normaliser.is_fitted
+
+        predictions = model.predict(sample_data.candidates)
+        assert np.all(np.isfinite(predictions.means))
