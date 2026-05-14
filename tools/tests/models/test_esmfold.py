@@ -19,12 +19,10 @@ import pytest
 import torch
 from alf_core import Candidate, Predictions
 from alf_core.dataclasses import LabelledCandidates, State
-from alf_core.dataclasses.candidate import Modality
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.model.base_model import BaseModel
 from alf_core.oracle.oracle import Oracle
 from alf_core.surrogate.surrogate import Surrogate
-
 from alf_tools.models.esmfold import ESMFoldConfig, ESMFoldModel
 
 MOCK_PTM = 0.7
@@ -94,9 +92,12 @@ class TestESMFoldConfig:
 
 @pytest.fixture
 def mock_components():
-    """Patch HuggingFace ESMFold components. Yields (mock_model, mock_tok, mock_cls, mock_tok_cls).
+    """Patch HuggingFace ESMFold components.
 
     Forward pass returns ptm=0.7, plddt=60.0 per residue (scaled mean pLDDT = 0.6).
+
+    Yields:
+        tuple: (mock_model, mock_tok, mock_cls, mock_tok_cls).
     """
 
     def _tok_call(seqs, return_tensors="pt", padding=True):
@@ -136,13 +137,21 @@ def mock_components():
 
 @pytest.fixture
 def default_model(mock_components):
-    """ESMFoldModel with default ESMFoldConfig and mocked HuggingFace components."""
+    """ESMFoldModel with default ESMFoldConfig and mocked HuggingFace components.
+
+    Returns:
+        ESMFoldModel: model instance with mocked HuggingFace components.
+    """
     return ESMFoldModel(ESMFoldConfig())
 
 
 @pytest.fixture
 def protein_candidates():
-    """Five short valid protein sequence candidates."""
+    """Five short valid protein sequence candidates.
+
+    Returns:
+        list[Candidate]: list of five short amino acid sequence candidates.
+    """
     return [
         Candidate(data="ACDEF", modality="sequence"),
         Candidate(data="GHIKL", modality="sequence"),
@@ -264,7 +273,7 @@ class TestESMFoldModelPredict:
         assert isinstance(result, Predictions)
 
     def test_means_is_numpy_array(self, mock_components, default_model):
-        """means is np.ndarray."""
+        """Means is np.ndarray."""
         cand = Candidate(data="ACDE", modality="sequence")
         result = default_model.predict([cand])
         assert isinstance(result.means, np.ndarray)
@@ -308,7 +317,7 @@ class TestESMFoldModelPredict:
         np.testing.assert_array_almost_equal(result_combined.means, result_ptm.means)
 
     def test_ptm_output_matches_mock_value(self, mock_components, default_model):
-        """ptm scores match the mocked value (0.7)."""
+        """Ptm scores match the mocked value (0.7)."""
         cand = Candidate(data="ACDE", modality="sequence")
         result = default_model.predict([cand])
         np.testing.assert_array_almost_equal(result.means, [MOCK_PTM])
@@ -583,7 +592,9 @@ def esmfold_state():
 class TestESMFoldOracle:
     """Integration of ESMFoldModel with the Oracle wrapper."""
 
-    def test_oracle_evaluate_returns_labelled_candidates(self, mock_components, protein_candidates, esmfold_state):
+    def test_oracle_evaluate_returns_labelled_candidates(
+        self, mock_components, protein_candidates, esmfold_state
+    ):
         """Oracle.evaluate() returns LabelledCandidates with correct length."""
         model = ESMFoldModel(ESMFoldConfig())
         oracle = Oracle(scorer=model)
@@ -591,7 +602,9 @@ class TestESMFoldOracle:
         assert isinstance(result, LabelledCandidates)
         assert len(result.candidates) == len(protein_candidates)
 
-    def test_oracle_evaluate_records_oracle_time(self, mock_components, protein_candidates, esmfold_state):
+    def test_oracle_evaluate_records_oracle_time(
+        self, mock_components, protein_candidates, esmfold_state
+    ):
         """oracle_time is recorded in state.round_metrics after evaluate()."""
         model = ESMFoldModel(ESMFoldConfig())
         oracle = Oracle(scorer=model)
@@ -629,4 +642,6 @@ class TestESMFoldGoldenSequences:
         model = ESMFoldModel(config)
         cand = Candidate(data=GFP_50, modality="sequence")
         result = model.predict([cand])
-        assert 0.7 <= result.means[0] <= 1.0, f"Expected mean_plddt/100 in [0.7, 1.0], got {result.means[0]}"
+        assert 0.7 <= result.means[0] <= 1.0, (
+            f"Expected mean_plddt/100 in [0.7, 1.0], got {result.means[0]}"
+        )
