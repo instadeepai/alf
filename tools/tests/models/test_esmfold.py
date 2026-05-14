@@ -26,7 +26,7 @@ from alf_core.surrogate.surrogate import Surrogate
 from alf_tools.models.esmfold import ESMFoldConfig, ESMFoldModel
 
 MOCK_PTM = 0.7
-MOCK_PLDDT = 60.0  # raw; /100 → 0.6
+MOCK_PLDDT = 0.6  # EsmForProteinFolding returns plddt already in [0, 1]
 
 
 class TestESMFoldConfig:
@@ -94,13 +94,13 @@ class TestESMFoldConfig:
 def mock_components():
     """Patch HuggingFace ESMFold components.
 
-    Forward pass returns ptm=0.7, plddt=60.0 per residue (scaled mean pLDDT = 0.6).
+    Forward pass returns ptm=0.7, plddt=0.6 per residue (mean pLDDT = 0.6).
 
     Yields:
         tuple: (mock_model, mock_tok, mock_cls, mock_tok_cls).
     """
 
-    def _tok_call(seqs, return_tensors="pt", padding=True):
+    def _tok_call(seqs, return_tensors="pt", padding=True, add_special_tokens=False):
         n = len(seqs)
         seq_len = max(len(s) for s in seqs) if seqs else 1
         return {
@@ -311,7 +311,7 @@ class TestESMFoldModelPredict:
         assert np.all(result.means <= 1.0)
 
     def test_combined_weight_0_equals_mean_plddt(self, mock_components, protein_candidates):
-        """combined_ptm_weight=0.0 -> means equal to mean_plddt/100."""
+        """combined_ptm_weight=0.0 -> means equal to mean_plddt."""
         config_combined = ESMFoldConfig(scoring_metric="combined", combined_ptm_weight=0.0)
         model_combined = ESMFoldModel(config_combined)
         result_combined = model_combined.predict(protein_candidates)
@@ -335,13 +335,13 @@ class TestESMFoldModelPredict:
         np.testing.assert_array_almost_equal(result_combined.means, result_ptm.means)
 
     def test_combined_weight_intermediate_interpolates(self, mock_components):
-        """combined_ptm_weight=0.3 -> means = 0.3*ptm + 0.7*(plddt/100)."""
+        """combined_ptm_weight=0.3 -> means = 0.3*ptm + 0.7*plddt."""
         w = 0.3
         config = ESMFoldConfig(scoring_metric="combined", combined_ptm_weight=w)
         model = ESMFoldModel(config)
         cand = Candidate(data="ACDE", modality="sequence")
         result = model.predict([cand])
-        expected = w * MOCK_PTM + (1.0 - w) * (MOCK_PLDDT / 100.0)
+        expected = w * MOCK_PTM + (1.0 - w) * MOCK_PLDDT
         np.testing.assert_almost_equal(result.means[0], expected, decimal=6)
 
     def test_ptm_output_matches_mock_value(self, mock_components, default_model):
@@ -351,11 +351,11 @@ class TestESMFoldModelPredict:
         np.testing.assert_array_almost_equal(result.means, [MOCK_PTM])
 
     def test_mean_plddt_output_matches_mock_value(self, mock_components, protein_candidates):
-        """mean_plddt scores match the mocked value (60.0/100 = 0.6)."""
+        """mean_plddt scores match the mocked value (0.6)."""
         config = ESMFoldConfig(scoring_metric="mean_plddt")
         model = ESMFoldModel(config)
         result = model.predict(protein_candidates)
-        expected = MOCK_PLDDT / 100.0
+        expected = MOCK_PLDDT
         np.testing.assert_array_almost_equal(result.means, [expected] * len(protein_candidates))
 
 
@@ -495,7 +495,7 @@ class TestESMFoldSequenceLengths:
 
         # Use a custom fixture that gives different plddt values across residues
         # so the mean is only correct if (B, L, 37) is reduced correctly.
-        def _tok_call(seqs, return_tensors="pt", padding=True):
+        def _tok_call(seqs, return_tensors="pt", padding=True, add_special_tokens=False):
             n, seq_len = len(seqs), max(len(s) for s in seqs)
             return {
                 "input_ids": torch.ones(n, seq_len, dtype=torch.long),
@@ -515,9 +515,9 @@ class TestESMFoldSequenceLengths:
                 seq_len = tokens["input_ids"].shape[1]
                 out = MagicMock()
                 out.ptm = torch.tensor(0.5, dtype=torch.float32)
-                # plddt varies across residue dim: position 0 = 80, rest = 40
-                plddt = torch.full((n, seq_len, 37), 40.0, dtype=torch.float32)
-                plddt[:, 0, :] = 80.0
+                # plddt varies across residue dim: position 0 = 0.8, rest = 0.4
+                plddt = torch.full((n, seq_len, 37), 0.4, dtype=torch.float32)
+                plddt[:, 0, :] = 0.8
                 out.plddt = plddt
                 return out
 
@@ -531,8 +531,8 @@ class TestESMFoldSequenceLengths:
             cand = Candidate(data="ACG", modality="sequence")  # 3 residues
             result = model.predict([cand])
 
-        # expected: (80 + 40 + 40) / 3 / 100 = 53.33.../100 ≈ 0.5333
-        expected = (80.0 + 40.0 * 2) / 3.0 / 100.0
+        # expected: (0.8 + 0.4 + 0.4) / 3 ≈ 0.5333
+        expected = (0.8 + 0.4 * 2) / 3.0
         np.testing.assert_almost_equal(result.means[0], expected, decimal=5)
 
 
@@ -680,36 +680,52 @@ class TestESMFoldOracle:
         assert "oracle_time" in new_state.round_metrics.metrics
 
 
+@pytest.fixture(scope="session")
+def _golden_esmfold():
+    """Load facebook/esmfold_v1 once per pytest session for golden-sequence tests.
+
+    Loading the ~2.6 GB checkpoint is the dominant cost; sharing it across all three
+    tests in TestESMFoldGoldenSequences avoids repeating that cost.  Each test sets
+    config.scoring_metric before calling predict(), which is safe because integration
+    tests run serially.
+
+    Yields:
+        ESMFoldModel: loaded model instance shared across the session.
+    """
+    model = ESMFoldModel(ESMFoldConfig(device="cpu", scoring_metric="ptm"))
+    yield model
+    model.cleanup()
+
+
 @pytest.mark.integration
 class TestESMFoldGoldenSequences:
     """Integration tests with real ESMFold model and known reference sequences."""
 
-    def test_high_ptm_helical_peptide(self):
+    @pytest.mark.skipif(not torch.cuda.is_available(), reason="PTM scores are unreliable on CPU")
+    def test_high_ptm_helical_peptide(self, _golden_esmfold):
         """Short alpha-helical peptide → pTM in [0.6, 1.0]."""
         # AAAAAKAAAAKAAAAK — poly-Ala helical-like peptide; known to fold
-        config = ESMFoldConfig(device="cpu", scoring_metric="ptm")
-        model = ESMFoldModel(config)
+        _golden_esmfold.config.scoring_metric = "ptm"
         cand = Candidate(data="AAAAAKAAAAKAAAAK", modality="sequence")
-        result = model.predict([cand])
+        result = _golden_esmfold.predict([cand])
         assert 0.6 <= result.means[0] <= 1.0, f"Expected ptm in [0.6, 1.0], got {result.means[0]}"
 
-    def test_low_ptm_disordered_peptide(self):
+    def test_low_ptm_disordered_peptide(self, _golden_esmfold):
         """Short disordered sequence → pTM in [0.0, 0.4]."""
         # GSGSGSGSGS — Gly-Ser repeats, intrinsically disordered
-        config = ESMFoldConfig(device="cpu", scoring_metric="ptm")
-        model = ESMFoldModel(config)
+        _golden_esmfold.config.scoring_metric = "ptm"
         cand = Candidate(data="GSGSGSGSGS", modality="sequence")
-        result = model.predict([cand])
+        result = _golden_esmfold.predict([cand])
         assert 0.0 <= result.means[0] <= 0.4, f"Expected ptm in [0.0, 0.4], got {result.means[0]}"
 
-    def test_gfp_fragment_high_plddt(self):
-        """GFP first 50 AA → mean pLDDT/100 in [0.7, 1.0]."""
+    @pytest.mark.skipif(not torch.cuda.is_available(), reason="pLDDT scores are unreliable on CPU")
+    def test_gfp_fragment_high_plddt(self, _golden_esmfold):
+        """GFP first 50 AA → mean pLDDT in [0.7, 1.0]."""
         # GFP (PDB 1EMA), first 50 residues
+        _golden_esmfold.config.scoring_metric = "mean_plddt"
         GFP_50 = "MSKGEELFTGVVPILVELDGDVNGHKFSVSGEGEGDATYGKLTLKFICTT"
-        config = ESMFoldConfig(device="cpu", scoring_metric="mean_plddt")
-        model = ESMFoldModel(config)
         cand = Candidate(data=GFP_50, modality="sequence")
-        result = model.predict([cand])
+        result = _golden_esmfold.predict([cand])
         assert 0.7 <= result.means[0] <= 1.0, (
-            f"Expected mean_plddt/100 in [0.7, 1.0], got {result.means[0]}"
+            f"Expected mean_plddt in [0.7, 1.0], got {result.means[0]}"
         )

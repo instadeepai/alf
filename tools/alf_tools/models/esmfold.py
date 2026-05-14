@@ -168,44 +168,47 @@ class ESMFoldModel(BaseModel):
         self._validate_candidates(candidate_points)
 
         sequences = [c.data for c in candidate_points]
+        n = len(sequences)
         metric = self.config.scoring_metric
         # ptm_batch_scores: one float per *batch* (pTM is a scalar for the whole batch).
         # batch_size=1 is enforced in __init__ for ptm/combined, so one float per sequence.
-        ptm_batch_scores: list[float] = []
-        plddt_means: list[float] = []  # one float per sequence
 
-        for i in range(0, len(sequences), self.config.batch_size):
-            batch = sequences[i : i + self.config.batch_size]
-            tokens = self.tokenizer(batch, return_tensors="pt", padding=True)
-            tokens = {k: v.to(self.device) for k, v in tokens.items()}
-            with torch.no_grad():
+        ptm_scores = np.zeros(n, dtype=np.float64) if metric != "mean_plddt" else None
+        plddt_scores = np.zeros(n, dtype=np.float64) if metric != "ptm" else None
+
+        with torch.no_grad():
+            for i in range(0, n, self.config.batch_size):
+                batch = sequences[i : i + self.config.batch_size]
+                dest = slice(i, i + len(batch))  # handles partial last batch
+
+                tokens = self.tokenizer(
+                    batch, return_tensors="pt", padding=True, add_special_tokens=False
+                )
+                tokens = {k: v.to(self.device) for k, v in tokens.items()}
                 output = self.model(**tokens)
-                if metric != "mean_plddt":
-                    # output.ptm is a 0-dim scalar (single TM score for the batch)
-                    ptm_batch_scores.append(output.ptm.item())
-                if metric != "ptm":
-                    # output.plddt has shape (B, L, n_atoms). The tokenizer pads shorter
-                    # sequences in a batch to the length of the longest one; a simple mean
-                    # over all L positions would include those padding positions and bias
-                    # the per-sequence pLDDT relative to a solo-sequence run. We exclude
-                    # padding by weighting with the attention mask before averaging.
-                    non_padding_mask = tokens["attention_mask"]  # (B, L): 1=real, 0=pad
+
+                if ptm_scores is not None:
+                    # pTM is a batch-level scalar; replicate across every sequence
+                    # in this batch so ptm_scores[dest] stays aligned with candidates.
+                    ptm_scores[dest] = output.ptm.item()
+
+                if plddt_scores is not None:
+                    mask = tokens["attention_mask"]  # (B, L)
                     n_atoms = output.plddt.shape[-1]
-                    masked_plddt_sum = (output.plddt * non_padding_mask.unsqueeze(-1)).sum(
-                        dim=(1, 2)
-                    )  # (B,)
-                    real_position_count = non_padding_mask.sum(dim=1) * n_atoms  # (B,)
-                    plddt_means.extend((masked_plddt_sum / real_position_count).cpu().tolist())
+                    masked_sum = (output.plddt * mask.unsqueeze(-1)).sum(dim=(1, 2))  # (B,)
+                    real_count = mask.sum(dim=1) * n_atoms  # (B,)
+                    plddt_scores[dest] = (masked_sum / real_count).cpu().numpy()
 
         if metric == "ptm":
-            means = np.array(ptm_batch_scores, dtype=np.float64)
+            assert ptm_scores is not None
+            means = ptm_scores
         elif metric == "mean_plddt":
-            means = np.array(plddt_means, dtype=np.float64) / 100.0
-        else:  # combined
-            ptm_arr = np.array(ptm_batch_scores, dtype=np.float64)
-            plddt_arr = np.array(plddt_means, dtype=np.float64) / 100.0
+            assert plddt_scores is not None
+            means = plddt_scores
+        else:
+            assert ptm_scores is not None and plddt_scores is not None
             w = self.config.combined_ptm_weight
-            means = w * ptm_arr + (1.0 - w) * plddt_arr
+            means = w * ptm_scores + (1.0 - w) * plddt_scores
 
         return Predictions(means=means)
 
