@@ -475,3 +475,57 @@ class TestESMFoldSequenceLengths:
         result = model.predict(cands)
         assert result.means.shape == (2,)
         assert np.all(np.isfinite(result.means))
+
+
+class TestESMFoldDuplicates:
+    """Duplicate sequences are each processed independently."""
+
+    def test_two_identical_sequences(self, mock_components):
+        """Two identical sequences -> each gets its own output at separate indices."""
+        config = ESMFoldConfig()
+        model = ESMFoldModel(config)
+        cands = [
+            Candidate(data="ACDE", modality="sequence"),
+            Candidate(data="ACDE", modality="sequence"),
+        ]
+        result = model.predict(cands)
+        assert result.means.shape == (2,)
+        # Both values equal (same mock output), but stored at separate indices
+        assert result.means[0] == result.means[1]
+
+    def test_5_sequences_with_3_duplicates(self, mock_components):
+        """5-sequence batch with 3 duplicates -> all 5 results returned."""
+        config = ESMFoldConfig()
+        model = ESMFoldModel(config)
+        cands = [
+            Candidate(data="ACDE", modality="sequence"),
+            Candidate(data="FGHI", modality="sequence"),
+            Candidate(data="ACDE", modality="sequence"),
+            Candidate(data="ACDE", modality="sequence"),
+            Candidate(data="MNPQ", modality="sequence"),
+        ]
+        result = model.predict(cands)
+        assert result.means.shape == (5,)
+        assert np.all(np.isfinite(result.means))
+
+
+class TestESMFoldCleanup:
+    """Tests for ESMFoldModel.cleanup()."""
+
+    def test_cleanup_moves_model_to_cpu(self, mock_components):
+        """After cleanup(), model.to('cpu') was called."""
+        mock_mdl, _, _, _ = mock_components
+        model = ESMFoldModel(ESMFoldConfig())
+        mock_mdl.to.reset_mock()
+        model.cleanup()
+        mock_mdl.to.assert_called_once_with("cpu")
+
+    def test_cleanup_calls_cuda_empty_cache_when_cuda_available(self, mock_components):
+        """torch.cuda.empty_cache() called once when CUDA is available."""
+        model = ESMFoldModel(ESMFoldConfig())
+        with (
+            patch("alf_tools.models.esmfold.torch.cuda.is_available", return_value=True),
+            patch("alf_tools.models.esmfold.torch.cuda.empty_cache") as mock_cache,
+        ):
+            model.cleanup()
+        assert mock_cache.call_count == 1
