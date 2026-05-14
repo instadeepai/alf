@@ -1,5 +1,7 @@
 import numpy as np
 import pytest
+from alf_core import Candidate, LabelledCandidates, Predictions, Surrogate
+from alf_core.model.base_model import BaseModel
 from alf_core.normalizer.normalizer import (
     IdentityNormalizer,
     MinMaxNormalizer,
@@ -150,3 +152,64 @@ class TestMinMaxNormalizer:
         n.fit(constant_labels)
         result = n.inverse_transform_variance(np.array([1.0, 2.0]))
         np.testing.assert_array_equal(result, np.zeros(2))
+
+
+class _ConstantModel(BaseModel):
+    """Test double: always predicts 0 with variance 1."""
+
+    def featurise(self, inputs):
+        """No-op featurise."""
+        return inputs
+
+    def train(self, train_data, val_data=None):
+        """Store train labels for inspection."""
+        self._train_labels = train_data.labels.copy()
+
+    def predict(self, candidate_points):
+        """Always predict 0 mean with variance 1."""
+        return Predictions(
+            means=np.zeros(len(candidate_points)),
+            variances=np.ones(len(candidate_points)),
+        )
+
+    def sample(self, *args, **kwargs):
+        """Not implemented."""
+        raise NotImplementedError
+
+
+@pytest.fixture
+def labelled_data():
+    """Five candidates with labels [1, 2, 3, 4, 5]."""
+    candidates = [Candidate(data="A", modality="sequence") for _ in range(5)]
+    labels = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    return LabelledCandidates(candidates, labels)
+
+
+class TestSurrogateNormalization:
+    """Tests for Surrogate normalizer integration."""
+
+    def test_default_normalizer_is_identity(self, labelled_data):
+        surrogate = Surrogate(model=_ConstantModel())
+        assert isinstance(surrogate.normalizer, IdentityNormalizer)
+
+    def test_zscore_normalizer_inverse_transforms_predictions(self, labelled_data):
+        surrogate = Surrogate(model=_ConstantModel(), normalizer=ZScoreNormalizer())
+        surrogate.fit(labelled_data, labelled_data)
+        preds = surrogate.predict(labelled_data.candidates)
+        # Model predicts 0 in normalised space; inverse of 0 with z-score = mean of labels
+        expected_mean = float(np.mean(labelled_data.labels))
+        np.testing.assert_almost_equal(preds.means[0], expected_mean)
+
+    def test_zscore_normalizer_inverse_transforms_variances(self, labelled_data):
+        surrogate = Surrogate(model=_ConstantModel(), normalizer=ZScoreNormalizer())
+        surrogate.fit(labelled_data, labelled_data)
+        preds = surrogate.predict(labelled_data.candidates)
+        # Model predicts variance=1 in normalised space; inverse = std^2
+        expected_var = float(np.std(labelled_data.labels) ** 2)
+        np.testing.assert_almost_equal(preds.variances[0], expected_var)
+
+    def test_original_labels_not_mutated(self, labelled_data):
+        original_labels = labelled_data.labels.copy()
+        surrogate = Surrogate(model=_ConstantModel(), normalizer=ZScoreNormalizer())
+        surrogate.fit(labelled_data, labelled_data)
+        np.testing.assert_array_equal(labelled_data.labels, original_labels)

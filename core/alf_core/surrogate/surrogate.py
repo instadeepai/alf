@@ -19,20 +19,42 @@ import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.model.base_model import BaseModel
+from alf_core.normalizer.normalizer import IdentityNormalizer, Normalizer
 
 
 class Surrogate:
-    """Surrogate model is fine-tuned during the active learning process on the acquired candidates.
-    Any BaseModel child class can be used as a surrogate model.
+    """Surrogate model fine-tuned during the active learning process.
+
+    Wraps a BaseModel and an optional Normalizer. Labels are normalised
+    before training and predictions are inverse-transformed before returning.
     """
 
-    def __init__(self, model: BaseModel):
-        """Initialize the Surrogate with a model.
+    def __init__(self, model: BaseModel, normalizer: Normalizer | None = None):
+        """Initialize the Surrogate.
 
         Args:
             model: The BaseModel instance to use as the surrogate model.
+            normalizer: Optional normalizer for target labels. Defaults to
+                IdentityNormalizer (no-op).
         """
         self.model = model
+        self.normalizer: Normalizer = normalizer if normalizer is not None else IdentityNormalizer()
+
+    def _normalise(self, data: LabelledCandidates) -> LabelledCandidates:
+        """Return a new LabelledCandidates with transformed labels.
+
+        Does not mutate the input.
+
+        Args:
+            data: Original labelled candidates.
+
+        Returns:
+            New LabelledCandidates with normalised labels.
+        """
+        return LabelledCandidates(
+            candidates=data.candidates,
+            labels=self.normalizer.transform(data.labels),
+        )
 
     def fit(
         self,
@@ -41,33 +63,45 @@ class Surrogate:
     ) -> list[SurrogateEpochMetrics]:
         """Fit the surrogate model on training and validation data.
 
+        Fits the normalizer on training labels, then trains the model on
+        normalised data.
+
         Args:
             train_data: Labeled candidates for training.
             val_data: Labeled candidates for validation.
 
         Returns:
-            List of SurrogateEpochMetrics, one per epoch trained. Empty if the
-            underlying model does not track per-epoch metrics.
+            List of SurrogateEpochMetrics, one per epoch trained.
         """
-        self.model.train(train_data, val_data)
+        self.normalizer.fit(train_data.labels)
+        self.model.train(self._normalise(train_data), self._normalise(val_data))
         return self.model.get_epoch_metrics()
 
     def predict(self, candidates: list[Candidate]) -> Predictions:
         """Predict scores for the given candidates.
 
+        Predictions from the model are inverse-transformed back to the
+        original label space before returning.
+
         Args:
-            candidates: List of Candidate objects to make predictions for.
+            candidates: List of Candidate objects to predict for.
 
         Returns:
-            Predictions object containing means and optionally variances
-            and empirical distributions.
+            Predictions in the original (un-normalised) label space.
         """
-        return self.model.predict(candidates)
+        raw = self.model.predict(candidates)
+        means = self.normalizer.inverse_transform(raw.means)
+        variances = (
+            self.normalizer.inverse_transform_variance(raw.variances)
+            if raw.variances is not None
+            else None
+        )
+        return Predictions(means=means, variances=variances)
 
     def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Get summary metrics from the most recent training run.
 
         Returns:
-            Dictionary of metric names to values from the underlying model's training.
+            Dictionary of metric names to values from the underlying model.
         """
         return self.model.get_training_summary_metrics()
