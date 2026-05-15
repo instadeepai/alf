@@ -23,7 +23,39 @@ from alf_core.surrogate.surrogate import Surrogate
 from alf_tools.optimizer.acquisition_functions.core_set import CoreSet
 
 
-class EmbeddingModel(BaseModel):
+class _BaseTestModel(BaseModel):
+    """Shared base for test models implementing the non-featurise abstract methods."""
+
+    def predict(self, candidate_points: list[Candidate]) -> Predictions:
+        """Return zero-mean predictions.
+
+        Args:
+            candidate_points: Candidates to predict for.
+
+        Returns:
+            Predictions with zero means.
+        """
+        return Predictions(means=np.zeros(len(candidate_points)))
+
+    def train(self, train_data: LabelledCandidates, val_data: LabelledCandidates) -> None:
+        """No-op training.
+
+        Args:
+            train_data: Training data (unused).
+            val_data: Validation data (unused).
+        """
+        pass
+
+    def sample(self, condition: Any | None = None) -> list[Candidate]:
+        """Not implemented for test models.
+
+        Raises:
+            NotImplementedError: Always.
+        """
+        raise NotImplementedError
+
+
+class EmbeddingModel(_BaseTestModel):
     """Test model that returns a pre-set numpy embedding array."""
 
     def __init__(self, embeddings: np.ndarray) -> None:
@@ -44,38 +76,13 @@ class EmbeddingModel(BaseModel):
             Embedding array of shape (n, d).
         """
         n = len(inputs) if isinstance(inputs, list) else len(inputs.candidates)
+        assert n <= len(self._embeddings), (
+            f"EmbeddingModel has {len(self._embeddings)} embeddings but {n} requested"
+        )
         return self._embeddings[:n]
 
-    def predict(self, candidate_points: list[Candidate]) -> Predictions:
-        """Return zero-mean predictions.
 
-        Args:
-            candidate_points: Candidates to predict for.
-
-        Returns:
-            Predictions with zero means.
-        """
-        return Predictions(means=np.zeros(len(candidate_points)))
-
-    def train(self, train_data: LabelledCandidates, val_data: LabelledCandidates) -> None:
-        """No-op training.
-
-        Args:
-            train_data: Training data (unused).
-            val_data: Validation data (unused).
-        """
-        pass
-
-    def sample(self, condition: Any | None = None) -> list[Candidate]:
-        """Not implemented for this test model.
-
-        Raises:
-            NotImplementedError: Always.
-        """
-        raise NotImplementedError
-
-
-class NullFeaturiseModel(BaseModel):
+class NullFeaturiseModel(_BaseTestModel):
     """Test model whose featurise returns None."""
 
     def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> None:
@@ -88,34 +95,6 @@ class NullFeaturiseModel(BaseModel):
             None.
         """
         return None
-
-    def predict(self, candidate_points: list[Candidate]) -> Predictions:
-        """Return zero-mean predictions.
-
-        Args:
-            candidate_points: Candidates to predict for.
-
-        Returns:
-            Predictions with zero means.
-        """
-        return Predictions(means=np.zeros(len(candidate_points)))
-
-    def train(self, train_data: LabelledCandidates, val_data: LabelledCandidates) -> None:
-        """No-op training.
-
-        Args:
-            train_data: Training data (unused).
-            val_data: Validation data (unused).
-        """
-        pass
-
-    def sample(self, condition: Any | None = None) -> list[Candidate]:
-        """Not implemented for this test model.
-
-        Raises:
-            NotImplementedError: Always.
-        """
-        raise NotImplementedError
 
 
 class MockDataset(BaseDataset):
