@@ -160,7 +160,9 @@ class ESMFoldModel(BaseModel):
 
         Raises:
             ValueError: If any candidate fails validation.
-            RuntimeError: If the forward pass fails (e.g., GPU OOM).
+            RuntimeError: If the forward pass fails. GPU OOM propagates as
+                torch.cuda.OutOfMemoryError; reduce batch_size or enable chunk_size
+                in ESMFoldConfig to lower peak memory.
         """
         self._validate_candidates(candidate_points)
 
@@ -177,6 +179,13 @@ class ESMFoldModel(BaseModel):
             for i in range(0, n, self.config.batch_size):
                 batch = sequences[i : i + self.config.batch_size]
                 dest = slice(i, i + len(batch))  # handles partial last batch
+                # Runtime guard: catches config.batch_size mutation after construction.
+                if ptm_scores is not None and len(batch) > 1:
+                    raise RuntimeError(
+                        f"scoring_metric='{metric}' requires batch_size=1 because ESMFold "
+                        "returns a single pTM scalar per batch. config.batch_size was "
+                        f"changed after construction (current value: {self.config.batch_size})."
+                    )
 
                 tokens = self.tokenizer(
                     batch, return_tensors="pt", padding=True, add_special_tokens=False
@@ -260,7 +269,8 @@ class ESMFoldModel(BaseModel):
         """Move model to CPU and clear CUDA cache to free GPU memory."""
         self.model = self.model.to("cpu")
         self.device = torch.device("cpu")
-        # ESM backbone was fp16 on GPU; restore fp32 so the model is usable on CPU after cleanup.
-        self.model.esm.float()
+        # Restore full model to fp32: esm backbone was fp16 on GPU (fp16_esm=True default),
+        # and the folding trunk may also have been in fp16. CPU requires fp32 for all submodules.
+        self.model.float()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()

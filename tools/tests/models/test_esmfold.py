@@ -706,14 +706,14 @@ class TestESMFoldCleanup:
             model.cleanup()
         assert model.device == torch.device("cpu")
 
-    def test_cleanup_converts_esm_to_float32(self, mock_components):
-        """After cleanup(), model.esm.float() is called to restore fp32 for CPU use."""
+    def test_cleanup_converts_full_model_to_float32(self, mock_components):
+        """After cleanup(), model.float() is called to restore fp32 for all submodules."""
         mock_mdl, _, _, _ = mock_components
         model = ESMFoldModel(ESMFoldConfig())
-        mock_mdl.esm.float.reset_mock()  # clear the call from __init__
+        mock_mdl.float.reset_mock()  # clear any prior calls
         with patch("alf_tools.models.esmfold.torch.cuda.is_available", return_value=False):
             model.cleanup()
-        mock_mdl.esm.float.assert_called_once()
+        mock_mdl.float.assert_called_once()
 
 
 class _StubModel(BaseModel):
@@ -822,6 +822,22 @@ class TestESMFoldGoldenSequences:
     at that length.  Use mean_pLDDT (per-residue confidence) to distinguish well-
     structured regions for short sequences.
     """
+
+    @pytest.fixture(autouse=True)
+    def _restore_scoring_metric(self, _golden_esmfold):
+        """Reset scoring_metric to its default after each test.
+
+        The session-scoped fixture loads the 2.6 GB checkpoint once and shares it
+        across all tests. Each test mutates config.scoring_metric before calling
+        predict(). This autouse fixture restores the original value after each test
+        so test-execution order cannot cause a wrong metric to bleed into the next test.
+
+        Yields:
+            None.
+        """
+        original = _golden_esmfold.config.scoring_metric
+        yield
+        _golden_esmfold.config.scoring_metric = original
 
     @pytest.mark.skipif(
         not torch.cuda.is_available(),

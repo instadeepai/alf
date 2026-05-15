@@ -20,6 +20,7 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 
 ### Models
 - **CNNModel** - Convolutional neural network for sequence modeling with uncertainty quantification
+- **ESMFoldModel** - ESMFold protein structure prediction oracle; returns pTM and/or mean pLDDT scores for amino acid sequence candidates. Use as `Oracle(scorer=ESMFoldModel(ESMFoldConfig(...)))`. Requires `transformers>=4.36.0` and `accelerate>=0.26.0`.
 - **PyRosetta** - Rosetta energy function for protein design (requires PyRosetta installation)
 
 ### Acquisition Functions
