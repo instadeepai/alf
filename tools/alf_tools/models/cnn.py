@@ -202,9 +202,6 @@ class CNNModel(BaseModel):
         self.model: SequenceCNN | None = None
         self.seq_length: int | None = None
 
-        # Problem type — set at train() time from kwargs
-        self._problem_type: ProblemType = ProblemType.REGRESSION
-
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
