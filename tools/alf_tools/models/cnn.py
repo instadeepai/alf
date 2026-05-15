@@ -55,8 +55,6 @@ class CNNModelConfig:
         num_conv_layers: Number of convolutional layers.
         fc_hidden_dim: Dimension of fully connected hidden layers.
         dropout: Dropout rate.
-        num_classes: Number of classes for classification tasks (always the actual
-            class count, e.g. 2 for binary). Ignored for regression. Defaults to 2.
     """
 
     num_filters: int = 128
@@ -64,7 +62,6 @@ class CNNModelConfig:
     num_conv_layers: int = 3
     fc_hidden_dim: int = 256
     dropout: float = 0.3
-    num_classes: int = 2
 
 
 @dataclass
@@ -411,9 +408,8 @@ class CNNModel(BaseModel):
     def train(
         self,
         train_data: LabelledCandidates,
+        problem_type: ProblemType,
         val_data: LabelledCandidates | None = None,
-        problem_type: ProblemType = ProblemType.REGRESSION,
-        **kwargs: Any,
     ) -> None:
         """Train the CNN model.
 
@@ -424,15 +420,16 @@ class CNNModel(BaseModel):
             **kwargs: Additional keyword arguments. Recognises ``problem_type``
                 (``ProblemType``) to configure loss, label dtype, and output layer.
         """
-        self._problem_type = kwargs.get("problem_type", problem_type)
+        self._problem_type = problem_type
         logger.info(
             f"Training CNN with {len(train_data)} samples (problem_type={self._problem_type})"
         )
         self._epoch_metrics = []
 
         # Determine output neurons: 1 for regression/binary, num_classes for multiclass
+        num_classes = train_data.labels.shape[-1]
         output_neurons = (
-            self.model_config.num_classes if self._problem_type == ProblemType.MULTICLASS else 1
+            num_classes if self._problem_type == ProblemType.MULTICLASS else 1
         )
 
         # Initialize model on first call or when output shape changes
@@ -532,16 +529,8 @@ class CNNModel(BaseModel):
         with torch.no_grad():
             logits = self.model(x)
 
-        if self._problem_type == ProblemType.REGRESSION:
-            return Predictions(means=logits.cpu().numpy())
-
-        if self._problem_type == ProblemType.BINARY:
-            pos_prob = torch.sigmoid(logits).cpu().numpy()  # (n,)
-            probs = np.stack([1.0 - pos_prob, pos_prob], axis=1)  # (n, 2)
-            return Predictions(means=probs)
-
         # MULTICLASS
-        probs = torch.softmax(logits, dim=-1).cpu().numpy()  # (n, num_classes)
+        probs = _apply_activation(logits, self._problem_type).cpu().numpy()  # (n, num_classes)
         return Predictions(means=probs)
 
     def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
