@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.models.utils.normaliser import InputNormaliser
 from alf_tools.models.utils.sequence_utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
@@ -24,6 +23,5 @@ __all__ = [
     "create_char_to_idx_mapping",
     "extract_sequences_from_inputs",
     "get_device",
-    "InputNormaliser",
     "one_hot_encode",
 ]

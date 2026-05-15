@@ -19,42 +19,20 @@ import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.model.base_model import BaseModel
-from alf_core.normaliser.normaliser import IdentityNormaliser, Normaliser
 
 
 class Surrogate:
-    """Surrogate model fine-tuned during the active learning process.
-
-    Wraps a BaseModel and an optional Normaliser. Labels are normalised
-    before training and predictions are inverse-transformed before returning.
+    """Surrogate model is fine-tuned during the active learning process on the acquired candidates.
+    Any BaseModel child class can be used as a surrogate model.
     """
 
-    def __init__(self, model: BaseModel, normaliser: Normaliser | None = None):
-        """Initialize the Surrogate.
+    def __init__(self, model: BaseModel):
+        """Initialize the Surrogate with a model.
 
         Args:
             model: The BaseModel instance to use as the surrogate model.
-            normaliser: Optional normaliser for target labels. Defaults to
-                IdentityNormaliser (no-op).
         """
         self.model = model
-        self.normaliser: Normaliser = normaliser if normaliser is not None else IdentityNormaliser()
-
-    def _normalise(self, data: LabelledCandidates) -> LabelledCandidates:
-        """Return a new LabelledCandidates with transformed labels.
-
-        Does not share mutable references with the input.
-
-        Args:
-            data: Original labelled candidates.
-
-        Returns:
-            New LabelledCandidates with normalised labels.
-        """
-        return LabelledCandidates(
-            candidates=list(data.candidates),
-            labels=self.normaliser.transform(data.labels),
-        )
 
     def fit(
         self,
@@ -63,45 +41,33 @@ class Surrogate:
     ) -> list[SurrogateEpochMetrics]:
         """Fit the surrogate model on training and validation data.
 
-        Fits the normaliser on training labels, then trains the model on
-        normalised data.
-
         Args:
             train_data: Labeled candidates for training.
             val_data: Labeled candidates for validation.
 
         Returns:
-            List of SurrogateEpochMetrics, one per epoch trained.
+            List of SurrogateEpochMetrics, one per epoch trained. Empty if the
+            underlying model does not track per-epoch metrics.
         """
-        self.normaliser.fit(train_data.labels)
-        self.model.train(self._normalise(train_data), self._normalise(val_data))
+        self.model.train(train_data, val_data)
         return self.model.get_epoch_metrics()
 
     def predict(self, candidates: list[Candidate]) -> Predictions:
         """Predict scores for the given candidates.
 
-        Predictions from the model are inverse-transformed back to the
-        original label space before returning.
-
         Args:
-            candidates: List of Candidate objects to predict for.
+            candidates: List of Candidate objects to make predictions for.
 
         Returns:
-            Predictions in the original (un-normalised) label space.
+            Predictions object containing means and optionally variances
+            and empirical distributions.
         """
-        raw = self.model.predict(candidates)
-        means = self.normaliser.inverse_transform(raw.means)
-        variances = (
-            self.normaliser.inverse_transform_variance(raw.variances)
-            if raw.variances is not None
-            else None
-        )
-        return Predictions(means=means, variances=variances)
+        return self.model.predict(candidates)
 
     def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Get summary metrics from the most recent training run.
 
         Returns:
-            Dictionary of metric names to values from the underlying model.
+            Dictionary of metric names to values from the underlying model's training.
         """
         return self.model.get_training_summary_metrics()

@@ -26,7 +26,7 @@ from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.model.base_train_config import BaseTrainConfig
 from jaxtyping import Float
 
-from alf_tools.models.utils.normaliser import InputNormaliser
+from alf_core.model.normaliser import InputNormaliser
 from alf_tools.models.utils.sequence_utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
