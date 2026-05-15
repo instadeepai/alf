@@ -549,6 +549,93 @@ class TestESMFoldSequenceLengths:
         np.testing.assert_almost_equal(result.means[0], expected, decimal=5)
 
 
+class TestESMFoldPLDDTMasking:
+    """Tests that pLDDT aggregation correctly excludes padding positions."""
+
+    def test_plddt_masked_mean_excludes_padding(self):
+        """Padding zeros in attention_mask are excluded from pLDDT mean (batch_size=2)."""
+
+        def _tok_call(seqs, return_tensors="pt", padding=True, add_special_tokens=False):
+            # Two sequences: lengths 2 and 3, padded to length 3
+            return {
+                "input_ids": torch.ones(2, 3, dtype=torch.long),
+                "attention_mask": torch.tensor([[1, 1, 0], [1, 1, 1]], dtype=torch.long),
+            }
+
+        with (
+            patch("alf_tools.models.esmfold.EsmForProteinFolding") as mock_cls,
+            patch("alf_tools.models.esmfold.AutoTokenizer") as mock_tok_cls,
+        ):
+            mock_tok = MagicMock()
+            mock_tok.side_effect = _tok_call
+            mock_tok_cls.from_pretrained.return_value = mock_tok
+
+            def _model_call(**tokens):
+                out = MagicMock()
+                out.ptm = torch.tensor(0.5, dtype=torch.float32)
+                out.plddt = torch.full((2, 3, 37), 0.4, dtype=torch.float32)
+                return out
+
+            mock_mdl = MagicMock()
+            mock_mdl.to.return_value = mock_mdl
+            mock_mdl.side_effect = _model_call
+            mock_mdl.esm = MagicMock()
+            mock_cls.from_pretrained.return_value = mock_mdl
+
+            # batch_size=2 so both sequences are processed in one forward pass
+            model = ESMFoldModel(ESMFoldConfig(scoring_metric="mean_plddt", batch_size=2))
+            cands = [
+                Candidate(data="AC", modality="sequence"),
+                Candidate(data="ACG", modality="sequence"),
+            ]
+            result = model.predict(cands)
+
+        # seq 0: 2 real residues, plddt 0.4 -> masked mean = 0.4
+        # seq 1: 3 real residues, plddt 0.4 -> masked mean = 0.4
+        np.testing.assert_almost_equal(result.means[0], 0.4, decimal=5)
+        np.testing.assert_almost_equal(result.means[1], 0.4, decimal=5)
+
+    def test_plddt_masked_mean_differs_from_unmasked_when_padding_present(self):
+        """Confirms masking changes the result when padding values would inflate the mean."""
+
+        def _tok_call(seqs, return_tensors="pt", padding=True, add_special_tokens=False):
+            # seq 0: length 2, padded to 3; padding position gets plddt=1.0 from model
+            return {
+                "input_ids": torch.ones(1, 3, dtype=torch.long),
+                "attention_mask": torch.tensor([[1, 1, 0]], dtype=torch.long),
+            }
+
+        with (
+            patch("alf_tools.models.esmfold.EsmForProteinFolding") as mock_cls,
+            patch("alf_tools.models.esmfold.AutoTokenizer") as mock_tok_cls,
+        ):
+            mock_tok = MagicMock()
+            mock_tok.side_effect = _tok_call
+            mock_tok_cls.from_pretrained.return_value = mock_tok
+
+            def _model_call(**tokens):
+                out = MagicMock()
+                out.ptm = torch.tensor(0.5, dtype=torch.float32)
+                plddt = torch.zeros(1, 3, 37, dtype=torch.float32)
+                plddt[:, :2, :] = 0.6  # real residues
+                plddt[:, 2, :] = 1.0  # padding position — should be excluded
+                out.plddt = plddt
+                return out
+
+            mock_mdl = MagicMock()
+            mock_mdl.to.return_value = mock_mdl
+            mock_mdl.side_effect = _model_call
+            mock_mdl.esm = MagicMock()
+            mock_cls.from_pretrained.return_value = mock_mdl
+
+            model = ESMFoldModel(ESMFoldConfig(scoring_metric="mean_plddt"))
+            cand = Candidate(data="AC", modality="sequence")
+            result = model.predict([cand])
+
+        # Masked mean: (0.6 * 2 residues) / 2 = 0.6 (not 0.733 which would be unmasked mean)
+        np.testing.assert_almost_equal(result.means[0], 0.6, decimal=5)
+
+
 class TestESMFoldDuplicates:
     """Duplicate sequences are each processed independently."""
 

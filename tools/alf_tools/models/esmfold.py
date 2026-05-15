@@ -39,7 +39,9 @@ class ESMFoldConfig:
         device: PyTorch device string ('cpu', 'cuda', 'cuda:0', 'mps').
         scoring_metric: Scalar metric returned as the oracle score.
         combined_ptm_weight: Weight of pTM in the combined metric; (1-w) applied to mean_plddt.
-        batch_size: Number of sequences processed per forward pass.
+        batch_size: Number of sequences processed per forward pass. Values > 1 are only valid
+            with scoring_metric="mean_plddt"; ptm and combined require batch_size=1 because
+            ESMFold returns a single pTM scalar per batch, not per sequence.
         chunk_size: Axial-attention chunk size for long sequences; None disables chunking.
         low_memory: Pass low_cpu_mem_usage=True to from_pretrained, deferring weight
             materialization to the first forward pass (latency spike on first call).
@@ -88,7 +90,10 @@ class ESMFoldModel(BaseModel):
             )
 
         self.config = config
-        self.device = torch.device(config.device)
+        try:
+            self.device = torch.device(config.device)
+        except RuntimeError as exc:
+            raise ValueError(f"Invalid device string in ESMFoldConfig: {config.device!r}") from exc
 
         self.tokenizer = AutoTokenizer.from_pretrained(config.model_name)
         self.model = EsmForProteinFolding.from_pretrained(
@@ -101,7 +106,7 @@ class ESMFoldModel(BaseModel):
         if config.chunk_size is not None:
             self.model.esm.encoder.set_chunk_size(config.chunk_size)
 
-        if config.device == "cpu":
+        if self.device.type == "cpu":
             # EsmForProteinFolding casts the ESM backbone to fp16 by default (fp16_esm=True).
             # CPU lacks native fp16 hardware, so emulated fp16 produces noisy representations
             # that corrupt pTM and pLDDT scores. Converting to fp32 restores accuracy.
@@ -187,18 +192,29 @@ class ESMFoldModel(BaseModel):
                 if plddt_scores is not None:
                     mask = tokens["attention_mask"]  # (B, L)
                     n_atoms = output.plddt.shape[-1]
-                    masked_sum = (output.plddt * mask.unsqueeze(-1)).sum(dim=(1, 2))  # (B,)
-                    real_count = mask.sum(dim=1) * n_atoms  # (B,)
+                    # Cast to float32: avoids fp16 overflow (seq_len * n_atoms can exceed 65504).
+                    # Sum atoms first to avoid an O(B*L*n_atoms) broadcast copy.
+                    plddt_per_residue = output.plddt.float().sum(dim=-1)  # (B, L)
+                    real_count = mask.float().sum(dim=1) * n_atoms  # (B,)
+                    if (real_count == 0).any():
+                        raise RuntimeError(
+                            f"Batch at offset {i} contains sequences with all-padding "
+                            "attention mask after tokenization."
+                        )
+                    masked_sum = (plddt_per_residue * mask.float()).sum(dim=1)  # (B,)
                     plddt_scores[dest] = (masked_sum / real_count).cpu().numpy()
 
         if metric == "ptm":
-            assert ptm_scores is not None
+            if ptm_scores is None:
+                raise RuntimeError("ptm_scores is None but metric='ptm'; this is a bug")
             means = ptm_scores
         elif metric == "mean_plddt":
-            assert plddt_scores is not None
+            if plddt_scores is None:
+                raise RuntimeError("plddt_scores is None but metric='mean_plddt'; this is a bug")
             means = plddt_scores
         else:
-            assert ptm_scores is not None and plddt_scores is not None
+            if ptm_scores is None or plddt_scores is None:
+                raise RuntimeError("Score arrays are None but metric='combined'; this is a bug")
             w = self.config.combined_ptm_weight
             means = w * ptm_scores + (1.0 - w) * plddt_scores
 
@@ -224,7 +240,7 @@ class ESMFoldModel(BaseModel):
         """
         raise NotImplementedError("Training is not implemented for ESMFoldModel.")
 
-    def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
+    def sample(self, condition: Any | None = None) -> list[Candidate]:
         """Not implemented for ESMFoldModel.
 
         Raises:
