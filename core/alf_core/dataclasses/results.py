@@ -63,9 +63,9 @@ class Results:
 
         if self.problem_type == ProblemType.REGRESSION:
             metrics_dict = (
-                regression_metric_registry.get_metrics_not_requiring_variance()
+                regression_metric_registry.get_metrics()
                 if self.predictions.variances is None
-                else regression_metric_registry.get_metrics_requiring_variance()
+                else regression_metric_registry.get_metrics()
             )
             for _, metric_fn in metrics_dict.items():
                 metrics.update(
