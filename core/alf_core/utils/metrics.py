@@ -77,7 +77,7 @@ class RegressionMetricRegistry:
     """Simple registry for metrics with variance requirements."""
 
     def __init__(self) -> None:
-        """Initialize an empty metric registry."""
+        """Initialise an empty metric registry."""
         self.metrics: dict[str, Callable] = {}
         self.variance_required: dict[str, bool] = {}
 
@@ -102,10 +102,19 @@ class RegressionMetricRegistry:
 
 
 class ClassificationMetricRegistry:
+    """Simple registry for classification metrics not requiring variance information."""
+
     def __init__(self) -> None:
+        """Initialise an empty classification metric registry."""
         self.metrics: dict[str, Callable] = {}
 
     def register(self, name: str, fn: Callable) -> None:
+        """Register a classification metric function in the registry.
+
+        Args:
+            name (str): Name of the metric.
+            fn (Callable): The metric function to register.
+        """
         self.metrics[name] = fn
 
     def get_metrics(self) -> dict[str, Callable]:
@@ -458,10 +467,10 @@ def width(
     targets: Float[np.ndarray, " b"],
     alpha: float = 0.95,
 ) -> dict[str, float]:
-    """Compute average confidence interval width normalized by dataset range.
+    """Compute average confidence interval width normalised by dataset range.
 
     Computes alpha% confidence intervals for all predictions, then calculates
-    the average width normalized by the maximum distance between any two targets.
+    the average width normalised by the maximum distance between any two targets.
     Lower values are better while maintaining good calibration.
 
     Args:
@@ -471,7 +480,7 @@ def width(
         alpha: Confidence level (e.g., 0.95 for 95% CI). Defaults to 0.95.
 
     Returns:
-        Dictionary with key "width_{alpha:.2f}" mapping to the normalized
+        Dictionary with key "width_{alpha:.2f}" mapping to the normalised
         average width value.
 
     Raises:
@@ -510,7 +519,7 @@ def rank_width(
         alpha: Confidence level (e.g., 0.95 for 95% CI). Defaults to 0.95.
 
     Returns:
-        Dictionary with key "rank_width_{alpha:.2f}" mapping to the normalized
+        Dictionary with key "rank_width_{alpha:.2f}" mapping to the normalised
         average width value in rank space.
 
     Raises:

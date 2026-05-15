@@ -525,7 +525,6 @@ class CNNModel(BaseModel):
         with torch.no_grad():
             logits = self.model(x)
 
-        # MULTICLASS
         probs = _apply_activation(logits, self._problem_type).cpu().numpy()  # (n, num_classes)
         return Predictions(means=probs)
 
