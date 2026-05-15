@@ -13,28 +13,28 @@
 # limitations under the License.
 
 import logging
+import random
 from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
-import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
-from alf_tools.models.utils import get_device
-from torch.utils.data import DataLoader
-
-from chemprop.nn import MeanAggregation, NormAggregation, SumAggregation, BondMessagePassing
-from chemprop.nn.predictors import RegressionFFN  
 from chemprop.data import (
     BatchMolGraph,
     MoleculeDatapoint,
     MoleculeDataset,
     build_dataloader,
 )
-        
+from chemprop.nn import BondMessagePassing, MeanAggregation, NormAggregation, SumAggregation
+from chemprop.nn.predictors import RegressionFFN
+from torch.utils.data import DataLoader
+
+from alf_tools.models.utils import get_device
+
 logger = logging.getLogger("alf-tools")
 
 
@@ -74,8 +74,7 @@ class ChempropTrainConfig:
     batch_size: int = 50
     num_epochs: int = 50
     optimizer: Literal["adam", "sgd", "adamw"] = "adam"
-    weight_init: Literal["default", "xavier_uniform",
-                         "kaiming_normal"] | None = None
+    weight_init: Literal["default", "xavier_uniform", "kaiming_normal"] | None = None
     seed: int | None = None
 
 
@@ -85,7 +84,6 @@ def _get_aggregations() -> dict[str, type]:
     Returns:
         Dictionary mapping aggregation name strings to aggregation classes.
     """
-
     return {
         "mean": MeanAggregation,
         "sum": SumAggregation,
@@ -198,7 +196,6 @@ class ChempropModel(BaseModel):
         Returns:
             Chemprop DataLoader.
         """
-
         if labels is not None:
             datapoints = [
                 MoleculeDatapoint.from_smi(smi, y=np.array([label]))
@@ -263,6 +260,9 @@ class ChempropModel(BaseModel):
 
         Returns:
             Tuple of (average loss weighted by batch size, metrics dict).
+
+        Raises:
+            RuntimeError: If called before model is initialised.
         """
         if self._model is None:
             raise RuntimeError("_train_epoch called before model is initialised")
@@ -275,8 +275,8 @@ class ChempropModel(BaseModel):
 
         model.train(True)
         for batch in loader:
-            # BatchMolGraph.to() is in-place with no return value; unlike Tensor.to() which creates
-            # a new tensor and must be assigned — assigning bmg.to() would leave bmg on the old device
+            # BatchMolGraph.to() is in-place (no return value) — do not assign the result;
+            # unlike Tensor.to(), which returns a new tensor.
             batch.bmg.to(self.device)
             V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
             X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
@@ -289,8 +289,8 @@ class ChempropModel(BaseModel):
 
             b = targets.shape[0]
             total_loss += loss.item() * b
-            all_preds[idx: idx + b] = preds.detach().cpu()
-            all_targets[idx: idx + b] = targets.detach().cpu()
+            all_preds[idx : idx + b] = preds.detach().cpu()
+            all_targets[idx : idx + b] = targets.detach().cpu()
             idx += b
 
         all_preds = all_preds[:idx]
@@ -299,10 +299,8 @@ class ChempropModel(BaseModel):
         preds_np = all_preds.numpy()
         targets_np = all_targets.numpy()
         if len(preds_np) >= 2:
-            raw = Results(targets=targets_np,
-                          predictions=Predictions(means=preds_np)).metrics
-            metrics = {k: float(v) for k in ("spearman", "mse")
-                       if (v := raw.get(k)) is not None}
+            raw = Results(targets=targets_np, predictions=Predictions(means=preds_np)).metrics
+            metrics = {k: float(v) for k in ("spearman", "mse") if (v := raw.get(k)) is not None}
         else:
             metrics = {"mse": float(np.mean((preds_np - targets_np) ** 2))}
         return avg_loss, metrics
@@ -320,6 +318,9 @@ class ChempropModel(BaseModel):
 
         Returns:
             Tuple of (average loss weighted by batch size, metrics dict).
+
+        Raises:
+            RuntimeError: If called before model is initialised.
         """
         if self._model is None:
             raise RuntimeError("_eval_epoch called before model is initialised")
@@ -333,8 +334,8 @@ class ChempropModel(BaseModel):
         model.train(False)
         with torch.no_grad():
             for batch in loader:
-                # BatchMolGraph.to() is in-place with no return value; unlike Tensor.to() which creates
-                # a new tensor and must be assigned — assigning bmg.to() would leave bmg on the old device
+                # BatchMolGraph.to() is in-place (no return value) — do not assign the result;
+                # unlike Tensor.to(), which returns a new tensor.
                 batch.bmg.to(self.device)
                 V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
                 X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
@@ -344,8 +345,8 @@ class ChempropModel(BaseModel):
 
                 b = targets.shape[0]
                 total_loss += loss.item() * b
-                all_preds[idx: idx + b] = preds.detach().cpu()
-                all_targets[idx: idx + b] = targets.detach().cpu()
+                all_preds[idx : idx + b] = preds.detach().cpu()
+                all_targets[idx : idx + b] = targets.detach().cpu()
                 idx += b
 
         all_preds = all_preds[:idx]
@@ -354,10 +355,8 @@ class ChempropModel(BaseModel):
         preds_np = all_preds.numpy()
         targets_np = all_targets.numpy()
         if len(preds_np) >= 2:
-            raw = Results(targets=targets_np,
-                          predictions=Predictions(means=preds_np)).metrics
-            metrics = {k: float(v) for k in ("spearman", "mse")
-                       if (v := raw.get(k)) is not None}
+            raw = Results(targets=targets_np, predictions=Predictions(means=preds_np)).metrics
+            metrics = {k: float(v) for k in ("spearman", "mse") if (v := raw.get(k)) is not None}
         else:
             metrics = {"mse": float(np.mean((preds_np - targets_np) ** 2))}
         return avg_loss, metrics
@@ -419,7 +418,6 @@ class ChempropModel(BaseModel):
         logger.info("Training ChempropModel on %d samples", len(train_data))
 
         if self.train_config.seed is not None:
-
             random.seed(self.train_config.seed)
             np.random.seed(self.train_config.seed)
             torch.manual_seed(self.train_config.seed)
@@ -427,13 +425,13 @@ class ChempropModel(BaseModel):
 
         if self._model is None:
             self._init_model()
-            
+        assert self._model is not None
+
         train_loader = self._build_dataloader(
             self.featurise(train_data), train_data.labels, shuffle=True
         )
         val_loader = (
-            self._build_dataloader(self.featurise(
-                val_data), val_data.labels, shuffle=False)
+            self._build_dataloader(self.featurise(val_data), val_data.labels, shuffle=False)
             if val_data is not None and len(val_data) > 0
             else None
         )
@@ -447,25 +445,20 @@ class ChempropModel(BaseModel):
             return
 
         for epoch in range(self.train_config.num_epochs):
-            avg_train_loss, train_metrics = self._train_epoch(
-                train_loader, criterion, optimizer)
+            avg_train_loss, train_metrics = self._train_epoch(train_loader, criterion, optimizer)
             if val_loader is not None:
-                avg_val_loss, val_metrics = self._eval_epoch(
-                    val_loader, criterion)
+                avg_val_loss, val_metrics = self._eval_epoch(val_loader, criterion)
                 self._record_epoch_metrics(
                     epoch, avg_train_loss, train_metrics, avg_val_loss, val_metrics
                 )
             else:
-                self._record_epoch_metrics(
-                    epoch, avg_train_loss, train_metrics)
+                self._record_epoch_metrics(epoch, avg_train_loss, train_metrics)
 
         self.training_metrics = {"final_train_loss": avg_train_loss}
-        self.training_metrics.update(
-            {f"final_train_{k}": v for k, v in train_metrics.items()})
+        self.training_metrics.update({f"final_train_{k}": v for k, v in train_metrics.items()})
         if val_loader is not None:
             self.training_metrics["final_val_loss"] = avg_val_loss
-            self.training_metrics.update(
-                {f"final_val_{k}": v for k, v in val_metrics.items()})
+            self.training_metrics.update({f"final_val_{k}": v for k, v in val_metrics.items()})
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Predict fitness means for a list of candidates.
@@ -493,13 +486,11 @@ class ChempropModel(BaseModel):
         with torch.no_grad():
             for batch in loader:
                 batch.bmg.to(self.device)
-                V_d = batch.V_d.to(
-                    self.device) if batch.V_d is not None else None
-                X_d = batch.X_d.to(
-                    self.device) if batch.X_d is not None else None
+                V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
+                X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
                 preds = model(batch.bmg, V_d, X_d).squeeze(-1)
                 b = preds.shape[0]
-                all_preds[idx: idx + b] = preds.cpu()
+                all_preds[idx : idx + b] = preds.cpu()
                 idx += b
 
         all_preds = all_preds[:idx]
@@ -507,8 +498,7 @@ class ChempropModel(BaseModel):
 
     def sample(self, condition: object | None = None) -> list[Candidate]:
         """Not implemented for mean-only MPNN."""
-        raise NotImplementedError(
-            "Sampling is not implemented for ChempropModel.")
+        raise NotImplementedError("Sampling is not implemented for ChempropModel.")
 
     def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
         """Return per-epoch metrics from the most recent train() call.
