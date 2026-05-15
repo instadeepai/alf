@@ -27,6 +27,7 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 - **UCB** - Upper Confidence Bound for exploration-exploitation
 - **ExpectedImprovement** - Expected improvement over current best
 - **ThompsonSampling** - Bayesian sampling for exploration
+- **CoreSet** - Greedy k-centres selection for input-space diversity (coverage-based)
 
 ### Search Strategies
 - **SingleMutantSearch** - Generate single-mutation variants of reference sequences

@@ -13,18 +13,13 @@
 # limitations under the License.
 
 import numpy as np
+import torch
 from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
 from scipy.spatial.distance import cdist
-
-try:
-    import torch
-
-    HAS_TORCH = True
-except ImportError:
-    HAS_TORCH = False
+from jaxtyping import Float
 
 
-def _to_numpy(features: object) -> np.ndarray:
+def _to_numpy(features: Float[np.ndarray | torch.Tensor, "n_samples n_features"]) -> np.ndarray:
     """Convert model features to a numpy array.
 
     Args:
@@ -41,7 +36,7 @@ def _to_numpy(features: object) -> np.ndarray:
             "featurise returned None. CoreSet requires a model with a featurise "
             "implementation that returns numerical embeddings."
         )
-    if HAS_TORCH and isinstance(features, torch.Tensor):
+    if isinstance(features, torch.Tensor):
         return features.detach().cpu().numpy()
     try:
         return np.asarray(features)
@@ -57,8 +52,9 @@ class CoreSet(AcquisitionFunction):
     Greedily selects candidates that maximise the minimum distance to
     the training set and previously selected candidates (greedy k-centres).
 
-    Candidates are scored by their minimum L2 distance to all centres at
-    the time of selection. Unselected candidates receive a score of 0.
+    Candidates are scored by their selection rank (n_select - step), so the
+    first selected candidate receives the highest score and the last receives 1.
+    Unselected candidates receive a score of 0.
     This is a maximising acquisition function.
     """
 
@@ -80,24 +76,44 @@ class CoreSet(AcquisitionFunction):
             LabelledCandidates with CoreSet acquisition values.
         """
         training_candidates = state.dataset.train_dataset.candidates
+        # Surrogate has no featurise() delegation method; access the underlying model directly.
         features = state.surrogate.model.featurise(training_candidates + search_candidates)
         embeddings = _to_numpy(features)
 
+        if embeddings.ndim != 2:
+            raise ValueError(
+                f"featurise must return a 2-D array of shape (n_inputs, d), got shape {embeddings.shape}"
+            )
+
         n_train = len(training_candidates)
+        n_cands = len(search_candidates)
+
+        if len(embeddings) != n_train + n_cands:
+            raise ValueError(
+                f"featurise returned {len(embeddings)} rows for "
+                f"{n_train} training + {n_cands} candidates (expected {n_train + n_cands})"
+            )
+
         training_embs = embeddings[:n_train]
         candidate_embs = embeddings[n_train:]
 
-        n_cands = len(search_candidates)
         n_select = min(state.acq_batch_size, n_cands)
 
-        min_dists = cdist(candidate_embs, training_embs).min(axis=1)
+        if n_train == 0:
+            min_dists = np.full(n_cands, np.inf)
+        else:
+            _CHUNK = 512
+            min_dists = np.empty(n_cands)
+            for _i in range(0, n_cands, _CHUNK):
+                _sl = candidate_embs[_i : _i + _CHUNK]
+                min_dists[_i : _i + _CHUNK] = cdist(_sl, training_embs).min(axis=1)
         selected_mask = np.zeros(n_cands, dtype=bool)
         acquisition_values = np.zeros(n_cands)
 
-        for _ in range(n_select):
+        for step in range(n_select):
             masked = np.where(~selected_mask, min_dists, -np.inf)
             best_idx = int(np.argmax(masked))
-            acquisition_values[best_idx] = min_dists[best_idx]
+            acquisition_values[best_idx] = float(n_select - step)
             selected_mask[best_idx] = True
             dists_to_new = cdist(candidate_embs, candidate_embs[[best_idx]])[:, 0]
             min_dists = np.minimum(min_dists, dists_to_new)

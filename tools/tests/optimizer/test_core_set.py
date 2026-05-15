@@ -56,18 +56,18 @@ class _BaseTestModel(BaseModel):
 
 
 class EmbeddingModel(_BaseTestModel):
-    """Test model that returns a pre-set numpy embedding array."""
+    """Test model that looks up embeddings by the integer index in candidate.data (format: 'emb_<int>')."""
 
     def __init__(self, embeddings: np.ndarray) -> None:
         """Initialise with a fixed embedding array.
 
         Args:
-            embeddings: Array of shape (n_total, d) returned slice-by-count from featurise.
+            embeddings: Array of shape (n_total, d) indexed by the integer in candidate.data.
         """
         self._embeddings = embeddings
 
     def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> np.ndarray:
-        """Return the first n rows of the pre-set embeddings.
+        """Return embeddings looked up by candidate index encoded in candidate.data.
 
         Args:
             inputs: Candidates to featurise.
@@ -75,11 +75,9 @@ class EmbeddingModel(_BaseTestModel):
         Returns:
             Embedding array of shape (n, d).
         """
-        n = len(inputs) if isinstance(inputs, list) else len(inputs.candidates)
-        assert n <= len(self._embeddings), (
-            f"EmbeddingModel has {len(self._embeddings)} embeddings but {n} requested"
-        )
-        return self._embeddings[:n]
+        candidates = inputs if isinstance(inputs, list) else inputs.candidates
+        indices = [int(c.data.split("_")[1]) for c in candidates]
+        return self._embeddings[indices]
 
 
 class NullFeaturiseModel(_BaseTestModel):
@@ -138,9 +136,9 @@ def _make_state(
     """Build a State and search_candidates list for testing.
 
     The embeddings array has shape (n_train + n_cands, d). The first n_train rows
-    are assigned to the training set; the remaining rows to the search candidates.
-    The EmbeddingModel returns ``embeddings[:n]`` for any call to featurise with n inputs,
-    so CoreSet receives the full array when it calls featurise(training + search).
+    are assigned to the training set (candidates named ``emb_0`` … ``emb_{n_train-1}``);
+    the remaining rows to the search candidates (named ``emb_{n_train}`` … ``emb_{n_train+n_cands-1}``).
+    EmbeddingModel looks up rows by the integer index in candidate.data.
 
     Args:
         embeddings: Full embedding array, training rows first.
@@ -150,9 +148,11 @@ def _make_state(
     Returns:
         Tuple of (State, search_candidates).
     """
-    train_candidates = [Candidate(data=f"train_{i}", modality="sequence") for i in range(n_train)]
+    train_candidates = [Candidate(data=f"emb_{i}", modality="sequence") for i in range(n_train)]
     n_cands = len(embeddings) - n_train
-    search_candidates = [Candidate(data=f"cand_{i}", modality="sequence") for i in range(n_cands)]
+    search_candidates = [
+        Candidate(data=f"emb_{n_train + i}", modality="sequence") for i in range(n_cands)
+    ]
 
     dataset = MockDataset(train_candidates=train_candidates, train_labels=np.zeros(n_train))
     surrogate = Surrogate(model=EmbeddingModel(embeddings))
@@ -172,13 +172,14 @@ class TestCoreSet:
             Min dists:   1.0,    3.0,    sqrt(8) ≈ 2.83
 
         With acq_batch_size=1 only candidate index 1 (dist 3.0) is selected.
+        Scores are rank-based: the single selected candidate receives score 1.0.
         """
         embeddings = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 3.0], [2.0, 2.0]])
         state, search_candidates = _make_state(embeddings, n_train=1, acq_batch_size=1)
 
         result = CoreSet()(search_candidates, state)
 
-        assert result.labels[1] == pytest.approx(3.0)
+        assert result.labels[1] == pytest.approx(1.0)
         assert result.labels[0] == 0.0
         assert result.labels[2] == 0.0
 
@@ -190,9 +191,9 @@ class TestCoreSet:
             Candidates: (1, 0), (0, 3), (2, 2)
             acq_batch_size = 2
 
-        Step 1: select (0, 3) with score 3.0.
+        Step 1: select (0, 3) — farthest from training set. Score = 2.0 (rank-based: n_select - 0).
         After update, min_dists become [1.0, 0.0, sqrt(5)] (new centre at (0,3)).
-        Step 2: select (2, 2) with score sqrt(5) ≈ 2.24.
+        Step 2: select (2, 2) — farthest from remaining centres. Score = 1.0 (rank-based: n_select - 1).
         Candidate (1, 0) is not selected (score 0).
         """
         embeddings = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 3.0], [2.0, 2.0]])
@@ -200,8 +201,8 @@ class TestCoreSet:
 
         result = CoreSet()(search_candidates, state)
 
-        assert result.labels[1] == pytest.approx(3.0)
-        assert result.labels[2] == pytest.approx(np.sqrt(5))
+        assert result.labels[1] == pytest.approx(2.0)
+        assert result.labels[2] == pytest.approx(1.0)
         assert result.labels[0] == 0.0
         assert result.labels[1] >= result.labels[2]
 
@@ -236,3 +237,23 @@ class TestCoreSet:
 
         with pytest.raises(ValueError, match="featurise returned None"):
             CoreSet()(search_candidates, state)
+
+    def test_empty_training_set_selects_by_mutual_distance(self) -> None:
+        """When the training set is empty, greedy selection is driven purely by mutual candidate distances.
+
+        With no training centres, all candidates start with min_dist=inf.
+        After each selection the min_dists update using the new centre.
+        All acq_batch_size candidates must receive a positive (rank-based) score.
+        """
+        embeddings = np.array([[1.0, 0.0], [0.0, 1.0], [2.0, 2.0]])
+        n_cands = 3
+        search_candidates = [
+            Candidate(data=f"emb_{i}", modality="sequence") for i in range(n_cands)
+        ]
+        dataset = MockDataset(train_candidates=[], train_labels=np.zeros(0))
+        surrogate = Surrogate(model=EmbeddingModel(embeddings))
+        state = State(dataset=dataset, surrogate=surrogate, acq_batch_size=n_cands)
+
+        result = CoreSet()(search_candidates, state)
+
+        assert (result.labels > 0).all()
