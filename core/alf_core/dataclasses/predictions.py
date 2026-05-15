@@ -46,8 +46,10 @@ class Predictions:
             AssertionError: If means is empty, or if variances or empirical_dist
                 don't match the length of means.
         """
-        assert len(self.means) > 0, "Means must have at least one prediction — "
-        "expected shape (num_candidates,)"
+        assert len(self.means) > 0, (
+            "Means must have at least one prediction — "
+            "expected shape (num_candidates,)"
+        )
         if self.variances is not None:
             assert len(self.variances) == len(self.means), (
                 "Variances must have the same length as means (num_candidates,), "
