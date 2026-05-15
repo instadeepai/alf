@@ -56,7 +56,10 @@ class _BaseTestModel(BaseModel):
 
 
 class EmbeddingModel(_BaseTestModel):
-    """Test model that looks up embeddings by the integer index in candidate.data (format: 'emb_<int>')."""
+    """Test model that looks up embeddings by index encoded in candidate.data.
+
+    Expects candidate.data in the format ``'emb_<int>'``.
+    """
 
     def __init__(self, embeddings: np.ndarray) -> None:
         """Initialise with a fixed embedding array.
@@ -137,7 +140,8 @@ def _make_state(
 
     The embeddings array has shape (n_train + n_cands, d). The first n_train rows
     are assigned to the training set (candidates named ``emb_0`` … ``emb_{n_train-1}``);
-    the remaining rows to the search candidates (named ``emb_{n_train}`` … ``emb_{n_train+n_cands-1}``).
+    the remaining rows to the search candidates (named ``emb_{n_train}`` …
+    ``emb_{n_train+n_cands-1}``).
     EmbeddingModel looks up rows by the integer index in candidate.data.
 
     Args:
@@ -191,9 +195,9 @@ class TestCoreSet:
             Candidates: (1, 0), (0, 3), (2, 2)
             acq_batch_size = 2
 
-        Step 1: select (0, 3) — farthest from training set. Score = 2.0 (rank-based: n_select - 0).
+        Step 1: select (0, 3) — farthest from training set. Score = 2.0 (rank: n_select - 0).
         After update, min_dists become [1.0, 0.0, sqrt(5)] (new centre at (0,3)).
-        Step 2: select (2, 2) — farthest from remaining centres. Score = 1.0 (rank-based: n_select - 1).
+        Step 2: select (2, 2) — farthest from remaining centres. Score = 1.0 (rank: n_select - 1).
         Candidate (1, 0) is not selected (score 0).
         """
         embeddings = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 3.0], [2.0, 2.0]])
@@ -239,7 +243,7 @@ class TestCoreSet:
             CoreSet()(search_candidates, state)
 
     def test_empty_training_set_selects_by_mutual_distance(self) -> None:
-        """When the training set is empty, greedy selection is driven purely by mutual candidate distances.
+        """When training set is empty, greedy selection is driven by mutual candidate distances.
 
         With no training centres, all candidates start with min_dist=inf.
         After each selection the min_dists update using the new centre.

@@ -15,8 +15,8 @@
 import numpy as np
 import torch
 from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
-from scipy.spatial.distance import cdist
 from jaxtyping import Float
+from scipy.spatial.distance import cdist
 
 
 def _to_numpy(features: Float[np.ndarray | torch.Tensor, "n_samples n_features"]) -> np.ndarray:
@@ -82,7 +82,8 @@ class CoreSet(AcquisitionFunction):
 
         if embeddings.ndim != 2:
             raise ValueError(
-                f"featurise must return a 2-D array of shape (n_inputs, d), got shape {embeddings.shape}"
+                "featurise must return a 2-D array of shape (n_inputs, d), "
+                f"got shape {embeddings.shape}"
             )
 
         n_train = len(training_candidates)
