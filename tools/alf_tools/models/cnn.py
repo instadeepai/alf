@@ -408,17 +408,15 @@ class CNNModel(BaseModel):
     def train(
         self,
         train_data: LabelledCandidates,
-        val_data: LabelledCandidates | None = None,
-        problem_type: ProblemType = ProblemType.REGRESSION,
+        val_data: LabelledCandidates,
+        problem_type: ProblemType,
     ) -> None:
         """Train the CNN model.
 
         Args:
             train_data: Training data containing sequences and oracle values.
-            val_data: Optional validation data.
+            val_data: Validation data.
             problem_type: Type of problem determining which metrics are computed.
-            **kwargs: Additional keyword arguments. Recognises ``problem_type``
-                (``ProblemType``) to configure loss, label dtype, and output layer.
         """
         self._problem_type = problem_type
         logger.info(
@@ -453,7 +451,7 @@ class CNNModel(BaseModel):
         # Prepare data loaders
         train_loader = self._prepare_data_loader(train_data, shuffle=True)
         val_loader = None
-        if val_data is not None and len(val_data) > 0:
+        if len(val_data) > 0:
             val_loader = self._prepare_data_loader(val_data, shuffle=False)
 
         # Setup training

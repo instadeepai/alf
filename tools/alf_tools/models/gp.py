@@ -563,14 +563,14 @@ class GPModel(BaseModel):
     def train(
         self,
         train_data: LabelledCandidates,
-        val_data: LabelledCandidates | None = None,
-        problem_type: ProblemType = ProblemType.REGRESSION,
+        val_data: LabelledCandidates,
+        problem_type: ProblemType,
     ) -> None:
         """Train the GP model by optimizing hyperparameters.
 
         Args:
             train_data: Training data containing sequences and oracle values.
-            val_data: Optional validation data (used for monitoring, not for training).
+            val_data: Validation data (used for monitoring, not for training).
             problem_type: Type of problem determining which metrics are computed.
 
         Note:
@@ -630,7 +630,7 @@ class GPModel(BaseModel):
         logger.info(f"Training complete with metrics: {self.training_metrics}")
 
         # Evaluate on validation data if provided
-        if val_data is not None and len(val_data) > 0:
+        if len(val_data) > 0:
             val_predictions = self.predict(val_data.candidates)
             val_results = Results(
                 predictions=val_predictions,
