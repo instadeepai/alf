@@ -20,12 +20,13 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
+from alf_core import Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.model.base_train_config import BaseTrainConfig
+from alf_core.model.normaliser import InputNormaliser, OutputStandardiser
 from torch.utils.data import DataLoader, TensorDataset
 
-from alf_core.model.normaliser import InputNormaliser
+from alf_tools.models.base import SurrogateModel
 from alf_tools.models.utils import (
     create_char_to_idx_mapping,
     get_device,
@@ -64,6 +65,8 @@ class CNNTrainConfig(BaseTrainConfig):
         num_epochs: Number of epochs to train for.
         normalise_inputs: Whether to apply min-max normalisation to input
             features before training. Defaults to False.
+        standardise_outputs: Whether to apply Z-score standardisation to
+            outputs before training. Defaults to False.
         learning_rate: Inherited from BaseTrainConfig. Default: 1e-3.
         log_frequency: Inherited from BaseTrainConfig. Default: 10.
     """
@@ -71,6 +74,7 @@ class CNNTrainConfig(BaseTrainConfig):
     batch_size: int = 32
     num_epochs: int = 50
     normalise_inputs: bool = False
+    standardise_outputs: bool = False
 
 
 class SequenceCNN(nn.Module):
@@ -147,7 +151,7 @@ class SequenceCNN(nn.Module):
         return x.squeeze(-1)
 
 
-class CNNModel(BaseModel):
+class CNNModel(SurrogateModel):
     """Minimal CNN model for sequence fitness prediction.
 
     One-hot encodes sequences, trains a simple 1D CNN with MSE loss.
@@ -187,6 +191,7 @@ class CNNModel(BaseModel):
 
         # Input normaliser — fitted on each train() call, applied at predict() time
         self._input_normaliser: InputNormaliser | None = None
+        self._output_standardiser: OutputStandardiser | None = None
 
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
@@ -267,16 +272,14 @@ class CNNModel(BaseModel):
             Tuple of (train_loader, val_loader). val_loader is None if val_data is None.
         """
         train_x = self.featurise(train_data).to(self.device)
-        train_y = train_data.labels.astype(np.float64)
+        train_x, self._input_normaliser = self._fit_input_normaliser(
+            train_x, self.train_config.normalise_inputs
+        )
+        train_y_np, self._output_standardiser = self._fit_output_standardiser(
+            train_data.labels, self.train_config.standardise_outputs
+        )
+        train_y = torch.tensor(train_y_np, dtype=torch.float32).to(self.device)
 
-        if self.train_config.normalise_inputs:
-            self._input_normaliser = InputNormaliser()
-            self._input_normaliser.fit(train_x)
-            train_x = self._input_normaliser.transform(train_x)
-        else:
-            self._input_normaliser = None
-
-        train_y = torch.tensor(train_y, dtype=torch.float32).to(self.device)
         train_loader = DataLoader(
             TensorDataset(train_x, train_y),
             batch_size=self.train_config.batch_size,
@@ -287,9 +290,11 @@ class CNNModel(BaseModel):
         val_loader = None
         if val_data is not None and len(val_data) > 0:
             val_x = self.featurise(val_data).to(self.device)
-            val_y_np = val_data.labels.astype(np.float64)
             if self._input_normaliser is not None:
                 val_x = self._input_normaliser.transform(val_x)
+            val_y_np = val_data.labels
+            if self._output_standardiser is not None:
+                val_y_np = self._output_standardiser.transform(val_y_np)
             val_y = torch.tensor(val_y_np, dtype=torch.float32).to(self.device)
             val_loader = DataLoader(
                 TensorDataset(val_x, val_y),
@@ -535,6 +540,9 @@ class CNNModel(BaseModel):
 
         with torch.no_grad():
             means = self.model(x).cpu().numpy()
+
+        if self._output_standardiser is not None:
+            means, _ = self._output_standardiser.inverse_transform(means)
 
         return Predictions(means=means)
 

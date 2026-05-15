@@ -16,17 +16,18 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Callable, Literal, Optional, TypeAlias, Union
+from typing import Any, Callable, Literal, TypeAlias, Union
 
 import gpytorch
 import numpy as np
 import torch
-from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
+from alf_core import Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.model.base_train_config import BaseTrainConfig
+from alf_core.model.normaliser import InputNormaliser, OutputStandardiser
 from jaxtyping import Float
 
-from alf_core.model.normaliser import InputNormaliser
+from alf_tools.models.base import SurrogateModel
 from alf_tools.models.utils.sequence_utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
@@ -96,6 +97,7 @@ class GPTrainConfig(BaseTrainConfig):
     """
 
     normalise_inputs: bool = True
+    standardise_outputs: bool = False
     learning_rate: float = 0.01  # override BaseTrainConfig default
     num_iterations: int = 100
     optimizer_type: Literal["adam", "lbfgs"] = "adam"
@@ -278,7 +280,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
 
-class GPModel(BaseModel):
+class GPModel(SurrogateModel):
     """Gaussian Process model for sequence fitness prediction.
 
     Uses GPyTorch for efficient GP inference with flexible featurization,
@@ -327,6 +329,7 @@ class GPModel(BaseModel):
 
         # Normalisers — fitted on each train() call, used at predict() time
         self._input_normaliser: InputNormaliser | None = None
+        self._output_standardiser: OutputStandardiser | None = None
 
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
@@ -552,9 +555,10 @@ class GPModel(BaseModel):
         self,
         train_data: LabelledCandidates,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Prepare the training data by featurising inputs x,
-        normalising x, and standardizing outputs y. Transform
-        numpy arrays into tensors and put on the current device.
+        """Prepare the training data by featurising, normalising, and standardising.
+
+        Fits normalisers exclusively on training data; call transform separately
+        for validation data to avoid leakage. Converts numpy labels to tensors.
 
         Args:
             train_data: Training data containing sequences and oracle values.
@@ -562,26 +566,20 @@ class GPModel(BaseModel):
         Returns:
             A tuple of training features and targets as tensors on the current device.
         """
-        # Featurize training data
         train_x = self.featurise(train_data).to(self.device)
-        train_y = train_data.labels.astype(np.float64)
-
-        # Fit and apply input normaliser
-        if self.train_config.normalise_inputs:
-            self._input_normaliser = InputNormaliser()
-            self._input_normaliser.fit(train_x)
-            train_x = self._input_normaliser.transform(train_x)
-        else:
-            self._input_normaliser = None
-
-        train_y = torch.tensor(train_y, dtype=torch.float32).to(self.device)
-
+        train_x, self._input_normaliser = self._fit_input_normaliser(
+            train_x, self.train_config.normalise_inputs
+        )
+        train_y_np, self._output_standardiser = self._fit_output_standardiser(
+            train_data.labels, self.train_config.standardise_outputs
+        )
+        train_y = torch.tensor(train_y_np, dtype=torch.float32).to(self.device)
         return train_x, train_y
 
     def train(
         self,
         train_data: LabelledCandidates,
-        val_data: Optional[LabelledCandidates] = None,
+        val_data: LabelledCandidates | None = None,
     ) -> None:
         """Train the GP model by optimizing hyperparameters.
 
@@ -619,13 +617,18 @@ class GPModel(BaseModel):
         # Store training metrics
         self.training_metrics = train_metrics
 
-        # Evaluate on training data — inverse-transform to original scale for metrics
+        # Evaluate on training data — inverse-transform to original label scale for metrics
         self.gp_model.eval()
         self.likelihood.eval()
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
             train_preds = self.likelihood(self.gp_model(train_x))
             train_means = train_preds.mean.cpu().numpy()
             train_vars = train_preds.variance.cpu().numpy()
+
+        if self._output_standardiser is not None:
+            train_means, train_vars = self._output_standardiser.inverse_transform(
+                train_means, train_vars
+            )
 
         train_predictions_obj = Predictions(means=train_means, variances=train_vars)
         train_results = Results(predictions=train_predictions_obj, targets=train_data.labels)
@@ -676,6 +679,9 @@ class GPModel(BaseModel):
             predictions = self.likelihood(self.gp_model(test_x))
             means = predictions.mean.cpu().numpy()
             variances = predictions.variance.cpu().numpy()
+
+        if self._output_standardiser is not None:
+            means, variances = self._output_standardiser.inverse_transform(means, variances)
 
         return Predictions(means=means, variances=variances)
 
