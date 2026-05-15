@@ -408,8 +408,8 @@ class CNNModel(BaseModel):
     def train(
         self,
         train_data: LabelledCandidates,
-        problem_type: ProblemType,
         val_data: LabelledCandidates | None = None,
+        problem_type: ProblemType = ProblemType.REGRESSION,
     ) -> None:
         """Train the CNN model.
 
