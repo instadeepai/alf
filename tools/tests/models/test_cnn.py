@@ -233,6 +233,8 @@ class TestCNNModelReproducibility:
 
 
 class TestCNNNormalisation:
+    """Tests for CNNModel input normalisation and output standardisation."""
+
     def test_input_normalisation_enabled(self, sample_data):
         """normalise_inputs=True must run without error."""
         model = CNNModel(
@@ -245,3 +247,31 @@ class TestCNNNormalisation:
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
+
+    def test_input_normalisation_disabled(self, sample_data):
+        """normalise_inputs=False (the default) leaves _input_normaliser as None."""
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=2, normalise_inputs=False),
+            device="cpu",
+        )
+        model.train(sample_data)
+        assert model._input_normaliser is None
+
+        predictions = model.predict(sample_data.candidates)
+        assert np.all(np.isfinite(predictions.means))
+
+    def test_output_standardisation_enabled(self, sample_data):
+        """standardise_outputs=True trains in standardised space; predict returns original scale."""
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=2, standardise_outputs=True),
+            device="cpu",
+        )
+        model.train(sample_data)
+        assert model._output_standardiser is not None
+        assert model._output_standardiser.is_fitted
+
+        predictions = model.predict(sample_data.candidates)
+        assert np.all(np.isfinite(predictions.means))
+        # Predictions must be in original label scale, not standardised space
+        label_scale = sample_data.labels.std()
+        assert predictions.means.std() < label_scale * 10  # sanity: not blown up

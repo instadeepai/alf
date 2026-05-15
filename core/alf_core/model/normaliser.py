@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Tuple
-
 import numpy as np
 import torch
 from jaxtyping import Float
@@ -37,8 +35,8 @@ class OutputStandardiser:
 
     def __init__(self) -> None:
         """Initialize with no fitted parameters."""
-        self._mean: Optional[float] = None
-        self._std: Optional[float] = None
+        self._mean: float | None = None
+        self._std: float | None = None
 
     @property
     def is_fitted(self) -> bool:
@@ -68,13 +66,14 @@ class OutputStandardiser:
         """
         if not self.is_fitted:
             raise RuntimeError("OutputStandardiser must be fitted before calling transform.")
+        assert self._mean is not None and self._std is not None
         return (Y - self._mean) / self._std
 
     def inverse_transform(
         self,
         mean: Float[np.ndarray, "n_samples"],
-        var: Optional[Float[np.ndarray, "n_samples"]] = None,
-    ) -> Tuple[Float[np.ndarray, "n_samples"], Optional[Float[np.ndarray, "n_samples"]]]:
+        var: Float[np.ndarray, "n_samples"] | None = None,
+    ) -> tuple[Float[np.ndarray, "n_samples"], Float[np.ndarray, "n_samples"] | None]:
         """Transform predictions back to the original label scale.
 
         Applies the correct variance scaling: var_orig = var_standardised * std².
@@ -93,7 +92,7 @@ class OutputStandardiser:
             raise RuntimeError(
                 "OutputStandardiser must be fitted before calling inverse_transform."
             )
-        assert self._std is not None and self._mean is not None
+        assert self._mean is not None and self._std is not None
         mean_orig = mean * self._std + self._mean
         var_orig = var * (self._std**2) if var is not None else None
         return mean_orig, var_orig
@@ -130,8 +129,8 @@ class InputNormaliser:
 
     def __init__(self) -> None:
         """Initialize with no fitted parameters."""
-        self._min: Optional[torch.Tensor] = None
-        self._range: Optional[torch.Tensor] = None
+        self._min: torch.Tensor | None = None
+        self._range: torch.Tensor | None = None
 
     @property
     def is_fitted(self) -> bool:
@@ -149,10 +148,9 @@ class InputNormaliser:
                Statistics are computed over the batch dimension (dim=0),
                so each feature position gets its own min/max.
         """
-        self._min = X.min(dim=0).values
-        x_max = X.max(dim=0).values
-        raw_range = x_max - self._min
-        self._range = raw_range.clamp(min=self._MIN_RANGE)
+        x_min, x_max = torch.aminmax(X, dim=0)
+        self._min = x_min
+        self._range = (x_max - x_min).clamp(min=self._MIN_RANGE)
 
     def transform(
         self,
@@ -172,4 +170,5 @@ class InputNormaliser:
         """
         if not self.is_fitted:
             raise RuntimeError("InputNormaliser must be fitted before calling transform.")
+        assert self._min is not None and self._range is not None
         return (X - self._min) / self._range
