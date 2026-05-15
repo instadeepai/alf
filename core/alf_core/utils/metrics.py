@@ -42,8 +42,10 @@ def check_inputs(means: np.ndarray, targets: np.ndarray) -> None:
         f"Means shape {means.shape} does not match targets shape {targets.shape} "
         f"(both must be (b,))"
     )
-    assert len(means) != 0, "Means and targets must not be empty (expected shape (b,) with b > 0)"
-    assert not (np.any(np.isnan(means))), "Mean prediction array contains NaN values"
+    assert len(
+        means) != 0, "Means and targets must not be empty (expected shape (b,) with b > 0)"
+    assert not (np.any(np.isnan(means))
+                ), "Mean prediction array contains NaN values"
     assert not (np.any(np.isnan(targets))), "Target array contains NaN values"
 
 
@@ -70,10 +72,11 @@ def check_variance_validity(variances: np.ndarray, targets: np.ndarray) -> None:
         f"variances has {len(variances)} elements but targets has {len(targets)} — "
         f"both must have shape (b,)"
     )
-    assert not (np.any(np.isnan(variances))), "Variance arrays contain NaN values"
+    assert not (np.any(np.isnan(variances))
+                ), "Variance arrays contain NaN values"
 
 
-class MetricRegistry:
+class RegressionMetricRegistry:
     """Simple registry for metrics with variance requirements."""
 
     def __init__(self) -> None:
@@ -92,26 +95,34 @@ class MetricRegistry:
         self.metrics[name] = metric_fn
         self.variance_required[name] = requires_variance
 
-    def get_metrics_requiring_variance(self) -> dict[str, Callable]:
-        """Get all registered metrics that require variance.
+    def get_metrics(self) -> dict[str, Callable]:
+        """Get all registered metrics.
 
         Returns:
             Dictionary mapping metric names to their functions.
         """
-        return {name: fn for name, fn in self.metrics.items() if self.variance_required[name]}
+        return {name: fn for name, fn in self.metrics.items()}
 
-    def get_metrics_not_requiring_variance(self) -> dict[str, Callable]:
+
+class ClassificationMetricRegistry:
+    def __init__(self) -> None:
+        self.metrics: dict[str, Callable] = {}
+
+    def register(self, name: str, fn: Callable) -> None:
+        self.metrics[name] = fn
+
+    def get_metrics(self) -> dict[str, Callable]:
         """Get all registered metrics that don't require variance.
 
         Returns:
             Dictionary mapping metric names to their functions.
         """
-        return {name: fn for name, fn in self.metrics.items() if not self.variance_required[name]}
+        return {name: fn for name, fn in self.metrics.items()}
 
 
 # Create the global registry instances
-regression_metric_registry = MetricRegistry()
-classification_metric_registry = MetricRegistry()
+regression_metric_registry = RegressionMetricRegistry()
+classification_metric_registry = ClassificationMetricRegistry()
 
 
 def register_requires_variance(metric_fn: Callable) -> Callable:
@@ -140,7 +151,8 @@ def register_requires_variance(metric_fn: Callable) -> Callable:
         return metric_fn(means, variances, targets, *args, **kwargs)
 
     # Register the metric with variance requirement
-    regression_metric_registry.register(metric_fn.__name__, wrapper, requires_variance=True)
+    regression_metric_registry.register(
+        metric_fn.__name__, wrapper, requires_variance=True)
     return wrapper
 
 
@@ -169,7 +181,8 @@ def register_no_variance_required(metric_fn: Callable) -> Callable:
         return metric_fn(means, variances, targets, *args, **kwargs)
 
     # Register the metric without variance requirement
-    regression_metric_registry.register(metric_fn.__name__, wrapper, requires_variance=False)
+    regression_metric_registry.register(
+        metric_fn.__name__, wrapper, requires_variance=False)
     return wrapper
 
 
@@ -227,7 +240,8 @@ def register_classification_metric(metric_fn: Callable) -> Callable:
         )
         return metric_fn(probs, targets)
 
-    classification_metric_registry.register(metric_fn.__name__, wrapper, requires_variance=False)
+    classification_metric_registry.register(
+        metric_fn.__name__, wrapper)
     return wrapper
 
 
@@ -256,7 +270,8 @@ def monte_carlo_ranking(
     n = len(means)
 
     # Simulate Gaussian scores
-    mean_samples = np.random.normal(loc=means, scale=np.sqrt(variances), size=(num_samples, n))
+    mean_samples = np.random.normal(
+        loc=means, scale=np.sqrt(variances), size=(num_samples, n))
 
     # Compute hard ranks for each sample
     rank_samples = np.argsort(np.argsort(-mean_samples, axis=1), axis=1) + 1
@@ -438,7 +453,8 @@ def rank_expected_calibration_error(
     mean_rank, rank_variances = monte_carlo_ranking(means, variances)
     target_ranks = (-targets).argsort().argsort() + 1
 
-    ece = expected_calibration_error(mean_rank, rank_variances, target_ranks)["ece"]
+    ece = expected_calibration_error(
+        mean_rank, rank_variances, target_ranks)["ece"]
 
     return {"rank_ece": ece}
 
@@ -513,7 +529,8 @@ def rank_width(
     mean_rank, rank_variances = monte_carlo_ranking(means, variances)
     target_ranks = (-targets).argsort().argsort() + 1
 
-    avg_width_ratio = width(mean_rank, rank_variances, target_ranks, alpha)[f"width_{alpha:.2f}"]
+    avg_width_ratio = width(mean_rank, rank_variances, target_ranks, alpha)[
+        f"width_{alpha:.2f}"]
 
     return {f"rank_width_{alpha:.2f}": avg_width_ratio}
 
@@ -669,7 +686,8 @@ def regret_ucb_alpha(
     Raises:
         AssertionError: If num_acquisitions is not a positive integer.
     """
-    assert isinstance(num_acquisitions, int), "num_acquisitions should be an integer."
+    assert isinstance(num_acquisitions,
+                      int), "num_acquisitions should be an integer."
     assert num_acquisitions > 0, "num_acquisitions should be positive"
     # Handle case where num_acquisitions > available items
     if num_acquisitions > len(means):
@@ -743,7 +761,8 @@ def regret_ucb_alpha_sweep(
         TypeError: If alpha is not a float or list of floats.
     """
     assert variances is not None, "UCB regret requires variances"
-    assert np.all(variances >= 0), "All uncertainty values must be non-negative (variances)."
+    assert np.all(
+        variances >= 0), "All uncertainty values must be non-negative (variances)."
 
     # Set the default list if alpha was not provided.
     # This is an ugly solution, but setting a mutable object (a list)
@@ -766,7 +785,8 @@ def regret_ucb_alpha_sweep(
 
     for a in alpha_list:
         # Compute UCB values
-        regret_alpha = regret_ucb_alpha(means, variances, targets, a, num_acquisitions)
+        regret_alpha = regret_ucb_alpha(
+            means, variances, targets, a, num_acquisitions)
 
         regret_alpha_list.update(regret_alpha)
     return regret_alpha_list
