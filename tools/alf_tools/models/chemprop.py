@@ -12,21 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import contextlib
 import logging
 from dataclasses import dataclass
-from typing import Literal, Union
+from typing import Literal
 
 import numpy as np
+import random
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_tools.models.utils import get_device
 from torch.utils.data import DataLoader
 
-from alf_tools.models.utils import get_device
-
+from chemprop.nn import MeanAggregation, NormAggregation, SumAggregation, BondMessagePassing
+from chemprop.nn.predictors import RegressionFFN  
+from chemprop.data import (
+    BatchMolGraph,
+    MoleculeDatapoint,
+    MoleculeDataset,
+    build_dataloader,
+)
+        
 logger = logging.getLogger("alf-tools")
 
 
@@ -66,19 +74,17 @@ class ChempropTrainConfig:
     batch_size: int = 50
     num_epochs: int = 50
     optimizer: Literal["adam", "sgd", "adamw"] = "adam"
-    weight_init: Literal["default", "xavier_uniform", "kaiming_normal"] | None = None
+    weight_init: Literal["default", "xavier_uniform",
+                         "kaiming_normal"] | None = None
     seed: int | None = None
 
 
 def _get_aggregations() -> dict[str, type]:
     """Return mapping of aggregation name to Chemprop aggregation class.
 
-    Imports are deferred to avoid loading chemprop at module level.
-
     Returns:
         Dictionary mapping aggregation name strings to aggregation classes.
     """
-    from chemprop.nn import MeanAggregation, NormAggregation, SumAggregation  # noqa: PLC0415
 
     return {
         "mean": MeanAggregation,
@@ -112,7 +118,7 @@ class _MPNNWrapper(nn.Module):
 
     def forward(
         self,
-        bmg: "BatchMolGraph",  # type: ignore[name-defined]
+        bmg: BatchMolGraph,
         V_d: torch.Tensor | None = None,
         X_d: torch.Tensor | None = None,
     ) -> torch.Tensor:
@@ -160,9 +166,9 @@ class ChempropModel(BaseModel):
         self.device = get_device(device)
         self._model: nn.Module | None = None
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
-        self.training_metrics: dict[str, Union[float, int, np.number]] = {}
+        self.training_metrics: dict[str, float] = {}
 
-    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> list[str]:
+    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> list[str]:
         """Extract SMILES strings from inputs.
 
         Args:
@@ -192,11 +198,6 @@ class ChempropModel(BaseModel):
         Returns:
             Chemprop DataLoader.
         """
-        from chemprop.data import (  # noqa: PLC0415
-            MoleculeDatapoint,
-            MoleculeDataset,
-            build_dataloader,
-        )
 
         if labels is not None:
             datapoints = [
@@ -216,9 +217,6 @@ class ChempropModel(BaseModel):
         RegressionFFN without depending on lightning.LightningModule.
         Applies weight initialisation if configured by train_config.weight_init.
         """
-        from chemprop.nn import BondMessagePassing  # noqa: PLC0415
-        from chemprop.nn.predictors import RegressionFFN  # noqa: PLC0415
-
         cfg = self.model_config
         mp = BondMessagePassing(d_h=cfg.hidden_size, depth=cfg.depth)
         agg = _get_aggregations()[cfg.aggregation]()
@@ -254,24 +252,20 @@ class ChempropModel(BaseModel):
         self,
         loader: DataLoader,
         criterion: nn.Module,
-        optimizer: optim.Optimizer | None = None,
+        optimizer: optim.Optimizer,
     ) -> tuple[float, dict[str, float]]:
-        """Run one full pass over a DataLoader.
-
-        When ``optimizer`` is provided the model is set to train mode and gradients are
-        computed; otherwise eval mode with ``torch.no_grad()``.  Output tensors are
-        pre-allocated by dataset size and filled by index slice to avoid per-batch
-        allocations and a final concatenation.
+        """Run one training pass over a DataLoader with gradient updates.
 
         Args:
             loader: DataLoader to iterate over.
             criterion: Loss function.
-            optimizer: Optimizer for the training pass; ``None`` for evaluation.
+            optimizer: Optimizer for gradient updates.
 
         Returns:
             Tuple of (average loss weighted by batch size, metrics dict).
         """
-        assert self._model is not None
+        if self._model is None:
+            raise RuntimeError("_train_epoch called before model is initialised")
         model = self._model
         n = len(loader.dataset)  # type: ignore[arg-type]
         all_preds = torch.empty(n, device="cpu")
@@ -279,12 +273,68 @@ class ChempropModel(BaseModel):
         total_loss = 0.0
         idx = 0
 
-        is_train = optimizer is not None
-        model.train(is_train)
-        ctx = contextlib.nullcontext() if is_train else torch.no_grad()
-        with ctx:
+        model.train(True)
+        for batch in loader:
+            # BatchMolGraph.to() is in-place with no return value; unlike Tensor.to() which creates
+            # a new tensor and must be assigned — assigning bmg.to() would leave bmg on the old device
+            batch.bmg.to(self.device)
+            V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
+            X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
+            targets = batch.Y.squeeze(-1).to(self.device)
+            preds = model(batch.bmg, V_d, X_d).squeeze(-1)
+            loss = criterion(preds, targets)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            b = targets.shape[0]
+            total_loss += loss.item() * b
+            all_preds[idx: idx + b] = preds.detach().cpu()
+            all_targets[idx: idx + b] = targets.detach().cpu()
+            idx += b
+
+        all_preds = all_preds[:idx]
+        all_targets = all_targets[:idx]
+        avg_loss = total_loss / idx if idx > 0 else 0.0
+        preds_np = all_preds.numpy()
+        targets_np = all_targets.numpy()
+        if len(preds_np) >= 2:
+            raw = Results(targets=targets_np,
+                          predictions=Predictions(means=preds_np)).metrics
+            metrics = {k: float(v) for k in ("spearman", "mse")
+                       if (v := raw.get(k)) is not None}
+        else:
+            metrics = {"mse": float(np.mean((preds_np - targets_np) ** 2))}
+        return avg_loss, metrics
+
+    def _eval_epoch(
+        self,
+        loader: DataLoader,
+        criterion: nn.Module,
+    ) -> tuple[float, dict[str, float]]:
+        """Run one evaluation pass over a DataLoader without gradient updates.
+
+        Args:
+            loader: DataLoader to iterate over.
+            criterion: Loss function.
+
+        Returns:
+            Tuple of (average loss weighted by batch size, metrics dict).
+        """
+        if self._model is None:
+            raise RuntimeError("_eval_epoch called before model is initialised")
+        model = self._model
+        n = len(loader.dataset)  # type: ignore[arg-type]
+        all_preds = torch.empty(n, device="cpu")
+        all_targets = torch.empty(n, device="cpu")
+        total_loss = 0.0
+        idx = 0
+
+        model.train(False)
+        with torch.no_grad():
             for batch in loader:
-                # BatchMolGraph.to() mutates in-place (no return value); Tensor.to() returns new
+                # BatchMolGraph.to() is in-place with no return value; unlike Tensor.to() which creates
+                # a new tensor and must be assigned — assigning bmg.to() would leave bmg on the old device
                 batch.bmg.to(self.device)
                 V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
                 X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
@@ -292,23 +342,22 @@ class ChempropModel(BaseModel):
                 preds = model(batch.bmg, V_d, X_d).squeeze(-1)
                 loss = criterion(preds, targets)
 
-                if optimizer is not None:
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
-
                 b = targets.shape[0]
                 total_loss += loss.item() * b
-                all_preds[idx : idx + b] = preds.detach().cpu()
-                all_targets[idx : idx + b] = targets.detach().cpu()
+                all_preds[idx: idx + b] = preds.detach().cpu()
+                all_targets[idx: idx + b] = targets.detach().cpu()
                 idx += b
 
-        avg_loss = total_loss / n
+        all_preds = all_preds[:idx]
+        all_targets = all_targets[:idx]
+        avg_loss = total_loss / idx if idx > 0 else 0.0
         preds_np = all_preds.numpy()
         targets_np = all_targets.numpy()
         if len(preds_np) >= 2:
-            raw = Results(targets=targets_np, predictions=Predictions(means=preds_np)).metrics
-            metrics = {k: float(v) for k in ("spearman", "mse") if (v := raw.get(k)) is not None}
+            raw = Results(targets=targets_np,
+                          predictions=Predictions(means=preds_np)).metrics
+            metrics = {k: float(v) for k in ("spearman", "mse")
+                       if (v := raw.get(k)) is not None}
         else:
             metrics = {"mse": float(np.mean((preds_np - targets_np) ** 2))}
         return avg_loss, metrics
@@ -362,15 +411,14 @@ class ChempropModel(BaseModel):
         Args:
             train_data: Training molecules and labels.
             val_data: Optional validation molecules and labels.
-
-        Raises:
-            RuntimeError: If model initialisation fails unexpectedly.
         """
         self._epoch_metrics = []
+        # TODO: also reset training_metrics = {} here; should be symmetric with _epoch_metrics
+        # reset across all model implementations (CNNModel, GPModel) so callers never read
+        # stale metrics after a failed train() call
         logger.info("Training ChempropModel on %d samples", len(train_data))
 
         if self.train_config.seed is not None:
-            import random  # noqa: PLC0415
 
             random.seed(self.train_config.seed)
             np.random.seed(self.train_config.seed)
@@ -379,14 +427,13 @@ class ChempropModel(BaseModel):
 
         if self._model is None:
             self._init_model()
-        if self._model is None:
-            raise RuntimeError("Model initialisation failed unexpectedly.")
-
+            
         train_loader = self._build_dataloader(
             self.featurise(train_data), train_data.labels, shuffle=True
         )
         val_loader = (
-            self._build_dataloader(self.featurise(val_data), val_data.labels, shuffle=False)
+            self._build_dataloader(self.featurise(
+                val_data), val_data.labels, shuffle=False)
             if val_data is not None and len(val_data) > 0
             else None
         )
@@ -395,21 +442,30 @@ class ChempropModel(BaseModel):
         )
         criterion = nn.MSELoss()
 
+        if self.train_config.num_epochs == 0:
+            logger.warning("num_epochs=0; skipping training loop.")
+            return
+
         for epoch in range(self.train_config.num_epochs):
-            avg_train_loss, train_metrics = self._train_epoch(train_loader, criterion, optimizer)
+            avg_train_loss, train_metrics = self._train_epoch(
+                train_loader, criterion, optimizer)
             if val_loader is not None:
-                avg_val_loss, val_metrics = self._train_epoch(val_loader, criterion)
+                avg_val_loss, val_metrics = self._eval_epoch(
+                    val_loader, criterion)
                 self._record_epoch_metrics(
                     epoch, avg_train_loss, train_metrics, avg_val_loss, val_metrics
                 )
             else:
-                self._record_epoch_metrics(epoch, avg_train_loss, train_metrics)
+                self._record_epoch_metrics(
+                    epoch, avg_train_loss, train_metrics)
 
         self.training_metrics = {"final_train_loss": avg_train_loss}
-        self.training_metrics.update({f"final_train_{k}": v for k, v in train_metrics.items()})
+        self.training_metrics.update(
+            {f"final_train_{k}": v for k, v in train_metrics.items()})
         if val_loader is not None:
             self.training_metrics["final_val_loss"] = avg_val_loss
-            self.training_metrics.update({f"final_val_{k}": v for k, v in val_metrics.items()})
+            self.training_metrics.update(
+                {f"final_val_{k}": v for k, v in val_metrics.items()})
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Predict fitness means for a list of candidates.
@@ -437,18 +493,22 @@ class ChempropModel(BaseModel):
         with torch.no_grad():
             for batch in loader:
                 batch.bmg.to(self.device)
-                V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
-                X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
+                V_d = batch.V_d.to(
+                    self.device) if batch.V_d is not None else None
+                X_d = batch.X_d.to(
+                    self.device) if batch.X_d is not None else None
                 preds = model(batch.bmg, V_d, X_d).squeeze(-1)
                 b = preds.shape[0]
-                all_preds[idx : idx + b] = preds.cpu()
+                all_preds[idx: idx + b] = preds.cpu()
                 idx += b
 
+        all_preds = all_preds[:idx]
         return Predictions(means=all_preds.numpy())
 
     def sample(self, condition: object | None = None) -> list[Candidate]:
         """Not implemented for mean-only MPNN."""
-        raise NotImplementedError("Sampling is not implemented for ChempropModel.")
+        raise NotImplementedError(
+            "Sampling is not implemented for ChempropModel.")
 
     def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
         """Return per-epoch metrics from the most recent train() call.
@@ -458,7 +518,7 @@ class ChempropModel(BaseModel):
         """
         return self._epoch_metrics
 
-    def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
+    def get_training_summary_metrics(self) -> dict[str, float]:
         """Return summary metrics from the most recent train() call.
 
         Returns:

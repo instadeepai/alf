@@ -205,6 +205,50 @@ class TestValidation:
         assert isinstance(summary["final_val_loss"], float)
 
 
+class TestWeightInit:
+    """Tests for ChempropModel weight initialisation strategies."""
+
+    @pytest.mark.parametrize("weight_init", ["xavier_uniform", "kaiming_normal"])
+    def test_weight_init_trains_without_error(
+        self, weight_init: str, train_data: LabelledCandidates
+    ) -> None:
+        """ChempropModel should train successfully with each weight_init strategy."""
+        model_config = ChempropModelConfig(hidden_size=32, depth=1, ffn_num_layers=1)
+        train_config = ChempropTrainConfig(batch_size=4, num_epochs=2, weight_init=weight_init)  # type: ignore[arg-type]
+        model = ChempropModel(model_config=model_config, train_config=train_config, device="cpu")
+        model.train(train_data)
+        candidates = [Candidate(data=smi, modality="graph") for smi in SMILES]
+        predictions = model.predict(candidates)
+        assert predictions.means.shape == (len(SMILES),)
+
+
+class TestFineTuning:
+    """Tests for ChempropModel fine-tuning semantics (second train() call)."""
+
+    def test_second_train_reuses_weights(self, train_data: LabelledCandidates) -> None:
+        """Calling train() twice should reuse the existing model rather than re-initialising."""
+        model_config = ChempropModelConfig(hidden_size=32, depth=1, ffn_num_layers=1)
+        train_config = ChempropTrainConfig(batch_size=4, num_epochs=2)
+        model = ChempropModel(model_config=model_config, train_config=train_config, device="cpu")
+
+        model.train(train_data)
+        model_after_first = model._model
+        assert model_after_first is not None
+
+        model.train(train_data)
+        assert model._model is model_after_first, "Second train() should reuse the same nn.Module"
+
+    def test_second_train_resets_epoch_metrics(self, train_data: LabelledCandidates) -> None:
+        """get_epoch_metrics() should reflect only the most recent train() call."""
+        model_config = ChempropModelConfig(hidden_size=32, depth=1, ffn_num_layers=1)
+        train_config = ChempropTrainConfig(batch_size=4, num_epochs=2)
+        model = ChempropModel(model_config=model_config, train_config=train_config, device="cpu")
+
+        model.train(train_data)
+        model.train(train_data)
+        assert len(model.get_epoch_metrics()) == train_config.num_epochs
+
+
 class TestSeed:
     """Tests for ChempropModel seed reproducibility."""
 
