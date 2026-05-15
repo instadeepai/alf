@@ -47,8 +47,7 @@ class Predictions:
                 don't match the length of means.
         """
         assert len(self.means) > 0, (
-            "Means must have at least one prediction — "
-            "expected shape (num_candidates,)"
+            "Means must have at least one prediction — expected shape (num_candidates,)"
         )
         if self.variances is not None:
             assert len(self.variances) == len(self.means), (

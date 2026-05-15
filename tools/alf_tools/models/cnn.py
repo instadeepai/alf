@@ -426,9 +426,7 @@ class CNNModel(BaseModel):
 
         # Determine output neurons: 1 for regression/binary, num_classes for multiclass
         num_classes = train_data.labels.shape[-1]
-        output_neurons = (
-            num_classes if self._problem_type == ProblemType.MULTICLASS else 1
-        )
+        output_neurons = num_classes if self._problem_type == ProblemType.MULTICLASS else 1
 
         # Initialize model on first call or when output shape changes
         if self.model is None or self.model._output_neurons != output_neurons:

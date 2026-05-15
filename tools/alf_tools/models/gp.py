@@ -36,8 +36,7 @@ from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 logger = logging.getLogger("alf-tools")
 
-KernelTypes: TypeAlias = Literal["rbf", "matern",
-                                 "linear", "polynomial", "rbf_linear", "custom"]
+KernelTypes: TypeAlias = Literal["rbf", "matern", "linear", "polynomial", "rbf_linear", "custom"]
 
 
 @dataclass
@@ -114,11 +113,9 @@ class FeaturizerConfig:
             Only used for one_hot encoding.
     """
 
-    featurizer_type: Literal["one_hot",
-                             "custom", "precomputed"] = "precomputed"
+    featurizer_type: Literal["one_hot", "custom", "precomputed"] = "precomputed"
     custom_featurizer: (
-        Callable[[list[str]], Float[torch.Tensor,
-                                    "batch_size n_features"]] | None
+        Callable[[list[str]], Float[torch.Tensor, "batch_size n_features"]] | None
     ) = None
     flatten_one_hot: bool = True
 
@@ -175,8 +172,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         # Initialize covariance module (kernel)
         if kernel_type == "custom":
             if build_kernel_fn is None:
-                raise ValueError(
-                    "build_kernel_fn must be provided when kernel_type='custom'")
+                raise ValueError("build_kernel_fn must be provided when kernel_type='custom'")
             self.covar_module = build_kernel_fn()
         else:
             self.covar_module = self._build_kernel(
@@ -220,19 +216,15 @@ class ExactGPModel(gpytorch.models.ExactGP):
         if kernel_type == "rbf":
             base_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=ard_num_dims)
         elif kernel_type == "matern":
-            base_kernel = gpytorch.kernels.MaternKernel(
-                nu=matern_nu, ard_num_dims=ard_num_dims)
+            base_kernel = gpytorch.kernels.MaternKernel(nu=matern_nu, ard_num_dims=ard_num_dims)
         elif kernel_type == "linear":
-            base_kernel = gpytorch.kernels.LinearKernel(
-                ard_num_dims=ard_num_dims)
+            base_kernel = gpytorch.kernels.LinearKernel(ard_num_dims=ard_num_dims)
         elif kernel_type == "polynomial":
-            base_kernel = gpytorch.kernels.PolynomialKernel(
-                power=2, ard_num_dims=ard_num_dims)
+            base_kernel = gpytorch.kernels.PolynomialKernel(power=2, ard_num_dims=ard_num_dims)
         elif kernel_type == "rbf_linear":
             # Composite kernel: RBF + Linear
             rbf_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=ard_num_dims)
-            linear_kernel = gpytorch.kernels.LinearKernel(
-                ard_num_dims=ard_num_dims)
+            linear_kernel = gpytorch.kernels.LinearKernel(ard_num_dims=ard_num_dims)
             base_kernel = rbf_kernel + linear_kernel
         else:
             raise ValueError(
@@ -406,8 +398,7 @@ class GPModel(BaseModel):
             # Default: constrain noise to be >= 1e-4
             noise_constraint = gpytorch.constraints.GreaterThan(1e-4)
 
-        likelihood = gpytorch.likelihoods.GaussianLikelihood(
-            noise_constraint=noise_constraint)
+        likelihood = gpytorch.likelihoods.GaussianLikelihood(noise_constraint=noise_constraint)
         return likelihood
 
     def _initialize_gp_model(
@@ -482,8 +473,7 @@ class GPModel(BaseModel):
         self.likelihood.train()
 
         # Use marginal log likelihood as loss
-        mll = gpytorch.mlls.ExactMarginalLogLikelihood(
-            self.likelihood, self.gp_model)
+        mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.gp_model)
 
         # Setup optimizer
         if self.train_config.optimizer_type == "adam":
@@ -578,14 +568,14 @@ class GPModel(BaseModel):
             data is only used for logging validation metrics during training.
         """
         assert problem_type == ProblemType.REGRESSION, (
-            "GPModel currently only supports regression problems.")
+            "GPModel currently only supports regression problems."
+        )
         self._epoch_metrics = []
         logger.info(f"Training GP with {len(train_data)} samples")
 
         # Featurize training data
         train_x = self.featurise(train_data).to(self.device)
-        train_y = torch.tensor(
-            train_data.labels, dtype=torch.float32).to(self.device)
+        train_y = torch.tensor(train_data.labels, dtype=torch.float32).to(self.device)
 
         # Store training data for later predictions
         self.train_x = train_x
@@ -616,8 +606,7 @@ class GPModel(BaseModel):
             train_means = train_preds.mean.cpu().numpy()
             train_vars = train_preds.variance.cpu().numpy()
 
-        train_predictions_obj = Predictions(
-            means=train_means, variances=train_vars)
+        train_predictions_obj = Predictions(means=train_means, variances=train_vars)
         train_results = Results(
             predictions=train_predictions_obj,
             targets=train_data.labels,
