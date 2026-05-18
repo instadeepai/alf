@@ -14,7 +14,6 @@
 
 import numpy as np
 import pytest
-import torch
 from alf_core.model.normaliser import InputNormaliser, OutputStandardiser
 
 
