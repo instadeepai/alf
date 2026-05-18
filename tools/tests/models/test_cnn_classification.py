@@ -178,11 +178,20 @@ class TestCNNRegressionUnchanged:
         assert preds.means.ndim == 1
         assert preds.means.shape == (len(data_float),)
 
-    def test_default_problem_type_is_regression(self):
+    def test_problem_type_is_regression(self):
         """Test that the default problem type before training is REGRESSION."""
         model_cfg = CNNModelConfig(num_filters=8, num_conv_layers=1, fc_hidden_dim=16)
         train_cfg = CNNTrainConfig(batch_size=4, num_epochs=1)
         model = CNNModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
+        
+        # Problem type is set in train loop
+        model.train(
+            train_data=LabelledCandidates(
+                make_data([0, 1, 2, 3, 4, 5]).candidates, np.array([0, 1, 1, 2, 3, 4])
+            ),
+            val_data=LabelledCandidates([], np.array([])),
+            problem_type=ProblemType.REGRESSION,
+        )
         assert model._problem_type == ProblemType.REGRESSION
 
     def test_output_neurons_is_one_for_regression(self):

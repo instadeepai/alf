@@ -889,6 +889,7 @@ def auc_roc(
     Returns:
         {"auc_roc": AUC-ROC float}
     """
+    # raise ValueError(f'{probs.shape}, {targets.shape}, {roc_auc_score(targets, probs[:, 1])}')
     if probs.shape[1] == 2:
         return {"auc_roc": float(roc_auc_score(targets, probs[:, 1]))}
     return {"auc_roc": float(roc_auc_score(targets, probs, multi_class="ovr"))}

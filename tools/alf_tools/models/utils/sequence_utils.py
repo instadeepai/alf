@@ -30,8 +30,10 @@ Note:
 
 from typing import Literal, Union, overload
 
+import numpy as np
 import torch
 from alf_core import Candidate, LabelledCandidates
+from alf_core.utils.enums import ProblemType
 from jaxtyping import Float
 
 
@@ -132,3 +134,11 @@ def one_hot_encode(
         one_hot = one_hot.view(batch_size, -1)
 
     return one_hot
+
+
+def determine_num_classes(labels: Float, problem_type: ProblemType) -> int:
+    if problem_type == ProblemType.BINARY:
+        return 2
+    if problem_type == ProblemType.MULTICLASS:
+        return int(np.max(labels)) + 1
+    return 1

@@ -31,6 +31,7 @@ from alf_tools.models.utils import (
     get_device,
     one_hot_encode,
 )
+from alf_tools.models.utils.sequence_utils import determine_num_classes
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 logger = logging.getLogger("alf-tools")
@@ -422,7 +423,7 @@ class CNNModel(BaseModel):
         self._epoch_metrics = []
 
         # Determine output neurons: 1 for regression/binary, num_classes for multiclass
-        num_classes = train_data.labels.shape[-1]
+        num_classes = determine_num_classes(train_data.labels, problem_type)
         output_neurons = num_classes if self._problem_type == ProblemType.MULTICLASS else 1
 
         # Initialize model on first call or when output shape changes

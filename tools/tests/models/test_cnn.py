@@ -53,6 +53,18 @@ def val_data():
 
 
 @pytest.fixture
+def empty_data():
+    """Create empty sample data for validation testing.
+
+    Returns:
+        A LabelledCandidates object containing the empty data.
+    """
+    candidates = []
+    labels = np.array([])
+    return LabelledCandidates(candidates, labels)
+
+
+@pytest.fixture
 def cnn_model():
     """Create a CNNModel with small settings for fast testing.
 
@@ -123,7 +135,9 @@ class TestCNNModel:
         """Test that sequences of different lengths cause issues appropriately."""
         # First train with one length
         data1 = LabelledCandidates([Candidate(data="A" * 10, modality="sequence")], np.array([1.0]))
-        val_data1 = LabelledCandidates([Candidate(data="A" * 2, modality="sequence")], np.array([1.0]))
+        val_data1 = LabelledCandidates(
+            [Candidate(data="A" * 10, modality="sequence")], np.array([1.0])
+        )
         cnn_model.train(data1, val_data=val_data1, problem_type=ProblemType.REGRESSION)
 
         # Trying to predict with different length should fail in one-hot encoding
@@ -159,7 +173,9 @@ class TestCNNModel:
 class TestCNNModelSurrogateEpochMetrics:
     """Tests for CNNModel.get_epoch_metrics() and per-epoch recording."""
 
-    def test_get_epoch_metrics_returns_list_of_epoch_metrics(self, cnn_model, sample_data, val_data):
+    def test_get_epoch_metrics_returns_list_of_epoch_metrics(
+        self, cnn_model, sample_data, val_data
+    ):
         """get_epoch_metrics() should return a list of SurrogateEpochMetrics after training."""
         cnn_model.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
         epoch_metrics = cnn_model.get_epoch_metrics()
@@ -183,16 +199,20 @@ class TestCNNModelSurrogateEpochMetrics:
         for em in cnn_model.get_epoch_metrics():
             assert np.isfinite(em.train_loss)
 
-    def test_epoch_metrics_val_fields_populated_with_val_data(self, cnn_model, sample_data, val_data):
+    def test_epoch_metrics_val_fields_populated_with_val_data(
+        self, cnn_model, sample_data, val_data
+    ):
         """When val_data is provided, val_loss must be set on every SurrogateEpochMetrics."""
         cnn_model.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
         for em in cnn_model.get_epoch_metrics():
             assert em.val_loss is not None
             assert np.isfinite(em.val_loss)
 
-    def test_epoch_metrics_val_fields_none_without_val_data(self, cnn_model, sample_data, val_data):
+    def test_epoch_metrics_val_fields_none_without_val_data(
+        self, cnn_model, sample_data, empty_data
+    ):
         """Without val_data, val_loss must be None on every SurrogateEpochMetrics."""
-        cnn_model.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
+        cnn_model.train(sample_data, val_data=empty_data, problem_type=ProblemType.REGRESSION)
         for em in cnn_model.get_epoch_metrics():
             assert em.val_loss is None
 
@@ -290,7 +310,7 @@ class TestEpochMetricsClassification:
             [Candidate(data=s, modality="sequence") for s in sequences], labels
         )
         val_data = LabelledCandidates(
-            [Candidate(data=s, modality="sequence") for s in sequences[:2]], labels
+            [Candidate(data=s, modality="sequence") for s in sequences[:2]], labels[:2]
         )
         model.train(data, val_data=val_data, problem_type=ProblemType.BINARY)
 
