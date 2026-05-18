@@ -566,10 +566,12 @@ class GPModel(BaseModel):
         Note:
             For exact GPs, all training data is used for predictions. Validation
             data is only used for logging validation metrics during training.
+
+        Raises:
+            ValueError: If problem_type is not REGRESSION.
         """
-        assert problem_type == ProblemType.REGRESSION, (
-            "GPModel currently only supports regression problems."
-        )
+        if problem_type != ProblemType.REGRESSION:
+            raise ValueError(f"GPModel only supports REGRESSION, got {problem_type!r}.")
         self._epoch_metrics = []
         logger.info(f"Training GP with {len(train_data)} samples")
 

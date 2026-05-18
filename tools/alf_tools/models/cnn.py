@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Union
+from typing import Any, Union
 
 import numpy as np
 import torch
@@ -206,6 +206,7 @@ class CNNModel(BaseModel):
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
+        self._problem_type: ProblemType | None = None
 
     def _one_hot_encode(
         self, sequences: list[str]
@@ -290,7 +291,7 @@ class CNNModel(BaseModel):
         Raises:
             RuntimeError: If the model is not initialized.
         """
-        if self.model is None:
+        if self.model is None or self._problem_type is None:
             raise RuntimeError(
                 "CNN model has not been initialized — call model.train() before _train_epoch()"
             )
@@ -336,7 +337,7 @@ class CNNModel(BaseModel):
         Raises:
             RuntimeError: If the model is not initialized.
         """
-        if self.model is None:
+        if self.model is None or self._problem_type is None:
             raise RuntimeError(
                 "CNN model has not been initialized — call model.train() before _validate_epoch()"
             )
@@ -373,8 +374,8 @@ class CNNModel(BaseModel):
         epoch: int,
         avg_train_loss: float,
         train_metrics: dict,
-        avg_val_loss: Optional[float] = None,
-        val_metrics: Optional[Dict[str, float]] = None,
+        avg_val_loss: float | None = None,
+        val_metrics: dict[str, float] | None = None,
     ) -> None:
         """Record epoch metrics and log at the configured frequency.
 
@@ -386,15 +387,11 @@ class CNNModel(BaseModel):
             val_metrics: Dictionary of validation metrics.
         """
         additional: dict[str, float] = {}
-        if (v := train_metrics.get("spearman")) is not None:
-            additional["train_spearman"] = float(v)
-        if (v := train_metrics.get("mse")) is not None:
-            additional["train_mse"] = float(v)
+        for k, v in train_metrics.items():
+            additional[f"train_{k}"] = float(v)
         if val_metrics is not None:
-            if (v := val_metrics.get("spearman")) is not None:
-                additional["val_spearman"] = float(v)
-            if (v := val_metrics.get("mse")) is not None:
-                additional["val_mse"] = float(v)
+            for k, v in val_metrics.items():
+                additional[f"val_{k}"] = float(v)
         epoch_metrics = SurrogateEpochMetrics(
             epoch=epoch,
             train_loss=avg_train_loss,
@@ -460,8 +457,10 @@ class CNNModel(BaseModel):
             criterion = nn.CrossEntropyLoss()
 
         # Training loop
+        avg_train_loss: float = 0.0
+        train_metrics: dict[str, float] = {}
         avg_val_loss = None
-        val_metrics: Dict[str, float] = {}
+        val_metrics: dict[str, float] = {}
         for epoch in range(self.train_config.num_epochs):
             # Train
             avg_train_loss, train_metrics = self._train_epoch(train_loader, optimizer, criterion)
@@ -514,8 +513,8 @@ class CNNModel(BaseModel):
         Raises:
             RuntimeError: If the model has not been trained yet.
         """
-        if self.model is None:
-            raise RuntimeError("Model not trained. Call fit() first.")
+        if self.model is None or self._problem_type is None:
+            raise RuntimeError("Model not trained. Call train() first.")
 
         self.model.eval()
         x = self.featurise(candidate_points).to(self.device)

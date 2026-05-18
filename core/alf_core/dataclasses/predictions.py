@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -20,6 +21,8 @@ import numpy as np
 import pandas as pd
 from alf_core.dataclasses.candidate import Candidate
 from alf_core.utils.enums import ProblemType
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -93,6 +96,12 @@ class Predictions:
         predictions_list = []
         if problem_type is None:
             is_classification = self.means.ndim == 2
+            if is_classification:
+                logger.warning(
+                    "problem_type not provided to to_dataframe(); "
+                    "inferring classification from means.ndim == 2. "
+                    "Pass problem_type explicitly to avoid ambiguity."
+                )
         else:
             is_classification = problem_type in [ProblemType.BINARY, ProblemType.MULTICLASS]
 

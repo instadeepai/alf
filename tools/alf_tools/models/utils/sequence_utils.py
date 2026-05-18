@@ -149,5 +149,5 @@ def determine_num_classes(labels: Float, problem_type: ProblemType) -> int:
     if problem_type == ProblemType.BINARY:
         return 2
     if problem_type == ProblemType.MULTICLASS:
-        return int(np.max(labels)) + 1
+        return len(np.unique(labels))
     return 1

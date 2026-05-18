@@ -14,7 +14,7 @@
 
 import warnings
 from functools import wraps
-from typing import Any, Callable, Union
+from typing import Any, Callable
 
 import numpy as np
 from jaxtyping import Float, Int
@@ -739,7 +739,7 @@ def regret_ucb_alpha_sweep(
     means: Float[np.ndarray, " b"],
     variances: Float[np.ndarray, " b"],
     targets: Float[np.ndarray, " b"],
-    alpha: Union[float, list[float]] | None = None,
+    alpha: float | list[float] | None = None,
     num_acquisitions: int = 100,
 ) -> dict[str, float]:
     """Compute UCB regret for multiple alpha values.
@@ -889,7 +889,8 @@ def auc_roc(
     Returns:
         {"auc_roc": AUC-ROC float}
     """
-    # raise ValueError(f'{probs.shape}, {targets.shape}, {roc_auc_score(targets, probs[:, 1])}')
+    if len(np.unique(targets)) < 2:
+        return {}
     if probs.shape[1] == 2:
         return {"auc_roc": float(roc_auc_score(targets, probs[:, 1]))}
     return {"auc_roc": float(roc_auc_score(targets, probs, multi_class="ovr"))}

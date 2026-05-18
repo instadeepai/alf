@@ -64,8 +64,6 @@ def split_dataset(
         return split_stratified(
             dataset, train_size, validation_size, test_size, candidate_pool_size, seed
         )
-    else:
-        raise ValueError(f"Invalid split type: {split_type}")
 
 
 def split_random(
@@ -191,6 +189,9 @@ def split_stratified(
 
     Returns:
         Dictionary with keys "train", "validation", "test", and "candidate_pool".
+
+    Raises:
+        ValueError: If any split requests more samples than remain after earlier splits.
     """
     labels = dataset.labels.astype(int)
     non_integer_mask = ~np.isclose(dataset.labels, dataset.labels.astype(int).astype(float))
@@ -216,6 +217,14 @@ def split_stratified(
         # Remaining samples available per class at this point in the loop.
         avail = [len(cls_idxs[cls]) - cls_used[cls] for cls in classes]
         total_avail = sum(avail)
+
+        if S == 0:
+            continue
+        if total_avail < S:
+            raise ValueError(
+                f"split_stratified: requested {S} samples for '{name}' "
+                f"but only {total_avail} remain."
+            )
 
         # Largest remainder method: allocate exactly S samples proportional to
         # remaining class availability, guaranteeing no rounding waste within the split.
