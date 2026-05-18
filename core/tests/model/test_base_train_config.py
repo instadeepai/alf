@@ -14,7 +14,7 @@
 
 from dataclasses import dataclass, fields, is_dataclass
 
-from alf_core.model.base_train_config import BaseTrainConfig
+from alf_core.model.base_model import BaseTrainConfig
 
 
 class TestBaseTrainConfig:

@@ -172,3 +172,45 @@ class InputNormaliser:
             raise RuntimeError("InputNormaliser must be fitted before calling transform.")
         assert self._min is not None and self._range is not None
         return (X - self._min) / self._range
+
+
+def fit_input_normaliser(
+    train_x: torch.Tensor,
+    apply: bool,
+) -> tuple[torch.Tensor, InputNormaliser | None]:
+    """Fit an InputNormaliser on train_x and apply it.
+
+    Args:
+        train_x: Training feature tensor, shape (n_samples, ...).
+        apply: If False, returns (train_x, None) unchanged.
+
+    Returns:
+        Tuple of (normalised_x, fitted_normaliser). normalised_x equals
+        train_x when apply is False; normaliser is None when apply is False.
+    """
+    if apply:
+        normaliser = InputNormaliser()
+        normaliser.fit(train_x)
+        return normaliser.transform(train_x), normaliser
+    return train_x, None
+
+
+def fit_output_standardiser(
+    train_y: np.ndarray,
+    apply: bool,
+) -> tuple[np.ndarray, OutputStandardiser | None]:
+    """Fit an OutputStandardiser on train_y and apply it.
+
+    Args:
+        train_y: Training label array, shape (n_samples,).
+        apply: If False, returns (train_y, None) unchanged.
+
+    Returns:
+        Tuple of (standardised_y, fitted_standardiser). standardised_y equals
+        train_y when apply is False; standardiser is None when apply is False.
+    """
+    if apply:
+        standardiser = OutputStandardiser()
+        standardiser.fit(train_y)
+        return standardiser.transform(train_y), standardiser
+    return train_y, None

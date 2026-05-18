@@ -22,11 +22,10 @@ import torch.nn as nn
 import torch.optim as optim
 from alf_core import Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
-from alf_core.model.base_train_config import BaseTrainConfig
-from alf_core.model.normaliser import InputNormaliser, OutputStandardiser
+from alf_core.model.base_model import BaseTrainConfig
+from alf_core.model.normaliser import InputNormaliser, OutputStandardiser, fit_input_normaliser, fit_output_standardiser
 from torch.utils.data import DataLoader, TensorDataset
 
-from alf_tools.models.base import SurrogateModel
 from alf_tools.models.utils import (
     create_char_to_idx_mapping,
     get_device,
@@ -147,7 +146,7 @@ class SequenceCNN(nn.Module):
         return x.squeeze(-1)
 
 
-class CNNModel(SurrogateModel):
+class CNNModel:
     """Minimal CNN model for sequence fitness prediction.
 
     One-hot encodes sequences, trains a simple 1D CNN with MSE loss.
@@ -250,10 +249,10 @@ class CNNModel(SurrogateModel):
             Tuple of (train_loader, val_loader). val_loader is None if val_data is None.
         """
         train_x = self.featurise(train_data).to(self.device)
-        train_x, self._input_normaliser = self._fit_input_normaliser(
+        train_x, self._input_normaliser = fit_input_normaliser(
             train_x, self.train_config.normalise_inputs
         )
-        train_y_np, self._output_standardiser = self._fit_output_standardiser(
+        train_y_np, self._output_standardiser = fit_output_standardiser(
             train_data.labels, self.train_config.standardise_outputs
         )
         label_dtype = self.train_config.label_dtype or self._default_label_dtype

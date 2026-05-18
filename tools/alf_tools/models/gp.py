@@ -23,11 +23,10 @@ import numpy as np
 import torch
 from alf_core import Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
-from alf_core.model.base_train_config import BaseTrainConfig
-from alf_core.model.normaliser import InputNormaliser, OutputStandardiser
+from alf_core.model.base_model import BaseTrainConfig
+from alf_core.model.normaliser import InputNormaliser, OutputStandardiser, fit_input_normaliser, fit_output_standardiser
 from jaxtyping import Float
 
-from alf_tools.models.base import SurrogateModel
 from alf_tools.models.utils.sequence_utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
@@ -280,7 +279,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
 
-class GPModel(SurrogateModel):
+class GPModel:
     """Gaussian Process model for sequence fitness prediction.
 
     Uses GPyTorch for efficient GP inference with flexible featurization,
@@ -567,10 +566,10 @@ class GPModel(SurrogateModel):
             A tuple of training features and targets as tensors on the current device.
         """
         train_x = self.featurise(train_data).to(self.device)
-        train_x, self._input_normaliser = self._fit_input_normaliser(
+        train_x, self._input_normaliser = fit_input_normaliser(
             train_x, self.train_config.normalise_inputs
         )
-        train_y_np, self._output_standardiser = self._fit_output_standardiser(
+        train_y_np, self._output_standardiser = fit_output_standardiser(
             train_data.labels, self.train_config.standardise_outputs
         )
         train_y = torch.tensor(train_y_np, dtype=torch.float32).to(self.device)

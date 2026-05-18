@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.models.base import SurrogateModel
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.utils import (
@@ -23,7 +22,6 @@ from alf_tools.models.utils import (
 )
 
 __all__ = [
-    "SurrogateModel",
     "CNNModel",
     "CNNModelConfig",
     "CNNTrainConfig",
