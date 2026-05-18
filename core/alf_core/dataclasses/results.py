@@ -63,14 +63,15 @@ class Results:
 
         if self.problem_type == ProblemType.REGRESSION:
             metrics_dict = (
-                regression_metric_registry.get_metrics()
+                regression_metric_registry.get_metrics(requires_variance=False)
                 if self.predictions.variances is None
-                else regression_metric_registry.get_metrics()
+                else regression_metric_registry.get_metrics(requires_variance=True)
             )
             for _, metric_fn in metrics_dict.items():
-                metrics.update(
-                    metric_fn(self.predictions.means, self.predictions.variances, self.targets)
+                metric_update = metric_fn(
+                    self.predictions.means, self.predictions.variances, self.targets
                 )
+                metrics.update(metric_update)
         else:
             for _, metric_fn in classification_metric_registry.metrics.items():
                 metrics.update(metric_fn(self.predictions.means, self.targets))

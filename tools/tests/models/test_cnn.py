@@ -40,6 +40,19 @@ def sample_data():
 
 
 @pytest.fixture
+def val_data():
+    """Create sample validation data.
+
+    Returns:
+        A LabelledCandidates object containing the validation data.
+    """
+    sequences = ["ACDEFGHIKLMNPQRSTVWY"] * 2  # Simple repeated sequence
+    candidates = [Candidate(data=seq, modality="sequence") for seq in sequences]
+    labels = np.random.randn(2) * 0.5 + 1.0
+    return LabelledCandidates(candidates, labels)
+
+
+@pytest.fixture
 def cnn_model():
     """Create a CNNModel with small settings for fast testing.
 
@@ -59,10 +72,10 @@ def cnn_model():
 class TestCNNModel:
     """Test the CNNModel class."""
 
-    def test_train_and_predict(self, cnn_model, sample_data):
+    def test_train_and_predict(self, cnn_model, sample_data, val_data):
         """Test the full training and prediction pipeline."""
         # Train should work without error
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data, problem_type=ProblemType.REGRESSION)
 
         # Model should be initialized
         assert cnn_model.model is not None
@@ -78,13 +91,13 @@ class TestCNNModel:
         assert predictions.means.shape == (3,)
         assert np.all(np.isfinite(predictions.means))
 
-    def test_train_with_validation(self, cnn_model, sample_data):
+    def test_train_with_validation(self, cnn_model, sample_data, val_data):
         """Test training with validation data."""
         val_sequences = ["ACDEFGHIKLMNPQRSTVWY"] * 3
         val_candidates = [Candidate(data=seq, modality="sequence") for seq in val_sequences]
         val_data = LabelledCandidates(val_candidates, np.random.randn(3))
 
-        cnn_model.train(sample_data, val_data=val_data)
+        cnn_model.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
 
         metrics = cnn_model.get_training_summary_metrics()
         assert "final_val_loss" in metrics
@@ -110,24 +123,25 @@ class TestCNNModel:
         """Test that sequences of different lengths cause issues appropriately."""
         # First train with one length
         data1 = LabelledCandidates([Candidate(data="A" * 10, modality="sequence")], np.array([1.0]))
-        cnn_model.train(data1)
+        val_data1 = LabelledCandidates([Candidate(data="A" * 2, modality="sequence")], np.array([1.0]))
+        cnn_model.train(data1, val_data=val_data1, problem_type=ProblemType.REGRESSION)
 
         # Trying to predict with different length should fail in one-hot encoding
         different_length_candidates = [Candidate(data="A" * 15, modality="sequence")]
         with pytest.raises((RuntimeError, IndexError, ValueError)):
             cnn_model.predict(different_length_candidates)
 
-    def test_model_parameters_update(self, cnn_model, sample_data):
+    def test_model_parameters_update(self, cnn_model, sample_data, val_data):
         """Test that model parameters are actually updated during training."""
         # train the model
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
 
         # Get initial parameters
         initial_params = [p.clone() for p in cnn_model.model.parameters()]
 
         # Train for one more epoch
         cnn_model.train_config.num_epochs = 1
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
 
         # Get updated parameters
         updated_params = list(cnn_model.model.parameters())
@@ -145,42 +159,40 @@ class TestCNNModel:
 class TestCNNModelSurrogateEpochMetrics:
     """Tests for CNNModel.get_epoch_metrics() and per-epoch recording."""
 
-    def test_get_epoch_metrics_returns_list_of_epoch_metrics(self, cnn_model, sample_data):
+    def test_get_epoch_metrics_returns_list_of_epoch_metrics(self, cnn_model, sample_data, val_data):
         """get_epoch_metrics() should return a list of SurrogateEpochMetrics after training."""
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
         epoch_metrics = cnn_model.get_epoch_metrics()
         assert isinstance(epoch_metrics, list)
         assert all(isinstance(em, SurrogateEpochMetrics) for em in epoch_metrics)
 
-    def test_epoch_metrics_length_matches_num_epochs(self, cnn_model, sample_data):
+    def test_epoch_metrics_length_matches_num_epochs(self, cnn_model, sample_data, val_data):
         """get_epoch_metrics() length must equal num_epochs."""
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
         assert len(cnn_model.get_epoch_metrics()) == cnn_model.train_config.num_epochs
 
-    def test_epoch_metrics_reset_on_retrain(self, cnn_model, sample_data):
+    def test_epoch_metrics_reset_on_retrain(self, cnn_model, sample_data, val_data):
         """Calling train() twice must reset the epoch metrics list."""
-        cnn_model.train(sample_data)
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
+        cnn_model.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
         assert len(cnn_model.get_epoch_metrics()) == cnn_model.train_config.num_epochs
 
-    def test_epoch_metrics_train_loss_populated(self, cnn_model, sample_data):
+    def test_epoch_metrics_train_loss_populated(self, cnn_model, sample_data, val_data):
         """Every SurrogateEpochMetrics must have a finite train_loss."""
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
         for em in cnn_model.get_epoch_metrics():
             assert np.isfinite(em.train_loss)
 
-    def test_epoch_metrics_val_fields_populated_with_val_data(self, cnn_model, sample_data):
+    def test_epoch_metrics_val_fields_populated_with_val_data(self, cnn_model, sample_data, val_data):
         """When val_data is provided, val_loss must be set on every SurrogateEpochMetrics."""
-        val_candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * 3
-        val_data = LabelledCandidates(val_candidates, np.random.randn(3))
-        cnn_model.train(sample_data, val_data=val_data)
+        cnn_model.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
         for em in cnn_model.get_epoch_metrics():
             assert em.val_loss is not None
             assert np.isfinite(em.val_loss)
 
-    def test_epoch_metrics_val_fields_none_without_val_data(self, cnn_model, sample_data):
+    def test_epoch_metrics_val_fields_none_without_val_data(self, cnn_model, sample_data, val_data):
         """Without val_data, val_loss must be None on every SurrogateEpochMetrics."""
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
         for em in cnn_model.get_epoch_metrics():
             assert em.val_loss is None
 
@@ -192,7 +204,7 @@ class TestCNNModelSurrogateEpochMetrics:
 class TestCNNModelReproducibility:
     """Reproducibility tests, extracted for clarity."""
 
-    def test_reproducibility_with_seed(self, sample_data):
+    def test_reproducibility_with_seed(self, sample_data, val_data):
         """Test that training is reproducible when using the same seed."""
 
         def set_seed(seed: int):
@@ -214,7 +226,7 @@ class TestCNNModelReproducibility:
             train_config=train_config,
             device="cpu",
         )
-        surrogate1.train(sample_data)
+        surrogate1.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
 
         set_seed(42)
         surrogate2 = CNNModel(
@@ -223,7 +235,7 @@ class TestCNNModelReproducibility:
             train_config=train_config,
             device="cpu",
         )
-        surrogate2.train(sample_data)
+        surrogate2.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
 
         # Check that model parameters are identical
         params1 = list(surrogate1.model.parameters())
@@ -277,7 +289,10 @@ class TestEpochMetricsClassification:
         data = LabelledCandidates(
             [Candidate(data=s, modality="sequence") for s in sequences], labels
         )
-        model.train(data, problem_type=ProblemType.BINARY)
+        val_data = LabelledCandidates(
+            [Candidate(data=s, modality="sequence") for s in sequences[:2]], labels
+        )
+        model.train(data, val_data=val_data, problem_type=ProblemType.BINARY)
 
         summary = model.get_training_summary_metrics()
         assert "final_train_accuracy" in summary
@@ -297,7 +312,11 @@ class TestEpochMetricsClassification:
             [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")],
             np.array([1.0]),
         )
-        model.train(data)
+        val_data = LabelledCandidates(
+            [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")],
+            np.array([1.0]),
+        )
+        model.train(data, val_data=val_data, problem_type=ProblemType.REGRESSION)
 
         summary = model.get_training_summary_metrics()
         assert "final_train_mse" in summary

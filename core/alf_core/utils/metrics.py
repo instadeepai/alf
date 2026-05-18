@@ -60,7 +60,8 @@ def check_variance_validity(variances: np.ndarray, targets: np.ndarray) -> None:
     """
     assert variances is not None, (
         "variances is None — this metric requires uncertainty estimates; "
-        "ensure your model's predict() returns a Predictions object with variances set"
+        "ensure your model's predict() returns a Predictions object with variances set "
+        "or that the problem type is correctly specified."
     )
     assert np.all(variances >= 0), (
         f"variances must be non-negative, but {np.sum(variances < 0)} values are negative "
@@ -92,13 +93,17 @@ class RegressionMetricRegistry:
         self.metrics[name] = metric_fn
         self.variance_required[name] = requires_variance
 
-    def get_metrics(self) -> dict[str, Callable]:
+    def get_metrics(self, requires_variance: bool) -> dict[str, Callable]:
         """Get all registered metrics.
 
         Returns:
             Dictionary mapping metric names to their functions.
         """
-        return {name: fn for name, fn in self.metrics.items()}
+        return {
+            name: fn
+            for name, fn in self.metrics.items()
+            if self.variance_required[name] == requires_variance
+        }
 
 
 class ClassificationMetricRegistry:

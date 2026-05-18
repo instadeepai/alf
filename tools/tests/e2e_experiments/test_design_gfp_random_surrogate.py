@@ -25,6 +25,7 @@ from alf_core import (
     Surrogate,
     TerminalStateLogger,
 )
+from alf_core.utils.enums import ProblemType
 from alf_tools.datasets import GFP
 from alf_tools.optimizer.acquisition_functions import Greedy
 
@@ -44,7 +45,7 @@ def gfp_dataset():
         validation_frac=0.2,
         test_ratio=0.2,
         split_type="random",
-        problem_type="regression",
+        problem_type=ProblemType.REGRESSION,
     )
     return GFP(config)
 
