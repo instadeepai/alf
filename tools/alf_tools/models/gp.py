@@ -24,7 +24,12 @@ import torch
 from alf_core import Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.model.base_model import BaseTrainConfig
-from alf_core.model.normaliser import InputNormaliser, OutputStandardiser, fit_input_normaliser, fit_output_standardiser
+from alf_core.model.normaliser import (
+    InputNormaliser,
+    OutputStandardiser,
+    fit_input_normaliser,
+    fit_output_standardiser,
+)
 from jaxtyping import Float
 
 from alf_tools.models.utils.sequence_utils import (
@@ -285,6 +290,8 @@ class GPModel:
     Uses GPyTorch for efficient GP inference with flexible featurization,
     kernel selection, and uncertainty quantification.
     """
+
+    _default_label_dtype: torch.dtype = torch.float32
 
     def __init__(
         self,
@@ -566,13 +573,15 @@ class GPModel:
             A tuple of training features and targets as tensors on the current device.
         """
         train_x = self.featurise(train_data).to(self.device)
-        train_x, self._input_normaliser = fit_input_normaliser(
-            train_x, self.train_config.normalise_inputs
+        train_x_np, self._input_normaliser = fit_input_normaliser(
+            np.array(train_x), self.train_config.normalise_inputs
         )
         train_y_np, self._output_standardiser = fit_output_standardiser(
             train_data.labels, self.train_config.standardise_outputs
         )
-        train_y = torch.tensor(train_y_np, dtype=torch.float32).to(self.device)
+        label_dtype = self.train_config.label_dtype or self._default_label_dtype
+        train_x = torch.tensor(train_x_np, dtype=label_dtype).to(self.device)
+        train_y = torch.tensor(train_y_np, dtype=label_dtype).to(self.device)
         return train_x, train_y
 
     def train(

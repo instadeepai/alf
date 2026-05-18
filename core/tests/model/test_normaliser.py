@@ -102,7 +102,7 @@ class TestInputNormaliser:
 
     def test_transform_produces_values_in_zero_one(self):
         """Transformed features lie in [0, 1] for each dimension."""
-        X = torch.tensor([[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]])
+        X = np.array([[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]])
         n = InputNormaliser()
         n.fit(X)
         X_t = n.transform(X)
@@ -111,7 +111,7 @@ class TestInputNormaliser:
 
     def test_transform_round_trip_min_max(self):
         """Min sample maps to 0 and max sample maps to 1 per feature after transform."""
-        X = torch.tensor([[0.0, 5.0], [5.0, 10.0], [10.0, 15.0]])
+        X = np.array([[0.0, 5.0], [5.0, 10.0], [10.0, 15.0]])
         n = InputNormaliser()
         n.fit(X)
         X_t = n.transform(X)
@@ -121,40 +121,40 @@ class TestInputNormaliser:
 
     def test_constant_feature_does_not_divide_by_zero(self):
         """A constant feature column clamps range to _MIN_RANGE and transforms to 0."""
-        X = torch.tensor([[3.0, 1.0], [3.0, 2.0], [3.0, 3.0]])
+        X = np.array([[3.0, 1.0], [3.0, 2.0], [3.0, 3.0]])
         n = InputNormaliser()
         n.fit(X)
         X_t = n.transform(X)
-        assert torch.all(torch.isfinite(X_t))
+        assert np.all(np.isfinite(X_t))
         # Constant feature should transform to 0
-        assert torch.all(X_t[:, 0] == 0.0)
+        assert np.all(X_t[:, 0] == 0.0)
 
     def test_single_sample(self):
         """A single training sample is handled without errors."""
-        X = torch.tensor([[1.0, 2.0, 3.0]])
+        X = np.array([[1.0, 2.0, 3.0]])
         n = InputNormaliser()
         n.fit(X)
         X_t = n.transform(X)
-        assert torch.all(torch.isfinite(X_t))
+        assert np.all(np.isfinite(X_t))
 
     def test_transform_before_fit_raises(self):
         """Calling transform before fit raises RuntimeError."""
         n = InputNormaliser()
         with pytest.raises(RuntimeError, match="fitted"):
-            n.transform(torch.tensor([[1.0, 2.0]]))
+            n.transform(np.array([[1.0, 2.0]]))
 
     def test_is_fitted(self):
         """is_fitted is False before fit() and True after."""
         n = InputNormaliser()
         assert not n.is_fitted
-        n.fit(torch.tensor([[1.0, 2.0], [3.0, 4.0]]))
+        n.fit(np.array([[1.0, 2.0], [3.0, 4.0]]))
         assert n.is_fitted
 
     def test_fit_on_3d_tensor(self):
         """InputNormaliser must handle CNN's 3D one-hot tensors (batch, alphabet, seq_len)."""
-        X = torch.rand(8, 20, 10)  # (batch, alphabet_size, seq_len)
+        X = np.random.rand(8, 20, 10)  # (batch, alphabet_size, seq_len)
         n = InputNormaliser()
         n.fit(X)
         X_t = n.transform(X)
-        assert torch.all(torch.isfinite(X_t))
+        assert np.all(np.isfinite(X_t))
         assert X_t.shape == X.shape

@@ -16,8 +16,8 @@
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING, Any, Union
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Union
 
 import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions

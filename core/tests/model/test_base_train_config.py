@@ -14,6 +14,7 @@
 
 from dataclasses import dataclass, fields, is_dataclass
 
+import torch
 from alf_core.model.base_model import BaseTrainConfig
 
 
@@ -47,8 +48,6 @@ class TestBaseTrainConfig:
 
     def test_label_dtype_can_be_set(self):
         """label_dtype must accept a torch.dtype value."""
-        import torch
-
         config = BaseTrainConfig(label_dtype=torch.float64)
         assert config.label_dtype == torch.float64
 
@@ -66,7 +65,6 @@ class TestBaseTrainConfig:
 
     def test_subclass_inherits_label_dtype(self):
         """Subclass must inherit label_dtype from BaseTrainConfig."""
-        import torch
 
         @dataclass
         class ConcreteTrainConfig(BaseTrainConfig):

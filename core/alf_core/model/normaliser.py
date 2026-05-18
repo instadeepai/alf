@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import numpy as np
-import torch
 from jaxtyping import Float
 
 
@@ -129,8 +128,8 @@ class InputNormaliser:
 
     def __init__(self) -> None:
         """Initialize with no fitted parameters."""
-        self._min: torch.Tensor | None = None
-        self._range: torch.Tensor | None = None
+        self._min: np.ndarray | None = None
+        self._range: np.ndarray | None = None
 
     @property
     def is_fitted(self) -> bool:
@@ -139,7 +138,7 @@ class InputNormaliser:
 
     def fit(
         self,
-        X: Float[torch.Tensor, "n_samples ..."],
+        X: Float[np.ndarray, "n_samples ..."],
     ) -> None:
         """Compute per-feature min and range from training features.
 
@@ -148,14 +147,14 @@ class InputNormaliser:
                Statistics are computed over the batch dimension (dim=0),
                so each feature position gets its own min/max.
         """
-        x_min, x_max = torch.aminmax(X, dim=0)
+        x_min, x_max = (np.min(X, axis=0), np.max(X, axis=0))
         self._min = x_min
-        self._range = (x_max - x_min).clamp(min=self._MIN_RANGE)
+        self._range = (x_max - x_min).clip(min=self._MIN_RANGE)
 
     def transform(
         self,
-        X: Float[torch.Tensor, "n_samples ..."],
-    ) -> Float[torch.Tensor, "n_samples ..."]:
+        X: Float[np.ndarray, "n_samples ..."],
+    ) -> Float[np.ndarray, "n_samples ..."]:
         """Scale features to [0, 1].
 
         Args:
@@ -175,9 +174,9 @@ class InputNormaliser:
 
 
 def fit_input_normaliser(
-    train_x: torch.Tensor,
+    train_x: np.ndarray,
     apply: bool,
-) -> tuple[torch.Tensor, InputNormaliser | None]:
+) -> tuple[np.ndarray, InputNormaliser | None]:
     """Fit an InputNormaliser on train_x and apply it.
 
     Args:
