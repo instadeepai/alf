@@ -232,6 +232,42 @@ class TestCNNModelReproducibility:
             torch.testing.assert_close(p1, p2, rtol=1e-5, atol=1e-7)
 
 
+class TestCNNLabelDtype:
+    """Tests for label_dtype resolution in CNNModel."""
+
+    def test_default_label_dtype_is_float32(self, sample_data):
+        """Without explicit label_dtype, label tensors must be float32."""
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=1),
+            device="cpu",
+        )
+        train_loader, _ = model._build_data_loaders(sample_data, None)
+        _, batch_y = next(iter(train_loader))
+        assert batch_y.dtype == torch.float32
+
+    def test_explicit_label_dtype_override_is_used(self, sample_data):
+        """When label_dtype=torch.float64 is set, label tensors must be float64."""
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=1, label_dtype=torch.float64),
+            device="cpu",
+        )
+        train_loader, _ = model._build_data_loaders(sample_data, None)
+        _, batch_y = next(iter(train_loader))
+        assert batch_y.dtype == torch.float64
+
+    def test_val_loader_label_dtype_matches_train(self, sample_data):
+        """Val label tensors must use the same resolved dtype as train labels."""
+        val_candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * 3
+        val_data = LabelledCandidates(val_candidates, np.random.randn(3))
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=1, label_dtype=torch.float64),
+            device="cpu",
+        )
+        _, val_loader = model._build_data_loaders(sample_data, val_data)
+        _, val_batch_y = next(iter(val_loader))
+        assert val_batch_y.dtype == torch.float64
+
+
 class TestCNNNormalisation:
     """Tests for CNNModel input normalisation and output standardisation."""
 

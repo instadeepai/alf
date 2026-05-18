@@ -63,18 +63,14 @@ class CNNTrainConfig(BaseTrainConfig):
     Args:
         batch_size: Batch size for training.
         num_epochs: Number of epochs to train for.
-        normalise_inputs: Whether to apply min-max normalisation to input
-            features before training. Defaults to False.
-        standardise_outputs: Whether to apply Z-score standardisation to
-            outputs before training. Defaults to False.
         learning_rate: Inherited from BaseTrainConfig. Default: 1e-3.
         log_frequency: Inherited from BaseTrainConfig. Default: 10.
+        label_dtype: Inherited from BaseTrainConfig. None uses the model
+            default (float32 for CNN regression). Override to force a dtype.
     """
 
     batch_size: int = 32
     num_epochs: int = 50
-    normalise_inputs: bool = False
-    standardise_outputs: bool = False
 
 
 class SequenceCNN(nn.Module):
@@ -156,6 +152,8 @@ class CNNModel(SurrogateModel):
 
     One-hot encodes sequences, trains a simple 1D CNN with MSE loss.
     """
+
+    _default_label_dtype: torch.dtype = torch.float32
 
     def __init__(
         self,
@@ -258,7 +256,8 @@ class CNNModel(SurrogateModel):
         train_y_np, self._output_standardiser = self._fit_output_standardiser(
             train_data.labels, self.train_config.standardise_outputs
         )
-        train_y = torch.tensor(train_y_np, dtype=torch.float32).to(self.device)
+        label_dtype = self.train_config.label_dtype or self._default_label_dtype
+        train_y = torch.tensor(train_y_np, dtype=label_dtype).to(self.device)
 
         train_loader = DataLoader(
             TensorDataset(train_x, train_y),
@@ -275,7 +274,7 @@ class CNNModel(SurrogateModel):
             val_y_np = val_data.labels
             if self._output_standardiser is not None:
                 val_y_np = self._output_standardiser.transform(val_y_np)
-            val_y = torch.tensor(val_y_np, dtype=torch.float32).to(self.device)
+            val_y = torch.tensor(val_y_np, dtype=label_dtype).to(self.device)
             val_loader = DataLoader(
                 TensorDataset(val_x, val_y),
                 batch_size=self.train_config.batch_size,

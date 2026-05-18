@@ -40,6 +40,18 @@ class TestBaseTrainConfig:
         assert "learning_rate" in field_names
         assert "log_frequency" in field_names
 
+    def test_label_dtype_defaults_to_none(self):
+        """label_dtype must default to None (model resolves its own default)."""
+        config = BaseTrainConfig()
+        assert config.label_dtype is None
+
+    def test_label_dtype_can_be_set(self):
+        """label_dtype must accept a torch.dtype value."""
+        import torch
+
+        config = BaseTrainConfig(label_dtype=torch.float64)
+        assert config.label_dtype == torch.float64
+
     def test_subclass_inherits_fields(self):
         """Subclass must inherit learning_rate and log_frequency from BaseTrainConfig."""
 
@@ -51,3 +63,14 @@ class TestBaseTrainConfig:
         assert config.learning_rate == 1e-3
         assert config.log_frequency == 10
         assert config.extra_field == 99
+
+    def test_subclass_inherits_label_dtype(self):
+        """Subclass must inherit label_dtype from BaseTrainConfig."""
+        import torch
+
+        @dataclass
+        class ConcreteTrainConfig(BaseTrainConfig):
+            extra_field: int = 0
+
+        assert ConcreteTrainConfig().label_dtype is None
+        assert ConcreteTrainConfig(label_dtype=torch.long).label_dtype == torch.long
