@@ -137,6 +137,15 @@ def one_hot_encode(
 
 
 def determine_num_classes(labels: Float, problem_type: ProblemType) -> int:
+    """Determine the number of output neurons based on problem type and labels.
+
+    Args:
+        labels (Float): Array of labels for the dataset.
+        problem_type (ProblemType): Type of problem (REGRESSION, BINARY, MULTICLASS).
+
+    Returns:
+        int: Number of output neurons. For REGRESSION and BINARY, returns 1 and 2 respectively.
+    """
     if problem_type == ProblemType.BINARY:
         return 2
     if problem_type == ProblemType.MULTICLASS:

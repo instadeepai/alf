@@ -183,7 +183,7 @@ class TestCNNRegressionUnchanged:
         model_cfg = CNNModelConfig(num_filters=8, num_conv_layers=1, fc_hidden_dim=16)
         train_cfg = CNNTrainConfig(batch_size=4, num_epochs=1)
         model = CNNModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
-        
+
         # Problem type is set in train loop
         model.train(
             train_data=LabelledCandidates(
