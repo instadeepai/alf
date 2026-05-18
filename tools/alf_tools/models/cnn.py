@@ -234,26 +234,6 @@ class CNNModel(SurrogateModel):
 
         return self._one_hot_encode(sequences)
 
-    def _prepare_data_loader(self, data: LabelledCandidates, shuffle: bool = False) -> DataLoader:
-        """Prepare a DataLoader from LabelledCandidates.
-
-        Args:
-            data: Data containing sequences and oracle values.
-            shuffle: Whether to shuffle the data.
-
-        Returns:
-            DataLoader for the data.
-        """
-        x = self.featurise(data).to(self.device)
-        y = torch.tensor(data.labels, dtype=torch.float32).to(self.device)
-        dataset = TensorDataset(x, y)
-        return DataLoader(
-            dataset,
-            batch_size=self.train_config.batch_size,
-            shuffle=shuffle,
-            num_workers=0,
-        )
-
     def _build_data_loaders(
         self,
         train_data: LabelledCandidates,
