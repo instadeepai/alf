@@ -518,10 +518,11 @@ class CNNModel(BaseModel):
             raise RuntimeError("Model not trained. Call fit() first.")
 
         self.model.eval()
-        x = self.featurise(candidate_points).to(self.device)
+        x_np = np.array(self.featurise(candidate_points))
 
         if self._input_normaliser is not None:
-            x = self._input_normaliser.transform(x)
+            x_np = self._input_normaliser.transform(x_np)
+        x = torch.tensor(x_np, dtype=torch.float32).to(self.device)
 
         with torch.no_grad():
             means = self.model(x).cpu().numpy()
