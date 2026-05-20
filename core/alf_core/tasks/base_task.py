@@ -59,6 +59,11 @@ class BaseTask(abc.ABC):
         Returns:
             Initialized task state with the provided dataset and surrogate.
         """
+        if dataset._raw_dataset is None:
+            raise RuntimeError(
+                "dataset.setup() must be called before task.setup(). "
+                "Call dataset.setup() to load and split the data first."
+            )
         surrogate.setup(dataset)
         return State(
             dataset=dataset,
