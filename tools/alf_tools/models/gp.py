@@ -284,7 +284,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
 
 
-class GPModel:
+class GPModel(BaseModel):
     """Gaussian Process model for sequence fitness prediction.
 
     Uses GPyTorch for efficient GP inference with flexible featurization,
@@ -557,7 +557,7 @@ class GPModel:
 
         return metrics
 
-    def _prepare_train_data(
+    def _build_data_loaders(
         self,
         train_data: LabelledCandidates,
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -602,7 +602,7 @@ class GPModel:
         self._epoch_metrics = []
         logger.info(f"Training GP with {len(train_data)} samples")
 
-        train_x, train_y = self._prepare_train_data(train_data)
+        train_x, train_y = self._build_data_loaders(train_data)
 
         # Store training data for later predictions
         self.train_x = train_x

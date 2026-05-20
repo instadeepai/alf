@@ -22,7 +22,7 @@ import torch.nn as nn
 import torch.optim as optim
 from alf_core import Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
-from alf_core.model.base_model import BaseTrainConfig
+from alf_core.model.base_model import BaseModel, BaseTrainConfig
 from alf_core.model.normaliser import (
     InputNormaliser,
     OutputStandardiser,
@@ -151,7 +151,7 @@ class SequenceCNN(nn.Module):
         return x.squeeze(-1)
 
 
-class CNNModel:
+class CNNModel(BaseModel):
     """Minimal CNN model for sequence fitness prediction.
 
     One-hot encodes sequences, trains a simple 1D CNN with MSE loss.
