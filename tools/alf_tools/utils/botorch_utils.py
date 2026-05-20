@@ -157,23 +157,17 @@ def predictions_to_posterior(
 
     # Convert to tensors - detach to avoid gradient issues since predictions
     # come from a model that doesn't maintain torch gradient flow
-    mean = torch.from_numpy(predictions.means).float().to(device).detach()
-    variance = torch.from_numpy(predictions.variances).float().to(device).detach()
-
-    # Ensure proper shape: (n, 1) for single-output GP
-    if mean.dim() == 1:
-        mean = mean.unsqueeze(-1)
-    if variance.dim() == 1:
-        variance = variance.unsqueeze(-1)
+    mean = torch.from_numpy(predictions.means).float().to(device)
+    variance = torch.from_numpy(predictions.variances).float().to(device)
 
     # Create diagonal covariance matrix
     # Shape: (n, n) where n is the number of points
     # Use clamp to ensure positive variance for numerical stability
     variance_clamped = torch.clamp(variance, min=1e-6)
-    covar = torch.diag_embed(variance_clamped.squeeze(-1))
+    covar = torch.diag_embed(variance_clamped)
 
     # Create multivariate normal distribution
-    mvn = MultivariateNormal(mean.squeeze(-1), covar)
+    mvn = MultivariateNormal(mean, covar)
 
     # Wrap in GPyTorchPosterior
     posterior = GPyTorchPosterior(mvn)
@@ -207,6 +201,18 @@ def get_bounds_tensor(
     """
     if device is None:
         device = torch.device("cpu")
+
+    def is_valid_bounds_array(arr):
+        return (
+            isinstance(arr, np.ndarray)
+            and arr.ndim == 2
+            and arr.shape[0] == 2
+            and np.all(arr[0] <= arr[1])  # Ensure lower <= upper
+        )
+
+    assert is_valid_bounds_array(bounds), (
+        "Bounds must be a numpy array of shape(2, d) with lower bounds <= upper bounds"
+    )
 
     if isinstance(bounds, np.ndarray):
         # Already in (2, d) format
