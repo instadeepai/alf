@@ -31,11 +31,6 @@ def _to_numpy(features: Float[np.ndarray | torch.Tensor, "n_samples n_features"]
     Raises:
         ValueError: If features is None or cannot be converted to a numpy array.
     """
-    if features is None:
-        raise ValueError(
-            "featurise returned None. CoreSet requires a model with a featurise "
-            "implementation that returns numerical embeddings."
-        )
     if isinstance(features, torch.Tensor):
         return features.detach().cpu().numpy()
     try:
