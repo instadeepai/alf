@@ -32,7 +32,7 @@ from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
 from botorch.fit import fit_gpytorch_mll
 from botorch.models import SingleTaskGP
 from botorch.optim.fit import fit_gpytorch_mll_torch
-from gpytorch.kernels import MaternKernel, ScaleKernel
+from gpytorch.kernels import MaternKernel, RBFKernel, ScaleKernel
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from torch.optim import Adam
 
@@ -90,6 +90,7 @@ class BoTorchGPModel(BaseModel):
         dtype: torch.dtype = torch.float32,
         kernel_type: str | None = None,
         nu: float = 2.5,
+        use_ard: bool = False,
     ):
         """Initialize BoTorch GP model.
 
@@ -129,7 +130,7 @@ class BoTorchGPModel(BaseModel):
         self.dtype = dtype
         self.kernel_type = kernel_type
         self.nu = nu
-
+        self.use_ard = use_ard
         if optimizer not in ["scipy", "torch"]:
             raise ValueError(f"optimizer must be 'scipy' or 'torch', got {optimizer}")
 
@@ -204,10 +205,14 @@ class BoTorchGPModel(BaseModel):
         # Initialize SingleTaskGP
         # Note: SingleTaskGP automatically applies Standardize outcome transform
         # if standardize_outputs=True (which is the default)
+        ard_num_dims=self.train_X.shape[-1] if self.use_ard else None
         if self.kernel_type == "matern":
-            covar_module = ScaleKernel(MaternKernel(nu=self.nu))
+            covar_module = ScaleKernel(MaternKernel(nu=self.nu, ard_num_dims=ard_num_dims))
+        elif self.kernel_type == "rbf":
+            covar_module = ScaleKernel(RBFKernel(nu=self.nu, ard_num_dims=ard_num_dims))
         else:
             covar_module = None
+            logger.warning(f"Invalid kernel_type '{self.kernel_type}' specified. Using default RBF kernel.")
 
         self.model = SingleTaskGP(
             train_X=self.train_X, train_Y=self.train_Y, covar_module=covar_module
