@@ -234,13 +234,13 @@ class BoTorchGPModel(BaseModel):
             else:  # torch
                 # Use torch Adam optimizer
                 if self.optimizer == "adamw":
-                    kwargs_optimizer = lambda params: AdamW(params, lr=self.learning_rate)
+                    optim = AdamW
                 else:
-                    kwargs_optimizer = lambda params: Adam(params, lr=self.learning_rate)
+                    optim = Adam
                 optimizer=fit_gpytorch_mll_torch
                 optimizer_kwargs={
                     "step_limit": self.num_iterations,
-                    "optimizer": kwargs_optimizer,
+                    "optimizer": lambda params: optim(params, lr=self.learning_rate),
                 }
                 logging_optimizer = f"torch {"Adam" if self.optimizer is None else self.optimizer.upper()}"
 
