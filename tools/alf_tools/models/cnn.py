@@ -231,7 +231,7 @@ class CNNModel(BaseModel):
         # BINARY uses a single logit (BCEWithLogitsLoss); _apply_activation expands to (n, 2).
         # MULTICLASS needs one neuron per class; REGRESSION uses a single scalar.
         if self.problem_type == ProblemType.MULTICLASS:
-            self._num_output_neurons = dataset.determine_num_classes()
+            self._num_output_neurons = dataset.num_classes
         else:
             self._num_output_neurons = 1
 
@@ -318,7 +318,7 @@ class CNNModel(BaseModel):
         Raises:
             RuntimeError: If the model is not initialized.
         """
-        if self.model is None or self.problem_type is None:
+        if self.model is None:
             raise RuntimeError(
                 "CNN model has not been initialized — call model.train() before _train_epoch()"
             )
@@ -364,7 +364,7 @@ class CNNModel(BaseModel):
         Raises:
             RuntimeError: If the model is not initialized.
         """
-        if self.model is None or self.problem_type is None:
+        if self.model is None:
             raise RuntimeError(
                 "CNN model has not been initialized — call model.train() before _validate_epoch()"
             )
@@ -536,7 +536,7 @@ class CNNModel(BaseModel):
         Raises:
             RuntimeError: If the model has not been trained yet.
         """
-        if self.model is None or self.problem_type is None:
+        if self.model is None:
             raise RuntimeError("Model not trained. Call train() first.")
 
         self.model.eval()
