@@ -103,9 +103,7 @@ def cnn_model(sample_data):
     Returns:
         A CNNModel configured and set up for regression.
     """
-    model_config = CNNModelConfig(
-        problem_type=ProblemType.REGRESSION, num_filters=16, num_conv_layers=1, fc_hidden_dim=32
-    )
+    model_config = CNNModelConfig(num_filters=16, num_conv_layers=1, fc_hidden_dim=32)
     train_config = CNNTrainConfig(batch_size=4, num_epochs=2)
     model = CNNModel(
         model_config=model_config,
@@ -271,9 +269,7 @@ class TestCNNModelReproducibility:
             torch.backends.cudnn.deterministic = True
             torch.backends.cudnn.benchmark = False
 
-        model_config = CNNModelConfig(
-            problem_type=ProblemType.REGRESSION, num_filters=16, num_conv_layers=1, fc_hidden_dim=32
-        )
+        model_config = CNNModelConfig(num_filters=16, num_conv_layers=1, fc_hidden_dim=32)
         train_config = CNNTrainConfig(batch_size=4, num_epochs=2)
         dataset = _make_dataset(sample_data.labels, ProblemType.REGRESSION)
 
@@ -336,9 +332,7 @@ class TestEpochMetricsClassification:
 
     def test_binary_training_produces_nonempty_metrics(self):
         """Test that binary training populates accuracy and f1 in the summary."""
-        model_config = CNNModelConfig(
-            problem_type=ProblemType.BINARY, num_filters=4, num_conv_layers=1, fc_hidden_dim=8
-        )
+        model_config = CNNModelConfig(num_filters=4, num_conv_layers=1, fc_hidden_dim=8)
         train_config = CNNTrainConfig(batch_size=4, num_epochs=1)
         model = CNNModel(
             model_config=model_config,
@@ -363,9 +357,7 @@ class TestEpochMetricsClassification:
 
     def test_regression_one_sample_omits_pearson_and_spearman(self):
         """Test that single-sample regression omits pearson and spearman from summary."""
-        model_config = CNNModelConfig(
-            problem_type=ProblemType.REGRESSION, num_filters=4, num_conv_layers=1, fc_hidden_dim=8
-        )
+        model_config = CNNModelConfig(num_filters=4, num_conv_layers=1, fc_hidden_dim=8)
         train_config = CNNTrainConfig(batch_size=1, num_epochs=1)
         model = CNNModel(
             model_config=model_config,

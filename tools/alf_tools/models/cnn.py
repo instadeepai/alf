@@ -70,7 +70,6 @@ class CNNModelConfig:
         dropout: Dropout rate.
     """
 
-    problem_type: ProblemType
     num_filters: int = 128
     kernel_size: int = 3
     num_conv_layers: int = 3
@@ -202,9 +201,8 @@ class CNNModel(BaseModel):
             device: Device to use for training ('cuda', 'cpu', or None for auto-detect).
         """
         self.name = name
-        self.model_config = model_config
+        self.model_config = model_config or CNNModelConfig()
         self.train_config = train_config or CNNTrainConfig()
-        self.problem_type: ProblemType = model_config.problem_type
 
         self.alphabet = alphabet
         self.alphabet_size = len(alphabet)

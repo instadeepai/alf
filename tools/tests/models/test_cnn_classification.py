@@ -66,9 +66,7 @@ def _make_dataset(labels: np.ndarray, problem_type: ProblemType) -> BaseDataset:
 @pytest.fixture
 def binary_model():
     """Return a CNNModel instance configured and set up for binary classification."""
-    model_cfg = CNNModelConfig(
-        problem_type=ProblemType.BINARY, num_filters=8, num_conv_layers=1, fc_hidden_dim=16
-    )
+    model_cfg = CNNModelConfig(num_filters=8, num_conv_layers=1, fc_hidden_dim=16)
     train_cfg = CNNTrainConfig(batch_size=4, num_epochs=1)
     model = CNNModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
     model.setup(_make_dataset(np.array([0, 1, 0, 1], dtype=float), ProblemType.BINARY))
@@ -78,9 +76,7 @@ def binary_model():
 @pytest.fixture
 def multiclass_model():
     """Return a CNNModel instance configured and set up for multiclass classification."""
-    model_cfg = CNNModelConfig(
-        problem_type=ProblemType.MULTICLASS, num_filters=8, num_conv_layers=1, fc_hidden_dim=16
-    )
+    model_cfg = CNNModelConfig(num_filters=8, num_conv_layers=1, fc_hidden_dim=16)
     train_cfg = CNNTrainConfig(batch_size=4, num_epochs=1)
     model = CNNModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
     model.setup(_make_dataset(np.array([0, 1, 2, 0, 1, 2], dtype=float), ProblemType.MULTICLASS))
@@ -194,9 +190,7 @@ class TestCNNRegressionUnchanged:
 
     def test_regression_predict_shape_is_1d(self):
         """Test that regression predictions remain 1D arrays."""
-        model_cfg = CNNModelConfig(
-            problem_type=ProblemType.REGRESSION, num_filters=8, num_conv_layers=1, fc_hidden_dim=16
-        )
+        model_cfg = CNNModelConfig(num_filters=8, num_conv_layers=1, fc_hidden_dim=16)
         train_cfg = CNNTrainConfig(batch_size=4, num_epochs=1)
         model = CNNModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
         labels = np.array([0.1, 0.5, 0.9, 0.3, 0.7, 0.4])
@@ -211,18 +205,14 @@ class TestCNNRegressionUnchanged:
 
     def test_problem_type_is_regression(self):
         """Test that the problem type is set to REGRESSION at initialisation."""
-        model_cfg = CNNModelConfig(
-            problem_type=ProblemType.REGRESSION, num_filters=8, num_conv_layers=1, fc_hidden_dim=16
-        )
+        model_cfg = CNNModelConfig(num_filters=8, num_conv_layers=1, fc_hidden_dim=16)
         train_cfg = CNNTrainConfig(batch_size=4, num_epochs=1)
         model = CNNModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
         assert model.problem_type == ProblemType.REGRESSION
 
     def test_output_neurons_is_one_for_regression(self):
         """Test that regression training uses a single output neuron."""
-        model_cfg = CNNModelConfig(
-            problem_type=ProblemType.REGRESSION, num_filters=8, num_conv_layers=1, fc_hidden_dim=16
-        )
+        model_cfg = CNNModelConfig(num_filters=8, num_conv_layers=1, fc_hidden_dim=16)
         train_cfg = CNNTrainConfig(batch_size=4, num_epochs=1)
         model = CNNModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
         labels = np.array([0.1, 0.5, 0.9, 0.3])

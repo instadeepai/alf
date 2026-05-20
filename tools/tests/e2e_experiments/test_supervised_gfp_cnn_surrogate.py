@@ -24,7 +24,6 @@ from alf_core import (
     Surrogate,
     TerminalStateLogger,
 )
-from alf_core.utils.enums import ProblemType
 from alf_tools.datasets import GFP
 from alf_tools.models import CNNModel, CNNModelConfig, CNNTrainConfig
 
@@ -77,7 +76,7 @@ def surrogate_model():
     """
     return Surrogate(
         model=CNNModel(
-            model_config=CNNModelConfig(problem_type=ProblemType.REGRESSION),
+            model_config=CNNModelConfig(),
             train_config=CNNTrainConfig(num_epochs=10),
         )
     )
