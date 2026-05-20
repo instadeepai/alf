@@ -194,7 +194,6 @@ class DummyModel(BaseModel):
         self,
         train_data: LabelledCandidates,
         val_data: LabelledCandidates,
-        **kwargs: Any,
     ) -> None:
         """Dummy model does not perform any actual training but updates the random seed."""
         self.rng = np.random.RandomState(self.seed + 1)

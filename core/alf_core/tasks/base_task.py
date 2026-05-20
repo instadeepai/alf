@@ -59,6 +59,7 @@ class BaseTask(abc.ABC):
         Returns:
             Initialized task state with the provided dataset and surrogate.
         """
+        surrogate.setup(dataset)
         return State(
             dataset=dataset,
             surrogate=surrogate,

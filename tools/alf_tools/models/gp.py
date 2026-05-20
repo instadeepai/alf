@@ -23,6 +23,7 @@ import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.utils.enums import ProblemType
 from jaxtyping import Float
 
@@ -300,6 +301,7 @@ class GPModel(BaseModel):
         self.model_config = model_config or GPModelConfig()
         self.train_config = train_config or GPTrainConfig()
         self.featurizer_config = featurizer_config or FeaturizerConfig()
+        self.problem_type: ProblemType = ProblemType.REGRESSION
 
         self.alphabet = alphabet
         self.alphabet_size = len(alphabet)
@@ -550,28 +552,35 @@ class GPModel(BaseModel):
 
         return metrics
 
+    def setup(self, dataset: "BaseDataset") -> None:
+        """Validate that the dataset uses REGRESSION problem type.
+
+        Args:
+            dataset: The dataset this model will be trained on.
+
+        Raises:
+            ValueError: If the dataset problem_type is not REGRESSION.
+        """
+        if dataset.config.problem_type != ProblemType.REGRESSION:
+            raise ValueError(
+                f"GPModel only supports REGRESSION, got {dataset.config.problem_type!r}."
+            )
+
     def train(
         self,
         train_data: LabelledCandidates,
         val_data: LabelledCandidates,
-        problem_type: ProblemType,
     ) -> None:
         """Train the GP model by optimizing hyperparameters.
 
         Args:
             train_data: Training data containing sequences and oracle values.
             val_data: Validation data (used for monitoring, not for training).
-            problem_type: Type of problem determining which metrics are computed.
 
         Note:
             For exact GPs, all training data is used for predictions. Validation
             data is only used for logging validation metrics during training.
-
-        Raises:
-            ValueError: If problem_type is not REGRESSION.
         """
-        if problem_type != ProblemType.REGRESSION:
-            raise ValueError(f"GPModel only supports REGRESSION, got {problem_type!r}.")
         self._epoch_metrics = []
         logger.info(f"Training GP with {len(train_data)} samples")
 
@@ -612,7 +621,7 @@ class GPModel(BaseModel):
         train_results = Results(
             predictions=train_predictions_obj,
             targets=train_data.labels,
-            problem_type=problem_type,
+            problem_type=self.problem_type,
         )
         self.training_metrics.update({
             f"final_train_{k}": v for k, v in train_results.metrics.items()
@@ -626,7 +635,7 @@ class GPModel(BaseModel):
             val_results = Results(
                 predictions=val_predictions,
                 targets=val_data.labels,
-                problem_type=problem_type,
+                problem_type=self.problem_type,
             )
             self.training_metrics.update({
                 f"final_val_{k}": v for k, v in val_results.metrics.items()

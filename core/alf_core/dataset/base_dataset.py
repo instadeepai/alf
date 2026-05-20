@@ -19,7 +19,7 @@ import logging
 import os
 from math import floor
 from pathlib import Path
-from typing import Annotated, Literal, Self, Union
+from typing import Annotated, Self, Union
 
 import numpy as np
 from alf_core.dataclasses.candidate import Modality
@@ -297,6 +297,23 @@ class BaseDataset(abc.ABC):
         indices = [self._raw_dataset.candidates.index(cand) for cand in candidates]
         labels = self._raw_dataset.labels[indices]
         return LabelledCandidates(candidates=candidates, labels=labels)
+
+    def determine_num_classes(self) -> int:
+        """Determine the number of output neurons based on problem type and labels.
+
+        Returns:
+            int: Number of output neurons. For REGRESSION and BINARY, returns 1 and 2 respectively.
+        """
+        assert self._raw_dataset is not None, (
+            "Dataset must be loaded before querying; "
+            "_raw_dataset is None — call dataset.setup() before querying"
+        )
+        problem_type = self.config.problem_type
+        if problem_type == ProblemType.BINARY:
+            return 2
+        if problem_type == ProblemType.MULTICLASS:
+            return len(np.unique(self._raw_dataset.labels))
+        return 1
 
     def get_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Get summary metrics for all dataset splits.

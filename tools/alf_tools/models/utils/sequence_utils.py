@@ -30,10 +30,8 @@ Note:
 
 from typing import Literal, Union, overload
 
-import numpy as np
 import torch
 from alf_core import Candidate, LabelledCandidates
-from alf_core.utils.enums import ProblemType
 from jaxtyping import Float
 
 
@@ -134,20 +132,3 @@ def one_hot_encode(
         one_hot = one_hot.view(batch_size, -1)
 
     return one_hot
-
-
-def determine_num_classes(labels: Float, problem_type: ProblemType) -> int:
-    """Determine the number of output neurons based on problem type and labels.
-
-    Args:
-        labels (Float): Array of labels for the dataset.
-        problem_type (ProblemType): Type of problem (REGRESSION, BINARY, MULTICLASS).
-
-    Returns:
-        int: Number of output neurons. For REGRESSION and BINARY, returns 1 and 2 respectively.
-    """
-    if problem_type == ProblemType.BINARY:
-        return 2
-    if problem_type == ProblemType.MULTICLASS:
-        return len(np.unique(labels))
-    return 1

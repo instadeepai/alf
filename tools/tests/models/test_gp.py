@@ -16,7 +16,6 @@ import numpy as np
 import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates
-from alf_core.utils.enums import ProblemType
 from alf_tools.models.gp import (
     FeaturizerConfig,
     GPModel,
@@ -128,7 +127,7 @@ class TestGPModel:
     def test_train_and_predict(self, gp_model, sample_data, sample_val_data):
         """Test the full training and prediction pipeline."""
         # Train should work without error
-        gp_model.train(sample_data, sample_val_data, problem_type=ProblemType.REGRESSION)
+        gp_model.train(sample_data, sample_val_data)
 
         # Model should be initialized
         assert gp_model.gp_model is not None
@@ -155,7 +154,7 @@ class TestGPModel:
         val_candidates = [Candidate(data=seq, modality="sequence") for seq in val_sequences]
         val_data = LabelledCandidates(val_candidates, np.random.randn(3))
 
-        gp_model.train(sample_data, val_data=val_data, problem_type=ProblemType.REGRESSION)
+        gp_model.train(sample_data, val_data=val_data)
 
         metrics = gp_model.get_training_summary_metrics()
         assert "final_mll" in metrics
@@ -200,7 +199,7 @@ class TestGPModel:
 
     def test_get_hyperparameters(self, gp_model, sample_data, sample_val_data):
         """Test that we can extract learned hyperparameters."""
-        gp_model.train(sample_data, val_data=sample_val_data, problem_type=ProblemType.REGRESSION)
+        gp_model.train(sample_data, val_data=sample_val_data)
         hyperparams = gp_model.get_hyperparameters()
 
         assert "noise" in hyperparams
@@ -228,7 +227,7 @@ class TestGPModel:
             )
 
             # Should train without error
-            gp_model.train(sample_data, sample_val_data, problem_type=ProblemType.REGRESSION)
+            gp_model.train(sample_data, sample_val_data)
 
             # Should predict without error
             test_candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")]
@@ -248,7 +247,7 @@ class TestGPModel:
             device="cpu",
         )
 
-        gp_model.train(sample_data, sample_val_data, problem_type=ProblemType.REGRESSION)
+        gp_model.train(sample_data, sample_val_data)
         hyperparams = gp_model.get_hyperparameters()
 
         # With ARD, lengthscale should be an array
@@ -276,7 +275,7 @@ class TestGPModel:
             device="cpu",
         )
 
-        gp_model.train(sample_data, sample_val_data, problem_type=ProblemType.REGRESSION)
+        gp_model.train(sample_data, sample_val_data)
 
         test_candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")]
         predictions = gp_model.predict(test_candidates)
@@ -307,7 +306,7 @@ class TestGPModel:
             featurizer_config=featurizer_config,
             device="cpu",
         )
-        gp_model1.train(sample_data, sample_val_data, problem_type=ProblemType.REGRESSION)
+        gp_model1.train(sample_data, sample_val_data)
 
         set_seed(42)
         gp_model2 = GPModel(
@@ -317,7 +316,7 @@ class TestGPModel:
             featurizer_config=featurizer_config,
             device="cpu",
         )
-        gp_model2.train(sample_data, sample_val_data, problem_type=ProblemType.REGRESSION)
+        gp_model2.train(sample_data, sample_val_data)
 
         # Get predictions from both models
         test_candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")]
@@ -344,7 +343,7 @@ class TestGPModel:
             )
 
             # Should train without error
-            gp_model.train(sample_data, sample_val_data, problem_type=ProblemType.REGRESSION)
+            gp_model.train(sample_data, sample_val_data)
 
             # Should predict without error
             test_candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")]
@@ -363,7 +362,7 @@ class TestGPModel:
             device="cpu",
         )
 
-        gp_model.train(sample_data, sample_val_data, problem_type=ProblemType.REGRESSION)
+        gp_model.train(sample_data, sample_val_data)
         assert gp_model.gp_model is not None
 
     def test_lbfgs_optimizer(self, sample_data, sample_val_data):
@@ -378,7 +377,7 @@ class TestGPModel:
             device="cpu",
         )
 
-        gp_model.train(sample_data, sample_val_data, problem_type=ProblemType.REGRESSION)
+        gp_model.train(sample_data, sample_val_data)
         assert gp_model.gp_model is not None
 
     def test_sinusoidal_data(
@@ -388,7 +387,6 @@ class TestGPModel:
         gp_model_sinusoidal.train(
             sample_sinusoidal_data,
             val_data=val_sinusoidal_data,
-            problem_type=ProblemType.REGRESSION,
         )
         test_candidates = [Candidate(data=x, modality="tabular") for x in np.linspace(0, 10, 10)]
         predictions = gp_model_sinusoidal.predict(test_candidates)

@@ -55,7 +55,6 @@ class DesignTask(BaseTask):
         epoch_metrics = state.surrogate.fit(
             train_data=state.dataset.train_dataset,
             val_data=state.dataset.validation_dataset,
-            problem_type=state.problem_type,
         )
         state.round_metrics.training_history = epoch_metrics
         state = self.evaluate(state=state)

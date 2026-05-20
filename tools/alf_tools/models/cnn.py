@@ -22,6 +22,7 @@ import torch.nn as nn
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.utils.enums import ProblemType
 from jaxtyping import Float
 from torch.utils.data import DataLoader, TensorDataset
@@ -31,7 +32,6 @@ from alf_tools.models.utils import (
     get_device,
     one_hot_encode,
 )
-from alf_tools.models.utils.sequence_utils import determine_num_classes
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 logger = logging.getLogger("alf-tools")
@@ -51,6 +51,7 @@ class CNNModelConfig:
     """Configuration for CNN model architecture.
 
     Args:
+        problem_type: Type of problem. Required — no default to prevent silent misconfiguration.
         num_filters: Number of filters in convolutional layers.
         kernel_size: Size of convolutional kernels.
         num_conv_layers: Number of convolutional layers.
@@ -58,6 +59,7 @@ class CNNModelConfig:
         dropout: Dropout rate.
     """
 
+    problem_type: ProblemType
     num_filters: int = 128
     kernel_size: int = 3
     num_conv_layers: int = 3
@@ -173,8 +175,8 @@ class CNNModel(BaseModel):
 
     def __init__(
         self,
+        model_config: CNNModelConfig,
         name: str = "cnn_model",
-        model_config: CNNModelConfig | None = None,
         train_config: CNNTrainConfig | None = None,
         alphabet: str = PROTEIN_ALPHABET,
         device: str | None = None,
@@ -182,31 +184,56 @@ class CNNModel(BaseModel):
         """Initialize the CNNModel.
 
         Args:
+            model_config: Configuration for model architecture and problem type.
             name: Name of the surrogate model.
-            model_config: Configuration for model architecture.
             train_config: Configuration for training.
             alphabet: Sequence alphabet to use.
             device: Device to use for training ('cuda', 'cpu', or None for auto-detect).
         """
-        # Use defaults if configs not provided
-        self.model_config = model_config or CNNModelConfig()
+        self.name = name
+        self.model_config = model_config
         self.train_config = train_config or CNNTrainConfig()
+        self.problem_type: ProblemType = model_config.problem_type
 
         self.alphabet = alphabet
         self.alphabet_size = len(alphabet)
         self.char_to_idx = create_char_to_idx_mapping(alphabet)
 
-        # Device setup
         self.device = get_device(device)
 
-        # Model initialized on first fit
+        # Set by setup() from the full dataset before training
+        self._num_output_neurons: int | None = None
+
+        # Pytorch model, initialized on first train() call
         self.model: SequenceCNN | None = None
         self.seq_length: int | None = None
 
-        # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
-        self._problem_type: ProblemType | None = None
+
+    def setup(self, dataset: BaseDataset) -> None:
+        """Configure the model from the full dataset before training begins.
+
+        Determines the number of output neurons from the complete label space and
+        validates consistency with the declared problem type.
+
+        Args:
+            dataset: The dataset this model will be trained on.
+
+        Raises:
+            ValueError: If the model's problem_type disagrees with the dataset's.
+        """
+        if dataset.config.problem_type != self.problem_type:
+            raise ValueError(
+                f"CNNModel problem_type {self.problem_type!r} does not match "
+                f"dataset problem_type {dataset.config.problem_type!r}"
+            )
+        # BINARY uses a single logit (BCEWithLogitsLoss); _apply_activation expands to (n, 2).
+        # MULTICLASS needs one neuron per class; REGRESSION uses a single scalar.
+        if self.problem_type == ProblemType.MULTICLASS:
+            self._num_output_neurons = dataset.determine_num_classes()
+        else:
+            self._num_output_neurons = 1
 
     def _one_hot_encode(
         self, sequences: list[str]
@@ -263,7 +290,7 @@ class CNNModel(BaseModel):
             DataLoader for the data.
         """
         x = self.featurise(data).to(self.device)
-        label_dtype = torch.long if self._problem_type == ProblemType.MULTICLASS else torch.float32
+        label_dtype = torch.long if self.problem_type == ProblemType.MULTICLASS else torch.float32
         y = torch.tensor(data.labels, dtype=label_dtype).to(self.device)
         dataset = TensorDataset(x, y)
         return DataLoader(
@@ -291,7 +318,7 @@ class CNNModel(BaseModel):
         Raises:
             RuntimeError: If the model is not initialized.
         """
-        if self.model is None or self._problem_type is None:
+        if self.model is None or self.problem_type is None:
             raise RuntimeError(
                 "CNN model has not been initialized — call model.train() before _train_epoch()"
             )
@@ -308,7 +335,7 @@ class CNNModel(BaseModel):
             optimizer.step()
             train_losses.append(loss.item())
             train_predictions_all.append(
-                _apply_activation(logits, self._problem_type).detach().cpu().numpy()
+                _apply_activation(logits, self.problem_type).detach().cpu().numpy()
             )
             train_targets_all.append(batch_y.detach().cpu().numpy())
 
@@ -319,7 +346,7 @@ class CNNModel(BaseModel):
         train_metrics = Results(
             predictions=Predictions(means=train_preds, variances=None),
             targets=train_targets,
-            problem_type=self._problem_type,
+            problem_type=self.problem_type,
         ).metrics
 
         return avg_train_loss, train_metrics
@@ -337,7 +364,7 @@ class CNNModel(BaseModel):
         Raises:
             RuntimeError: If the model is not initialized.
         """
-        if self.model is None or self._problem_type is None:
+        if self.model is None or self.problem_type is None:
             raise RuntimeError(
                 "CNN model has not been initialized — call model.train() before _validate_epoch()"
             )
@@ -353,7 +380,7 @@ class CNNModel(BaseModel):
                 loss = criterion(logits, batch_y)
                 val_losses.append(loss.item())
                 val_predictions_all.append(
-                    _apply_activation(logits, self._problem_type).cpu().numpy()
+                    _apply_activation(logits, self.problem_type).cpu().numpy()
                 )
                 val_targets_all.append(batch_y.cpu().numpy())
 
@@ -364,7 +391,7 @@ class CNNModel(BaseModel):
         val_metrics = Results(
             predictions=Predictions(means=val_preds, variances=None),
             targets=val_targets,
-            problem_type=self._problem_type,
+            problem_type=self.problem_type,
         ).metrics
 
         return avg_val_loss, val_metrics
@@ -404,27 +431,23 @@ class CNNModel(BaseModel):
         self,
         train_data: LabelledCandidates,
         val_data: LabelledCandidates,
-        problem_type: ProblemType,
     ) -> None:
         """Train the CNN model.
 
         Args:
             train_data: Training data containing sequences and oracle values.
             val_data: Validation data.
-            problem_type: Type of problem determining which metrics are computed.
         """
-        self._problem_type = problem_type
+        assert self._num_output_neurons is not None, (
+            "CNNModel.setup(dataset) must be called before train()"
+        )
         logger.info(
-            f"Training CNN with {len(train_data)} samples (problem_type={self._problem_type})"
+            f"Training CNN with {len(train_data)} samples (problem_type={self.problem_type})"
         )
         self._epoch_metrics = []
 
-        # Determine output neurons: 1 for regression/binary, num_classes for multiclass
-        num_classes = determine_num_classes(train_data.labels, problem_type)
-        output_neurons = num_classes if self._problem_type == ProblemType.MULTICLASS else 1
-
         # Initialize model on first call or when output shape changes
-        if self.model is None or self.model._output_neurons != output_neurons:
+        if self.model is None or self.model._output_neurons != self._num_output_neurons:
             self.seq_length = len(train_data.data[0])
             self.model = SequenceCNN(
                 seq_length=self.seq_length,
@@ -434,7 +457,7 @@ class CNNModel(BaseModel):
                 num_conv_layers=self.model_config.num_conv_layers,
                 fc_hidden_dim=self.model_config.fc_hidden_dim,
                 dropout=self.model_config.dropout,
-                output_neurons=output_neurons,
+                output_neurons=self._num_output_neurons,
             ).to(self.device)
 
         assert self.model is not None  # guaranteed by the block above
@@ -449,9 +472,9 @@ class CNNModel(BaseModel):
 
         # Setup training
         optimizer = optim.Adam(self.model.parameters(), lr=self.train_config.learning_rate)
-        if self._problem_type == ProblemType.REGRESSION:
+        if self.problem_type == ProblemType.REGRESSION:
             criterion: nn.Module = nn.MSELoss()
-        elif self._problem_type == ProblemType.BINARY:
+        elif self.problem_type == ProblemType.BINARY:
             criterion = nn.BCEWithLogitsLoss()
         else:
             criterion = nn.CrossEntropyLoss()
@@ -513,7 +536,7 @@ class CNNModel(BaseModel):
         Raises:
             RuntimeError: If the model has not been trained yet.
         """
-        if self.model is None or self._problem_type is None:
+        if self.model is None or self.problem_type is None:
             raise RuntimeError("Model not trained. Call train() first.")
 
         self.model.eval()
@@ -522,7 +545,7 @@ class CNNModel(BaseModel):
         with torch.no_grad():
             logits = self.model(x)
 
-        probs = _apply_activation(logits, self._problem_type).cpu().numpy()  # (n, num_classes)
+        probs = _apply_activation(logits, self.problem_type).cpu().numpy()  # (n, num_classes)
         return Predictions(means=probs)
 
     def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:

@@ -17,6 +17,7 @@
 import numpy as np
 import pytest
 from alf_core import Candidate, LabelledCandidates
+from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.utils.enums import ProblemType
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 
@@ -33,26 +34,57 @@ def make_data(labels: list[int]) -> LabelledCandidates:
     return LabelledCandidates(candidates, np.array(labels, dtype=float))
 
 
+def _make_dataset(labels: np.ndarray, problem_type: ProblemType) -> BaseDataset:
+    """Create a minimal BaseDataset for model setup in tests.
+
+    Sets _raw_dataset directly so determine_num_classes() works without a full
+    dataset load/split cycle.
+
+    Returns:
+        A BaseDataset with _raw_dataset pre-populated from the given labels.
+    """
+
+    class _TestDataset(BaseDataset):
+        def load_dataset(self) -> LabelledCandidates:
+            candidates = [Candidate(data=SEQ, modality="sequence") for _ in labels]
+            return LabelledCandidates(candidates=candidates, labels=labels)
+
+    config = BaseDatasetConfig(
+        name="test",
+        modality="sequence",
+        seed=0,
+        train_ratio=0.6,
+        validation_frac=0.2,
+        test_ratio=0.2,
+        problem_type=problem_type,
+    )
+    dataset = _TestDataset(config)
+    dataset._raw_dataset = dataset.load_dataset()
+    return dataset
+
+
 @pytest.fixture
-def small_config() -> tuple[CNNModelConfig, CNNTrainConfig]:
-    """Return a minimal CNNModelConfig and CNNTrainConfig for fast tests."""
-    model_cfg = CNNModelConfig(num_filters=8, num_conv_layers=1, fc_hidden_dim=16)
+def binary_model():
+    """Return a CNNModel instance configured and set up for binary classification."""
+    model_cfg = CNNModelConfig(
+        problem_type=ProblemType.BINARY, num_filters=8, num_conv_layers=1, fc_hidden_dim=16
+    )
     train_cfg = CNNTrainConfig(batch_size=4, num_epochs=1)
-    return model_cfg, train_cfg
+    model = CNNModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
+    model.setup(_make_dataset(np.array([0, 1, 0, 1], dtype=float), ProblemType.BINARY))
+    return model
 
 
 @pytest.fixture
-def binary_model(small_config):
-    """Return a CNNModel instance for binary classification tests."""
-    model_cfg, train_cfg = small_config
-    return CNNModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
-
-
-@pytest.fixture
-def multiclass_model(small_config):
-    """Return a CNNModel instance for multiclass classification tests."""
-    model_cfg, train_cfg = small_config
-    return CNNModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
+def multiclass_model():
+    """Return a CNNModel instance configured and set up for multiclass classification."""
+    model_cfg = CNNModelConfig(
+        problem_type=ProblemType.MULTICLASS, num_filters=8, num_conv_layers=1, fc_hidden_dim=16
+    )
+    train_cfg = CNNTrainConfig(batch_size=4, num_epochs=1)
+    model = CNNModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
+    model.setup(_make_dataset(np.array([0, 1, 2, 0, 1, 2], dtype=float), ProblemType.MULTICLASS))
+    return model
 
 
 class TestCNNBinaryClassification:
@@ -62,20 +94,17 @@ class TestCNNBinaryClassification:
         """Test that training in BINARY mode completes without error."""
         data = make_data([0, 1, 0, 1, 0, 1, 0, 1])
         val_data = make_data([0, 1, 0, 1])
-        binary_model.train(data, val_data, problem_type=ProblemType.BINARY)
+        binary_model.train(data, val_data)
 
-    def test_problem_type_stored(self, binary_model):
-        """Test that the problem type is stored on the model after training."""
-        data = make_data([0, 1, 0, 1])
-        val_data = make_data([0, 1, 0, 1])
-        binary_model.train(data, val_data, problem_type=ProblemType.BINARY)
-        assert binary_model._problem_type == ProblemType.BINARY
+    def test_problem_type_set_at_init(self, binary_model):
+        """Test that the problem type is set on the model at initialisation."""
+        assert binary_model.problem_type == ProblemType.BINARY
 
     def test_predict_shape(self, binary_model):
         """Test that binary predictions have shape (n_samples, 2)."""
         data = make_data([0, 1, 0, 1, 0, 1])
         val_data = make_data([0, 1, 0, 1])
-        binary_model.train(data, val_data, problem_type=ProblemType.BINARY)
+        binary_model.train(data, val_data)
         preds = binary_model.predict(data.candidates)
         # Binary: means must be (n_samples, 2)
         assert preds.means.ndim == 2
@@ -85,7 +114,7 @@ class TestCNNBinaryClassification:
         """Test that binary predicted probabilities sum to 1 for each sample."""
         data = make_data([0, 1, 0, 1, 0, 1])
         val_data = make_data([0, 1, 0, 1])
-        binary_model.train(data, val_data, problem_type=ProblemType.BINARY)
+        binary_model.train(data, val_data)
         preds = binary_model.predict(data.candidates)
         np.testing.assert_allclose(preds.means.sum(axis=1), np.ones(len(data)), atol=1e-5)
 
@@ -93,7 +122,7 @@ class TestCNNBinaryClassification:
         """Test that binary predicted probabilities are in [0, 1]."""
         data = make_data([0, 1, 0, 1])
         val_data = make_data([0, 1, 0, 1])
-        binary_model.train(data, val_data, problem_type=ProblemType.BINARY)
+        binary_model.train(data, val_data)
         preds = binary_model.predict(data.candidates)
         assert np.all(preds.means >= 0.0)
         assert np.all(preds.means <= 1.0)
@@ -102,7 +131,7 @@ class TestCNNBinaryClassification:
         """Test that the binary model uses a single output neuron (logit)."""
         data = make_data([0, 1, 0, 1])
         val_data = make_data([0, 1, 0, 1])
-        binary_model.train(data, val_data, problem_type=ProblemType.BINARY)
+        binary_model.train(data, val_data)
         assert binary_model.model is not None
         assert binary_model.model._output_neurons == 1
 
@@ -111,7 +140,7 @@ class TestCNNBinaryClassification:
         data = make_data([0, 1, 0, 1, 0, 1])
         val_data = make_data([0, 1, 0, 1, 0, 1])
         # Would raise RuntimeError if wrong loss or dtype
-        binary_model.train(data, val_data, problem_type=ProblemType.BINARY)
+        binary_model.train(data, val_data)
 
 
 class TestCNNMulticlassClassification:
@@ -121,20 +150,17 @@ class TestCNNMulticlassClassification:
         """Test that training in MULTICLASS mode completes without error."""
         data = make_data([0, 1, 2, 0, 1, 2])
         val_data = make_data([0, 1, 2, 0, 1, 2])
-        multiclass_model.train(data, val_data, problem_type=ProblemType.MULTICLASS)
+        multiclass_model.train(data, val_data)
 
-    def test_problem_type_stored(self, multiclass_model):
-        """Test that the problem type is stored on the model after training."""
-        data = make_data([0, 1, 2, 0, 1, 2])
-        val_data = make_data([0, 1, 2, 0, 1, 2])
-        multiclass_model.train(data, val_data, problem_type=ProblemType.MULTICLASS)
-        assert multiclass_model._problem_type == ProblemType.MULTICLASS
+    def test_problem_type_set_at_init(self, multiclass_model):
+        """Test that the problem type is set on the model at initialisation."""
+        assert multiclass_model.problem_type == ProblemType.MULTICLASS
 
     def test_predict_shape(self, multiclass_model):
         """Test that multiclass predictions have shape (n_samples, num_classes)."""
         data = make_data([0, 1, 2, 0, 1, 2])
         val_data = make_data([0, 1, 2, 0, 1, 2])
-        multiclass_model.train(data, val_data, problem_type=ProblemType.MULTICLASS)
+        multiclass_model.train(data, val_data)
         preds = multiclass_model.predict(data.candidates)
         # Multiclass: means must be (n_samples, num_classes)
         assert preds.means.ndim == 2
@@ -144,7 +170,7 @@ class TestCNNMulticlassClassification:
         """Test that multiclass predicted probabilities sum to 1 for each sample."""
         data = make_data([0, 1, 2, 0, 1, 2])
         val_data = make_data([0, 1, 2, 0, 1, 2])
-        multiclass_model.train(data, val_data, problem_type=ProblemType.MULTICLASS)
+        multiclass_model.train(data, val_data)
         preds = multiclass_model.predict(data.candidates)
         np.testing.assert_allclose(preds.means.sum(axis=1), np.ones(len(data)), atol=1e-5)
 
@@ -152,7 +178,7 @@ class TestCNNMulticlassClassification:
         """Test that the multiclass model output neuron count equals num_classes."""
         data = make_data([0, 1, 2, 0, 1, 2])
         val_data = make_data([0, 1, 2, 0, 1, 2])
-        multiclass_model.train(data, val_data, problem_type=ProblemType.MULTICLASS)
+        multiclass_model.train(data, val_data)
         assert multiclass_model.model is not None
         assert multiclass_model.model._output_neurons == 3
 
@@ -160,7 +186,7 @@ class TestCNNMulticlassClassification:
         """CrossEntropyLoss works with long labels — no dtype error."""
         data = make_data([0, 1, 2, 0, 1, 2])
         val_data = make_data([0, 1, 2, 0, 1, 2])
-        multiclass_model.train(data, val_data, problem_type=ProblemType.MULTICLASS)
+        multiclass_model.train(data, val_data)
 
 
 class TestCNNRegressionUnchanged:
@@ -168,45 +194,42 @@ class TestCNNRegressionUnchanged:
 
     def test_regression_predict_shape_is_1d(self):
         """Test that regression predictions remain 1D arrays."""
-        model_cfg = CNNModelConfig(num_filters=8, num_conv_layers=1, fc_hidden_dim=16)
+        model_cfg = CNNModelConfig(
+            problem_type=ProblemType.REGRESSION, num_filters=8, num_conv_layers=1, fc_hidden_dim=16
+        )
         train_cfg = CNNTrainConfig(batch_size=4, num_epochs=1)
         model = CNNModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
-        data = make_data([0, 1, 2, 3, 4, 5])
-        data_float = LabelledCandidates(data.candidates, np.array([0.1, 0.5, 0.9, 0.3, 0.7, 0.4]))
-        model.train(data_float, val_data=data_float, problem_type=ProblemType.REGRESSION)
+        labels = np.array([0.1, 0.5, 0.9, 0.3, 0.7, 0.4])
+        model.setup(_make_dataset(labels, ProblemType.REGRESSION))
+        data_float = LabelledCandidates(
+            [Candidate(data=SEQ, modality="sequence") for _ in labels], labels
+        )
+        model.train(data_float, val_data=data_float)
         preds = model.predict(data_float.candidates)
         assert preds.means.ndim == 1
         assert preds.means.shape == (len(data_float),)
 
     def test_problem_type_is_regression(self):
-        """Test that the default problem type before training is REGRESSION."""
-        model_cfg = CNNModelConfig(num_filters=8, num_conv_layers=1, fc_hidden_dim=16)
+        """Test that the problem type is set to REGRESSION at initialisation."""
+        model_cfg = CNNModelConfig(
+            problem_type=ProblemType.REGRESSION, num_filters=8, num_conv_layers=1, fc_hidden_dim=16
+        )
         train_cfg = CNNTrainConfig(batch_size=4, num_epochs=1)
         model = CNNModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
-
-        # Problem type is set in train loop
-        model.train(
-            train_data=LabelledCandidates(
-                make_data([0, 1, 2, 3, 4, 5]).candidates, np.array([0, 1, 1, 2, 3, 4])
-            ),
-            val_data=LabelledCandidates([], np.array([])),
-            problem_type=ProblemType.REGRESSION,
-        )
-        assert model._problem_type == ProblemType.REGRESSION
+        assert model.problem_type == ProblemType.REGRESSION
 
     def test_output_neurons_is_one_for_regression(self):
         """Test that regression training uses a single output neuron."""
-        model_cfg = CNNModelConfig(num_filters=8, num_conv_layers=1, fc_hidden_dim=16)
+        model_cfg = CNNModelConfig(
+            problem_type=ProblemType.REGRESSION, num_filters=8, num_conv_layers=1, fc_hidden_dim=16
+        )
         train_cfg = CNNTrainConfig(batch_size=4, num_epochs=1)
         model = CNNModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
+        labels = np.array([0.1, 0.5, 0.9, 0.3])
+        model.setup(_make_dataset(labels, ProblemType.REGRESSION))
         data_float = LabelledCandidates(
-            [Candidate(data=SEQ, modality="sequence") for _ in range(4)],
-            np.array([0.1, 0.5, 0.9, 0.3]),
+            [Candidate(data=SEQ, modality="sequence") for _ in labels], labels
         )
-        val_data = LabelledCandidates(
-            [Candidate(data=SEQ, modality="sequence") for _ in range(4)],
-            np.array([0.1, 0.5, 0.9, 0.3]),
-        )
-        model.train(data_float, val_data, problem_type=ProblemType.REGRESSION)
+        model.train(data_float, data_float)
         assert model.model is not None
         assert model.model._output_neurons == 1

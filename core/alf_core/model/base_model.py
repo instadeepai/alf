@@ -23,6 +23,7 @@ from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
 
 if TYPE_CHECKING:
     from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+    from alf_core.dataset.base_dataset import BaseDataset
 
 
 class BaseModel(abc.ABC):
@@ -48,14 +49,12 @@ class BaseModel(abc.ABC):
         self,
         train_data: LabelledCandidates,
         val_data: LabelledCandidates,
-        **kwargs: Any,
     ) -> None:
         """Train the model on the provided training and validation data.
 
         Args:
             train_data: Labeled candidates for training.
             val_data: Labeled candidates for validation.
-            **kwargs: Additional keyword arguments (e.g. ``problem_type``).
         """
         pass
 
@@ -81,6 +80,14 @@ class BaseModel(abc.ABC):
 
         Returns:
             List of sampled candidate points.
+        """
+        pass
+
+    def setup(self, dataset: "BaseDataset") -> None:
+        """Configure the model for the given dataset. Called once before training begins.
+
+        Args:
+            dataset: The dataset this model will be trained on.
         """
         pass
 
