@@ -50,7 +50,8 @@ class CoreSet(AcquisitionFunction):
     Candidates are scored by their selection rank (n_select - step), so the
     first selected candidate receives the highest score and the last receives 1.
     Unselected candidates receive a score of 0.
-    This is a maximising acquisition function.
+    This is a maximising acquisition function that uses features as a 
+    2-D array of shape (n_inputs, d).
     """
 
     def __call__(
@@ -59,6 +60,7 @@ class CoreSet(AcquisitionFunction):
         state: State,
     ) -> LabelledCandidates:
         """Compute CoreSet acquisition values for unlabelled candidates.
+        The model's featurise() must return a 2-D array of shape (n_inputs, d).
 
         Args:
             search_candidates: List of unlabelled candidates to score.
