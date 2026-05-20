@@ -77,7 +77,7 @@ class Predictions:
         self,
         candidates: list[Candidate],
         targets: np.ndarray,
-        problem_type: Optional[ProblemType] = None,
+        problem_type: ProblemType,
     ) -> pd.DataFrame:
         """Convert predictions to a DataFrame.
 
@@ -87,7 +87,7 @@ class Predictions:
         Args:
             candidates: List of Candidate objects corresponding to the predictions.
             targets: Ground truth target values corresponding to each candidate.
-            problem_type: Optional ProblemType to determine the predictions type.
+            problem_type: ProblemType to determine the predictions type.
 
         Returns:
             A DataFrame with predictions, targets, and optionally variances
