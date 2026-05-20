@@ -26,6 +26,7 @@ from alf_core import Candidate, Predictions
 from alf_core.dataclasses.candidate import Modality
 from botorch.posteriors.gpytorch import GPyTorchPosterior
 from gpytorch.distributions import MultivariateNormal
+from linear_operator.operators import DiagLinearOperator
 
 
 def candidates_to_tensor(
@@ -116,7 +117,9 @@ def tensor_to_candidates(
     """
     X_numpy = X.detach().cpu().numpy()
     candidates = [
-        Candidate(data=x, modality=modality, features=dict(features) if features is not None else None)
+        Candidate(
+            data=x, modality=modality, features=dict(features) if features is not None else None
+        )
         for x in X_numpy
     ]
     return candidates
@@ -161,11 +164,8 @@ def predictions_to_posterior(
     mean = torch.from_numpy(predictions.means).float().to(device)
     variance = torch.from_numpy(predictions.variances).float().to(device)
 
-    # Create diagonal covariance matrix
-    # Shape: (n, n) where n is the number of points
-    # Use clamp to ensure positive variance for numerical stability
     variance_clamped = torch.clamp(variance, min=1e-6)
-    covar = torch.diag_embed(variance_clamped.squeeze(-1))
+    covar = DiagLinearOperator(variance_clamped.squeeze(-1))
 
     # Create multivariate normal distribution
     mvn = MultivariateNormal(mean, covar)
@@ -190,6 +190,10 @@ def get_bounds_tensor(
                                             [upper_1, ..., upper_d]]
             - list of tuples: [(lower_1, upper_1), ..., (lower_d, upper_d)]
         device: Optional device to place the tensor on. If None, uses CPU.
+
+    Raises:
+        ValueError: If bounds are not in a valid format or if lower
+        bounds are not <= upper bounds.
 
     Returns:
         Tensor of shape (2, d) in BoTorch format.

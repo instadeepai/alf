@@ -89,6 +89,19 @@ def test_candidates_to_tensor_device():
         assert X_gpu.device.type == "cuda"
 
 
+def test_candidates_to_tensor_with_list_data():
+    """Test conversion when candidate data is a plain Python list (np.asarray fallback)."""
+    candidates = [
+        Candidate(data=[1.0, 2.0], modality=Modality.TABULAR),
+        Candidate(data=[3.0, 4.0], modality=Modality.TABULAR),
+    ]
+
+    X = candidates_to_tensor(candidates)
+
+    assert X.shape == (2, 2)
+    assert torch.allclose(X, torch.tensor([[1.0, 2.0], [3.0, 4.0]]))
+
+
 def test_tensor_to_candidates_basic():
     """Test basic conversion of tensor to candidates."""
     X = torch.tensor([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
@@ -170,6 +183,18 @@ def test_predictions_to_posterior_shape_handling():
     assert posterior.covariance_matrix.shape == torch.Size([3, 3])
 
 
+def test_predictions_to_posterior_variance_clamping():
+    """Test that near-zero or zero variances are clamped to at least 1e-6."""
+    means = np.array([1.0, 2.0, 3.0])
+    variances = np.array([0.0, 1e-9, 0.1])
+    predictions = Predictions(means=means, variances=variances)
+
+    posterior = predictions_to_posterior(predictions)
+
+    posterior_variance = posterior.variance.squeeze()
+    assert torch.all(posterior_variance >= 1e-6)
+
+
 def test_get_bounds_tensor_from_numpy():
     """Test conversion of numpy bounds to tensor."""
     bounds = np.array([[0.0, 0.0], [1.0, 1.0]])  # Shape (2, 2)
@@ -199,6 +224,14 @@ def test_get_bounds_tensor_device():
     bounds_tensor = get_bounds_tensor(bounds, device=torch.device("cpu"))
 
     assert bounds_tensor.device.type == "cpu"
+
+
+def test_get_bounds_tensor_invalid_bounds():
+    """Test that bounds where lower > upper raise ValueError."""
+    bounds = np.array([[1.0, 0.0], [0.0, 1.0]])  # lower[0]=1.0 > upper[0]=0.0
+
+    with pytest.raises(ValueError, match="lower bounds <= upper bounds"):
+        get_bounds_tensor(bounds)
 
 
 def test_roundtrip_conversion():
