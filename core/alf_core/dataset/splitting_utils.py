@@ -60,7 +60,7 @@ def split_dataset(
         return split_low_vs_high(
             dataset, train_size, validation_size, test_size, candidate_pool_size, seed
         )
-    elif split_type == "stratified":
+    else:
         return split_stratified(
             dataset, train_size, validation_size, test_size, candidate_pool_size, seed
         )

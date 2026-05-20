@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import warnings
 from functools import wraps
 from typing import Any, Callable
@@ -26,6 +27,8 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def check_inputs(means: np.ndarray, targets: np.ndarray) -> None:
@@ -890,6 +893,7 @@ def auc_roc(
         {"auc_roc": AUC-ROC float}
     """
     if len(np.unique(targets)) < 2:
+        logger.warning("auc_roc: fewer than 2 unique classes in targets — returning empty dict.")
         return {}
     if probs.shape[1] == 2:
         return {"auc_roc": float(roc_auc_score(targets, probs[:, 1]))}

@@ -56,6 +56,9 @@ class BaseTask(abc.ABC):
             dataset: The dataset containing train/validation/test splits.
             surrogate: The surrogate model to use for predictions.
 
+        Raises:
+            RuntimeError: If dataset.setup() has not been called before this method.
+
         Returns:
             Initialized task state with the provided dataset and surrogate.
         """
