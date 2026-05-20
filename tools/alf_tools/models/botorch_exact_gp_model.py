@@ -34,7 +34,7 @@ from botorch.models import SingleTaskGP
 from botorch.optim.fit import fit_gpytorch_mll_torch
 from gpytorch.kernels import MaternKernel, RBFKernel, ScaleKernel
 from gpytorch.mlls import ExactMarginalLogLikelihood
-from torch.optim import Adam
+from torch.optim import Adam, AdamW
 
 from alf_tools.models.utils.torch_utils import get_device
 from alf_tools.utils.botorch_utils import candidates_to_tensor
@@ -228,31 +228,34 @@ class BoTorchGPModel(BaseModel):
         try:
             if self.optimizer == "scipy":
                 # Use L-BFGS-B optimizer with scipy
-                fit_gpytorch_mll(
-                    mll,
-                    optimizer_kwargs={"options": {"maxiter": self.num_iterations}},
-                    max_attempts=self.max_attempts,
-                )
-                logger.info(
-                    f"Successfully trained BoTorch GP model using scipy L-BFGS-B "
-                    f"(maxiter={self.num_iterations}, max_attempts={self.max_attempts})"
-                )
+                optimizer = None
+                optimizer_kwargs={"options": {"maxiter": self.num_iterations}}
+                logging_optimizer = "scipy L-BFGS-B"
             else:  # torch
                 # Use torch Adam optimizer
-                fit_gpytorch_mll(
-                    mll,
-                    optimizer=fit_gpytorch_mll_torch,
-                    optimizer_kwargs={
-                        "step_limit": self.num_iterations,
-                        "optimizer": lambda params: Adam(params, lr=self.learning_rate),
-                    },
-                    max_attempts=self.max_attempts,
-                )
-                logger.info(
-                    f"Successfully trained BoTorch GP model using torch Adam "
-                    f"(step_limit={self.num_iterations}, lr={self.learning_rate}, "
-                    f"max_attempts={self.max_attempts})"
-                )
+                if self.optimizer == "adamw":
+                    kwargs_optimizer = lambda params: AdamW(params, lr=self.learning_rate)
+                else:
+                    kwargs_optimizer = lambda params: Adam(params, lr=self.learning_rate)
+                optimizer=fit_gpytorch_mll_torch
+                optimizer_kwargs={
+                    "step_limit": self.num_iterations,
+                    "optimizer": kwargs_optimizer,
+                }
+                logging_optimizer = f"torch {"Adam" if self.optimizer is None else self.optimizer.upper()}"
+
+            fit_gpytorch_mll(
+                mll,
+                optimizer=optimizer,
+                optimizer_kwargs=optimizer_kwargs,
+                max_attempts=self.max_attempts,
+            )
+            logger.info(
+                f"Successfully trained BoTorch GP model using {logging_optimizer} "
+                f"(step_limit={self.num_iterations}, "
+                f"max_attempts={self.max_attempts})" + (
+                    f", lr={self.learning_rate}" if self.optimizer == "torch" else "")
+            )
 
             # Record final loss
             self.model.eval()
