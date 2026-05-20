@@ -210,16 +210,16 @@ def get_bounds_tensor(
             and np.all(arr[0] <= arr[1])  # Ensure lower <= upper
         )
 
-    assert is_valid_bounds_array(bounds), (
-        "Bounds must be a numpy array of shape(2, d) with lower bounds <= upper bounds"
-    )
-
     if isinstance(bounds, np.ndarray):
         # Already in (2, d) format
         bounds_array = bounds
     else:
         # Convert list of tuples to (2, d) array
         bounds_array = np.array(bounds).T  # Transpose to get (2, d)
+
+    assert is_valid_bounds_array(bounds_array), (
+        "Bounds must be a numpy array of shape(2, d) with lower bounds <= upper bounds"
+    )
 
     bounds_tensor = torch.from_numpy(bounds_array).float().to(device)
     return bounds_tensor
