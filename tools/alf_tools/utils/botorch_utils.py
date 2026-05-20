@@ -71,7 +71,7 @@ def candidates_to_tensor(
 
         # Convert to numpy array if torch tensor
         if isinstance(data, torch.Tensor):
-            data = data.cpu().numpy()
+            data = data.detach().cpu().numpy()
         elif not isinstance(data, np.ndarray):
             # Try to convert to numpy
             data = np.asarray(data)
@@ -115,7 +115,10 @@ def tensor_to_candidates(
         2
     """
     X_numpy = X.detach().cpu().numpy()
-    candidates = [Candidate(data=x, modality=modality, features=features) for x in X_numpy]
+    candidates = [
+        Candidate(data=x, modality=modality, features=dict(features) if features is not None else None)
+        for x in X_numpy
+    ]
     return candidates
 
 
@@ -155,8 +158,6 @@ def predictions_to_posterior(
     if device is None:
         device = torch.device("cpu")
 
-    # Convert to tensors - detach to avoid gradient issues since predictions
-    # come from a model that doesn't maintain torch gradient flow
     mean = torch.from_numpy(predictions.means).float().to(device)
     variance = torch.from_numpy(predictions.variances).float().to(device)
 
@@ -164,7 +165,7 @@ def predictions_to_posterior(
     # Shape: (n, n) where n is the number of points
     # Use clamp to ensure positive variance for numerical stability
     variance_clamped = torch.clamp(variance, min=1e-6)
-    covar = torch.diag_embed(variance_clamped)
+    covar = torch.diag_embed(variance_clamped.squeeze(-1))
 
     # Create multivariate normal distribution
     mvn = MultivariateNormal(mean, covar)
@@ -217,9 +218,10 @@ def get_bounds_tensor(
         # Convert list of tuples to (2, d) array
         bounds_array = np.array(bounds).T  # Transpose to get (2, d)
 
-    assert is_valid_bounds_array(bounds_array), (
-        "Bounds must be a numpy array of shape(2, d) with lower bounds <= upper bounds"
-    )
+    if not is_valid_bounds_array(bounds_array):
+        raise ValueError(
+            "Bounds must be a numpy array of shape (2, d) with lower bounds <= upper bounds"
+        )
 
     bounds_tensor = torch.from_numpy(bounds_array).float().to(device)
     return bounds_tensor

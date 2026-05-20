@@ -132,7 +132,7 @@ def test_predictions_to_posterior_basic():
     posterior = predictions_to_posterior(predictions)
 
     assert isinstance(posterior, GPyTorchPosterior)
-    assert posterior.mean.shape in [torch.Size([3, 1])]
+    assert posterior.mean.shape == torch.Size([3, 1])
     # Check values regardless of shape
     mean_flat = posterior.mean.flatten()
     assert torch.allclose(mean_flat, torch.tensor([1.0, 2.0, 3.0]))
@@ -166,8 +166,7 @@ def test_predictions_to_posterior_shape_handling():
 
     posterior = predictions_to_posterior(predictions)
 
-    # Should handle shape correctly (mean can be [3] or [3, 1])
-    assert posterior.mean.shape in [torch.Size([3]), torch.Size([3, 1])]
+    assert posterior.mean.shape == torch.Size([3, 1])
     assert posterior.covariance_matrix.shape == torch.Size([3, 3])
 
 
