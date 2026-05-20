@@ -114,6 +114,8 @@ class BoTorchGPModel(BaseModel):
             dtype: Data type for tensors. Default: torch.float32.
             kernel_type: "matern" or None. If None, RBF is used by default.
             nu: nu value for Matern kernel. Default 2.5 aka Matern 5/2.
+            use_ard: Whether to use ARD (Automatic Relevance Determination) in the
+                kernel. Default: False.
 
         Raises:
             ValueError: If optimizer is not 'scipy' or 'torch'.
@@ -167,7 +169,7 @@ class BoTorchGPModel(BaseModel):
             ValueError: If candidates don't contain valid tensor data.
         """
         return candidates_to_tensor(inputs, device=self.device)
-    
+
     def _validate_shape(self, tensor: torch.Tensor) -> None:
         if tensor.ndim != 2:
             raise ValueError(f"Expected 2D input tensor, got shape {tensor.shape}")
@@ -207,14 +209,16 @@ class BoTorchGPModel(BaseModel):
         # Initialize SingleTaskGP
         # Note: SingleTaskGP automatically applies Standardize outcome transform
         # if standardize_outputs=True (which is the default)
-        ard_num_dims=self.train_X.shape[-1] if self.use_ard else None
+        ard_num_dims = self.train_X.shape[-1] if self.use_ard else None
         if self.kernel_type == "matern":
             covar_module = ScaleKernel(MaternKernel(nu=self.nu, ard_num_dims=ard_num_dims))
         elif self.kernel_type == "rbf":
             covar_module = ScaleKernel(RBFKernel(nu=self.nu, ard_num_dims=ard_num_dims))
         else:
             covar_module = None
-            logger.warning(f"Invalid kernel_type '{self.kernel_type}' specified. Using default RBF kernel.")
+            logger.warning(
+                f"Invalid kernel_type '{self.kernel_type}' specified. Using default RBF kernel."
+            )
 
         self.model = SingleTaskGP(
             train_X=self.train_X, train_Y=self.train_Y, covar_module=covar_module
@@ -228,33 +232,37 @@ class BoTorchGPModel(BaseModel):
         try:
             if self.optimizer == "scipy":
                 # Use L-BFGS-B optimizer with scipy
-                optimizer = None
-                optimizer_kwargs={"options": {"maxiter": self.num_iterations}}
                 logging_optimizer = "scipy L-BFGS-B"
+
+                fit_gpytorch_mll(
+                    mll,
+                    optimizer_kwargs={"options": {"maxiter": self.num_iterations}},
+                    max_attempts=self.max_attempts,
+                )
             else:  # torch
                 # Use torch Adam optimizer
                 if self.optimizer == "adamw":
                     optim = AdamW
                 else:
                     optim = Adam
-                optimizer=fit_gpytorch_mll_torch
-                optimizer_kwargs={
-                    "step_limit": self.num_iterations,
-                    "optimizer": lambda params: optim(params, lr=self.learning_rate),
-                }
-                logging_optimizer = f"torch {"Adam" if self.optimizer is None else self.optimizer.upper()}"
+                logging_optimizer = (
+                    f"torch {'Adam' if self.optimizer is None else self.optimizer.upper()}"
+                )
 
-            fit_gpytorch_mll(
-                mll,
-                optimizer=optimizer,
-                optimizer_kwargs=optimizer_kwargs,
-                max_attempts=self.max_attempts,
-            )
+                fit_gpytorch_mll(
+                    mll,
+                    optimizer=fit_gpytorch_mll_torch,
+                    optimizer_kwargs={
+                        "step_limit": self.num_iterations,
+                        "optimizer": lambda params: optim(params, lr=self.learning_rate),
+                    },
+                    max_attempts=self.max_attempts,
+                )
             logger.info(
                 f"Successfully trained BoTorch GP model using {logging_optimizer} "
                 f"(step_limit={self.num_iterations}, "
-                f"max_attempts={self.max_attempts})" + (
-                    f", lr={self.learning_rate}" if self.optimizer == "torch" else "")
+                f"max_attempts={self.max_attempts})"
+                + (f", lr={self.learning_rate}" if self.optimizer == "torch" else "")
             )
 
             # Record final loss
