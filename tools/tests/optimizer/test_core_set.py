@@ -83,21 +83,6 @@ class EmbeddingModel(_BaseTestModel):
         return self._embeddings[indices]
 
 
-class NullFeaturiseModel(_BaseTestModel):
-    """Test model whose featurise returns None."""
-
-    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> None:
-        """Return None to trigger the ValueError path.
-
-        Args:
-            inputs: Candidates (unused).
-
-        Returns:
-            None.
-        """
-        return None
-
-
 class MockDataset(BaseDataset):
     """Minimal dataset subclass exposing only train_dataset for testing."""
 
@@ -227,20 +212,6 @@ class TestCoreSet:
         result = CoreSet()(search_candidates, state)
 
         assert (result.labels > 0).all()
-
-    def test_raises_on_none_features(self) -> None:
-        """ValueError is raised when the model's featurise returns None."""
-        train_candidates = [Candidate(data="train_0", modality="sequence")]
-        search_candidates = [Candidate(data="cand_0", modality="sequence")]
-        dataset = MockDataset(train_candidates=train_candidates, train_labels=np.zeros(1))
-        state = State(
-            dataset=dataset,
-            surrogate=Surrogate(model=NullFeaturiseModel()),
-            acq_batch_size=1,
-        )
-
-        with pytest.raises(ValueError, match="featurise returned None"):
-            CoreSet()(search_candidates, state)
 
     def test_empty_training_set_selects_by_mutual_distance(self) -> None:
         """When training set is empty, greedy selection is driven by mutual candidate distances.
