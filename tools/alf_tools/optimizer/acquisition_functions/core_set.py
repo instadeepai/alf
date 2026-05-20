@@ -18,6 +18,8 @@ from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
 from jaxtyping import Float
 from scipy.spatial.distance import cdist
 
+_CDIST_CHUNK_SIZE = 512
+
 
 def _to_numpy(features: Float[np.ndarray | torch.Tensor, "n_samples n_features"]) -> np.ndarray:
     """Convert model features to a numpy array.
@@ -50,7 +52,7 @@ class CoreSet(AcquisitionFunction):
     Candidates are scored by their selection rank (n_select - step), so the
     first selected candidate receives the highest score and the last receives 1.
     Unselected candidates receive a score of 0.
-    This is a maximising acquisition function that uses features as a 
+    This is a maximising acquisition function that uses features as a
     2-D array of shape (n_inputs, d).
     """
 
@@ -100,11 +102,10 @@ class CoreSet(AcquisitionFunction):
         if n_train == 0:
             min_dists = np.full(n_cands, np.inf)
         else:
-            _CHUNK = 512
             min_dists = np.empty(n_cands)
-            for _i in range(0, n_cands, _CHUNK):
-                _sl = candidate_embs[_i : _i + _CHUNK]
-                min_dists[_i : _i + _CHUNK] = cdist(_sl, training_embs).min(axis=1)
+            for _i in range(0, n_cands, _CDIST_CHUNK_SIZE):
+                _sl = candidate_embs[_i : _i + _CDIST_CHUNK_SIZE]
+                min_dists[_i : _i + _CDIST_CHUNK_SIZE] = cdist(_sl, training_embs).min(axis=1)
         selected_mask = np.zeros(n_cands, dtype=bool)
         acquisition_values = np.zeros(n_cands)
 
