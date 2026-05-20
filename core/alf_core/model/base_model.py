@@ -32,7 +32,7 @@ class BaseModel(abc.ABC):
     """
 
     @abc.abstractmethod
-    def featurise(self, inputs: list[Candidate]) -> Any:
+    def featurise(self, inputs: list[Candidate] | LabelledCandidates) -> Any:
         """Convert inputs into feature representations.
 
         Args:

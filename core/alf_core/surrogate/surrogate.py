@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from typing import Union
+from typing import Any, Union
 
 import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
@@ -63,6 +63,19 @@ class Surrogate:
             and empirical distributions.
         """
         return self.model.predict(candidates)
+
+    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> Any:
+        """Featurise the given inputs using the surrogate model's featurisation method.
+
+        Args:
+            inputs (LabelledCandidates | list[Candidate]): The inputs to featurise,
+                which can be either a list of Candidate objects or LabelledCandidates.
+
+        Returns:
+            Any: Outputs from the model's featurisation method, typically
+                np.ndarray or torch.Tensor.
+        """
+        return self.model.featurise(inputs)
 
     def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Get summary metrics from the most recent training run.

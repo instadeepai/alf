@@ -72,7 +72,7 @@ class CoreSet(AcquisitionFunction):
         """
         training_candidates = state.dataset.train_dataset.candidates
         # Surrogate has no featurise() delegation method; access the underlying model directly.
-        features = state.surrogate.model.featurise(training_candidates + search_candidates)
+        features = state.surrogate.featurise(training_candidates + search_candidates)
         embeddings = _to_numpy(features)
 
         if embeddings.ndim != 2:
