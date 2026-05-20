@@ -580,7 +580,7 @@ class GPModel(BaseModel):
             train_data.labels, self.train_config.standardise_outputs
         )
         label_dtype = self.train_config.label_dtype or self._default_label_dtype
-        train_x = torch.tensor(train_x_np, dtype=label_dtype).to(self.device)
+        train_x = torch.tensor(train_x_np, dtype=torch.float32).to(self.device)
         train_y = torch.tensor(train_y_np, dtype=label_dtype).to(self.device)
         return train_x, train_y
 
@@ -676,11 +676,12 @@ class GPModel(BaseModel):
         self.likelihood.eval()
 
         # Featurize input
-        test_x = self.featurise(candidate_points).to(self.device)
+        test_x_np = np.array(self.featurise(candidate_points))
 
         # Apply input normalization if fitted
         if self._input_normaliser is not None:
-            test_x = self._input_normaliser.transform(test_x)
+            test_x_np = self._input_normaliser.transform(test_x_np)
+        test_x = torch.tensor(test_x_np, dtype=torch.float32).to(self.device)
 
         # Make predictions with fast predictive variance computation
         with torch.no_grad(), gpytorch.settings.fast_pred_var():

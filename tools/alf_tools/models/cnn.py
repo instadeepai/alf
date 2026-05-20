@@ -261,7 +261,7 @@ class CNNModel(BaseModel):
             train_data.labels, self.train_config.standardise_outputs
         )
         label_dtype = self.train_config.label_dtype or self._default_label_dtype
-        train_x = torch.tensor(train_x_np, dtype=label_dtype).to(self.device)
+        train_x = torch.tensor(train_x_np, dtype=torch.float32).to(self.device)
         train_y = torch.tensor(train_y_np, dtype=label_dtype).to(self.device)
 
         train_loader = DataLoader(
@@ -273,12 +273,13 @@ class CNNModel(BaseModel):
 
         val_loader = None
         if val_data is not None and len(val_data) > 0:
-            val_x = self.featurise(val_data).to(self.device)
+            val_x_np = np.array(self.featurise(val_data))
             if self._input_normaliser is not None:
-                val_x = self._input_normaliser.transform(val_x)
+                val_x_np = self._input_normaliser.transform(val_x_np)
             val_y_np = val_data.labels
             if self._output_standardiser is not None:
                 val_y_np = self._output_standardiser.transform(val_y_np)
+            val_x = torch.tensor(val_x_np, dtype=torch.float32).to(self.device)
             val_y = torch.tensor(val_y_np, dtype=label_dtype).to(self.device)
             val_loader = DataLoader(
                 TensorDataset(val_x, val_y),
