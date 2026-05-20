@@ -24,7 +24,7 @@ from typing import Annotated, Literal, Self, Union
 import numpy as np
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataclasses.labelled_candidates import Candidate, LabelledCandidates
-from alf_core.dataset.splitting_utils import split_dataset
+from alf_core.dataset.splitting_utils import SplitType, split_dataset
 from alf_core.utils.enums import ProblemType
 from pydantic import BaseModel, Field, model_validator
 
@@ -53,7 +53,7 @@ class BaseDatasetConfig(BaseModel):
     train_ratio: FloatBetweenZeroAndOne
     validation_frac: FloatBetweenZeroAndOne
     test_ratio: FloatBetweenZeroAndOne
-    split_type: Literal["random", "low_vs_high", "stratified"] = "random"
+    split_type: SplitType = "random"
     problem_type: ProblemType
     max_candidate_pool: int | None = None
 
