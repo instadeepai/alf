@@ -21,7 +21,7 @@ from typing import Any, Callable, Literal, TypeAlias, Union
 import gpytorch
 import numpy as np
 import torch
-from alf_core import Candidate, LabelledCandidates, Predictions, Results
+from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.model.base_model import BaseTrainConfig
 from alf_core.model.normaliser import (
