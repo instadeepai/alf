@@ -561,6 +561,7 @@ class GPModel(BaseModel):
         Raises:
             ValueError: If the dataset problem_type is not REGRESSION.
         """
+        super().setup(dataset)
         if dataset.config.problem_type != ProblemType.REGRESSION:
             raise ValueError(
                 f"GPModel only supports REGRESSION, got {dataset.config.problem_type!r}."

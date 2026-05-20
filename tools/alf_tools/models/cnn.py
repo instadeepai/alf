@@ -38,6 +38,17 @@ logger = logging.getLogger("alf-tools")
 
 
 def _apply_activation(logits: torch.Tensor, problem_type: ProblemType) -> torch.Tensor:
+    """Apply output activation for the given problem type.
+
+    Args:
+        logits: Raw model output tensor of shape (batch, 1) for BINARY or (batch, k) for MULTICLASS.
+        problem_type: Determines the activation. BINARY → sigmoid + complement pair (n, 2);
+            MULTICLASS → softmax (n, k); REGRESSION → identity (no-op).
+
+    Returns:
+        Activated tensor. BINARY returns (n, 2) [neg_prob, pos_prob];
+        others pass through shape unchanged.
+    """
     if problem_type == ProblemType.BINARY:
         pos_prob = torch.sigmoid(logits)
         return torch.stack([1.0 - pos_prob, pos_prob], dim=-1)
@@ -201,9 +212,6 @@ class CNNModel(BaseModel):
 
         self.device = get_device(device)
 
-        # Set by setup() from the full dataset before training
-        self._num_output_neurons: int | None = None
-
         # Pytorch model, initialized on first train() call
         self.model: SequenceCNN | None = None
         self.seq_length: int | None = None
@@ -223,17 +231,8 @@ class CNNModel(BaseModel):
         Raises:
             ValueError: If the model's problem_type disagrees with the dataset's.
         """
-        if dataset.config.problem_type != self.problem_type:
-            raise ValueError(
-                f"CNNModel problem_type {self.problem_type!r} does not match "
-                f"dataset problem_type {dataset.config.problem_type!r}"
-            )
-        # BINARY uses a single logit (BCEWithLogitsLoss); _apply_activation expands to (n, 2).
-        # MULTICLASS needs one neuron per class; REGRESSION uses a single scalar.
-        if self.problem_type == ProblemType.MULTICLASS:
-            self._num_output_neurons = dataset.num_classes
-        else:
-            self._num_output_neurons = 1
+        super().setup(dataset)
+        self._num_output_neurons = self.outputs_dim
 
     def _one_hot_encode(
         self, sequences: list[str]
@@ -437,17 +436,19 @@ class CNNModel(BaseModel):
         Args:
             train_data: Training data containing sequences and oracle values.
             val_data: Validation data.
+
+        Raises:
+            ValueError: If the model's problem_type disagrees with the dataset's.
         """
-        assert self._num_output_neurons is not None, (
-            "CNNModel.setup(dataset) must be called before train()"
-        )
+        if self.output_dim is None:
+            raise ValueError("CNNModel.setup(dataset) must be called before train()")
         logger.info(
             f"Training CNN with {len(train_data)} samples (problem_type={self.problem_type})"
         )
         self._epoch_metrics = []
 
         # Initialize model on first call or when output shape changes
-        if self.model is None or self.model._output_neurons != self._num_output_neurons:
+        if (self.model is None) or (self.model._output_neurons != self.output_dim):
             self.seq_length = len(train_data.data[0])
             self.model = SequenceCNN(
                 seq_length=self.seq_length,
@@ -457,7 +458,7 @@ class CNNModel(BaseModel):
                 num_conv_layers=self.model_config.num_conv_layers,
                 fc_hidden_dim=self.model_config.fc_hidden_dim,
                 dropout=self.model_config.dropout,
-                output_neurons=self._num_output_neurons,
+                output_neurons=self.output_dim,
             ).to(self.device)
 
         assert self.model is not None  # guaranteed by the block above

@@ -19,6 +19,7 @@ import abc
 from typing import TYPE_CHECKING, Any, Union
 
 import numpy as np
+from alf_core import ProblemType
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
 
 if TYPE_CHECKING:
@@ -31,6 +32,9 @@ class BaseModel(abc.ABC):
     Several components of the framework can be treated as models, such as the surrogate, oracle,
     and the generator defined as model based search.
     """
+
+    problem_type: ProblemType
+    output_dim: int
 
     @abc.abstractmethod
     def featurise(self, inputs: list[Candidate]) -> Any:
@@ -89,7 +93,8 @@ class BaseModel(abc.ABC):
         Args:
             dataset: The dataset this model will be trained on.
         """
-        pass
+        self.problem_type = dataset.config.problem_type
+        self.output_dim = dataset.num_classes if self.problem_type == ProblemType.MULTICLASS else 1
 
     def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
         """Return per-epoch training metrics from the most recent train() call.
