@@ -167,6 +167,10 @@ class BoTorchGPModel(BaseModel):
             ValueError: If candidates don't contain valid tensor data.
         """
         return candidates_to_tensor(inputs, device=self.device)
+    
+    def _validate_shape(self, tensor: torch.Tensor) -> None:
+        if tensor.ndim != 2:
+            raise ValueError(f"Expected 2D input tensor, got shape {tensor.shape}")
 
     def train(
         self,
@@ -197,10 +201,8 @@ class BoTorchGPModel(BaseModel):
         ).unsqueeze(-1)
 
         # Validate shapes
-        if self.train_X.ndim != 2:
-            raise ValueError(f"Expected 2D input tensor, got shape {self.train_X.shape}")
-        if self.train_Y.ndim != 2:
-            raise ValueError(f"Expected 2D output tensor, got shape {self.train_Y.shape}")
+        self._validate_shape(self.train_X)
+        self._validate_shape(self.train_Y)
 
         # Initialize SingleTaskGP
         # Note: SingleTaskGP automatically applies Standardize outcome transform
@@ -289,8 +291,7 @@ class BoTorchGPModel(BaseModel):
         test_X = candidates_to_tensor(candidate_points, device=self.device)
 
         # Validate shapes
-        if test_X.ndim != 2:
-            raise ValueError(f"Expected 2D input tensor, got shape {test_X.shape}")
+        self._validate_shape(test_X)
         if self.train_X is not None and test_X.shape[1] != self.train_X.shape[1]:
             raise ValueError(
                 f"Input dimension mismatch: expected {self.train_X.shape[1]}, got {test_X.shape[1]}"
