@@ -253,6 +253,7 @@ class BaseDataset(abc.ABC):
         """
         self._raw_dataset = self.load_dataset()
         self.splits = self._split_dataset()
+        self.num_classes = self.determine_num_classes()
         self.set_metadata()
 
     def update_splits(self, acquired_candidates: LabelledCandidates) -> None:

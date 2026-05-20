@@ -23,7 +23,7 @@ from typing import Literal, Self
 import numpy as np
 import pandas as pd
 import requests
-from alf_core import BaseDataset, BaseDatasetConfig, Candidate, LabelledCandidates
+from alf_core import BaseDataset, BaseDatasetConfig, Candidate, LabelledCandidates, ProblemType
 from pydantic import model_validator
 
 logger = logging.getLogger("alf-tools")
@@ -88,6 +88,7 @@ class FLIPConfig(BaseDatasetConfig):
 
     flip_dataset: FLIP_DATASETS
     flip_split: str
+    problem_type: ProblemType = ProblemType.REGRESSION
 
     @model_validator(mode="after")
     def validate_config(self) -> Self:

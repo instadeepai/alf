@@ -19,7 +19,7 @@ from typing import Literal
 
 import numpy as np
 import pandas as pd
-from alf_core import BaseDataset, Candidate, LabelledCandidates
+from alf_core import BaseDataset, Candidate, LabelledCandidates, ProblemType
 from alf_core.dataset.base_dataset import BaseDatasetConfig
 from huggingface_hub import hf_hub_download
 
@@ -46,6 +46,7 @@ class ProteinGymConfig(BaseDatasetConfig):
     cross_validation: bool = False
     cross_validation_type: Literal["random", "modulo", "contiguous"] | None = None
     cross_validation_fold: Literal[0, 1, 2, 3, 4] | None = None
+    problem_type: ProblemType = ProblemType.REGRESSION
 
 
 class ProteinGym(BaseDataset):
