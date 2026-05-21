@@ -489,40 +489,30 @@ class TestCNNNormalisation:
                 # MSE in original space: at most (label_range)^2 * 10 (loose upper bound)
                 assert val_mse < (label_range**2) * 10
 
-    def test_standardise_outputs_ignored_for_binary_classification(self):
-        """standardise_outputs=True must be ignored for BINARY — standardiser stays None."""
-        sequences = ["ACDEFGHIKLMNPQRSTVWY"] * 10
-        candidates = [Candidate(data=seq, modality="sequence") for seq in sequences]
+    def test_standardise_outputs_raises_for_binary_classification(self):
+        """standardise_outputs=True must raise ValueError for BINARY classification."""
         binary_labels = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1], dtype=np.float32)
-        train_data = LabelledCandidates(candidates, binary_labels)
-
         model = CNNModel(
             train_config=CNNTrainConfig(num_epochs=2, standardise_outputs=True),
             device="cpu",
         )
         model.setup(_make_dataset(binary_labels, ProblemType.BINARY))
-        model.train(train_data, val_data=LabelledCandidates([], np.array([])))
+        candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * 10
+        train_data = LabelledCandidates(candidates, binary_labels)
 
-        assert model._output_standardiser is None
-        probs = model.predict(candidates).means
-        assert probs.shape == (10, 2)
-        assert np.all(probs >= 0) and np.all(probs <= 1)
+        with pytest.raises(ValueError, match="standardise_outputs"):
+            model.train(train_data, val_data=LabelledCandidates([], np.array([])))
 
-    def test_standardise_outputs_ignored_for_multiclass_classification(self):
-        """standardise_outputs=True must be ignored for MULTICLASS — standardiser stays None."""
-        sequences = ["ACDEFGHIKLMNPQRSTVWY"] * 9
-        candidates = [Candidate(data=seq, modality="sequence") for seq in sequences]
+    def test_standardise_outputs_raises_for_multiclass_classification(self):
+        """standardise_outputs=True must raise ValueError for MULTICLASS classification."""
         multiclass_labels = np.array([0, 1, 2, 0, 1, 2, 0, 1, 2])
-        train_data = LabelledCandidates(candidates, multiclass_labels)
-
         model = CNNModel(
             train_config=CNNTrainConfig(num_epochs=2, standardise_outputs=True),
             device="cpu",
         )
         model.setup(_make_dataset(multiclass_labels, ProblemType.MULTICLASS))
-        model.train(train_data, val_data=LabelledCandidates([], np.array([])))
+        candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * 9
+        train_data = LabelledCandidates(candidates, multiclass_labels)
 
-        assert model._output_standardiser is None
-        probs = model.predict(candidates).means
-        assert probs.shape == (9, 3)
-        assert np.all(probs >= 0) and np.all(probs <= 1)
+        with pytest.raises(ValueError, match="standardise_outputs"):
+            model.train(train_data, val_data=LabelledCandidates([], np.array([])))

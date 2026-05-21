@@ -303,6 +303,9 @@ class CNNModel(BaseModel):
             train_data: Training data.
             val_data: Optional validation data.
 
+        Raises:
+            ValueError: If standardise_outputs=True is set for a non-regression problem.
+
         Returns:
             Tuple of (train_loader, val_loader). val_loader is None if val_data is None.
         """
@@ -312,18 +315,17 @@ class CNNModel(BaseModel):
             label_dtype = torch.long
         else:
             label_dtype = self._default_label_dtype
-        is_regression = getattr(self, "problem_type", None) == ProblemType.REGRESSION
-        if self.train_config.standardise_outputs and not is_regression:
-            logger.warning(
-                "standardise_outputs=True is ignored for %s — standardisation only applies "
-                "to regression targets.",
-                self.problem_type,
+        problem_type = getattr(self, "problem_type", None)
+        if self.train_config.standardise_outputs and problem_type != ProblemType.REGRESSION:
+            raise ValueError(
+                f"standardise_outputs=True is not supported for {problem_type} — "
+                "standardisation only applies to regression targets."
             )
         train_x, train_y, self._input_normaliser, self._output_standardiser = transform_data(
             self.featurise(train_data),
             train_data.labels,
             self.train_config.normalise_inputs,
-            self.train_config.standardise_outputs and is_regression,
+            self.train_config.standardise_outputs,
             label_dtype,
             self.device,
         )
