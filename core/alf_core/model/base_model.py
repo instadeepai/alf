@@ -22,11 +22,11 @@ from typing import TYPE_CHECKING, Any, Union
 import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
 from alf_core.utils.enums import ProblemType
-from torch import dtype as TorchDtype
 
 if TYPE_CHECKING:
     from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
     from alf_core.dataset.base_dataset import BaseDataset
+    from torch import dtype as TorchDtype
 
 
 @dataclass
@@ -49,7 +49,7 @@ class BaseTrainConfig:
     log_frequency: int = 10
     normalise_inputs: bool = False
     standardise_outputs: bool = False
-    label_dtype: TorchDtype | None = None
+    label_dtype: "TorchDtype | None" = None
 
 
 class BaseModel(abc.ABC):

@@ -106,13 +106,15 @@ def expected_metrics():
     """
     return {
         "surrogate": {
-            # (min_inclusive, max_inclusive) — ranges are loose but non-trivial:
-            # test_mse: finite upper bound in original label scale (~3.0 mean)
-            "test_mse": (0.0, 100.0),
-            # correlation metrics: expect non-negative for a trained model
-            "test_spearman": (0.0, 1.0),
-            "test_pearson": (0.0, 1.0),
-            "test_pairwise_xent": (0.0, 1.0),
+            # (min_inclusive, max_inclusive) — platform-tolerant but non-trivial:
+            # test_mse: original ~2.8; 20x headroom for platform variation
+            "test_mse": (0.0, 20.0),
+            # correlation metrics: original ~0.08/0.18; small positive lower bound
+            # distinguishes a trained model from random (r≈0)
+            "test_spearman": (0.01, 1.0),
+            "test_pearson": (0.01, 1.0),
+            # pairwise cross-entropy: original ~0.34; below 0.7 = better than random
+            "test_pairwise_xent": (0.0, 0.7),
         },
         "dataset": {
             "num_train": 50.00000,

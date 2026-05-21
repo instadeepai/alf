@@ -73,7 +73,7 @@ class OutputStandardiser:
         Raises:
             RuntimeError: If called before fit().
         """
-        if not self.is_fitted:
+        if self._mean is None or self._std is None:
             raise RuntimeError("OutputStandardiser must be fitted before calling transform.")
         return (Y - self._mean) / self._std
 
@@ -96,11 +96,10 @@ class OutputStandardiser:
         Raises:
             RuntimeError: If called before fit().
         """
-        if not self.is_fitted:
+        if self._mean is None or self._std is None:
             raise RuntimeError(
                 "OutputStandardiser must be fitted before calling inverse_transform."
             )
-        assert self._mean is not None and self._std is not None
         mean_orig = mean * self._std + self._mean
         var_orig = var * (self._std**2) if var is not None else None
         return mean_orig, var_orig
@@ -117,7 +116,10 @@ class InputNormaliser:
     Statistics are always computed over the batch dimension (dim=0).
 
     Edge case: if a feature has zero range (constant column), the range is clamped
-    to _MIN_RANGE and the feature transforms to 0.0.
+    to _MIN_RANGE. A training value of 0 maps to 0.0; a non-zero test value (e.g. a
+    one-hot position never seen in training) maps to value / _MIN_RANGE, which can
+    be very large. For one-hot inputs, ensure the training set covers all amino acids
+    at all positions, or clip outputs after transform.
 
     Note:
         Min-max scaling is well suited for GP models, where the kernel computes

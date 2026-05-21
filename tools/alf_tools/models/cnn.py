@@ -339,13 +339,16 @@ class CNNModel(BaseModel):
 
         val_loader = None
         if val_data is not None and len(val_data) > 0:
-            val_x_np = np.array(self.featurise(val_data).cpu())
+            val_x_tensor = self.featurise(val_data)
             if self._input_normaliser is not None:
-                val_x_np = self._input_normaliser.transform(val_x_np)
+                val_x_np = self._input_normaliser.transform(np.array(val_x_tensor.cpu()))
+                val_x = torch.tensor(val_x_np, dtype=train_x.dtype).to(self.device)
+            else:
+                val_x = val_x_tensor.to(dtype=train_x.dtype).to(self.device)
             val_y_np = val_data.labels
             if self._output_standardiser is not None:
                 val_y_np = self._output_standardiser.transform(val_y_np)
-            val_x = torch.tensor(val_x_np, dtype=train_x.dtype).to(self.device)
+            val_y = torch.tensor(val_y_np, dtype=label_dtype).to(self.device)
             val_y = torch.tensor(val_y_np, dtype=label_dtype).to(self.device)
             val_loader = DataLoader(
                 TensorDataset(val_x, val_y),
@@ -635,12 +638,12 @@ class CNNModel(BaseModel):
         with torch.no_grad():
             logits = self.model(x)
 
-        probs = _apply_activation(logits, self.problem_type).cpu().numpy()  # (n, num_classes)
+        outputs = _apply_activation(logits, self.problem_type).cpu().numpy()  # (n, num_classes)
 
         if self._output_standardiser is not None:
-            probs, _ = self._output_standardiser.inverse_transform(probs)
+            outputs, _ = self._output_standardiser.inverse_transform(outputs)
 
-        return Predictions(means=probs)
+        return Predictions(means=outputs)
 
     def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
         """Sample candidate points from the model."""
