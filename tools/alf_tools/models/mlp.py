@@ -22,6 +22,7 @@ import torch.nn as nn
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Modality, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_core.utils.enums import ProblemType
 from torch.utils.data import DataLoader, TensorDataset
 
 from alf_tools.models.utils import get_device
@@ -282,7 +283,11 @@ class MLPModel(BaseModel):
         all_targets = np.concatenate(train_targets_list)
 
         if len(all_preds) >= 2:
-            metrics = Results(predictions=Predictions(means=all_preds), targets=all_targets).metrics
+            metrics = Results(
+                predictions=Predictions(means=all_preds),
+                targets=all_targets,
+                problem_type=ProblemType.REGRESSION,
+            ).metrics
         else:
             metrics = {"mse": float(np.mean((all_preds - all_targets) ** 2))}
 
@@ -322,7 +327,11 @@ class MLPModel(BaseModel):
         all_targets = np.concatenate(val_targets_list)
 
         if len(all_preds) >= 2:
-            metrics = Results(predictions=Predictions(means=all_preds), targets=all_targets).metrics
+            metrics = Results(
+                predictions=Predictions(means=all_preds),
+                targets=all_targets,
+                problem_type=ProblemType.REGRESSION,
+            ).metrics
         else:
             metrics = {"mse": float(np.mean((all_preds - all_targets) ** 2))}
 
