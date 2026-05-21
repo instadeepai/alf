@@ -250,6 +250,7 @@ def register_classification_metric(metric_fn: Callable) -> Callable:
         assert probs.shape[0] == targets.shape[0], (
             f"probs and targets batch size mismatch: {probs.shape[0]} vs {targets.shape[0]}"
         )
+        targets = targets.astype(int)
         return metric_fn(probs, targets)
 
     classification_metric_registry.register(metric_fn.__name__, wrapper)
@@ -497,6 +498,12 @@ def width(
     assert (alpha >= 0) and (alpha <= 1), "alpha should be in [0,1]"
 
     max_width_dataset = targets.max() - targets.min()
+    if max_width_dataset == 0:
+        logger.warning(
+            "width: all targets are equal (range=0) — calibration width ratio is undefined. "
+            "Returning empty dict."
+        )
+        return {}
 
     num_stds = norm.ppf(1 - ((1 - alpha) / 2))
 
@@ -718,7 +725,7 @@ def regret_ucb_alpha(
             f"Dataset size ({len(means)}) is too small to compute UCB regret. Returning NaN.",
             stacklevel=2,
         )
-        return {f"regret_ucb_{alpha:.2f}": np.nan}
+        return {}
 
     # Compute UCB values
     ucb_values = means + alpha * np.sqrt(variances)
@@ -896,5 +903,15 @@ def auc_roc(
         logger.warning("auc_roc: fewer than 2 unique classes in targets — returning empty dict.")
         return {}
     if probs.shape[1] == 2:
-        return {"auc_roc": float(roc_auc_score(targets, probs[:, 1]))}
-    return {"auc_roc": float(roc_auc_score(targets, probs, multi_class="ovr"))}
+        try:
+            return {"auc_roc": float(roc_auc_score(targets, probs[:, 1]))}
+        except ValueError as e:
+            logger.warning(
+                "auc_roc: sklearn raised ValueError (likely targets missing a class): %s", e
+            )
+            return {}
+    try:
+        return {"auc_roc": float(roc_auc_score(targets, probs, multi_class="ovr"))}
+    except ValueError as e:
+        logger.warning("auc_roc: sklearn raised ValueError (likely targets missing a class): %s", e)
+        return {}

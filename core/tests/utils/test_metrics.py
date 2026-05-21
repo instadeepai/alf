@@ -34,7 +34,7 @@ class TestClassificationMetricRegistry:
 
     def test_all_metrics_registered(self):
         """Test that all expected metrics are present in the registry."""
-        names = set(classification_metric_registry.metrics.keys())
+        names = set(classification_metric_registry.get_metrics().keys())
         assert {"accuracy", "f1", "precision", "recall", "auc_roc"}.issubset(names)
 
 

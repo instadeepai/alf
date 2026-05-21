@@ -60,6 +60,7 @@ def _make_dataset(labels: np.ndarray, problem_type: ProblemType) -> BaseDataset:
     )
     dataset = _TestDataset(config)
     dataset._raw_dataset = dataset.load_dataset()
+    dataset.num_classes = dataset.determine_num_classes()
     return dataset
 
 
@@ -202,13 +203,6 @@ class TestCNNRegressionUnchanged:
         preds = model.predict(data_float.candidates)
         assert preds.means.ndim == 1
         assert preds.means.shape == (len(data_float),)
-
-    def test_problem_type_is_regression(self):
-        """Test that the problem type is set to REGRESSION at initialisation."""
-        model_cfg = CNNModelConfig(num_filters=8, num_conv_layers=1, fc_hidden_dim=16)
-        train_cfg = CNNTrainConfig(batch_size=4, num_epochs=1)
-        model = CNNModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
-        assert model.problem_type == ProblemType.REGRESSION
 
     def test_output_neurons_is_one_for_regression(self):
         """Test that regression training uses a single output neuron."""

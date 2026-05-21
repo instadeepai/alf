@@ -22,22 +22,38 @@ from alf_core.utils.enums import ProblemType
 
 
 def _make_minimal_dataset(problem_type: ProblemType) -> BaseDataset:
-    """Create a minimal dataset with a single candidate for the given problem type.
+    """Create a minimal dataset with appropriate candidates for the given problem type.
 
     Returns:
         A set-up BaseDataset instance configured with the given problem type.
     """
+    if problem_type == ProblemType.BINARY:
+        candidates = [
+            Candidate(data="ACGT", modality=Modality.SEQUENCE),
+            Candidate(data="TGCA", modality=Modality.SEQUENCE),
+        ]
+        labels = np.array([0.0, 1.0])
+    elif problem_type == ProblemType.MULTICLASS:
+        candidates = [
+            Candidate(data="ACGT", modality=Modality.SEQUENCE),
+            Candidate(data="TGCA", modality=Modality.SEQUENCE),
+            Candidate(data="AAAA", modality=Modality.SEQUENCE),
+        ]
+        labels = np.array([0.0, 1.0, 2.0])
+    else:
+        candidates = [Candidate(data="ACGT", modality=Modality.SEQUENCE)]
+        labels = np.array([0.0])
 
     class MinimalDataset(BaseDataset):
         def load_dataset(self):
-            """Load a single-candidate dataset.
+            """Load a minimal dataset.
 
             Returns:
-                A LabelledCandidates with one sequence candidate.
+                A LabelledCandidates with sequence candidates.
             """
             return LabelledCandidates(
-                candidates=[Candidate(data="ACGT", modality=Modality.SEQUENCE)],
-                labels=np.array([0.0]),
+                candidates=candidates,
+                labels=labels,
             )
 
     config = BaseDatasetConfig(

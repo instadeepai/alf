@@ -230,7 +230,7 @@ class CNNModel(BaseModel):
             ValueError: If the model's problem_type disagrees with the dataset's.
         """
         super().setup(dataset)
-        self._num_output_neurons = self.outputs_dim
+        self._num_output_neurons = self.output_dim
 
     def _one_hot_encode(
         self, sequences: list[str]
@@ -440,13 +440,20 @@ class CNNModel(BaseModel):
         """
         if self.output_dim is None:
             raise ValueError("CNNModel.setup(dataset) must be called before train()")
+        if self.problem_type == ProblemType.BINARY:
+            invalid_labels = train_data.labels[~np.isin(train_data.labels, [0, 1])]
+            if len(invalid_labels) > 0:
+                raise ValueError(
+                    f"BINARY classification requires labels in {{0, 1}}, "
+                    f"got invalid values: {np.unique(invalid_labels).tolist()}"
+                )
         logger.info(
             f"Training CNN with {len(train_data)} samples (problem_type={self.problem_type})"
         )
         self._epoch_metrics = []
 
-        # Initialize model on first call or when output shape changes
-        if (self.model is None) or (self.model._output_neurons != self.output_dim):
+        # Initialize model on first call; raise if output shape changes
+        if self.model is None:
             self.seq_length = len(train_data.data[0])
             self.model = SequenceCNN(
                 seq_length=self.seq_length,
@@ -458,6 +465,12 @@ class CNNModel(BaseModel):
                 dropout=self.model_config.dropout,
                 output_neurons=self.output_dim,
             ).to(self.device)
+        elif self.model._output_neurons != self.output_dim:
+            raise RuntimeError(
+                f"CNNModel output neuron count changed from {self.model._output_neurons} "
+                f"to {self.output_dim} between train() calls. "
+                "Call setup() again with the correct dataset before retraining."
+            )
 
         assert self.model is not None  # guaranteed by the block above
         total_params = sum(p.numel() for p in self.model.parameters())

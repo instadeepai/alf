@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+import warnings
 from typing import Literal, get_args
 
 import numpy as np
@@ -193,16 +194,26 @@ def split_stratified(
     Raises:
         ValueError: If any split requests more samples than remain after earlier splits.
     """
-    labels = dataset.labels.astype(int)
-    non_integer_mask = ~np.isclose(dataset.labels, dataset.labels.astype(int).astype(float))
-    assert np.allclose(dataset.labels, labels.astype(float)), (
-        f"split_type='stratified' requires integer class labels, but {non_integer_mask.sum()} "
-        f"labels have fractional parts (e.g. {dataset.labels[non_integer_mask][:3]}). "
-        f"Cast your labels to int or use split_type='random'."
-    )
-    rng = np.random.RandomState(seed)
-
+    labels = dataset.labels.astype(float)
+    if np.any(np.isnan(labels)):
+        raise ValueError(
+            "split_stratified requires integer class labels, but labels contain NaN values."
+        )
+    non_integer_mask = ~np.isclose(labels, labels.round())
+    if non_integer_mask.any():
+        raise ValueError(
+            f"split_stratified requires integer class labels, "
+            f"got labels with fractional parts: {labels[non_integer_mask].tolist()}"
+        )
+    labels = labels.astype(int)
     classes = np.unique(labels)
+    if len(classes) < 2:
+        raise ValueError(
+            f"split_stratified requires at least 2 distinct classes, "
+            f"got {len(classes)}: {classes.tolist()}. "
+            "Use 'random' split type for single-class datasets."
+        )
+    rng = np.random.RandomState(seed)
     split_names = ["train", "validation", "test", "candidate_pool"]
     split_sizes = [train_size, validation_size, test_size, candidate_pool_size]
 
@@ -235,7 +246,14 @@ def split_stratified(
         for i in sorted(range(len(classes)), key=lambda i: -remainders[i])[:leftover]:
             alloc[i] += 1
 
-        for cls, n in zip(classes, alloc):
+        for cls, avail_count, n in zip(classes, avail, alloc):
+            if avail_count > 0 and n == 0:
+                warnings.warn(
+                    f"split_stratified: class {cls} has {avail_count} available samples but received "
+                    f"0 in the '{name}' split due to rounding. "
+                    "Consider using a larger dataset or fewer splits.",
+                    stacklevel=2,
+                )
             start = cls_used[cls]
             split_indices[name].extend(cls_idxs[cls][start : start + n].tolist())
             cls_used[cls] += n

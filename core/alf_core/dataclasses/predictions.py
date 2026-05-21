@@ -96,7 +96,7 @@ class Predictions:
         is_classification = problem_type in [ProblemType.BINARY, ProblemType.MULTICLASS]
 
         for i in range(len(self.means)):
-            record_i: dict[str, str | float | np.floating | list[float]] = {
+            record_i: dict[str, str | float | np.floating | list[float] | np.ndarray] = {
                 "sequence": candidates[i].data,
                 "targets": targets[i],
             }
