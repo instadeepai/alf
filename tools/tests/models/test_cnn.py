@@ -55,6 +55,7 @@ def _make_dataset(labels: np.ndarray, problem_type: ProblemType) -> BaseDataset:
     )
     dataset = _TestDataset(config)
     dataset._raw_dataset = dataset.load_dataset()
+    dataset.num_classes = dataset.determine_num_classes()
     return dataset
 
 
@@ -487,3 +488,41 @@ class TestCNNNormalisation:
                 label_range = float(np.ptp(sample_data.labels))
                 # MSE in original space: at most (label_range)^2 * 10 (loose upper bound)
                 assert val_mse < (label_range**2) * 10
+
+    def test_standardise_outputs_ignored_for_binary_classification(self):
+        """standardise_outputs=True must be ignored for BINARY — standardiser stays None."""
+        sequences = ["ACDEFGHIKLMNPQRSTVWY"] * 10
+        candidates = [Candidate(data=seq, modality="sequence") for seq in sequences]
+        binary_labels = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1], dtype=np.float32)
+        train_data = LabelledCandidates(candidates, binary_labels)
+
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=2, standardise_outputs=True),
+            device="cpu",
+        )
+        model.setup(_make_dataset(binary_labels, ProblemType.BINARY))
+        model.train(train_data, val_data=LabelledCandidates([], np.array([])))
+
+        assert model._output_standardiser is None
+        probs = model.predict(candidates).means
+        assert probs.shape == (10, 2)
+        assert np.all(probs >= 0) and np.all(probs <= 1)
+
+    def test_standardise_outputs_ignored_for_multiclass_classification(self):
+        """standardise_outputs=True must be ignored for MULTICLASS — standardiser stays None."""
+        sequences = ["ACDEFGHIKLMNPQRSTVWY"] * 9
+        candidates = [Candidate(data=seq, modality="sequence") for seq in sequences]
+        multiclass_labels = np.array([0, 1, 2, 0, 1, 2, 0, 1, 2])
+        train_data = LabelledCandidates(candidates, multiclass_labels)
+
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=2, standardise_outputs=True),
+            device="cpu",
+        )
+        model.setup(_make_dataset(multiclass_labels, ProblemType.MULTICLASS))
+        model.train(train_data, val_data=LabelledCandidates([], np.array([])))
+
+        assert model._output_standardiser is None
+        probs = model.predict(candidates).means
+        assert probs.shape == (9, 3)
+        assert np.all(probs >= 0) and np.all(probs <= 1)

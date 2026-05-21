@@ -645,7 +645,9 @@ class GPModel(BaseModel):
         self.train_x = train_x
         self.train_y = train_y
 
-        self.likelihood = self._initialize_likelihood().to(self.device)
+        # Initialize likelihood if first time
+        if self.likelihood is None:
+            self.likelihood = self._initialize_likelihood().to(self.device)
 
         # Initialize or reinitialize GP model
         self.feature_dim = train_x.shape[-1]

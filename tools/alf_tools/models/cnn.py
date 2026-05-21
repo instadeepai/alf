@@ -312,11 +312,18 @@ class CNNModel(BaseModel):
             label_dtype = torch.long
         else:
             label_dtype = self._default_label_dtype
+        is_regression = getattr(self, "problem_type", None) == ProblemType.REGRESSION
+        if self.train_config.standardise_outputs and not is_regression:
+            logger.warning(
+                "standardise_outputs=True is ignored for %s — standardisation only applies "
+                "to regression targets.",
+                self.problem_type,
+            )
         train_x, train_y, self._input_normaliser, self._output_standardiser = transform_data(
             self.featurise(train_data),
             train_data.labels,
             self.train_config.normalise_inputs,
-            self.train_config.standardise_outputs,
+            self.train_config.standardise_outputs and is_regression,
             label_dtype,
             self.device,
         )
