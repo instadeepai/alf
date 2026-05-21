@@ -147,6 +147,7 @@ def sinusoidal_dataset():
         validation_frac=0.0,
         test_ratio=0.1,
         split_type="random",
+        problem_type="regression",
     )
     return SinusoidalDataset(config)
 

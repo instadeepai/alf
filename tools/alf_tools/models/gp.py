@@ -23,6 +23,8 @@ import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_core.dataset.base_dataset import BaseDataset
+from alf_core.utils.enums import ProblemType
 from jaxtyping import Float
 
 from alf_tools.models.utils.sequence_utils import (
@@ -299,6 +301,7 @@ class GPModel(BaseModel):
         self.model_config = model_config or GPModelConfig()
         self.train_config = train_config or GPTrainConfig()
         self.featurizer_config = featurizer_config or FeaturizerConfig()
+        self.problem_type: ProblemType = ProblemType.REGRESSION
 
         self.alphabet = alphabet
         self.alphabet_size = len(alphabet)
@@ -339,7 +342,9 @@ class GPModel(BaseModel):
             )
         return self.featurizer_config.custom_featurizer(sequences)
 
-    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> torch.Tensor:
+    def featurise(
+        self, inputs: Union[LabelledCandidates, list[Candidate]]
+    ) -> Float[torch.Tensor, "batch_size n_features"]:
         """Convert inputs to feature tensors.
 
         Args:
@@ -372,8 +377,10 @@ class GPModel(BaseModel):
                 return torch.stack(sequences)
             else:
                 raise ValueError(
-                    "For featurizer_type='precomputed', Candidate.data must be "
-                    "torch.Tensor or np.ndarray"
+                    f"For featurizer_type='precomputed', Candidate.data must be torch.Tensor or "
+                    f"np.ndarray, got {type(sequences[0]).__name__}. "
+                    f"Wrap your data in a np.ndarray or torch.Tensor when creating Candidates, "
+                    f"or switch to featurizer_type='one_hot'."
                 )
         else:
             raise ValueError(
@@ -411,10 +418,13 @@ class GPModel(BaseModel):
             Initialized ExactGPModel.
 
         Raises:
-            ValueError: If likelihood has not been initialized before calling this method.
+            RuntimeError: If likelihood has not been initialized before calling this method.
         """
         if self.likelihood is None:
-            raise ValueError("Likelihood must be initialized before GP model")
+            raise RuntimeError(
+                "likelihood is None — _initialize_likelihood() "
+                "must be called before _initialize_gp_model()"
+            )
 
         gp_model = ExactGPModel(
             train_x=train_x,
@@ -446,10 +456,19 @@ class GPModel(BaseModel):
             Dictionary of training metrics (e.g., final loss, learned hyperparameters).
 
         Raises:
-            ValueError: If GP model or likelihood is not initialized.
+            RuntimeError: If GP model or likelihood is not initialized.
+            ValueError: If optimizer_type in train_config is not supported.
         """
         if self.gp_model is None or self.likelihood is None:
-            raise ValueError("GP model and likelihood must be initialized before optimization")
+            uninit = [
+                name
+                for name, obj in [("gp_model", self.gp_model), ("likelihood", self.likelihood)]
+                if obj is None
+            ]
+            raise RuntimeError(
+                f"{' and '.join(uninit)} not initialized — call train() "
+                "before _optimize_hyperparameters()"
+            )
 
         # Set to training mode
         self.gp_model.train()
@@ -471,7 +490,10 @@ class GPModel(BaseModel):
                 line_search_fn="strong_wolfe",
             )
         else:
-            raise ValueError(f"Unsupported optimizer_type: {self.train_config.optimizer_type}")
+            raise ValueError(
+                f"Unsupported optimizer_type: {self.train_config.optimizer_type!r}. "
+                f"Expected one of 'adam' or 'lbfgs'."
+            )
 
         # Training loop
         losses = []
@@ -530,16 +552,31 @@ class GPModel(BaseModel):
 
         return metrics
 
+    def setup(self, dataset: "BaseDataset") -> None:
+        """Validate that the dataset uses REGRESSION problem type.
+
+        Args:
+            dataset: The dataset this model will be trained on.
+
+        Raises:
+            ValueError: If the dataset problem_type is not REGRESSION.
+        """
+        super().setup(dataset)
+        if dataset.config.problem_type != ProblemType.REGRESSION:
+            raise ValueError(
+                f"GPModel only supports REGRESSION, got {dataset.config.problem_type!r}."
+            )
+
     def train(
         self,
         train_data: LabelledCandidates,
-        val_data: LabelledCandidates | None = None,
+        val_data: LabelledCandidates,
     ) -> None:
         """Train the GP model by optimizing hyperparameters.
 
         Args:
             train_data: Training data containing sequences and oracle values.
-            val_data: Optional validation data (used for monitoring, not for training).
+            val_data: Validation data (used for monitoring, not for training).
 
         Note:
             For exact GPs, all training data is used for predictions. Validation
@@ -582,7 +619,11 @@ class GPModel(BaseModel):
             train_vars = train_preds.variance.cpu().numpy()
 
         train_predictions_obj = Predictions(means=train_means, variances=train_vars)
-        train_results = Results(predictions=train_predictions_obj, targets=train_data.labels)
+        train_results = Results(
+            predictions=train_predictions_obj,
+            targets=train_data.labels,
+            problem_type=self.problem_type,
+        )
         self.training_metrics.update({
             f"final_train_{k}": v for k, v in train_results.metrics.items()
         })
@@ -590,9 +631,13 @@ class GPModel(BaseModel):
         logger.info(f"Training complete with metrics: {self.training_metrics}")
 
         # Evaluate on validation data if provided
-        if val_data is not None and len(val_data) > 0:
+        if len(val_data) > 0:
             val_predictions = self.predict(val_data.candidates)
-            val_results = Results(predictions=val_predictions, targets=val_data.labels)
+            val_results = Results(
+                predictions=val_predictions,
+                targets=val_data.labels,
+                problem_type=self.problem_type,
+            )
             self.training_metrics.update({
                 f"final_val_{k}": v for k, v in val_results.metrics.items()
             })

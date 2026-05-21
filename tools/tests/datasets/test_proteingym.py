@@ -33,6 +33,7 @@ def proteingym_dataset_singles():
         validation_frac=0.2,
         test_ratio=0.2,
         split_type="random",
+        problem_type="regression",
         dms_name="IF1_ECOLI_Kelsic_2016",
         dms_type="singles",
     )
@@ -54,6 +55,7 @@ def proteingym_dataset_multiples():
         validation_frac=0.2,
         test_ratio=0.2,
         split_type="random",
+        problem_type="regression",
         dms_name="CAPSD_AAV2S_Sinai_2021",
         dms_type="multiples",
     )
@@ -75,6 +77,7 @@ def proteingym_dataset_cv_singles():
         validation_frac=0.0,
         test_ratio=0.2173,
         split_type="random",
+        problem_type="regression",
         dms_name="IF1_ECOLI_Kelsic_2016",
         dms_type="singles",
         cross_validation=True,
@@ -99,6 +102,7 @@ def proteingym_dataset_cv_multiples():
         validation_frac=0.0,
         test_ratio=0.20032,
         split_type="random",
+        problem_type="regression",
         dms_name="CAPSD_AAV2S_Sinai_2021",
         dms_type="multiples",
         cross_validation=True,
