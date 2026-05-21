@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Public API for the metrics package.
+
+Re-exports all metric functions, decorators, and registry instances from the
+sub-modules so that existing imports of ``alf_core.utils.metrics`` continue to
+work without change.
+"""
+
 from alf_core.utils.metrics.base import (
     ClassificationMetricRegistry,
     RegressionMetricRegistry,

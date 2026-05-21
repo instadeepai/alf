@@ -78,8 +78,8 @@ class TestCheckVarianceValidity:
             check_variance_validity(np.array([0.1]), np.array([1.0, 2.0]))
 
     def test_nan_variance_raises(self):
-        """NaN variance raises AssertionError."""
-        with pytest.raises(AssertionError):
+        """NaN variance raises AssertionError with NaN message."""
+        with pytest.raises(AssertionError, match="NaN"):
             check_variance_validity(np.array([np.nan, 0.2]), np.array([1.0, 2.0]))
 
 

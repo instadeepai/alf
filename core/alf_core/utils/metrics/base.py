@@ -58,15 +58,15 @@ def check_variance_validity(variances: np.ndarray, targets: np.ndarray) -> None:
         "ensure your model's predict() returns a Predictions object with variances set "
         "or that the problem type is correctly specified."
     )
-    assert np.all(variances >= 0), (
-        f"variances must be non-negative, but {np.sum(variances < 0)} values are negative "
-        f"(min={variances.min():.4g})"
-    )
     assert len(variances) == len(targets), (
         f"variances has {len(variances)} elements but targets has {len(targets)} — "
         f"both must have shape (b,)"
     )
     assert not (np.any(np.isnan(variances))), "Variance arrays contain NaN values"
+    assert np.all(variances >= 0), (
+        f"variances must be non-negative, but {np.sum(variances < 0)} values are negative "
+        f"(min={variances.min():.4g})"
+    )
 
 
 def require_min_samples(n: int) -> Callable:
