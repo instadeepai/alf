@@ -15,6 +15,8 @@
 from alf_core.utils.metrics._base import (
     ClassificationMetricRegistry,
     RegressionMetricRegistry,
+    check_inputs,
+    check_variance_validity,
     classification_metric_registry,
     regression_metric_registry,
     require_min_samples,
