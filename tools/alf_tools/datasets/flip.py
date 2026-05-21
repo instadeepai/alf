@@ -23,7 +23,7 @@ from typing import Literal, Self
 import numpy as np
 import pandas as pd
 import requests
-from alf_core import BaseDataset, BaseDatasetConfig, Candidate, LabelledCandidates
+from alf_core import BaseDataset, BaseDatasetConfig, Candidate, LabelledCandidates, ProblemType
 from pydantic import model_validator
 
 logger = logging.getLogger("alf-tools")
@@ -88,6 +88,7 @@ class FLIPConfig(BaseDatasetConfig):
 
     flip_dataset: FLIP_DATASETS
     flip_split: str
+    problem_type: ProblemType = ProblemType.REGRESSION
 
     @model_validator(mode="after")
     def validate_config(self) -> Self:
@@ -192,10 +193,13 @@ class FLIP(BaseDataset):
             Dictionary with keys "train", "validation", "test", "candidate_pool".
 
         Raises:
-            ValueError: If dataset has not been loaded yet.
+            RuntimeError: If dataset has not been loaded yet.
         """
         if self._raw_dataset is None:
-            raise ValueError("Dataset must be loaded before splitting")
+            raise RuntimeError(
+                "Dataset must be loaded before splitting; "
+                "_raw_dataset is None — call dataset.setup() (or load_dataset()) before splitting"
+            )
 
         # Separate FLIP's pre-defined train and test pools
         flip_train = LabelledCandidates(candidates=[], labels=np.array([]))

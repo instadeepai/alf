@@ -17,6 +17,7 @@ dependencies = [
     "gpytorch>=1.9.0",
     "scipy>=1.9.0",
     "rdkit>=2026.3.1",
+    "botorch>=0.17.0",
 ]
 
 [tool.setuptools.packages.find]

@@ -21,6 +21,7 @@ import numpy as np
 import requests
 from alf_core import BaseDataset, Candidate, LabelledCandidates
 from alf_core.dataset.base_dataset import BaseDatasetConfig
+from alf_core.utils.enums import ProblemType
 from pydantic import model_validator
 from rdkit import Chem
 from rdkit.Chem import QED as RDKitQED
@@ -135,6 +136,7 @@ class GuacaMolConfig(BaseDatasetConfig):
         data_dir: Directory where SMILES files are cached. Defaults to the package data dir.
     """
 
+    problem_type: ProblemType = ProblemType.REGRESSION
     target_property: GuacaMolPropertyName | GuacaMolTaskName
     task_type: Literal["property", "benchmark_task"] = "property"
     computed_properties: list[GuacaMolPropertyName] | None = None

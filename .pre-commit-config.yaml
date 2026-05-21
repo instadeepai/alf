@@ -26,6 +26,7 @@ repos:
       - id: check-builtin-literals
         # Require literal syntax when initializing empty or zero Python builtin types
       - id: check-merge-conflict # Check for files that contain merge conflict strings
+        exclude: '\.rst$'
       - id: check-yaml # Check yaml files
       - id: end-of-file-fixer # Ensure that a file is either empty, or ends with one newline
       - id: mixed-line-ending # Replace or checks mixed line ending
@@ -65,7 +66,9 @@ repos:
     rev: 0.8.1
     hooks:
       - id: nbstripout
-        args: ["--extra-keys", "metadata.kernelspec metadata.language_info"]
+        args:
+          - --extra-keys
+          - metadata.kernelspec metadata.language_info
 
   - repo: https://github.com/Lucas-C/pre-commit-hooks
     rev: v1.4.0
