@@ -16,7 +16,7 @@
 
 import numpy as np
 import pytest
-from alf_core.utils.metrics._base import (
+from alf_core.utils.metrics.base import (
     ClassificationMetricRegistry,
     RegressionMetricRegistry,
     check_inputs,

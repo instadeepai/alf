@@ -23,6 +23,7 @@ from functools import wraps
 from typing import Callable
 
 import numpy as np
+from alf_core.utils.metrics.base import classification_metric_registry, require_min_samples
 from jaxtyping import Float, Int
 from sklearn.metrics import (
     accuracy_score,
@@ -31,8 +32,6 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
-
-from alf_core.utils.metrics._base import classification_metric_registry, require_min_samples
 
 logger = logging.getLogger(__name__)
 

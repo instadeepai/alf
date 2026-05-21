@@ -25,15 +25,14 @@ from functools import wraps
 from typing import Any, Callable
 
 import numpy as np
-from jaxtyping import Float
-from scipy.stats import norm, pearsonr, spearmanr
-
-from alf_core.utils.metrics._base import (
+from alf_core.utils.metrics.base import (
     check_inputs,
     check_variance_validity,
     regression_metric_registry,
     require_min_samples,
 )
+from jaxtyping import Float
+from scipy.stats import norm, pearsonr, spearmanr
 
 logger = logging.getLogger(__name__)
 

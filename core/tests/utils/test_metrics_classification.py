@@ -16,14 +16,13 @@
 
 import numpy as np
 import pytest
-from alf_core.utils.metrics._base import classification_metric_registry
+from alf_core.utils.metrics.base import classification_metric_registry
 from alf_core.utils.metrics.classification import (
     accuracy,
     auc_roc,
     f1,
     precision,
     recall,
-    register_classification_metric,
 )
 
 
@@ -61,7 +60,7 @@ class TestAccuracy:
         assert result == {"accuracy": 1.0}
 
     def test_returns_dict(self):
-        """accuracy returns a dict with a float value."""
+        """Accuracy returns a dict with a float value."""
         probs = np.array([[0.6, 0.4], [0.4, 0.6]])
         targets = np.array([0, 1])
         result = accuracy(probs, targets)
@@ -114,7 +113,7 @@ class TestPrecision:
         assert "precision" in result
 
     def test_returns_float(self):
-        """precision returns a float value."""
+        """Precision returns a float value."""
         probs = np.array([[0.6, 0.4], [0.4, 0.6]])
         targets = np.array([0, 1])
         assert isinstance(precision(probs, targets)["precision"], float)
@@ -138,7 +137,7 @@ class TestRecall:
         assert "recall" in result
 
     def test_returns_float(self):
-        """recall returns a float value."""
+        """Recall returns a float value."""
         probs = np.array([[0.6, 0.4], [0.4, 0.6]])
         targets = np.array([0, 1])
         assert isinstance(recall(probs, targets)["recall"], float)

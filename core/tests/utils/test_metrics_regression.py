@@ -16,22 +16,13 @@
 
 import numpy as np
 import pytest
+from alf_core.utils.metrics.base import regression_metric_registry
 from alf_core.utils.metrics.regression import (
-    coverage,
     expected_calibration_error,
-    monte_carlo_ranking,
     mse,
-    pairwise_xent,
     pearson,
-    rank_coverage,
-    rank_expected_calibration_error,
-    rank_width,
     regret_ucb_alpha,
-    regret_ucb_alpha_sweep,
-    residual_pearson,
-    residual_spearman,
     spearman,
-    width,
 )
 
 
@@ -159,15 +150,11 @@ class TestRegressionRegistryIntegration:
 
     def test_no_variance_metrics_registered(self):
         """mse, spearman, pearson, pairwise_xent are in the no-variance registry."""
-        from alf_core.utils.metrics._base import regression_metric_registry
-
         no_var = set(regression_metric_registry.get_metrics(requires_variance=False).keys())
         assert {"mse", "spearman", "pearson", "pairwise_xent"}.issubset(no_var)
 
     def test_variance_metrics_registered(self):
         """ECE, coverage, width, regret metrics are in the variance-required registry."""
-        from alf_core.utils.metrics._base import regression_metric_registry
-
         var_metrics = set(regression_metric_registry.get_metrics(requires_variance=True).keys())
         assert {
             "expected_calibration_error",

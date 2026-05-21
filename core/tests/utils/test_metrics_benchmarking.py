@@ -46,7 +46,11 @@ class TestRegisterBenchmarkingMetric:
 
         @register_benchmarking_metric
         def my_test_metric(means, targets):
-            """Dummy benchmarking metric."""
+            """Dummy benchmarking metric.
+
+            Returns:
+                dict with a single key "my_test_metric".
+            """
             return {"my_test_metric": 0.0}
 
         assert len(benchmarking_metric_registry.get_metrics()) == initial_count + 1
@@ -57,7 +61,11 @@ class TestRegisterBenchmarkingMetric:
 
         @register_benchmarking_metric
         def another_metric(means, targets):
-            """Dummy benchmarking metric."""
+            """Dummy benchmarking metric.
+
+            Returns:
+                dict with a single key "another_metric".
+            """
             return {"another_metric": float(len(means))}
 
         result = another_metric(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0]))
