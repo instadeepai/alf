@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Union
 
 import numpy as np
-from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
+from alf_core import BaseDataset, BaseModel, Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 
 logger = logging.getLogger("alf-tools")
@@ -171,6 +171,16 @@ class EnsembleWrapper(BaseModel):
         indices = rng.choice(n, size=k, replace=cfg.replace)
         candidates, labels = data[indices]
         return LabelledCandidates(candidates=candidates, labels=labels)
+
+    def setup(self, dataset: BaseDataset) -> None:
+        """Delegate setup to each ensemble member.
+
+        Args:
+            dataset: The dataset this ensemble will be trained on.
+        """
+        super().setup(dataset)
+        for member in self.members:
+            member.setup(dataset)
 
     def train(
         self,

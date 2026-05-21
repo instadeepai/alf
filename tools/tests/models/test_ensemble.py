@@ -18,8 +18,39 @@ import numpy as np
 import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates
+from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
+from alf_core.utils.enums import ProblemType
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, SubsampleConfig
+
+
+def _make_dataset(labels: np.ndarray, problem_type: ProblemType) -> BaseDataset:
+    """Create a minimal BaseDataset for model setup in tests.
+
+    Returns:
+        A BaseDataset with _raw_dataset pre-populated from the given labels.
+    """
+
+    class _TestDataset(BaseDataset):
+        def load_dataset(self) -> LabelledCandidates:
+            candidates = [
+                Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence") for _ in labels
+            ]
+            return LabelledCandidates(candidates=candidates, labels=labels)
+
+    config = BaseDatasetConfig(
+        name="test",
+        modality="sequence",
+        seed=0,
+        train_ratio=0.6,
+        validation_frac=0.2,
+        test_ratio=0.2,
+        problem_type=problem_type,
+    )
+    dataset = _TestDataset(config)
+    dataset._raw_dataset = dataset.load_dataset()
+    return dataset
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -49,6 +80,16 @@ def labelled_sequences(sequence_candidates):
     """Return LabelledCandidates wrapping sequence_candidates with fixed random labels."""
     rng = np.random.RandomState(2)
     return LabelledCandidates(sequence_candidates, rng.randn(6))
+
+
+@pytest.fixture
+def dataset(labelled_sequences):
+    """A minimal regression BaseDataset matching labelled_sequences.
+
+    Returns:
+        A BaseDataset configured for regression with labelled_sequences labels.
+    """
+    return _make_dataset(labelled_sequences.labels, ProblemType.REGRESSION)
 
 
 def cnn_factory(seed: int) -> CNNModel:
@@ -249,22 +290,24 @@ class TestEnsembleWrapperConstruction:
 class TestEnsembleWrapperTrain:
     """Tests for EnsembleWrapper training and metric aggregation."""
 
-    def test_train_trains_all_members(self, labelled_sequences):
+    def test_train_trains_all_members(self, labelled_sequences, dataset):
         """After train(), every member must have an initialised network."""
         wrapper = EnsembleWrapper(
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=3),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         for member in wrapper.members:
             assert member.model is not None
 
-    def test_epoch_metrics_tagged_with_member_index(self, labelled_sequences):
+    def test_epoch_metrics_tagged_with_member_index(self, labelled_sequences, dataset):
         """Epoch metric keys must be prefixed with 'member_0/' and 'member_1/'."""
         wrapper = EnsembleWrapper(
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         all_keys: set[str] = set()
         for em in wrapper.get_epoch_metrics():
@@ -272,18 +315,19 @@ class TestEnsembleWrapperTrain:
         assert any(k.startswith("member_0/") for k in all_keys)
         assert any(k.startswith("member_1/") for k in all_keys)
 
-    def test_summary_metrics_tagged_with_member_index(self, labelled_sequences):
+    def test_summary_metrics_tagged_with_member_index(self, labelled_sequences, dataset):
         """Summary metric keys must be prefixed with 'member_0/' and 'member_1/'."""
         wrapper = EnsembleWrapper(
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         summary = wrapper.get_training_summary_metrics()
         assert any(k.startswith("member_0/") for k in summary)
         assert any(k.startswith("member_1/") for k in summary)
 
-    def test_epoch_metrics_total_length(self, labelled_sequences):
+    def test_epoch_metrics_total_length(self, labelled_sequences, dataset):
         """Total epoch metrics count must equal n_members × num_epochs."""
         n_members = 3
         num_epochs = 2  # matches cnn_factory's CNNTrainConfig(num_epochs=2)
@@ -291,6 +335,7 @@ class TestEnsembleWrapperTrain:
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=n_members),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         assert len(wrapper.get_epoch_metrics()) == n_members * num_epochs
 
@@ -312,17 +357,18 @@ class TestEnsembleWrapperTrain:
         with pytest.raises(RuntimeError, match="not trained"):
             wrapper.predict(sequence_candidates)
 
-    def test_cleanup_delegates_to_all_members(self, labelled_sequences):
+    def test_cleanup_delegates_to_all_members(self, labelled_sequences, dataset):
         """cleanup() must call cleanup() on every member without error."""
         wrapper = EnsembleWrapper(
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=3),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         wrapper.cleanup()  # must not raise
 
     def test_train_with_val_data_populates_val_metrics(
-        self, labelled_sequences, sequence_candidates
+        self, labelled_sequences, sequence_candidates, dataset
     ):
         """Passing val_data to train() must result in finite val_loss in epoch metrics."""
         val_data = LabelledCandidates(
@@ -333,6 +379,7 @@ class TestEnsembleWrapperTrain:
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences, val_data=val_data)
         for em in wrapper.get_epoch_metrics():
             assert em.val_loss is not None
@@ -479,53 +526,65 @@ class TestEnsembleWrapperTrain:
 class TestEnsembleWrapperPredict:
     """Tests for EnsembleWrapper prediction in deep-ensemble mode."""
 
-    def test_deep_ensemble_empirical_dist_shape(self, sequence_candidates, labelled_sequences):
+    def test_deep_ensemble_empirical_dist_shape(
+        self, sequence_candidates, labelled_sequences, dataset
+    ):
         """4-member deep ensemble must produce empirical_dist of shape (6, 4)."""
         wrapper = EnsembleWrapper(
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=4),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         preds = wrapper.predict(sequence_candidates)
         assert preds.empirical_dist.shape == (6, 4)
         assert preds.means.shape == (6,)
         assert preds.variances.shape == (6,)
 
-    def test_deep_ensemble_means_are_rowwise_mean(self, sequence_candidates, labelled_sequences):
+    def test_deep_ensemble_means_are_rowwise_mean(
+        self, sequence_candidates, labelled_sequences, dataset
+    ):
         """Means must equal empirical_dist.mean(axis=1) for deep ensemble."""
         wrapper = EnsembleWrapper(
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=3),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         preds = wrapper.predict(sequence_candidates)
         np.testing.assert_allclose(preds.means, preds.empirical_dist.mean(axis=1), rtol=1e-5)
 
-    def test_deep_ensemble_variances_are_rowwise_var(self, sequence_candidates, labelled_sequences):
+    def test_deep_ensemble_variances_are_rowwise_var(
+        self, sequence_candidates, labelled_sequences, dataset
+    ):
         """Variances must equal empirical_dist.var(axis=1) for deep ensemble."""
         wrapper = EnsembleWrapper(
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=3),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         preds = wrapper.predict(sequence_candidates)
         np.testing.assert_allclose(preds.variances, preds.empirical_dist.var(axis=1), rtol=1e-5)
 
     def test_different_member_seeds_give_different_columns(
-        self, sequence_candidates, labelled_sequences
+        self, sequence_candidates, labelled_sequences, dataset
     ):
         """Different member seeds must produce different prediction columns."""
         wrapper = EnsembleWrapper(
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(member_seeds=[1, 2]),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         preds = wrapper.predict(sequence_candidates)
         assert not np.allclose(preds.empirical_dist[:, 0], preds.empirical_dist[:, 1]), (
             "Different member seeds should produce different predictions"
         )
 
-    def test_base_seed_and_member_seeds_same_result(self, sequence_candidates, labelled_sequences):
+    def test_base_seed_and_member_seeds_same_result(
+        self, sequence_candidates, labelled_sequences, dataset
+    ):
         """base_seed=10,n_members=2 and member_seeds=[10,11] must give identical results."""
         w1 = EnsembleWrapper(
             model_factory=cnn_factory,
@@ -539,9 +598,11 @@ class TestEnsembleWrapperPredict:
         seed = 10
         torch.manual_seed(seed)
         np.random.seed(seed)
+        w1.setup(dataset)
         w1.train(labelled_sequences)
         torch.manual_seed(seed)
         np.random.seed(seed)
+        w2.setup(dataset)
         w2.train(labelled_sequences)
         # p1 = w1.predict(sequence_candidates)
         # p2 = w2.predict(sequence_candidates)
@@ -611,22 +672,24 @@ class TestEnsembleWrapperWithCNN:
         with pytest.raises(RuntimeError, match="Model not trained"):
             wrapper.predict(sequence_candidates)
 
-    def test_cnn_ensemble_trains_all_members(self, labelled_sequences):
+    def test_cnn_ensemble_trains_all_members(self, labelled_sequences, dataset):
         """After train(), every CNNModel member must have an initialised .model attribute."""
         wrapper = EnsembleWrapper(
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=3),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         for member in wrapper.members:
             assert member.model is not None
 
-    def test_cnn_ensemble_epoch_metric_tagging(self, labelled_sequences):
+    def test_cnn_ensemble_epoch_metric_tagging(self, labelled_sequences, dataset):
         """After train(), epoch metric keys must be prefixed 'member_0/' and 'member_1/'."""
         wrapper = EnsembleWrapper(
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         all_keys: set[str] = set()
         for em in wrapper.get_epoch_metrics():
@@ -634,16 +697,19 @@ class TestEnsembleWrapperWithCNN:
         assert any(k.startswith("member_0/") for k in all_keys)
         assert any(k.startswith("member_1/") for k in all_keys)
 
-    def test_cnn_ensemble_cleanup_delegates(self, labelled_sequences):
+    def test_cnn_ensemble_cleanup_delegates(self, labelled_sequences, dataset):
         """cleanup() must call cleanup() on every CNN member without raising."""
         wrapper = EnsembleWrapper(
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         wrapper.cleanup()  # must not raise
 
-    def test_cnn_ensemble_empirical_dist_shape(self, sequence_candidates, labelled_sequences):
+    def test_cnn_ensemble_empirical_dist_shape(
+        self, sequence_candidates, labelled_sequences, dataset
+    ):
         """3-member CNN ensemble must produce empirical_dist of shape (6, 3).
 
         CNNModel.predict() returns means only (no empirical_dist), so
@@ -653,34 +719,41 @@ class TestEnsembleWrapperWithCNN:
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=3),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         preds = wrapper.predict(sequence_candidates)
         assert preds.empirical_dist.shape == (6, 3)
         assert preds.means.shape == (6,)
         assert preds.variances.shape == (6,)
 
-    def test_cnn_ensemble_means_are_rowwise_mean(self, sequence_candidates, labelled_sequences):
+    def test_cnn_ensemble_means_are_rowwise_mean(
+        self, sequence_candidates, labelled_sequences, dataset
+    ):
         """Means must equal empirical_dist.mean(axis=1) for a CNN deep ensemble."""
         wrapper = EnsembleWrapper(
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=3),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         preds = wrapper.predict(sequence_candidates)
         np.testing.assert_allclose(preds.means, preds.empirical_dist.mean(axis=1), rtol=1e-5)
 
-    def test_cnn_ensemble_variances_are_rowwise_var(self, sequence_candidates, labelled_sequences):
+    def test_cnn_ensemble_variances_are_rowwise_var(
+        self, sequence_candidates, labelled_sequences, dataset
+    ):
         """Variances must equal empirical_dist.var(axis=1) for a CNN deep ensemble."""
         wrapper = EnsembleWrapper(
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=3),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         preds = wrapper.predict(sequence_candidates)
         np.testing.assert_allclose(preds.variances, preds.empirical_dist.var(axis=1), rtol=1e-5)
 
     def test_cnn_different_seeds_give_different_columns(
-        self, sequence_candidates, labelled_sequences
+        self, sequence_candidates, labelled_sequences, dataset
     ):
         """Different member seeds must produce different per-member prediction columns.
 
@@ -692,6 +765,7 @@ class TestEnsembleWrapperWithCNN:
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(member_seeds=[1, 2]),
         )
+        wrapper.setup(dataset)
         wrapper.train(labelled_sequences)
         preds = wrapper.predict(sequence_candidates)
         assert not np.allclose(preds.empirical_dist[:, 0], preds.empirical_dist[:, 1]), (
