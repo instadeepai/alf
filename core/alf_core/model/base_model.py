@@ -90,6 +90,9 @@ class BaseModel(abc.ABC):
     def setup(self, dataset: "BaseDataset") -> None:
         """Configure the model for the given dataset. Called once before training begins.
 
+        For BINARY this is 1 (single logit, sigmoid-activated); see
+        dataset.num_classes for the number of distinct classes.
+
         Args:
             dataset: The dataset this model will be trained on.
         """

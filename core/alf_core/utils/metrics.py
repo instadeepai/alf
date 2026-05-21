@@ -216,6 +216,10 @@ def require_min_samples(n: int) -> Callable:
         @wraps(fn)
         def wrapper(*args: Any, **kwargs: Any) -> dict[str, float]:
             if len(args[0]) < n:
+                logger.warning(
+                    f"Insufficient samples for metric{fn.__name__}: got "
+                    f"{len(args[0])}, expected at least {n}"
+                )
                 return {}
             return fn(*args, **kwargs)
 

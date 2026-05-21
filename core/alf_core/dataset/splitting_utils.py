@@ -61,10 +61,13 @@ def split_dataset(
         return split_low_vs_high(
             dataset, train_size, validation_size, test_size, candidate_pool_size, seed
         )
-    else:
+    elif split_type == "stratified":
         return split_stratified(
             dataset, train_size, validation_size, test_size, candidate_pool_size, seed
         )
+    else:
+        # This should never happen due to the earlier check, but we include it for completeness.
+        raise ValueError(f"Unsupported split type: {split_type!r}")
 
 
 def split_random(

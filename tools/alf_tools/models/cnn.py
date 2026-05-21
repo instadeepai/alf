@@ -185,8 +185,8 @@ class CNNModel(BaseModel):
 
     def __init__(
         self,
-        model_config: CNNModelConfig,
         name: str = "cnn_model",
+        model_config: CNNModelConfig | None = None,
         train_config: CNNTrainConfig | None = None,
         alphabet: str = PROTEIN_ALPHABET,
         device: str | None = None,
@@ -439,7 +439,7 @@ class CNNModel(BaseModel):
             ValueError: If the model's problem_type disagrees with the dataset's.
             RuntimeError: If the model is not properly initialized.
         """
-        if self.output_dim is None:
+        if not hasattr(self, "output_dim"):
             raise ValueError("CNNModel.setup(dataset) must be called before train()")
         if self.problem_type == ProblemType.BINARY:
             invalid_labels = train_data.labels[~np.isin(train_data.labels, [0, 1])]
