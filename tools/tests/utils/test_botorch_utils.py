@@ -102,6 +102,14 @@ def test_candidates_to_tensor_with_list_data():
     assert torch.allclose(X, torch.tensor([[1.0, 2.0], [3.0, 4.0]]))
 
 
+def test_tensor_to_candidates_non_2d_raises():
+    """Test that a non-2D tensor raises ValueError."""
+    X = torch.tensor([1.0, 2.0, 3.0])  # 1D
+
+    with pytest.raises(ValueError, match="Expected 2D tensor"):
+        tensor_to_candidates(X)
+
+
 def test_tensor_to_candidates_basic():
     """Test basic conversion of tensor to candidates."""
     X = torch.tensor([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
@@ -149,6 +157,19 @@ def test_predictions_to_posterior_basic():
     # Check values regardless of shape
     mean_flat = posterior.mean.flatten()
     assert torch.allclose(mean_flat, torch.tensor([1.0, 2.0, 3.0]))
+
+
+def test_predictions_to_posterior_single_point():
+    """Test posterior with a single prediction (n=1 edge case)."""
+    means = np.array([1.5])
+    variances = np.array([0.1])
+    predictions = Predictions(means=means, variances=variances)
+
+    posterior = predictions_to_posterior(predictions)
+
+    assert isinstance(posterior, GPyTorchPosterior)
+    assert posterior.mean.shape == torch.Size([1, 1])
+    assert torch.allclose(posterior.mean.flatten(), torch.tensor([1.5]))
 
 
 def test_predictions_to_posterior_without_variances():

@@ -85,7 +85,7 @@ def candidates_to_tensor(
     except ValueError as e:
         raise ValueError(
             f"Failed to stack candidate data. Ensure all candidates have the same shape. Error: {e}"
-        )
+        ) from e
 
     # Convert to tensor
     X_tensor = torch.from_numpy(X).float().to(device)
@@ -109,12 +109,17 @@ def tensor_to_candidates(
     Returns:
         List of n Candidate objects.
 
+    Raises:
+        ValueError: If X is not a 2D tensor.
+
     Example:
         >>> X = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
         >>> candidates = tensor_to_candidates(X)
         >>> print(len(candidates))
         2
     """
+    if X.ndim != 2:
+        raise ValueError(f"Expected 2D tensor of shape (n, d), got shape {tuple(X.shape)}")
     X_numpy = X.detach().cpu().numpy()
     candidates = [
         Candidate(
@@ -165,7 +170,7 @@ def predictions_to_posterior(
     variance = torch.from_numpy(predictions.variances).float().to(device)
 
     variance_clamped = torch.clamp(variance, min=1e-6)
-    covar = DiagLinearOperator(variance_clamped.squeeze(-1))
+    covar = DiagLinearOperator(variance_clamped)
 
     # Create multivariate normal distribution
     mvn = MultivariateNormal(mean, covar)

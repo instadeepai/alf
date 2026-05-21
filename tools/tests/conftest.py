@@ -91,3 +91,4 @@ def random_seed():
     torch.manual_seed(seed)
     yield seed
     np.random.seed(None)
+    torch.seed()
