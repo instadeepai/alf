@@ -46,3 +46,8 @@ from alf_core.utils.metrics.regression import (
     spearman,
     width,
 )
+from alf_core.utils.metrics.benchmarking import (
+    BenchmarkingMetricRegistry,
+    benchmarking_metric_registry,
+    register_benchmarking_metric,
+)
