@@ -13,11 +13,15 @@
 # limitations under the License.
 
 
+import logging
 from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 from alf_core.dataclasses.candidate import Candidate
+from alf_core.utils.enums import ProblemType
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -44,14 +48,20 @@ class Predictions:
             AssertionError: If means is empty, or if variances or empirical_dist
                 don't match the length of means.
         """
-        assert len(self.means) > 0, "Means must have at least one prediction"
+        assert len(self.means) > 0, (
+            "Means must have at least one prediction — expected shape (num_candidates,)"
+        )
         if self.variances is not None:
             assert len(self.variances) == len(self.means), (
-                "Variances must have the same length as means"
+                "Variances must have the same length as means (num_candidates,), "
+                f"got {len(self.variances)} variances and {len(self.means)} means"
             )
         if self.empirical_dist is not None:
             assert len(self.empirical_dist) == len(self.means), (
-                "Empirical dist must have the same length as means"
+                "Empirical_dist must have the same length as means - "
+                "shape (num_candidates, num_ensemble_models), "
+                f"but its first dimension ({len(self.empirical_dist)}) does not match "
+                f"len(means) ({len(self.means)})"
             )
 
     def __len__(self) -> int:
@@ -66,6 +76,7 @@ class Predictions:
         self,
         candidates: list[Candidate],
         targets: np.ndarray,
+        problem_type: ProblemType,
     ) -> pd.DataFrame:
         """Convert predictions to a DataFrame.
 
@@ -75,19 +86,27 @@ class Predictions:
         Args:
             candidates: List of Candidate objects corresponding to the predictions.
             targets: Ground truth target values corresponding to each candidate.
+            problem_type: ProblemType to determine the predictions type.
 
         Returns:
             A DataFrame with predictions, targets, and optionally variances
             and ensemble predictions.
         """
         predictions_list = []
+        is_classification = problem_type in [ProblemType.BINARY, ProblemType.MULTICLASS]
+
         for i in range(len(self.means)):
-            record_i = {
+            record_i: dict[str, str | float | np.floating | list[float] | np.ndarray] = {
                 "sequence": candidates[i].data,
-                "mean": self.means[i],
-                "variance": self.variances[i] if self.variances is not None else 0,
                 "targets": targets[i],
             }
+
+            if is_classification:
+                for cls_idx in range(self.means.shape[1]):
+                    record_i[f"prob_class_{cls_idx}"] = self.means[i, cls_idx]
+            else:
+                record_i["mean"] = self.means[i]
+                record_i["variance"] = self.variances[i] if self.variances is not None else 0
 
             if self.empirical_dist is not None:
                 for j in range(self.empirical_dist.shape[1]):

@@ -17,11 +17,45 @@ import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
+from alf_core.utils.enums import ProblemType
 from alf_tools.models.cnn import (
     CNNModel,
     CNNModelConfig,
     CNNTrainConfig,
+    _apply_activation,  # noqa: PLC2701
 )
+
+
+def _make_dataset(labels: np.ndarray, problem_type: ProblemType) -> BaseDataset:
+    """Create a minimal BaseDataset for model setup in tests.
+
+    Sets _raw_dataset directly so determine_num_classes() works without a full
+    dataset load/split cycle.
+
+    Returns:
+        A BaseDataset with _raw_dataset pre-populated from the given labels.
+    """
+
+    class _TestDataset(BaseDataset):
+        def load_dataset(self) -> LabelledCandidates:
+            candidates = [
+                Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence") for _ in labels
+            ]
+            return LabelledCandidates(candidates=candidates, labels=labels)
+
+    config = BaseDatasetConfig(
+        name="test",
+        modality="sequence",
+        seed=0,
+        train_ratio=0.6,
+        validation_frac=0.2,
+        test_ratio=0.2,
+        problem_type=problem_type,
+    )
+    dataset = _TestDataset(config)
+    dataset._raw_dataset = dataset.load_dataset()
+    return dataset
 
 
 @pytest.fixture
@@ -38,29 +72,56 @@ def sample_data():
 
 
 @pytest.fixture
-def cnn_model():
+def val_data():
+    """Create sample validation data.
+
+    Returns:
+        A LabelledCandidates object containing the validation data.
+    """
+    sequences = ["ACDEFGHIKLMNPQRSTVWY"] * 2  # Simple repeated sequence
+    candidates = [Candidate(data=seq, modality="sequence") for seq in sequences]
+    labels = np.random.randn(2) * 0.5 + 1.0
+    return LabelledCandidates(candidates, labels)
+
+
+@pytest.fixture
+def empty_data():
+    """Create empty sample data for validation testing.
+
+    Returns:
+        A LabelledCandidates object containing the empty data.
+    """
+    candidates = []
+    labels = np.array([])
+    return LabelledCandidates(candidates, labels)
+
+
+@pytest.fixture
+def cnn_model(sample_data):
     """Create a CNNModel with small settings for fast testing.
 
     Returns:
-        A CNNModel.
+        A CNNModel configured and set up for regression.
     """
     model_config = CNNModelConfig(num_filters=16, num_conv_layers=1, fc_hidden_dim=32)
     train_config = CNNTrainConfig(batch_size=4, num_epochs=2)
-    return CNNModel(
-        name="test_cnn",
+    model = CNNModel(
         model_config=model_config,
+        name="test_cnn",
         train_config=train_config,
         device="cpu",
     )
+    model.setup(_make_dataset(sample_data.labels, ProblemType.REGRESSION))
+    return model
 
 
 class TestCNNModel:
     """Test the CNNModel class."""
 
-    def test_train_and_predict(self, cnn_model, sample_data):
+    def test_train_and_predict(self, cnn_model, sample_data, val_data):
         """Test the full training and prediction pipeline."""
         # Train should work without error
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data)
 
         # Model should be initialized
         assert cnn_model.model is not None
@@ -76,7 +137,7 @@ class TestCNNModel:
         assert predictions.means.shape == (3,)
         assert np.all(np.isfinite(predictions.means))
 
-    def test_train_with_validation(self, cnn_model, sample_data):
+    def test_train_with_validation(self, cnn_model, sample_data, val_data):
         """Test training with validation data."""
         val_sequences = ["ACDEFGHIKLMNPQRSTVWY"] * 3
         val_candidates = [Candidate(data=seq, modality="sequence") for seq in val_sequences]
@@ -108,24 +169,27 @@ class TestCNNModel:
         """Test that sequences of different lengths cause issues appropriately."""
         # First train with one length
         data1 = LabelledCandidates([Candidate(data="A" * 10, modality="sequence")], np.array([1.0]))
-        cnn_model.train(data1)
+        val_data1 = LabelledCandidates(
+            [Candidate(data="A" * 10, modality="sequence")], np.array([1.0])
+        )
+        cnn_model.train(data1, val_data=val_data1)
 
         # Trying to predict with different length should fail in one-hot encoding
         different_length_candidates = [Candidate(data="A" * 15, modality="sequence")]
         with pytest.raises((RuntimeError, IndexError, ValueError)):
             cnn_model.predict(different_length_candidates)
 
-    def test_model_parameters_update(self, cnn_model, sample_data):
+    def test_model_parameters_update(self, cnn_model, sample_data, val_data):
         """Test that model parameters are actually updated during training."""
         # train the model
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data=val_data)
 
         # Get initial parameters
         initial_params = [p.clone() for p in cnn_model.model.parameters()]
 
         # Train for one more epoch
         cnn_model.train_config.num_epochs = 1
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data=val_data)
 
         # Get updated parameters
         updated_params = list(cnn_model.model.parameters())
@@ -143,42 +207,46 @@ class TestCNNModel:
 class TestCNNModelSurrogateEpochMetrics:
     """Tests for CNNModel.get_epoch_metrics() and per-epoch recording."""
 
-    def test_get_epoch_metrics_returns_list_of_epoch_metrics(self, cnn_model, sample_data):
+    def test_get_epoch_metrics_returns_list_of_epoch_metrics(
+        self, cnn_model, sample_data, val_data
+    ):
         """get_epoch_metrics() should return a list of SurrogateEpochMetrics after training."""
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data=val_data)
         epoch_metrics = cnn_model.get_epoch_metrics()
         assert isinstance(epoch_metrics, list)
         assert all(isinstance(em, SurrogateEpochMetrics) for em in epoch_metrics)
 
-    def test_epoch_metrics_length_matches_num_epochs(self, cnn_model, sample_data):
+    def test_epoch_metrics_length_matches_num_epochs(self, cnn_model, sample_data, val_data):
         """get_epoch_metrics() length must equal num_epochs."""
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data=val_data)
         assert len(cnn_model.get_epoch_metrics()) == cnn_model.train_config.num_epochs
 
-    def test_epoch_metrics_reset_on_retrain(self, cnn_model, sample_data):
+    def test_epoch_metrics_reset_on_retrain(self, cnn_model, sample_data, val_data):
         """Calling train() twice must reset the epoch metrics list."""
-        cnn_model.train(sample_data)
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data=val_data)
+        cnn_model.train(sample_data, val_data=val_data)
         assert len(cnn_model.get_epoch_metrics()) == cnn_model.train_config.num_epochs
 
-    def test_epoch_metrics_train_loss_populated(self, cnn_model, sample_data):
+    def test_epoch_metrics_train_loss_populated(self, cnn_model, sample_data, val_data):
         """Every SurrogateEpochMetrics must have a finite train_loss."""
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data=val_data)
         for em in cnn_model.get_epoch_metrics():
             assert np.isfinite(em.train_loss)
 
-    def test_epoch_metrics_val_fields_populated_with_val_data(self, cnn_model, sample_data):
+    def test_epoch_metrics_val_fields_populated_with_val_data(
+        self, cnn_model, sample_data, val_data
+    ):
         """When val_data is provided, val_loss must be set on every SurrogateEpochMetrics."""
-        val_candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * 3
-        val_data = LabelledCandidates(val_candidates, np.random.randn(3))
         cnn_model.train(sample_data, val_data=val_data)
         for em in cnn_model.get_epoch_metrics():
             assert em.val_loss is not None
             assert np.isfinite(em.val_loss)
 
-    def test_epoch_metrics_val_fields_none_without_val_data(self, cnn_model, sample_data):
+    def test_epoch_metrics_val_fields_none_without_val_data(
+        self, cnn_model, sample_data, empty_data
+    ):
         """Without val_data, val_loss must be None on every SurrogateEpochMetrics."""
-        cnn_model.train(sample_data)
+        cnn_model.train(sample_data, val_data=empty_data)
         for em in cnn_model.get_epoch_metrics():
             assert em.val_loss is None
 
@@ -190,7 +258,7 @@ class TestCNNModelSurrogateEpochMetrics:
 class TestCNNModelReproducibility:
     """Reproducibility tests, extracted for clarity."""
 
-    def test_reproducibility_with_seed(self, sample_data):
+    def test_reproducibility_with_seed(self, sample_data, val_data):
         """Test that training is reproducible when using the same seed."""
 
         def set_seed(seed: int):
@@ -201,27 +269,29 @@ class TestCNNModelReproducibility:
             torch.backends.cudnn.deterministic = True
             torch.backends.cudnn.benchmark = False
 
-        # Create two identical surrogates
         model_config = CNNModelConfig(num_filters=16, num_conv_layers=1, fc_hidden_dim=32)
         train_config = CNNTrainConfig(batch_size=4, num_epochs=2)
+        dataset = _make_dataset(sample_data.labels, ProblemType.REGRESSION)
 
         set_seed(42)
         surrogate1 = CNNModel(
-            name="test_cnn_1",
             model_config=model_config,
+            name="test_cnn_1",
             train_config=train_config,
             device="cpu",
         )
-        surrogate1.train(sample_data)
+        surrogate1.setup(dataset)
+        surrogate1.train(sample_data, val_data=val_data)
 
         set_seed(42)
         surrogate2 = CNNModel(
-            name="test_cnn_2",
             model_config=model_config,
+            name="test_cnn_2",
             train_config=train_config,
             device="cpu",
         )
-        surrogate2.train(sample_data)
+        surrogate2.setup(dataset)
+        surrogate2.train(sample_data, val_data=val_data)
 
         # Check that model parameters are identical
         params1 = list(surrogate1.model.parameters())
@@ -230,3 +300,84 @@ class TestCNNModelReproducibility:
         # Parameters should be identical (or very close due to floating point)
         for p1, p2 in zip(params1, params2):
             torch.testing.assert_close(p1, p2, rtol=1e-5, atol=1e-7)
+
+
+class TestApplyActivation:
+    """Tests for the _apply_activation module-level helper."""
+
+    def test_regression_returns_tensor_unchanged(self):
+        """Test that regression logits are returned as-is."""
+        t = torch.tensor([1.0, -1.0, 0.5])
+        result = _apply_activation(t, ProblemType.REGRESSION)
+        assert torch.equal(result, t)
+
+    def test_binary_returns_two_class_probs(self):
+        """Test that binary logits are converted to (n, 2) probability matrix."""
+        t = torch.tensor([0.0, 2.0, -2.0])
+        result = _apply_activation(t, ProblemType.BINARY)
+        assert result.shape == (3, 2)
+        assert torch.allclose(result[:, 1], torch.sigmoid(t))
+        assert torch.allclose(result.sum(dim=-1), torch.ones(3))
+
+    def test_multiclass_applies_softmax(self):
+        """Test that multiclass logits are converted to softmax probabilities."""
+        t = torch.tensor([[1.0, 2.0, 3.0], [0.5, 0.5, 0.5]])
+        result = _apply_activation(t, ProblemType.MULTICLASS)
+        assert torch.allclose(result, torch.softmax(t, dim=-1))
+        assert torch.allclose(result.sum(dim=-1), torch.ones(2))
+
+
+class TestEpochMetricsClassification:
+    """Integration tests for epoch metric computation across problem types."""
+
+    def test_binary_training_produces_nonempty_metrics(self):
+        """Test that binary training populates accuracy and f1 in the summary."""
+        model_config = CNNModelConfig(num_filters=4, num_conv_layers=1, fc_hidden_dim=8)
+        train_config = CNNTrainConfig(batch_size=4, num_epochs=1)
+        model = CNNModel(
+            model_config=model_config,
+            name="test_binary",
+            train_config=train_config,
+            device="cpu",
+        )
+        labels = np.array([0, 1, 0, 1, 0, 1, 0, 1], dtype=np.float32)
+        model.setup(_make_dataset(labels, ProblemType.BINARY))
+        sequences = ["ACDEFGHIKLMNPQRSTVWY"] * 8
+        data = LabelledCandidates(
+            [Candidate(data=s, modality="sequence") for s in sequences], labels
+        )
+        val_data = LabelledCandidates(
+            [Candidate(data=s, modality="sequence") for s in sequences[:2]], labels[:2]
+        )
+        model.train(data, val_data=val_data)
+
+        summary = model.get_training_summary_metrics()
+        assert "final_train_accuracy" in summary
+        assert "final_train_f1" in summary
+
+    def test_regression_one_sample_omits_pearson_and_spearman(self):
+        """Test that single-sample regression omits pearson and spearman from summary."""
+        model_config = CNNModelConfig(num_filters=4, num_conv_layers=1, fc_hidden_dim=8)
+        train_config = CNNTrainConfig(batch_size=1, num_epochs=1)
+        model = CNNModel(
+            model_config=model_config,
+            name="test_reg_single",
+            train_config=train_config,
+            device="cpu",
+        )
+        labels = np.array([1.0])
+        model.setup(_make_dataset(labels, ProblemType.REGRESSION))
+        data = LabelledCandidates(
+            [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")],
+            labels,
+        )
+        val_data = LabelledCandidates(
+            [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")],
+            np.array([1.0]),
+        )
+        model.train(data, val_data=val_data)
+
+        summary = model.get_training_summary_metrics()
+        assert "final_train_mse" in summary
+        assert "final_train_pearson" not in summary
+        assert "final_train_spearman" not in summary

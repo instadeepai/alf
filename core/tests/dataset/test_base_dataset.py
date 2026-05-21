@@ -95,6 +95,7 @@ class TestBaseDatasetValidation:
                 validation_frac=0.2,
                 test_ratio=0.2,
                 split_type="random",
+                problem_type="regression",
             )
 
 
@@ -245,10 +246,13 @@ class TestBaseDatasetProperties:
             validation_frac=0.25,
             test_ratio=0.2,
             split_type="random",
+            problem_type="regression",
         )
         dataset = NoSetupDataset(config)
 
-        with pytest.raises(AssertionError, match="Dataset must be split before accessing"):
+        with pytest.raises(
+            AssertionError, match="Dataset must be split before accessing train dataset"
+        ):
             _ = dataset.train_dataset
 
 
