@@ -249,7 +249,8 @@ def split_stratified(
         for cls, avail_count, n in zip(classes, avail, alloc):
             if avail_count > 0 and n == 0:
                 warnings.warn(
-                    f"split_stratified: class {cls} has {avail_count} available samples but received "
+                    f"split_stratified: class {cls} has {avail_count} "
+                    "available samples but received "
                     f"0 in the '{name}' split due to rounding. "
                     "Consider using a larger dataset or fewer splits.",
                     stacklevel=2,

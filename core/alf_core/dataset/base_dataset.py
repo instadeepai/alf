@@ -302,13 +302,18 @@ class BaseDataset(abc.ABC):
     def determine_num_classes(self) -> int:
         """Determine the number of output neurons based on problem type and labels.
 
+        Raises:
+            RuntimeError: If the raw dataset is not loaded.
+            ValueError: If the dataset is empty (no labels found).
+
         Returns:
             int: Number of output neurons. For REGRESSION and BINARY, returns 1 and 2 respectively.
         """
-        assert self._raw_dataset is not None, (
-            "Dataset must be loaded before querying; "
-            "_raw_dataset is None — call dataset.setup() before querying"
-        )
+        if self._raw_dataset is None:
+            raise RuntimeError(
+                "Dataset must be loaded before querying; "
+                "_raw_dataset is None — call dataset.setup() before querying"
+            )
         problem_type = self.config.problem_type
         labels = self._raw_dataset.labels
         unique_labels = np.unique(labels)

@@ -437,6 +437,7 @@ class CNNModel(BaseModel):
 
         Raises:
             ValueError: If the model's problem_type disagrees with the dataset's.
+            RuntimeError: If the model is not properly initialized.
         """
         if self.output_dim is None:
             raise ValueError("CNNModel.setup(dataset) must be called before train()")
