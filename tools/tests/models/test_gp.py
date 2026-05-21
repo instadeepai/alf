@@ -406,14 +406,14 @@ class TestGPNormalisation:
         config = GPTrainConfig()
         assert config.normalise_inputs is True
 
-    def test_input_normalisation_enabled(self, sample_data):
+    def test_input_normalisation_enabled(self, sample_data, sample_val_data):
         """normalise_inputs=True must run without error; predictions in original label scale."""
         model = GPModel(
             train_config=GPTrainConfig(num_iterations=5, normalise_inputs=True),
             featurizer_config=FeaturizerConfig(featurizer_type="one_hot"),
             device="cpu",
         )
-        model.train(sample_data)
+        model.train(sample_data, val_data=sample_val_data)
         assert model._input_normaliser is not None
         assert model._input_normaliser.is_fitted
 
@@ -421,28 +421,28 @@ class TestGPNormalisation:
         assert np.all(np.isfinite(predictions.means))
         assert np.all(predictions.variances >= 0)
 
-    def test_input_normalisation_disabled(self, sample_data):
+    def test_input_normalisation_disabled(self, sample_data, sample_val_data):
         """normalise_inputs=False leaves _input_normaliser as None and predict still works."""
         model = GPModel(
             train_config=GPTrainConfig(num_iterations=5, normalise_inputs=False),
             featurizer_config=FeaturizerConfig(featurizer_type="one_hot"),
             device="cpu",
         )
-        model.train(sample_data)
+        model.train(sample_data, val_data=sample_val_data)
         assert model._input_normaliser is None
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
         assert np.all(predictions.variances >= 0)
 
-    def test_output_standardisation_enabled(self, sample_data):
+    def test_output_standardisation_enabled(self, sample_data, sample_val_data):
         """standardise_outputs=True trains in standardised space; predict returns original scale."""
         model = GPModel(
             train_config=GPTrainConfig(num_iterations=5, standardise_outputs=True),
             featurizer_config=FeaturizerConfig(featurizer_type="one_hot"),
             device="cpu",
         )
-        model.train(sample_data)
+        model.train(sample_data, val_data=sample_val_data)
         assert model._output_standardiser is not None
         assert model._output_standardiser.is_fitted
 

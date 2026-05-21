@@ -422,38 +422,41 @@ class TestCNNLabelDtype:
 class TestCNNNormalisation:
     """Tests for CNNModel input normalisation and output standardisation."""
 
-    def test_input_normalisation_enabled(self, sample_data):
+    def test_input_normalisation_enabled(self, sample_data, val_data):
         """normalise_inputs=True must run without error."""
         model = CNNModel(
             train_config=CNNTrainConfig(num_epochs=2, normalise_inputs=True),
             device="cpu",
         )
-        model.train(sample_data)
+        model.setup(_make_dataset(sample_data.labels, ProblemType.REGRESSION))
+        model.train(sample_data, val_data=val_data)
         assert model._input_normaliser is not None
         assert model._input_normaliser.is_fitted
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
 
-    def test_input_normalisation_disabled(self, sample_data):
+    def test_input_normalisation_disabled(self, sample_data, val_data):
         """normalise_inputs=False (the default) leaves _input_normaliser as None."""
         model = CNNModel(
             train_config=CNNTrainConfig(num_epochs=2, normalise_inputs=False),
             device="cpu",
         )
-        model.train(sample_data)
+        model.setup(_make_dataset(sample_data.labels, ProblemType.REGRESSION))
+        model.train(sample_data, val_data=val_data)
         assert model._input_normaliser is None
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
 
-    def test_output_standardisation_enabled(self, sample_data):
+    def test_output_standardisation_enabled(self, sample_data, val_data):
         """standardise_outputs=True trains in standardised space; predict returns original scale."""
         model = CNNModel(
             train_config=CNNTrainConfig(num_epochs=2, standardise_outputs=True),
             device="cpu",
         )
-        model.train(sample_data)
+        model.setup(_make_dataset(sample_data.labels, ProblemType.REGRESSION))
+        model.train(sample_data, val_data=val_data)
         assert model._output_standardiser is not None
         assert model._output_standardiser.is_fitted
 
@@ -464,14 +467,14 @@ class TestCNNNormalisation:
         label_std = sample_data.labels.std()
         assert np.abs(predictions.means.mean() - label_mean) < label_std * 5
 
-    def test_val_data_with_standardisation(self, sample_data):
+    def test_val_data_with_standardisation(self, sample_data, val_data):
         """Val metrics are in original label scale when standardise_outputs=True."""
         train_data = LabelledCandidates(sample_data.candidates[:6], sample_data.labels[:6])
-        val_data = LabelledCandidates(sample_data.candidates[6:], sample_data.labels[6:])
         model = CNNModel(
             train_config=CNNTrainConfig(num_epochs=2, standardise_outputs=True),
             device="cpu",
         )
+        model.setup(_make_dataset(sample_data.labels, ProblemType.REGRESSION))
         model.train(train_data, val_data=val_data)
 
         history = model.get_epoch_metrics()

@@ -306,7 +306,12 @@ class CNNModel(BaseModel):
         Returns:
             Tuple of (train_loader, val_loader). val_loader is None if val_data is None.
         """
-        label_dtype = self.train_config.label_dtype or self._default_label_dtype
+        if self.train_config.label_dtype is not None:
+            label_dtype = self.train_config.label_dtype
+        elif getattr(self, "problem_type", None) == ProblemType.MULTICLASS:
+            label_dtype = torch.long
+        else:
+            label_dtype = self._default_label_dtype
         train_x, train_y, self._input_normaliser, self._output_standardiser = transform_data(
             self.featurise(train_data),
             train_data.labels,
