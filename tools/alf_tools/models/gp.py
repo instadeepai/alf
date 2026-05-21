@@ -27,15 +27,14 @@ from alf_core.model.base_model import BaseTrainConfig
 from alf_core.model.normaliser import (
     InputNormaliser,
     OutputStandardiser,
-    fit_input_normaliser,
-    fit_output_standardiser,
 )
 from jaxtyping import Float
 
-from alf_tools.models.utils.sequence_utils import (
+from alf_tools.models.utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
     one_hot_encode,
+    transform_data,
 )
 from alf_tools.models.utils.torch_utils import get_device
 from alf_tools.utils.constants import PROTEIN_ALPHABET
@@ -572,16 +571,15 @@ class GPModel(BaseModel):
         Returns:
             A tuple of training features and targets as tensors on the current device.
         """
-        train_x = self.featurise(train_data).to(self.device)
-        train_x_np, self._input_normaliser = fit_input_normaliser(
-            np.array(train_x), self.train_config.normalise_inputs
-        )
-        train_y_np, self._output_standardiser = fit_output_standardiser(
-            train_data.labels, self.train_config.standardise_outputs
-        )
         label_dtype = self.train_config.label_dtype or self._default_label_dtype
-        train_x = torch.tensor(train_x_np, dtype=torch.float32).to(self.device)
-        train_y = torch.tensor(train_y_np, dtype=label_dtype).to(self.device)
+        train_x, train_y, self._input_normaliser, self._output_standardiser = transform_data(
+            self.featurise(train_data),
+            train_data.labels,
+            self.train_config.normalise_inputs,
+            self.train_config.standardise_outputs,
+            label_dtype,
+            self.device,
+        )
         return train_x, train_y
 
     def train(

@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any, Union
 
 import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
+from torch import dtype as TorchDtype
 
 if TYPE_CHECKING:
     from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
@@ -46,7 +47,7 @@ class BaseTrainConfig:
     log_frequency: int = 10
     normalise_inputs: bool = False
     standardise_outputs: bool = False
-    label_dtype: object | None = None
+    label_dtype: TorchDtype | None = None
 
 
 class BaseModel(abc.ABC):

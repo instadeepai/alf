@@ -16,6 +16,7 @@ from alf_tools.models.utils.sequence_utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
     one_hot_encode,
+    transform_data,
 )
 from alf_tools.models.utils.torch_utils import get_device
 
@@ -24,4 +25,5 @@ __all__ = [
     "extract_sequences_from_inputs",
     "get_device",
     "one_hot_encode",
+    "transform_data",
 ]

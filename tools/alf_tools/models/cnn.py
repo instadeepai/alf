@@ -26,8 +26,6 @@ from alf_core.model.base_model import BaseModel, BaseTrainConfig
 from alf_core.model.normaliser import (
     InputNormaliser,
     OutputStandardiser,
-    fit_input_normaliser,
-    fit_output_standardiser,
 )
 from torch.utils.data import DataLoader, TensorDataset
 
@@ -35,6 +33,7 @@ from alf_tools.models.utils import (
     create_char_to_idx_mapping,
     get_device,
     one_hot_encode,
+    transform_data,
 )
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
@@ -253,16 +252,15 @@ class CNNModel(BaseModel):
         Returns:
             Tuple of (train_loader, val_loader). val_loader is None if val_data is None.
         """
-        train_x = self.featurise(train_data).to(self.device)
-        train_x_np, self._input_normaliser = fit_input_normaliser(
-            np.array(train_x), self.train_config.normalise_inputs
-        )
-        train_y_np, self._output_standardiser = fit_output_standardiser(
-            train_data.labels, self.train_config.standardise_outputs
-        )
         label_dtype = self.train_config.label_dtype or self._default_label_dtype
-        train_x = torch.tensor(train_x_np, dtype=torch.float32).to(self.device)
-        train_y = torch.tensor(train_y_np, dtype=label_dtype).to(self.device)
+        train_x, train_y, self._input_normaliser, self._output_standardiser = transform_data(
+            self.featurise(train_data),
+            train_data.labels,
+            self.train_config.normalise_inputs,
+            self.train_config.standardise_outputs,
+            label_dtype,
+            self.device,
+        )
 
         train_loader = DataLoader(
             TensorDataset(train_x, train_y),
@@ -273,7 +271,7 @@ class CNNModel(BaseModel):
 
         val_loader = None
         if val_data is not None and len(val_data) > 0:
-            val_x_np = np.array(self.featurise(val_data))
+            val_x_np = np.array(self.featurise(val_data).cpu())
             if self._input_normaliser is not None:
                 val_x_np = self._input_normaliser.transform(val_x_np)
             val_y_np = val_data.labels
@@ -518,7 +516,7 @@ class CNNModel(BaseModel):
             raise RuntimeError("Model not trained. Call fit() first.")
 
         self.model.eval()
-        x_np = np.array(self.featurise(candidate_points))
+        x_np = np.array(self.featurise(candidate_points).cpu())
 
         if self._input_normaliser is not None:
             x_np = self._input_normaliser.transform(x_np)
