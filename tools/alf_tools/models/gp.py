@@ -99,8 +99,7 @@ class GPTrainConfig(BaseTrainConfig):
         log_frequency: Inherited from BaseTrainConfig. Default: 10.
     """
 
-    normalise_inputs: bool = True
-    standardise_outputs: bool = False
+    normalise_inputs: bool = True  # override BaseTrainConfig default
     learning_rate: float = 0.01  # override BaseTrainConfig default
     num_iterations: int = 100
     optimizer_type: Literal["adam", "lbfgs"] = "adam"
@@ -556,7 +555,7 @@ class GPModel(BaseModel):
 
         return metrics
 
-    def _build_data_loaders(
+    def _prepare_train_data(
         self,
         train_data: LabelledCandidates,
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -596,19 +595,20 @@ class GPModel(BaseModel):
         Note:
             For exact GPs, all training data is used for predictions. Validation
             data is only used for logging validation metrics during training.
+
+            This method is not thread-safe. Concurrent calls to train() and predict()
+            on the same instance will produce undefined behaviour.
         """
         self._epoch_metrics = []
         logger.info(f"Training GP with {len(train_data)} samples")
 
-        train_x, train_y = self._build_data_loaders(train_data)
+        train_x, train_y = self._prepare_train_data(train_data)
 
         # Store training data for later predictions
         self.train_x = train_x
         self.train_y = train_y
 
-        # Initialize likelihood if first time
-        if self.likelihood is None:
-            self.likelihood = self._initialize_likelihood().to(self.device)
+        self.likelihood = self._initialize_likelihood().to(self.device)
 
         # Initialize or reinitialize GP model
         self.feature_dim = train_x.shape[-1]

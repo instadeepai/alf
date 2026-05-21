@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 import numpy as np
 from jaxtyping import Float
 
@@ -49,7 +51,15 @@ class OutputStandardiser:
             Y: 1-D array of training labels, shape (n_samples,).
         """
         self._mean = float(np.mean(Y))
-        self._std = max(float(np.std(Y)), self._MIN_STD)
+        raw_std = float(np.std(Y))
+        self._std = max(raw_std, self._MIN_STD)
+        if raw_std < self._MIN_STD:
+            logging.warning(
+                "OutputStandardiser: training labels have near-zero std (%.2e). "
+                "Clamping to %.2e. Standardisation may not be meaningful.",
+                raw_std,
+                self._MIN_STD,
+            )
 
     def transform(self, Y: Float[np.ndarray, "n_samples"]) -> Float[np.ndarray, "n_samples"]:
         """Standardise labels to zero mean, unit variance.
@@ -65,7 +75,6 @@ class OutputStandardiser:
         """
         if not self.is_fitted:
             raise RuntimeError("OutputStandardiser must be fitted before calling transform.")
-        assert self._mean is not None and self._std is not None
         return (Y - self._mean) / self._std
 
     def inverse_transform(
@@ -91,7 +100,6 @@ class OutputStandardiser:
             raise RuntimeError(
                 "OutputStandardiser must be fitted before calling inverse_transform."
             )
-        assert self._mean is not None and self._std is not None
         mean_orig = mean * self._std + self._mean
         var_orig = var * (self._std**2) if var is not None else None
         return mean_orig, var_orig
@@ -169,39 +177,4 @@ class InputNormaliser:
         """
         if not self.is_fitted:
             raise RuntimeError("InputNormaliser must be fitted before calling transform.")
-        assert self._min is not None and self._range is not None
         return (X - self._min) / self._range
-
-
-def fit_input_normaliser(
-    train_x: np.ndarray,
-) -> tuple[np.ndarray, InputNormaliser | None]:
-    """Fit an InputNormaliser on train_x and apply it.
-
-    Args:
-        train_x: Training feature tensor, shape (n_samples, ...).
-
-    Returns:
-        Tuple of (normalised_x, fitted_normaliser). normalised_x equals
-        train_x when apply is False; normaliser is None when apply is False.
-    """
-    normaliser = InputNormaliser()
-    normaliser.fit(train_x)
-    return normaliser.transform(train_x), normaliser
-
-
-def fit_output_standardiser(
-    train_y: np.ndarray,
-) -> tuple[np.ndarray, OutputStandardiser | None]:
-    """Fit an OutputStandardiser on train_y and apply it.
-
-    Args:
-        train_y: Training label array, shape (n_samples,).
-
-    Returns:
-        Tuple of (standardised_y, fitted_standardiser). standardised_y equals
-        train_y when apply is False; standardiser is None when apply is False.
-    """
-    standardiser = OutputStandardiser()
-    standardiser.fit(train_y)
-    return standardiser.transform(train_y), standardiser

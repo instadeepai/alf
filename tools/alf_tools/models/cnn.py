@@ -235,7 +235,7 @@ class CNNModel(BaseModel):
 
         return self._one_hot_encode(sequences)
 
-    def _build_data_loaders(
+    def _prepare_train_data(
         self,
         train_data: LabelledCandidates,
         val_data: LabelledCandidates | None,
@@ -277,7 +277,7 @@ class CNNModel(BaseModel):
             val_y_np = val_data.labels
             if self._output_standardiser is not None:
                 val_y_np = self._output_standardiser.transform(val_y_np)
-            val_x = torch.tensor(val_x_np, dtype=torch.float32).to(self.device)
+            val_x = torch.tensor(val_x_np, dtype=train_x.dtype).to(self.device)
             val_y = torch.tensor(val_y_np, dtype=label_dtype).to(self.device)
             val_loader = DataLoader(
                 TensorDataset(val_x, val_y),
@@ -324,6 +324,8 @@ class CNNModel(BaseModel):
             train_predictions_all.append(predictions.detach().cpu().numpy())
             train_targets_all.append(batch_y.detach().cpu().numpy())
 
+        # TODO: train metrics are in standardised space when standardise_outputs=True;
+        # inverse-transform here for parity with val metrics.
         avg_train_loss = np.mean(train_losses)
         train_preds = np.concatenate(train_predictions_all)
         train_targets = np.concatenate(train_targets_all)
@@ -374,6 +376,10 @@ class CNNModel(BaseModel):
         avg_val_loss = np.mean(val_losses)
         val_preds = np.concatenate(val_predictions_all)
         val_targets = np.concatenate(val_targets_all)
+
+        if self._output_standardiser is not None:
+            val_preds, _ = self._output_standardiser.inverse_transform(val_preds)
+            val_targets, _ = self._output_standardiser.inverse_transform(val_targets)
 
         # Use Predictions to compute all metrics
         val_predictions_obj = Predictions(means=val_preds, variances=None)
@@ -452,7 +458,7 @@ class CNNModel(BaseModel):
             logger.info(f"CNN initialized with {total_params:,} parameters")
 
         # Featurize, fit normalisers on train, and build DataLoaders
-        train_loader, val_loader = self._build_data_loaders(train_data, val_data)
+        train_loader, val_loader = self._prepare_train_data(train_data, val_data)
 
         # Setup training
         optimizer = optim.Adam(self.model.parameters(), lr=self.train_config.learning_rate)
@@ -516,11 +522,14 @@ class CNNModel(BaseModel):
             raise RuntimeError("Model not trained. Call fit() first.")
 
         self.model.eval()
-        x_np = np.array(self.featurise(candidate_points).cpu())
+        x = self.featurise(candidate_points)
 
         if self._input_normaliser is not None:
+            x_np = x.cpu().numpy()
             x_np = self._input_normaliser.transform(x_np)
-        x = torch.tensor(x_np, dtype=torch.float32).to(self.device)
+            x = torch.tensor(x_np, dtype=x.dtype).to(self.device)
+        else:
+            x = x.to(self.device)
 
         with torch.no_grad():
             means = self.model(x).cpu().numpy()

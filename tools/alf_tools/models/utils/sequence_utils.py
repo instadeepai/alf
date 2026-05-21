@@ -30,16 +30,8 @@ Note:
 
 from typing import Union
 
-import numpy as np
 import torch
 from alf_core import Candidate, LabelledCandidates
-from alf_core.model.normaliser import (
-    InputNormaliser,
-    OutputStandardiser,
-    fit_input_normaliser,
-    fit_output_standardiser,
-)
-from torch import dtype as TorchDtype
 
 
 def create_char_to_idx_mapping(alphabet: str) -> dict[str, int]:
@@ -117,42 +109,3 @@ def one_hot_encode(
         one_hot = one_hot.view(batch_size, -1)
 
     return one_hot
-
-
-def transform_data(
-    train_x: torch.Tensor,
-    labels: np.ndarray,
-    normalise_inputs: bool,
-    standardise_outputs: bool,
-    label_dtype: TorchDtype,
-    device: torch.device,
-) -> tuple[torch.Tensor, torch.Tensor, InputNormaliser | None, OutputStandardiser | None]:
-    """Apply input normalisation and output standardisation to training data.
-
-    Args:
-        train_x (torch.Tensor): Training features tensor.
-        labels (np.ndarray): Training labels array.
-        normalise_inputs (bool): Whether to apply min-max normalisation to input features.
-        standardise_outputs (bool): Whether to apply Z-score standardisation to output labels.
-        label_dtype (TorchDtype): Data type for the output labels.
-        device (torch.device): Device to move tensors to.
-
-    Returns:
-        tuple[torch.Tensor, torch.Tensor, InputNormaliser | None, OutputStandardiser | None]:
-            Transformed training features, training labels, and the fitted normalisers.
-    """
-    input_normaliser = None
-    output_standardiser = None
-    if normalise_inputs:
-        train_x_np = np.array(train_x.cpu())
-        train_x_np, input_normaliser = fit_input_normaliser(train_x_np)
-        train_x = torch.tensor(train_x_np, dtype=torch.float32).to(device)
-    else:
-        train_x = train_x.to(device)
-
-    if standardise_outputs:
-        labels, output_standardiser = fit_output_standardiser(labels)
-        train_y = torch.tensor(labels, dtype=label_dtype).to(device)
-    else:
-        train_y = torch.tensor(labels, dtype=label_dtype).to(device)
-    return train_x, train_y, input_normaliser, output_standardiser

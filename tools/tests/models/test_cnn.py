@@ -241,7 +241,7 @@ class TestCNNLabelDtype:
             train_config=CNNTrainConfig(num_epochs=1),
             device="cpu",
         )
-        train_loader, _ = model._build_data_loaders(sample_data, None)
+        train_loader, _ = model._prepare_train_data(sample_data, None)
         _, batch_y = next(iter(train_loader))
         assert batch_y.dtype == torch.float32
 
@@ -251,7 +251,7 @@ class TestCNNLabelDtype:
             train_config=CNNTrainConfig(num_epochs=1, label_dtype=torch.float64),
             device="cpu",
         )
-        train_loader, _ = model._build_data_loaders(sample_data, None)
+        train_loader, _ = model._prepare_train_data(sample_data, None)
         _, batch_y = next(iter(train_loader))
         assert batch_y.dtype == torch.float64
 
@@ -263,7 +263,7 @@ class TestCNNLabelDtype:
             train_config=CNNTrainConfig(num_epochs=1, label_dtype=torch.float64),
             device="cpu",
         )
-        _, val_loader = model._build_data_loaders(sample_data, val_data)
+        _, val_loader = model._prepare_train_data(sample_data, val_data)
         _, val_batch_y = next(iter(val_loader))
         assert val_batch_y.dtype == torch.float64
 
@@ -308,6 +308,28 @@ class TestCNNNormalisation:
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
-        # Predictions must be in original label scale, not standardised space
-        label_scale = sample_data.labels.std()
-        assert predictions.means.std() < label_scale * 10  # sanity: not blown up
+        # Predictions must be in original label scale (mean ≈ label mean, not ~0 from Z-score space)
+        label_mean = sample_data.labels.mean()
+        label_std = sample_data.labels.std()
+        assert np.abs(predictions.means.mean() - label_mean) < label_std * 5
+
+    def test_val_data_with_standardisation(self, sample_data):
+        """Val metrics are in original label scale when standardise_outputs=True."""
+        train_data = LabelledCandidates(sample_data.candidates[:6], sample_data.labels[:6])
+        val_data = LabelledCandidates(sample_data.candidates[6:], sample_data.labels[6:])
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=2, standardise_outputs=True),
+            device="cpu",
+        )
+        model.train(train_data, val_data=val_data)
+
+        history = model.get_epoch_metrics()
+        assert len(history) == 2
+        for epoch_metrics in history:
+            assert epoch_metrics.val_loss is not None
+            # val_mse (if present) should be in original label scale
+            if "val_mse" in epoch_metrics.additional_metrics:
+                val_mse = epoch_metrics.additional_metrics["val_mse"]
+                label_range = float(np.ptp(sample_data.labels))
+                # MSE in original space: at most (label_range)^2 * 10 (loose upper bound)
+                assert val_mse < (label_range**2) * 10
