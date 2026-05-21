@@ -12,26 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-from functools import wraps
-from typing import Callable
-
-import numpy as np
-from jaxtyping import Float, Int
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    precision_score,
-    recall_score,
-    roc_auc_score,
-)
-
 from alf_core.utils.metrics._base import (
     ClassificationMetricRegistry,
     RegressionMetricRegistry,
     classification_metric_registry,
     regression_metric_registry,
     require_min_samples,
+)
+from alf_core.utils.metrics.classification import (
+    accuracy,
+    auc_roc,
+    f1,
+    precision,
+    recall,
+    register_classification_metric,
 )
 from alf_core.utils.metrics.regression import (
     coverage,
@@ -52,153 +46,3 @@ from alf_core.utils.metrics.regression import (
     spearman,
     width,
 )
-
-logger = logging.getLogger(__name__)
-
-
-def register_classification_metric(metric_fn: Callable) -> Callable:
-    """Decorator to register a classification metric.
-
-    Automatically registers the metric in the classification registry and applies
-    basic input validation. The decorated function receives ``(probs, targets)``
-    where ``probs`` has shape ``(n_samples, num_classes)`` and ``targets`` has
-    shape ``(n_samples,)``.
-
-    Args:
-        metric_fn: The metric function to decorate.
-
-    Returns:
-        Wrapped metric function with validation and registration.
-    """
-
-    @wraps(metric_fn)
-    def wrapper(
-        probs: Float[np.ndarray, "n_samples num_classes"], targets: Float[np.ndarray, " n_samples"]
-    ) -> dict[str, float]:
-        assert probs.ndim == 2, (
-            f"probs must be with shape (n_samples, num_classes), got shape {probs.shape}"
-        )
-        assert len(probs) != 0, "Empty input arrays"
-        assert probs.shape[0] == targets.shape[0], (
-            f"probs and targets batch size mismatch: {probs.shape[0]} vs {targets.shape[0]}"
-        )
-        targets = targets.astype(int)
-        return metric_fn(probs, targets)
-
-    classification_metric_registry.register(metric_fn.__name__, wrapper)
-    return wrapper
-
-
-
-
-# ---------------------------------------------------------------------------
-# Classification metrics
-# ---------------------------------------------------------------------------
-
-
-@register_classification_metric
-def accuracy(
-    probs: Float[np.ndarray, "n_samples num_classes"],
-    targets: Int[np.ndarray, " n_samples"],
-) -> dict[str, float]:
-    """Compute classification accuracy.
-
-    Args:
-        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
-        targets: Array of shape (n_samples,). Integer class labels.
-
-    Returns:
-        {"accuracy": accuracy float}
-    """
-    preds = np.argmax(probs, axis=1)
-    return {"accuracy": float(accuracy_score(targets, preds))}
-
-
-@register_classification_metric
-def f1(
-    probs: Float[np.ndarray, "n_samples num_classes"],
-    targets: Int[np.ndarray, " n_samples"],
-) -> dict[str, float]:
-    """Compute macro-averaged F1 score.
-
-    Args:
-        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
-        targets: Array of shape (n_samples,). Integer class labels.
-
-    Returns:
-        {"f1": macro F1 float}
-    """
-    preds = np.argmax(probs, axis=1)
-    return {"f1": float(f1_score(targets, preds, average="macro", zero_division=0))}
-
-
-@register_classification_metric
-def precision(
-    probs: Float[np.ndarray, "n_samples num_classes"],
-    targets: Int[np.ndarray, " n_samples"],
-) -> dict[str, float]:
-    """Compute macro-averaged precision.
-
-    Args:
-        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
-        targets: Array of shape (n_samples,). Integer class labels.
-
-    Returns:
-        {"precision": macro precision float}
-    """
-    preds = np.argmax(probs, axis=1)
-    return {"precision": float(precision_score(targets, preds, average="macro", zero_division=0))}
-
-
-@register_classification_metric
-def recall(
-    probs: Float[np.ndarray, "n_samples num_classes"],
-    targets: Int[np.ndarray, " n_samples"],
-) -> dict[str, float]:
-    """Compute macro-averaged recall.
-
-    Args:
-        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
-        targets: Array of shape (n_samples,). Integer class labels.
-
-    Returns:
-        {"recall": macro recall float}
-    """
-    preds = np.argmax(probs, axis=1)
-    return {"recall": float(recall_score(targets, preds, average="macro", zero_division=0))}
-
-
-@register_classification_metric
-@require_min_samples(2)
-def auc_roc(
-    probs: Float[np.ndarray, "n_samples num_classes"],
-    targets: Int[np.ndarray, " n_samples"],
-) -> dict[str, float]:
-    """Compute Area Under the ROC Curve (AUC-ROC).
-
-    For binary classification, uses the positive-class probabilities.
-    For multiclass, uses one-vs-rest averaging.
-
-    Args:
-        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
-        targets: Array of shape (n_samples,). Integer class labels.
-
-    Returns:
-        {"auc_roc": AUC-ROC float}
-    """
-    if len(np.unique(targets)) < 2:
-        logger.warning("auc_roc: fewer than 2 unique classes in targets — returning empty dict.")
-        return {}
-    if probs.shape[1] == 2:
-        try:
-            return {"auc_roc": float(roc_auc_score(targets, probs[:, 1]))}
-        except ValueError as e:
-            logger.warning(
-                "auc_roc: sklearn raised ValueError (likely targets missing a class): %s", e
-            )
-            return {}
-    try:
-        return {"auc_roc": float(roc_auc_score(targets, probs, multi_class="ovr"))}
-    except ValueError as e:
-        logger.warning("auc_roc: sklearn raised ValueError (likely targets missing a class): %s", e)
-        return {}
