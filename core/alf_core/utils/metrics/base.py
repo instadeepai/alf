@@ -88,7 +88,7 @@ def require_min_samples(n: int) -> Callable:
         def wrapper(*args: Any, **kwargs: Any) -> dict[str, float]:
             if len(args[0]) < n:
                 logger.warning(
-                    f"Insufficient samples for metric{fn.__name__}: got "
+                    f"Insufficient samples for metric {fn.__name__}: got "
                     f"{len(args[0])}, expected at least {n}"
                 )
                 return {}
@@ -119,7 +119,11 @@ class RegressionMetricRegistry:
         self.variance_required[name] = requires_variance
 
     def get_metrics(self, requires_variance: bool) -> dict[str, Callable]:
-        """Get all registered metrics.
+        """Get registered metrics filtered by variance requirement.
+
+        Args:
+            requires_variance: If True, return only metrics that need variance;
+                if False, return only metrics that do not.
 
         Returns:
             Dictionary mapping metric names to their functions.

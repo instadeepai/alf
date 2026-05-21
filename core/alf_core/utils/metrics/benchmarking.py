@@ -44,7 +44,6 @@ Uncertainty calibration (NLL, reliability diagrams) belong in regression.py
 alongside the existing expected_calibration_error.
 """
 
-from functools import wraps
 from typing import Callable
 
 
@@ -86,12 +85,7 @@ def register_benchmarking_metric(metric_fn: Callable) -> Callable:
         metric_fn: The metric function to decorate.
 
     Returns:
-        The wrapped function, registered in ``benchmarking_metric_registry``.
+        The original function, registered in ``benchmarking_metric_registry``.
     """
-
-    @wraps(metric_fn)
-    def wrapper(*args, **kwargs):
-        return metric_fn(*args, **kwargs)
-
-    benchmarking_metric_registry.register(metric_fn.__name__, wrapper)
-    return wrapper
+    benchmarking_metric_registry.register(metric_fn.__name__, metric_fn)
+    return metric_fn

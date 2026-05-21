@@ -74,7 +74,7 @@ class TestCheckVarianceValidity:
 
     def test_length_mismatch_raises(self):
         """Length mismatch raises AssertionError."""
-        with pytest.raises(AssertionError, match="shape"):
+        with pytest.raises(AssertionError, match="variances has"):
             check_variance_validity(np.array([0.1]), np.array([1.0, 2.0]))
 
     def test_nan_variance_raises(self):
