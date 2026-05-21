@@ -252,8 +252,8 @@ class BaseDataset(abc.ABC):
         and sets metadata. This must be called before accessing dataset splits.
         """
         self._raw_dataset = self.load_dataset()
-        self.splits = self._split_dataset()
         self.num_classes = self.determine_num_classes()
+        self.splits = self._split_dataset()
         self.set_metadata()
 
     def update_splits(self, acquired_candidates: LabelledCandidates) -> None:
@@ -310,10 +310,24 @@ class BaseDataset(abc.ABC):
             "_raw_dataset is None — call dataset.setup() before querying"
         )
         problem_type = self.config.problem_type
+        labels = self._raw_dataset.labels
+        unique_labels = np.unique(labels)
+        if len(unique_labels) == 0:
+            raise ValueError("Dataset is empty — no labels found.")
+        if problem_type == ProblemType.BINARY and len(unique_labels) != 2:
+            raise ValueError(
+                f"problem_type=BINARY requires exactly 2 unique classes, "
+                f"got {len(unique_labels)}: {unique_labels.tolist()}"
+            )
+        if problem_type == ProblemType.MULTICLASS and len(unique_labels) < 3:
+            raise ValueError(
+                f"problem_type=MULTICLASS requires at least 3 unique classes, "
+                f"got {len(unique_labels)}: {unique_labels.tolist()}"
+            )
         if problem_type == ProblemType.BINARY:
             return 2
         if problem_type == ProblemType.MULTICLASS:
-            return len(np.unique(self._raw_dataset.labels))
+            return len(unique_labels)
         return 1
 
     def get_metrics(self) -> dict[str, Union[float, int, np.number]]:

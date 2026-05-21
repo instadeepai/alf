@@ -19,8 +19,8 @@ import abc
 from typing import TYPE_CHECKING, Any, Union
 
 import numpy as np
-from alf_core import ProblemType
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
+from alf_core.utils.enums import ProblemType
 
 if TYPE_CHECKING:
     from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics

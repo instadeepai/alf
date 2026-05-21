@@ -72,8 +72,10 @@ class Results:
                     self.predictions.means, self.predictions.variances, self.targets
                 )
                 metrics.update(metric_update)
-        else:
-            for _, metric_fn in classification_metric_registry.metrics.items():
+        elif self.problem_type in (ProblemType.BINARY, ProblemType.MULTICLASS):
+            for _, metric_fn in classification_metric_registry.get_metrics().items():
                 metrics.update(metric_fn(self.predictions.means, self.targets))
+        else:
+            raise ValueError(f"Unhandled ProblemType in compute_metrics: {self.problem_type!r}")
 
         return metrics

@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
+from alf_core.utils.enums import ProblemType
 
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
@@ -66,6 +67,7 @@ class PyRosetta(BaseModel):
         self.average_fn_over_repeats = average_fn_over_repeats
         self.alphabet = alphabet
         self.seed = seed
+        self.problem_type = ProblemType.REGRESSION
 
         # Initialize PyRosetta
         pyrosetta.init(f"-constant_seed -jran {self.seed}")
@@ -188,7 +190,7 @@ class PyRosetta(BaseModel):
     def train(
         self,
         train_data: LabelledCandidates,
-        val_data: LabelledCandidates | None = None,
+        val_data: LabelledCandidates,
     ) -> None:
         """Training is not implemented for this model.
 
