@@ -19,6 +19,11 @@ from alf_core.utils.metrics._base import (
     regression_metric_registry,
     require_min_samples,
 )
+from alf_core.utils.metrics.benchmarking import (
+    BenchmarkingMetricRegistry,
+    benchmarking_metric_registry,
+    register_benchmarking_metric,
+)
 from alf_core.utils.metrics.classification import (
     accuracy,
     auc_roc,
@@ -37,17 +42,12 @@ from alf_core.utils.metrics.regression import (
     rank_coverage,
     rank_expected_calibration_error,
     rank_width,
-    regret_ucb_alpha,
-    regret_ucb_alpha_sweep,
     register_no_variance_required,
     register_requires_variance,
+    regret_ucb_alpha,
+    regret_ucb_alpha_sweep,
     residual_pearson,
     residual_spearman,
     spearman,
     width,
-)
-from alf_core.utils.metrics.benchmarking import (
-    BenchmarkingMetricRegistry,
-    benchmarking_metric_registry,
-    register_benchmarking_metric,
 )
