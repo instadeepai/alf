@@ -78,6 +78,7 @@ def _make_flip_config(**overrides) -> FLIPConfig:
         train_ratio=0.5,
         validation_frac=0.2,
         test_ratio=1.0,
+        problem_type="regression",
     )
     defaults.update(overrides)
     return FLIPConfig(**defaults)

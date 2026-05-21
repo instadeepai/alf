@@ -100,6 +100,7 @@ class OutputStandardiser:
             raise RuntimeError(
                 "OutputStandardiser must be fitted before calling inverse_transform."
             )
+        assert self._mean is not None and self._std is not None
         mean_orig = mean * self._std + self._mean
         var_orig = var * (self._std**2) if var is not None else None
         return mean_orig, var_orig

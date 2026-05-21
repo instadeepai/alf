@@ -25,7 +25,7 @@ from alf_core import (
     TerminalStateLogger,
 )
 from alf_tools.datasets import GFP
-from alf_tools.models import CNNModel, CNNTrainConfig
+from alf_tools.models import CNNModel, CNNModelConfig, CNNTrainConfig
 
 
 @pytest.fixture
@@ -62,6 +62,7 @@ def gfp_dataset():
         test_ratio=0.2,
         validation_frac=0.5,
         split_type="random",
+        problem_type="regression",
     )
     return GFP(config)
 
@@ -73,7 +74,12 @@ def surrogate_model():
     Returns:
         A surrogate model.
     """
-    return Surrogate(model=CNNModel(train_config=CNNTrainConfig(num_epochs=10)))
+    return Surrogate(
+        model=CNNModel(
+            model_config=CNNModelConfig(),
+            train_config=CNNTrainConfig(num_epochs=10),
+        )
+    )
 
 
 @pytest.fixture

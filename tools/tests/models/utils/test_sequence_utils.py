@@ -66,10 +66,10 @@ class TestSequenceUtils:
 
     def test_extract_sequences_invalid_input(self):
         """Test that invalid input raises ValueError."""
-        with pytest.raises(ValueError, match="Input must be"):
+        with pytest.raises(ValueError, match="Inputs must be"):
             extract_sequences_from_inputs("invalid")
 
-        with pytest.raises(ValueError, match="Input must be"):
+        with pytest.raises(ValueError, match="Inputs must be"):
             extract_sequences_from_inputs(["not", "candidates"])
 
     def test_one_hot_encode_basic(self):

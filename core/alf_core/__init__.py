@@ -40,6 +40,7 @@ from alf_core.tasks.base_task import BaseTask
 from alf_core.tasks.design_task import DesignTask
 from alf_core.tasks.supervised_task import SupervisedTask
 from alf_core.tasks.zeroshot_task import ZeroShotTask
+from alf_core.utils.enums import ProblemType
 from alf_core.utils.state_logger import (
     FileStateLogger,
     StateLogger,
