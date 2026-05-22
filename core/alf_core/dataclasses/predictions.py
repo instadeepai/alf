@@ -21,7 +21,7 @@ import pandas as pd
 from alf_core.dataclasses.candidate import Candidate
 from alf_core.utils.enums import ProblemType
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("alf-core")
 
 
 @dataclass
