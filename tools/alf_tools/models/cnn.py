@@ -68,7 +68,6 @@ class CNNModelConfig:
     """Configuration for CNN model architecture.
 
     Args:
-        problem_type: Type of problem. Required — no default to prevent silent misconfiguration.
         num_filters: Number of filters in convolutional layers.
         kernel_size: Size of convolutional kernels.
         num_conv_layers: Number of convolutional layers.
@@ -92,6 +91,8 @@ class CNNTrainConfig(BaseTrainConfig):
         num_epochs: Number of epochs to train for.
         learning_rate: Inherited from BaseTrainConfig. Default: 1e-3.
         log_frequency: Inherited from BaseTrainConfig. Default: 10.
+        normalise_inputs: Inherited from BaseTrainConfig. Default: False.
+        standardise_outputs: Inherited from BaseTrainConfig. Default: False.
         label_dtype: Inherited from BaseTrainConfig. None uses the model
             default (float32 for CNN regression). Override to force a dtype.
     """
