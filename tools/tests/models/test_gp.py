@@ -452,3 +452,48 @@ class TestGPNormalisation:
         # Predictions must be in original label scale, not standardised space
         label_scale = sample_data.labels.std()
         assert predictions.means.std() < label_scale * 10  # sanity: not blown up
+
+    def test_standardise_outputs_train_and_val_metrics_are_inverse_transformed(self):
+        """Both final_train and final_val summary metrics must be in original label scale.
+
+        Labels have std=50. In standardised (Z-score) space, predicted CIs have width ≈ 4
+        and cannot contain targets scattered over ±150, giving coverage ≈ 0.  After correct
+        inverse-transform the CI is 50× wider and should contain most targets (coverage ≈ 0.95).
+        A threshold of 0.3 cleanly separates these two cases for both train and val metrics.
+        """
+        rng = np.random.default_rng(0)
+        n_train, n_val = 10, 10
+        label_std = 50.0
+        train_labels = rng.standard_normal(n_train) * label_std
+        val_labels = rng.standard_normal(n_val) * label_std
+
+        train_data = LabelledCandidates(
+            [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * n_train,
+            train_labels,
+        )
+        val_data = LabelledCandidates(
+            [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * n_val,
+            val_labels,
+        )
+
+        model = GPModel(
+            train_config=GPTrainConfig(num_iterations=10, standardise_outputs=True),
+            featurizer_config=FeaturizerConfig(featurizer_type="one_hot"),
+            device="cpu",
+        )
+        model.train(train_data, val_data=val_data)
+        metrics = model.get_training_summary_metrics()
+
+        # coverage_0.95 = fraction of targets inside the 95% CI.
+        # Correct (original scale): CI ≈ ±98, targets ~ N(0, 50) → coverage ≈ 0.95.
+        # Bug (standardised scale): CI ≈ ±2, targets at ±50s → coverage ≈ 0.
+        assert "final_train_coverage_0.95" in metrics
+        assert "final_val_coverage_0.95" in metrics
+        assert metrics["final_train_coverage_0.95"] > 0.3, (
+            f"final_train_coverage_0.95={metrics['final_train_coverage_0.95']:.3f} — "
+            "train metrics appear to be in standardised space, not original label scale"
+        )
+        assert metrics["final_val_coverage_0.95"] > 0.3, (
+            f"final_val_coverage_0.95={metrics['final_val_coverage_0.95']:.3f} — "
+            "val metrics appear to be in standardised space, not original label scale"
+        )

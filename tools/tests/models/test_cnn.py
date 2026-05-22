@@ -489,6 +489,52 @@ class TestCNNNormalisation:
                 # MSE in original space: at most (label_range)^2 * 10 (loose upper bound)
                 assert val_mse < (label_range**2) * 10
 
+    def test_standardise_outputs_train_and_val_metrics_are_inverse_transformed(self):
+        """Both final_train_mse and final_val_mse must be in original label scale.
+
+        Labels have std=50.  In standardised (Z-score) space the CNN predicts near 0
+        and MSE against unit-variance targets ≈ 1.  After correct inverse-transform
+        both predictions and targets are in original space, so MSE ≈ var(labels) ≈ 2500.
+        A threshold of 100 cleanly separates the two cases for both train and val metrics.
+        """
+        rng = np.random.default_rng(0)
+        n_train, n_val = 10, 4
+        label_std = 50.0
+        train_labels = rng.standard_normal(n_train) * label_std
+        val_labels = rng.standard_normal(n_val) * label_std
+
+        train_data = LabelledCandidates(
+            [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * n_train,
+            train_labels,
+        )
+        val_data = LabelledCandidates(
+            [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * n_val,
+            val_labels,
+        )
+
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=5, standardise_outputs=True),
+            device="cpu",
+        )
+        model.setup(_make_dataset(train_labels, ProblemType.REGRESSION))
+        model.train(train_data, val_data=val_data)
+        metrics = model.get_training_summary_metrics()
+
+        # Correct (original scale): CNN converges toward predicting ≈ label mean in
+        # original space; MSE = E[(pred - target)²] ≈ var(labels) ≈ 2500.
+        # Bug (standardised scale): predictions ≈ 0 in Z-score space, targets ~ N(0,1)
+        # → MSE ≈ 1.  Threshold of 100 cleanly separates both cases.
+        assert "final_train_mse" in metrics
+        assert "final_val_mse" in metrics
+        assert metrics["final_train_mse"] > 100, (
+            f"final_train_mse={metrics['final_train_mse']:.3f} — "
+            "train metrics appear to be in standardised space, not original label scale"
+        )
+        assert metrics["final_val_mse"] > 100, (
+            f"final_val_mse={metrics['final_val_mse']:.3f} — "
+            "val metrics appear to be in standardised space, not original label scale"
+        )
+
     def test_standardise_outputs_raises_for_binary_classification(self):
         """standardise_outputs=True must raise ValueError for BINARY classification."""
         binary_labels = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1], dtype=np.float32)
