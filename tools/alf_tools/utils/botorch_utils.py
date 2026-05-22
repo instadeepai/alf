@@ -32,6 +32,7 @@ from linear_operator.operators import DiagLinearOperator
 def candidates_to_tensor(
     candidates: list[Candidate],
     device: torch.device | None = None,
+    dtype: torch.dtype = torch.float64,
 ) -> torch.Tensor:
     """Convert a list of ALF Candidates to a PyTorch tensor.
 
@@ -88,7 +89,7 @@ def candidates_to_tensor(
         ) from e
 
     # Convert to tensor
-    X_tensor = torch.from_numpy(X).float().to(device)
+    X_tensor = torch.from_numpy(X).to(dtype).to(device)
     return X_tensor
 
 
@@ -133,6 +134,7 @@ def tensor_to_candidates(
 def predictions_to_posterior(
     predictions: Predictions,
     device: torch.device | None = None,
+    dtype: torch.dtype = torch.float64,
 ) -> GPyTorchPosterior:
     """Convert ALF Predictions to a BoTorch GPyTorchPosterior.
 
@@ -166,8 +168,8 @@ def predictions_to_posterior(
     if device is None:
         device = torch.device("cpu")
 
-    mean = torch.from_numpy(predictions.means).float().to(device)
-    variance = torch.from_numpy(predictions.variances).float().to(device)
+    mean = torch.from_numpy(predictions.means).to(dtype).to(device)
+    variance = torch.from_numpy(predictions.variances).to(dtype).to(device)
 
     variance_clamped = torch.clamp(variance, min=1e-6)
     covar = DiagLinearOperator(variance_clamped)
@@ -183,6 +185,7 @@ def predictions_to_posterior(
 def get_bounds_tensor(
     bounds: np.ndarray | list[tuple[float, float]],
     device: torch.device | None = None,
+    dtype: torch.dtype = torch.float64,
 ) -> torch.Tensor:
     """Convert bounds to BoTorch format.
 
@@ -232,5 +235,5 @@ def get_bounds_tensor(
             "Bounds must be a numpy array of shape (2, d) with lower bounds <= upper bounds"
         )
 
-    bounds_tensor = torch.from_numpy(bounds_array).float().to(device)
+    bounds_tensor = torch.from_numpy(bounds_array).to(dtype).to(device)
     return bounds_tensor
