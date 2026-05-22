@@ -140,7 +140,9 @@ def test_posterior_alf_model_2d(mock_alf_model_with_variances, test_tensor_2d):
 
     # Check variances match mock model (all 0.2)
     variance_flat = posterior.variance.flatten()
-    assert torch.allclose(variance_flat, torch.tensor([0.2, 0.2, 0.2], dtype=torch.float64), atol=0.01)
+    assert torch.allclose(
+        variance_flat, torch.tensor([0.2, 0.2, 0.2], dtype=torch.float64), atol=0.01
+    )
 
 
 def test_posterior_alf_model_3d(mock_alf_model_with_variances, test_tensor_3d):
