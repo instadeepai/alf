@@ -18,6 +18,9 @@ import numpy as np
 from jaxtyping import Float
 
 
+logger = logging.getLogger("alf-core")
+
+
 class OutputStandardiser:
     """Standardises output labels to zero mean and unit variance.
 
@@ -54,7 +57,7 @@ class OutputStandardiser:
         raw_std = float(np.std(Y))
         self._std = max(raw_std, self._MIN_STD)
         if raw_std < self._MIN_STD:
-            logging.warning(
+            logger.warning(
                 "OutputStandardiser: training labels have near-zero std (%.2e). "
                 "Clamping to %.2e. Standardisation may not be meaningful.",
                 raw_std,
