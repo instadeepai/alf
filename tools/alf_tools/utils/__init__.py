@@ -11,3 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from alf_tools.utils.botorch_utils import (
+    candidates_to_tensor,
+    get_bounds_tensor,
+    predictions_to_posterior,
+    tensor_to_candidates,
+)
+
+__all__ = [
+    "candidates_to_tensor",
+    "get_bounds_tensor",
+    "predictions_to_posterior",
+    "tensor_to_candidates",
+]
