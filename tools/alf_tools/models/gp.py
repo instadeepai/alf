@@ -727,7 +727,7 @@ class GPModel(BaseModel):
         self.likelihood.eval()
 
         # Featurize input
-        test_x_np = np.array(self.featurise(candidate_points))
+        test_x_np = self.featurise(candidate_points).cpu().numpy()
 
         # Apply input normalization if fitted
         if self._input_normaliser is not None:

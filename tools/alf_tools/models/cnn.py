@@ -399,8 +399,6 @@ class CNNModel(BaseModel):
             )
             train_targets_all.append(batch_y.detach().cpu().numpy())
 
-        # TODO: train metrics are in standardised space when standardise_outputs=True;
-        # inverse-transform here for parity with val metrics.
         avg_train_loss = float(np.mean(train_losses))
         train_preds = np.concatenate(train_predictions_all)
         train_targets = np.concatenate(train_targets_all)
