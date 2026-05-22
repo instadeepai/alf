@@ -18,6 +18,7 @@ This module provides conversion utilities between ALF's data structures
 (Candidates, Predictions) and BoTorch's expected formats (tensors, posteriors).
 """
 
+import logging
 from typing import Any
 
 import numpy as np
@@ -27,6 +28,8 @@ from alf_core.dataclasses.candidate import Modality
 from botorch.posteriors.gpytorch import GPyTorchPosterior
 from gpytorch.distributions import MultivariateNormal
 from linear_operator.operators import DiagLinearOperator
+
+logger = logging.getLogger(__name__)
 
 
 def candidates_to_tensor(
@@ -152,6 +155,8 @@ def predictions_to_posterior(
 
     Raises:
         ValueError: If predictions don't contain variances (required for posterior).
+        RuntimeError: If variances contain significantly negative values, which
+            may indicate a problem with the surrogate model.
 
     Example:
         >>> means = np.array([1.0, 2.0, 3.0])
@@ -172,6 +177,14 @@ def predictions_to_posterior(
 
     mean = torch.from_numpy(predictions.means).to(dtype).to(device)
     variance = torch.from_numpy(predictions.variances).to(dtype).to(device)
+
+    min_variance = variance.min().item()
+    if min_variance < -1e-4:
+        raise RuntimeError(
+            "Predictions contain significantly negative variances (min=%.6g). "
+            "This may indicate a problem with the surrogate model.",
+            min_variance,
+        )
 
     variance_clamped = torch.clamp(variance, min=1e-6)
     covar = DiagLinearOperator(variance_clamped)
