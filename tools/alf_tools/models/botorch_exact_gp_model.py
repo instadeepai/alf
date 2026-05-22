@@ -168,7 +168,7 @@ class BoTorchGPModel(BaseModel):
         Raises:
             ValueError: If candidates don't contain valid tensor data.
         """
-        return candidates_to_tensor(inputs, device=self.device)
+        return candidates_to_tensor(inputs, device=self.device, dtype=self.dtype)
 
     def _validate_shape(self, tensor: torch.Tensor) -> None:
         if tensor.ndim != 2:
@@ -299,7 +299,7 @@ class BoTorchGPModel(BaseModel):
             raise ValueError("Candidates list cannot be empty")
 
         # Convert candidates to tensor
-        test_X = candidates_to_tensor(candidate_points, device=self.device)
+        test_X = candidates_to_tensor(candidate_points, device=self.device, dtype=self.dtype)
 
         # Validate shapes
         self._validate_shape(test_X)
