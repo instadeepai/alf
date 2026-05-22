@@ -12,12 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import warnings
 from functools import wraps
-from typing import Any, Callable, Union
+from typing import Any, Callable
 
 import numpy as np
+from jaxtyping import Float, Int
 from scipy.stats import norm, pearsonr, spearmanr
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def check_inputs(means: np.ndarray, targets: np.ndarray) -> None:
@@ -31,9 +42,10 @@ def check_inputs(means: np.ndarray, targets: np.ndarray) -> None:
         AssertionError: If shapes don't match, arrays are empty, or contain NaN values.
     """
     assert means.shape == targets.shape, (
-        f"Means shape {means.shape} and targets shape {targets.shape} don't match"
+        f"Means shape {means.shape} does not match targets shape {targets.shape} "
+        f"(both must be (b,))"
     )
-    assert len(means) != 0, "Empty input arrays"
+    assert len(means) != 0, "Means and targets must not be empty (expected shape (b,) with b > 0)"
     assert not (np.any(np.isnan(means))), "Mean prediction array contains NaN values"
     assert not (np.any(np.isnan(targets))), "Target array contains NaN values"
 
@@ -49,20 +61,27 @@ def check_variance_validity(variances: np.ndarray, targets: np.ndarray) -> None:
         AssertionError: If variances is None, contains negative values, length
             doesn't match targets, or contains NaN values.
     """
-    assert variances is not None, "This function requires variances but it is None"
-    assert np.all(variances >= 0), "All uncertainty values must be non-negative (variances)."
+    assert variances is not None, (
+        "variances is None — this metric requires uncertainty estimates; "
+        "ensure your model's predict() returns a Predictions object with variances set "
+        "or that the problem type is correctly specified."
+    )
+    assert np.all(variances >= 0), (
+        f"variances must be non-negative, but {np.sum(variances < 0)} values are negative "
+        f"(min={variances.min():.4g})"
+    )
     assert len(variances) == len(targets), (
-        f"Length of variances vector ({len(variances)})"
-        f"should equal length of targets vector ({len(targets)})"
+        f"variances has {len(variances)} elements but targets has {len(targets)} — "
+        f"both must have shape (b,)"
     )
     assert not (np.any(np.isnan(variances))), "Variance arrays contain NaN values"
 
 
-class MetricRegistry:
+class RegressionMetricRegistry:
     """Simple registry for metrics with variance requirements."""
 
     def __init__(self) -> None:
-        """Initialize an empty metric registry."""
+        """Initialise an empty metric registry."""
         self.metrics: dict[str, Callable] = {}
         self.variance_required: dict[str, bool] = {}
 
@@ -77,28 +96,50 @@ class MetricRegistry:
         self.metrics[name] = metric_fn
         self.variance_required[name] = requires_variance
 
-    def get_metrics_requiring_variance(self) -> dict[str, Callable]:
-        """Get all registered metrics that require variance.
+    def get_metrics(self, requires_variance: bool) -> dict[str, Callable]:
+        """Get all registered metrics.
 
         Returns:
             Dictionary mapping metric names to their functions.
         """
-        return {name: fn for name, fn in self.metrics.items() if self.variance_required[name]}
+        return {
+            name: fn
+            for name, fn in self.metrics.items()
+            if self.variance_required[name] == requires_variance
+        }
 
-    def get_metrics_not_requiring_variance(self) -> dict[str, Callable]:
+
+class ClassificationMetricRegistry:
+    """Simple registry for classification metrics not requiring variance information."""
+
+    def __init__(self) -> None:
+        """Initialise an empty classification metric registry."""
+        self.metrics: dict[str, Callable] = {}
+
+    def register(self, name: str, fn: Callable) -> None:
+        """Register a classification metric function in the registry.
+
+        Args:
+            name (str): Name of the metric.
+            fn (Callable): The metric function to register.
+        """
+        self.metrics[name] = fn
+
+    def get_metrics(self) -> dict[str, Callable]:
         """Get all registered metrics that don't require variance.
 
         Returns:
             Dictionary mapping metric names to their functions.
         """
-        return {name: fn for name, fn in self.metrics.items() if not self.variance_required[name]}
+        return {name: fn for name, fn in self.metrics.items()}
 
 
-# Create the global registry instance
-metric_registry = MetricRegistry()
+# Create the global registry instances
+regression_metric_registry = RegressionMetricRegistry()
+classification_metric_registry = ClassificationMetricRegistry()
 
 
-def requires_variance(metric_fn: Callable) -> Callable:
+def register_requires_variance(metric_fn: Callable) -> Callable:
     """Decorator to mark a metric as requiring variance.
 
     Automatically registers the metric in the global registry and applies input validation.
@@ -114,7 +155,7 @@ def requires_variance(metric_fn: Callable) -> Callable:
     @wraps(metric_fn)
     def wrapper(
         means: np.ndarray,
-        variances: np.ndarray | None,
+        variances: np.ndarray,
         targets: np.ndarray,
         *args: Any,
         **kwargs: Any,
@@ -124,11 +165,11 @@ def requires_variance(metric_fn: Callable) -> Callable:
         return metric_fn(means, variances, targets, *args, **kwargs)
 
     # Register the metric with variance requirement
-    metric_registry.register(metric_fn.__name__, wrapper, requires_variance=True)
+    regression_metric_registry.register(metric_fn.__name__, wrapper, requires_variance=True)
     return wrapper
 
 
-def no_variance_required(metric_fn: Callable) -> Callable:
+def register_no_variance_required(metric_fn: Callable) -> Callable:
     """Decorator to mark a metric as not requiring variance.
 
     Automatically registers the metric in the global registry and applies input validation.
@@ -153,15 +194,78 @@ def no_variance_required(metric_fn: Callable) -> Callable:
         return metric_fn(means, variances, targets, *args, **kwargs)
 
     # Register the metric without variance requirement
-    metric_registry.register(metric_fn.__name__, wrapper, requires_variance=False)
+    regression_metric_registry.register(metric_fn.__name__, wrapper, requires_variance=False)
+    return wrapper
+
+
+def require_min_samples(n: int) -> Callable:
+    """Decorator factory that requires a minimum number of samples.
+
+    If the decorated function is called with fewer than n samples (based on
+    the length of the means array), returns an empty dictionary instead of
+    calling the function.
+
+    Args:
+        n: Minimum number of samples required.
+
+    Returns:
+        A decorator that wraps metric functions.
+    """
+
+    def decorator(fn: Callable) -> Callable:
+        @wraps(fn)
+        def wrapper(*args: Any, **kwargs: Any) -> dict[str, float]:
+            if len(args[0]) < n:
+                logger.warning(
+                    f"Insufficient samples for metric{fn.__name__}: got "
+                    f"{len(args[0])}, expected at least {n}"
+                )
+                return {}
+            return fn(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def register_classification_metric(metric_fn: Callable) -> Callable:
+    """Decorator to register a classification metric.
+
+    Automatically registers the metric in the classification registry and applies
+    basic input validation. The decorated function receives ``(probs, targets)``
+    where ``probs`` has shape ``(n_samples, num_classes)`` and ``targets`` has
+    shape ``(n_samples,)``.
+
+    Args:
+        metric_fn: The metric function to decorate.
+
+    Returns:
+        Wrapped metric function with validation and registration.
+    """
+
+    @wraps(metric_fn)
+    def wrapper(
+        probs: Float[np.ndarray, "n_samples num_classes"], targets: Float[np.ndarray, " n_samples"]
+    ) -> dict[str, float]:
+        assert probs.ndim == 2, (
+            f"probs must be with shape (n_samples, num_classes), got shape {probs.shape}"
+        )
+        assert len(probs) != 0, "Empty input arrays"
+        assert probs.shape[0] == targets.shape[0], (
+            f"probs and targets batch size mismatch: {probs.shape[0]} vs {targets.shape[0]}"
+        )
+        targets = targets.astype(int)
+        return metric_fn(probs, targets)
+
+    classification_metric_registry.register(metric_fn.__name__, wrapper)
     return wrapper
 
 
 def monte_carlo_ranking(
-    means: np.ndarray,
-    variances: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
     num_samples: int = 10000,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[Float[np.ndarray, " b"], Float[np.ndarray, " b"]]:
     """Compute ranks, their means and variances using Monte Carlo simulation.
 
     For predicted means and variances, estimates normally distributed means
@@ -194,8 +298,12 @@ def monte_carlo_ranking(
     return mean_rank, rank_variances
 
 
-@no_variance_required
-def mse(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dict[str, float]:
+@register_no_variance_required
+def mse(
+    means: Float[np.ndarray, " b"],
+    _: Float[np.ndarray, " b"] | None,
+    targets: Float[np.ndarray, " b"],
+) -> dict[str, float]:
     """Compute the mean squared error.
 
     For each sample compute the squared euclidean distance between
@@ -212,8 +320,13 @@ def mse(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dict[st
     return {"mse": ((targets - means) ** 2).mean(0)}
 
 
-@no_variance_required
-def spearman(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dict[str, float]:
+@register_no_variance_required
+@require_min_samples(2)
+def spearman(
+    means: Float[np.ndarray, " b"],
+    _: Float[np.ndarray, " b"] | None,
+    targets: Float[np.ndarray, " b"],
+) -> dict[str, float]:
     """Compute the spearman correlation.
 
     This is a non-parametric statistical test which measures
@@ -233,8 +346,13 @@ def spearman(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> di
     return {"spearman": spearmanr(targets, means)[0]}
 
 
-@no_variance_required
-def pearson(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dict[str, float]:
+@register_no_variance_required
+@require_min_samples(2)
+def pearson(
+    means: Float[np.ndarray, " b"],
+    _: Float[np.ndarray, " b"] | None,
+    targets: Float[np.ndarray, " b"],
+) -> dict[str, float]:
     """Compute the pearson correlation.
 
     This is a statistical test which measures the strength
@@ -253,8 +371,12 @@ def pearson(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dic
     return {"pearson": pearsonr(targets, means)[0]}
 
 
-@no_variance_required
-def pairwise_xent(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) -> dict[str, float]:
+@register_no_variance_required
+def pairwise_xent(
+    means: Float[np.ndarray, " b"],
+    _: Float[np.ndarray, " b"] | None,
+    targets: Float[np.ndarray, " b"],
+) -> dict[str, float]:
     """Compute the ranking loss for a pairwise classification problem.
 
     For each pair of items in the batch, predict which item has the higher target value.
@@ -284,11 +406,11 @@ def pairwise_xent(means: np.ndarray, _: np.ndarray | None, targets: np.ndarray) 
     return {"pairwise_xent": ranking_xent}
 
 
-@requires_variance
+@register_requires_variance
 def expected_calibration_error(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
     n_grid_points: int = 100,
 ) -> dict[str, float]:
     """Compute Expected Calibration Error (ECE).
@@ -322,11 +444,11 @@ def expected_calibration_error(
     return {"ece": ece}
 
 
-@requires_variance
+@register_requires_variance
 def rank_expected_calibration_error(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
 ) -> dict[str, float]:
     """Compute Expected Calibration Error (ECE) in rank space.
 
@@ -351,17 +473,17 @@ def rank_expected_calibration_error(
     return {"rank_ece": ece}
 
 
-@requires_variance
+@register_requires_variance
 def width(
-    _: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    _: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
     alpha: float = 0.95,
 ) -> dict[str, float]:
-    """Compute average confidence interval width normalized by dataset range.
+    """Compute average confidence interval width normalised by dataset range.
 
     Computes alpha% confidence intervals for all predictions, then calculates
-    the average width normalized by the maximum distance between any two targets.
+    the average width normalised by the maximum distance between any two targets.
     Lower values are better while maintaining good calibration.
 
     Args:
@@ -371,7 +493,7 @@ def width(
         alpha: Confidence level (e.g., 0.95 for 95% CI). Defaults to 0.95.
 
     Returns:
-        Dictionary with key "width_{alpha:.2f}" mapping to the normalized
+        Dictionary with key "width_{alpha:.2f}" mapping to the normalised
         average width value.
 
     Raises:
@@ -380,6 +502,12 @@ def width(
     assert (alpha >= 0) and (alpha <= 1), "alpha should be in [0,1]"
 
     max_width_dataset = targets.max() - targets.min()
+    if max_width_dataset == 0:
+        logger.warning(
+            "width: all targets are equal (range=0) — calibration width ratio is undefined. "
+            "Returning empty dict."
+        )
+        return {}
 
     num_stds = norm.ppf(1 - ((1 - alpha) / 2))
 
@@ -391,11 +519,11 @@ def width(
     return {f"width_{alpha:.2f}": avg_width_ratio}
 
 
-@requires_variance
+@register_requires_variance
 def rank_width(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
     alpha: float = 0.95,
 ) -> dict[str, float]:
     """Compute average confidence interval width in rank space.
@@ -410,7 +538,7 @@ def rank_width(
         alpha: Confidence level (e.g., 0.95 for 95% CI). Defaults to 0.95.
 
     Returns:
-        Dictionary with key "rank_width_{alpha:.2f}" mapping to the normalized
+        Dictionary with key "rank_width_{alpha:.2f}" mapping to the normalised
         average width value in rank space.
 
     Raises:
@@ -426,11 +554,11 @@ def rank_width(
     return {f"rank_width_{alpha:.2f}": avg_width_ratio}
 
 
-@requires_variance
+@register_requires_variance
 def coverage(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
     alpha: float = 0.95,
 ) -> dict[str, float]:
     """Compute coverage at alpha% confidence level.
@@ -463,11 +591,11 @@ def coverage(
     return {f"coverage_{alpha:.2f}": coverage_at_alpha}
 
 
-@requires_variance
+@register_requires_variance
 def rank_coverage(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
     alpha: float = 0.95,
 ) -> dict[str, float]:
     """Compute coverage at alpha% confidence level in rank space.
@@ -499,11 +627,11 @@ def rank_coverage(
     return {f"rank_coverage_{alpha:.2f}": coverage_at_alpha}
 
 
-@requires_variance
+@register_requires_variance
 def residual_spearman(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
 ) -> dict[str, float]:
     """Compute Spearman correlation between residuals and variances.
 
@@ -524,11 +652,11 @@ def residual_spearman(
     return {"residual_spearman": spearmanr(residuals, variances)[0]}
 
 
-@requires_variance
+@register_requires_variance
 def residual_pearson(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
 ) -> dict[str, float]:
     """Compute Pearson correlation between residuals and standard deviations.
 
@@ -549,11 +677,11 @@ def residual_pearson(
     return {"residual_pearson": pearsonr(residuals, np.sqrt(variances))[0]}
 
 
-@requires_variance
+@register_requires_variance
 def regret_ucb_alpha(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
     alpha: float = 0.1,
     num_acquisitions: int = 100,
 ) -> dict[str, float]:
@@ -601,7 +729,7 @@ def regret_ucb_alpha(
             f"Dataset size ({len(means)}) is too small to compute UCB regret. Returning NaN.",
             stacklevel=2,
         )
-        return {f"regret_ucb_{alpha:.2f}": np.nan}
+        return {}
 
     # Compute UCB values
     ucb_values = means + alpha * np.sqrt(variances)
@@ -620,12 +748,12 @@ def regret_ucb_alpha(
     return {f"regret_ucb_{alpha:.2f}": cumulative_regret}
 
 
-@requires_variance
+@register_requires_variance
 def regret_ucb_alpha_sweep(
-    means: np.ndarray,
-    variances: np.ndarray,
-    targets: np.ndarray,
-    alpha: Union[float, list[float]] | None = None,
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
+    alpha: float | list[float] | None = None,
     num_acquisitions: int = 100,
 ) -> dict[str, float]:
     """Compute UCB regret for multiple alpha values.
@@ -678,3 +806,116 @@ def regret_ucb_alpha_sweep(
 
         regret_alpha_list.update(regret_alpha)
     return regret_alpha_list
+
+
+# ---------------------------------------------------------------------------
+# Classification metrics
+# ---------------------------------------------------------------------------
+
+
+@register_classification_metric
+def accuracy(
+    probs: Float[np.ndarray, "n_samples num_classes"],
+    targets: Int[np.ndarray, " n_samples"],
+) -> dict[str, float]:
+    """Compute classification accuracy.
+
+    Args:
+        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
+        targets: Array of shape (n_samples,). Integer class labels.
+
+    Returns:
+        {"accuracy": accuracy float}
+    """
+    preds = np.argmax(probs, axis=1)
+    return {"accuracy": float(accuracy_score(targets, preds))}
+
+
+@register_classification_metric
+def f1(
+    probs: Float[np.ndarray, "n_samples num_classes"],
+    targets: Int[np.ndarray, " n_samples"],
+) -> dict[str, float]:
+    """Compute macro-averaged F1 score.
+
+    Args:
+        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
+        targets: Array of shape (n_samples,). Integer class labels.
+
+    Returns:
+        {"f1": macro F1 float}
+    """
+    preds = np.argmax(probs, axis=1)
+    return {"f1": float(f1_score(targets, preds, average="macro", zero_division=0))}
+
+
+@register_classification_metric
+def precision(
+    probs: Float[np.ndarray, "n_samples num_classes"],
+    targets: Int[np.ndarray, " n_samples"],
+) -> dict[str, float]:
+    """Compute macro-averaged precision.
+
+    Args:
+        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
+        targets: Array of shape (n_samples,). Integer class labels.
+
+    Returns:
+        {"precision": macro precision float}
+    """
+    preds = np.argmax(probs, axis=1)
+    return {"precision": float(precision_score(targets, preds, average="macro", zero_division=0))}
+
+
+@register_classification_metric
+def recall(
+    probs: Float[np.ndarray, "n_samples num_classes"],
+    targets: Int[np.ndarray, " n_samples"],
+) -> dict[str, float]:
+    """Compute macro-averaged recall.
+
+    Args:
+        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
+        targets: Array of shape (n_samples,). Integer class labels.
+
+    Returns:
+        {"recall": macro recall float}
+    """
+    preds = np.argmax(probs, axis=1)
+    return {"recall": float(recall_score(targets, preds, average="macro", zero_division=0))}
+
+
+@register_classification_metric
+@require_min_samples(2)
+def auc_roc(
+    probs: Float[np.ndarray, "n_samples num_classes"],
+    targets: Int[np.ndarray, " n_samples"],
+) -> dict[str, float]:
+    """Compute Area Under the ROC Curve (AUC-ROC).
+
+    For binary classification, uses the positive-class probabilities.
+    For multiclass, uses one-vs-rest averaging.
+
+    Args:
+        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
+        targets: Array of shape (n_samples,). Integer class labels.
+
+    Returns:
+        {"auc_roc": AUC-ROC float}
+    """
+    if len(np.unique(targets)) < 2:
+        logger.warning("auc_roc: fewer than 2 unique classes in targets — returning empty dict.")
+        return {}
+    if probs.shape[1] == 2:
+        try:
+            return {"auc_roc": float(roc_auc_score(targets, probs[:, 1]))}
+        except ValueError as e:
+            logger.warning(
+                "auc_roc: sklearn raised ValueError (likely targets missing a class): %s", e
+            )
+            return {}
+    try:
+        return {"auc_roc": float(roc_auc_score(targets, probs, multi_class="ovr"))}
+    except ValueError as e:
+        logger.warning("auc_roc: sklearn raised ValueError (likely targets missing a class): %s", e)
+        return {}

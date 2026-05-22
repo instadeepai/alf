@@ -19,12 +19,13 @@ import logging
 import os
 from math import floor
 from pathlib import Path
-from typing import Annotated, Literal, Self, Union
+from typing import Annotated, Self, Union
 
 import numpy as np
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataclasses.labelled_candidates import Candidate, LabelledCandidates
-from alf_core.dataset.splitting_utils import split_dataset
+from alf_core.dataset.splitting_utils import SplitType, split_dataset
+from alf_core.utils.enums import ProblemType
 from pydantic import BaseModel, Field, model_validator
 
 FloatBetweenZeroAndOne = Annotated[float, Field(ge=0, le=1)]
@@ -52,21 +53,28 @@ class BaseDatasetConfig(BaseModel):
     train_ratio: FloatBetweenZeroAndOne
     validation_frac: FloatBetweenZeroAndOne
     test_ratio: FloatBetweenZeroAndOne
-    split_type: Literal["random", "low_vs_high"] = "random"
+    split_type: SplitType = "random"
+    problem_type: ProblemType
     max_candidate_pool: int | None = None
 
     @model_validator(mode="after")
     def validate_config(self) -> Self:
-        """Validate that train and test ratios don't exceed 1.
+        """Validate dataset configuration.
 
         Returns:
             The validated configuration instance.
 
         Raises:
             ValueError: If train_ratio + test_ratio exceeds 1.
+            ValueError: If split_type is "stratified" with a REGRESSION problem_type.
         """
         if self.train_ratio + self.test_ratio > 1:
             raise ValueError("train_ratio + test_ratio must be <= 1")
+        if self.split_type == "stratified" and self.problem_type == ProblemType.REGRESSION:
+            raise ValueError(
+                "split_type='stratified' requires a classification problem_type "
+                "(BINARY or MULTICLASS), not REGRESSION."
+            )
         return self
 
 
@@ -121,7 +129,11 @@ class BaseDataset(abc.ABC):
         Raises:
             AssertionError: If dataset hasn't been split yet.
         """
-        assert "train" in self.splits, "Dataset must be split before accessing train dataset"
+        assert "train" in self.splits, (
+            "Dataset must be split before accessing train dataset; "
+            "train split has not been created yet — "
+            "call dataset.setup() before accessing train_dataset"
+        )
         return self.splits["train"]
 
     @property
@@ -134,7 +146,11 @@ class BaseDataset(abc.ABC):
         Raises:
             AssertionError: If dataset hasn't been split yet.
         """
-        assert "test" in self.splits, "Dataset must be split before accessing test dataset"
+        assert "test" in self.splits, (
+            "Dataset must be split before accessing test dataset; "
+            "test split has not been created yet — "
+            "call dataset.setup() before accessing test_dataset"
+        )
         return self.splits["test"]
 
     @property
@@ -148,7 +164,9 @@ class BaseDataset(abc.ABC):
             AssertionError: If dataset hasn't been split yet.
         """
         assert "validation" in self.splits, (
-            "Dataset must be split before accessing validation dataset"
+            "Dataset must be split before accessing validation dataset; "
+            "validation split has not been created yet — "
+            "call dataset.setup() before accessing validation_dataset"
         )
         return self.splits["validation"]
 
@@ -163,7 +181,9 @@ class BaseDataset(abc.ABC):
             AssertionError: If dataset hasn't been split yet.
         """
         assert "candidate_pool" in self.splits, (
-            "Dataset must be split before accessing candidate pool"
+            "Dataset must be split before accessing candidate pool; "
+            "candidate_pool split has not been created yet — "
+            "call dataset.setup() before accessing candidate_pool"
         )
         return self.splits["candidate_pool"]
 
@@ -196,7 +216,11 @@ class BaseDataset(abc.ABC):
         Raises:
             AssertionError: If dataset hasn't been loaded yet.
         """
-        assert self._raw_dataset is not None, "Dataset must be loaded before splitting"
+        assert self._raw_dataset is not None, (
+            "Dataset must be loaded before splitting; "
+            "_raw_dataset is None — load_dataset() must be called and return a "
+            "LabelledCandidates before _split_dataset() is called"
+        )
 
         # Calculate split sizes
         dataset_size = len(self._raw_dataset)
@@ -228,6 +252,7 @@ class BaseDataset(abc.ABC):
         and sets metadata. This must be called before accessing dataset splits.
         """
         self._raw_dataset = self.load_dataset()
+        self.num_classes = self.determine_num_classes()
         self.splits = self._split_dataset()
         self.set_metadata()
 
@@ -266,10 +291,49 @@ class BaseDataset(abc.ABC):
             AssertionError: If dataset hasn't been loaded yet.
             ValueError: If any candidate's data is not found in the dataset.
         """
-        assert self._raw_dataset is not None, "Dataset must be loaded before querying"
+        assert self._raw_dataset is not None, (
+            "Dataset must be loaded before querying; "
+            "_raw_dataset is None — call dataset.setup() before querying"
+        )
         indices = [self._raw_dataset.candidates.index(cand) for cand in candidates]
         labels = self._raw_dataset.labels[indices]
         return LabelledCandidates(candidates=candidates, labels=labels)
+
+    def determine_num_classes(self) -> int:
+        """Determine the number of output neurons based on problem type and labels.
+
+        Raises:
+            RuntimeError: If the raw dataset is not loaded.
+            ValueError: If the dataset is empty (no labels found).
+
+        Returns:
+            int: Number of output neurons. For REGRESSION and BINARY, returns 1 and 2 respectively.
+        """
+        if self._raw_dataset is None:
+            raise RuntimeError(
+                "Dataset must be loaded before querying; "
+                "_raw_dataset is None — call dataset.setup() before querying"
+            )
+        problem_type = self.config.problem_type
+        labels = self._raw_dataset.labels
+        unique_labels = np.unique(labels)
+        if len(unique_labels) == 0:
+            raise ValueError("Dataset is empty — no labels found.")
+        if problem_type == ProblemType.BINARY and len(unique_labels) != 2:
+            raise ValueError(
+                f"problem_type=BINARY requires exactly 2 unique classes, "
+                f"got {len(unique_labels)}: {unique_labels.tolist()}"
+            )
+        if problem_type == ProblemType.MULTICLASS and len(unique_labels) < 3:
+            raise ValueError(
+                f"problem_type=MULTICLASS requires at least 3 unique classes, "
+                f"got {len(unique_labels)}: {unique_labels.tolist()}"
+            )
+        if problem_type == ProblemType.BINARY:
+            return 2
+        if problem_type == ProblemType.MULTICLASS:
+            return len(unique_labels)
+        return 1
 
     def get_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Get summary metrics for all dataset splits.

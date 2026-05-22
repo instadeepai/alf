@@ -20,9 +20,11 @@ from typing import TYPE_CHECKING, Any, Union
 
 import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
+from alf_core.utils.enums import ProblemType
 
 if TYPE_CHECKING:
     from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+    from alf_core.dataset.base_dataset import BaseDataset
 
 
 class BaseModel(abc.ABC):
@@ -30,6 +32,9 @@ class BaseModel(abc.ABC):
     Several components of the framework can be treated as models, such as the surrogate, oracle,
     and the generator defined as model based search.
     """
+
+    problem_type: ProblemType
+    output_dim: int
 
     @abc.abstractmethod
     def featurise(self, inputs: list[Candidate]) -> Any:
@@ -81,6 +86,18 @@ class BaseModel(abc.ABC):
             List of sampled candidate points.
         """
         pass
+
+    def setup(self, dataset: "BaseDataset") -> None:
+        """Configure the model for the given dataset. Called once before training begins.
+
+        For BINARY this is 1 (single logit, sigmoid-activated); see
+        dataset.num_classes for the number of distinct classes.
+
+        Args:
+            dataset: The dataset this model will be trained on.
+        """
+        self.problem_type = dataset.config.problem_type
+        self.output_dim = dataset.num_classes if self.problem_type == ProblemType.MULTICLASS else 1
 
     def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
         """Return per-epoch training metrics from the most recent train() call.
