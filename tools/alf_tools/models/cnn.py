@@ -350,7 +350,6 @@ class CNNModel(BaseModel):
             if self._output_standardiser is not None:
                 val_y_np = self._output_standardiser.transform(val_y_np)
             val_y = torch.tensor(val_y_np, dtype=label_dtype).to(self.device)
-            val_y = torch.tensor(val_y_np, dtype=label_dtype).to(self.device)
             val_loader = DataLoader(
                 TensorDataset(val_x, val_y),
                 batch_size=self.train_config.batch_size,
@@ -405,6 +404,10 @@ class CNNModel(BaseModel):
         avg_train_loss = float(np.mean(train_losses))
         train_preds = np.concatenate(train_predictions_all)
         train_targets = np.concatenate(train_targets_all)
+
+        if self._output_standardiser is not None:
+            train_preds, _ = self._output_standardiser.inverse_transform(train_preds)
+            train_targets, _ = self._output_standardiser.inverse_transform(train_targets)
 
         train_metrics = Results(
             predictions=Predictions(means=train_preds, variances=None),
