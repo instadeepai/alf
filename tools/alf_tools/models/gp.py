@@ -91,6 +91,11 @@ class GPTrainConfig(BaseTrainConfig):
         normalise_inputs: Whether to apply min-max normalisation to input
             features before training. Defaults to True; GP kernels measure
             distances so scaling continuous features to [0, 1] improves MLL.
+        standardise_outputs: Whether to apply Z-score standardisation to
+            output labels before training. Defaults to True; standardisation
+            can improve training. For constant labels, std is clamped to a
+            minimum value to avoid division by zero, but standardisation may
+            not be meaningful.
         num_iterations: Number of optimisation iterations.
         optimizer_type: Type of optimizer to use ('adam' or 'lbfgs').
         early_stopping_patience: Number of iterations without improvement
@@ -102,6 +107,7 @@ class GPTrainConfig(BaseTrainConfig):
     """
 
     normalise_inputs: bool = True  # override BaseTrainConfig default
+    standardise_outputs: bool = True  # override BaseTrainConfig default
     learning_rate: float = 0.01  # override BaseTrainConfig default
     num_iterations: int = 100
     optimizer_type: Literal["adam", "lbfgs"] = "adam"
