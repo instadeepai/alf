@@ -17,7 +17,6 @@ import logging
 import numpy as np
 from jaxtyping import Float
 
-
 logger = logging.getLogger("alf-core")
 
 
