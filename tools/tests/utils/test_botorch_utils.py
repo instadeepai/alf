@@ -39,8 +39,10 @@ def test_candidates_to_tensor_basic():
     X = candidates_to_tensor(candidates)
 
     assert X.shape == (3, 2)
-    assert torch.allclose(X, torch.tensor([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]))
-    assert X.dtype == torch.float32
+    assert torch.allclose(
+        X, torch.tensor([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], dtype=torch.float64)
+    )
+    assert X.dtype == torch.float64
 
 
 def test_candidates_to_tensor_with_torch_data():
@@ -53,7 +55,7 @@ def test_candidates_to_tensor_with_torch_data():
     X = candidates_to_tensor(candidates)
 
     assert X.shape == (2, 2)
-    assert torch.allclose(X, torch.tensor([[1.0, 2.0], [3.0, 4.0]]))
+    assert torch.allclose(X, torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float64))
 
 
 def test_candidates_to_tensor_empty_list():
@@ -99,7 +101,7 @@ def test_candidates_to_tensor_with_list_data():
     X = candidates_to_tensor(candidates)
 
     assert X.shape == (2, 2)
-    assert torch.allclose(X, torch.tensor([[1.0, 2.0], [3.0, 4.0]]))
+    assert torch.allclose(X, torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float64))
 
 
 def test_tensor_to_candidates_non_2d_raises():
@@ -156,7 +158,7 @@ def test_predictions_to_posterior_basic():
     assert posterior.mean.shape == torch.Size([3, 1])
     # Check values regardless of shape
     mean_flat = posterior.mean.flatten()
-    assert torch.allclose(mean_flat, torch.tensor([1.0, 2.0, 3.0]))
+    assert torch.allclose(mean_flat, torch.tensor([1.0, 2.0, 3.0], dtype=torch.float64))
 
 
 def test_predictions_to_posterior_single_point():
@@ -169,7 +171,7 @@ def test_predictions_to_posterior_single_point():
 
     assert isinstance(posterior, GPyTorchPosterior)
     assert posterior.mean.shape == torch.Size([1, 1])
-    assert torch.allclose(posterior.mean.flatten(), torch.tensor([1.5]))
+    assert torch.allclose(posterior.mean.flatten(), torch.tensor([1.5], dtype=torch.float64))
 
 
 def test_predictions_to_posterior_without_variances():
@@ -223,8 +225,10 @@ def test_get_bounds_tensor_from_numpy():
     bounds_tensor = get_bounds_tensor(bounds)
 
     assert bounds_tensor.shape == torch.Size([2, 2])
-    assert torch.allclose(bounds_tensor, torch.tensor([[0.0, 0.0], [1.0, 1.0]]))
-    assert bounds_tensor.dtype == torch.float32
+    assert torch.allclose(
+        bounds_tensor, torch.tensor([[0.0, 0.0], [1.0, 1.0]], dtype=torch.float64)
+    )
+    assert bounds_tensor.dtype == torch.float64
 
 
 def test_get_bounds_tensor_from_list():
@@ -234,7 +238,7 @@ def test_get_bounds_tensor_from_list():
     bounds_tensor = get_bounds_tensor(bounds)
 
     assert bounds_tensor.shape == torch.Size([2, 3])
-    expected = torch.tensor([[0.0, 0.0, -1.0], [1.0, 1.0, 1.0]])
+    expected = torch.tensor([[0.0, 0.0, -1.0], [1.0, 1.0, 1.0]], dtype=torch.float64)
     assert torch.allclose(bounds_tensor, expected)
 
 
@@ -284,10 +288,10 @@ def test_predictions_posterior_statistics():
 
     # Check mean matches (flatten to handle different shapes)
     mean_flat = posterior.mean.flatten()
-    assert torch.allclose(mean_flat, torch.tensor(means, dtype=torch.float32), atol=1e-5)
+    assert torch.allclose(mean_flat, torch.tensor(means, dtype=torch.float64), atol=1e-5)
 
     # Check variance matches (diagonal of covariance)
     posterior_variance = posterior.variance.squeeze()
     assert torch.allclose(
-        posterior_variance, torch.tensor(variances, dtype=torch.float32), atol=1e-5
+        posterior_variance, torch.tensor(variances, dtype=torch.float64), atol=1e-5
     )
