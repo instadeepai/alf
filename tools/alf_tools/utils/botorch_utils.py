@@ -43,6 +43,7 @@ def candidates_to_tensor(
         candidates: List of Candidate objects. Each candidate's data should be
             a numpy array or torch tensor of shape (d,) where d is the feature dimension.
         device: Optional device to place the tensor on. If None, uses CPU.
+        dtype: Desired data type of the output tensor. Default is torch.float64.
 
     Returns:
         Tensor of shape (n, d) where n is the number of candidates and d is
@@ -144,6 +145,7 @@ def predictions_to_posterior(
     Args:
         predictions: ALF Predictions object containing means and variances.
         device: Optional device to place tensors on. If None, uses CPU.
+        dtype: Desired data type of the output tensor. Default is torch.float64.
 
     Returns:
         BoTorch GPyTorchPosterior wrapping the predictions.
@@ -198,6 +200,7 @@ def get_bounds_tensor(
                                             [upper_1, ..., upper_d]]
             - list of tuples: [(lower_1, upper_1), ..., (lower_d, upper_d)]
         device: Optional device to place the tensor on. If None, uses CPU.
+        dtype: Desired data type of the output tensor. Default is torch.float64.
 
     Raises:
         ValueError: If bounds are not in a valid format or if lower
