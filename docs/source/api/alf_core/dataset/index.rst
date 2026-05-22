@@ -1,4 +1,5 @@
 Dataset
+=======
 
 The ``BaseDataset`` class manages data loading, splitting, and querying. It handles data loading through
 the abstract ``load_dataset()`` method, splits data into train/validation/test/candidate_pool sets,

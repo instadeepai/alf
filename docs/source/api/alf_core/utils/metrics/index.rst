@@ -1,4 +1,5 @@
 Metrics
+=======
 
 The ``metrics`` module provides evaluation metrics for assessing surrogate model performance. It includes
 functions for computing prediction accuracy metrics (e.g., Spearman correlation, top-k accuracy) and
