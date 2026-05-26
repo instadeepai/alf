@@ -24,6 +24,7 @@ from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.model.base_model import BaseModel
 from alf_core.oracle.oracle import Oracle
 from alf_core.surrogate.surrogate import Surrogate
+from alf_core.utils.enums import ProblemType
 from alf_tools.models.esmfold import ESMFoldConfig, ESMFoldModel
 
 MOCK_PTM = 0.7
@@ -760,6 +761,7 @@ def esmfold_state():
         train_ratio=0.6,
         validation_frac=0.2,
         test_ratio=0.2,
+        problem_type=ProblemType.REGRESSION,
     )
     dataset = _StubDataset(config)
     surrogate = Surrogate(model=_StubModel())
