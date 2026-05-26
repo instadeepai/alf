@@ -20,6 +20,8 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 
 ### Models
 - **CNNModel** - Convolutional neural network for sequence modeling with uncertainty quantification
+- **GPModel** - Gaussian Process model for sequence fitness prediction with flexible kernel
+  selection, input normalisation, and output standardisation enabled by default
 - **PyRosetta** - Rosetta energy function for protein design (requires PyRosetta installation)
 
 ### Acquisition Functions
@@ -58,6 +60,34 @@ For detailed API documentation and tutorials, see:
 - **Core framework:** [../core/README.md](../core/README.md)
 - **Installation guide:** [../docs/INSTALLATION.md](../docs/INSTALLATION.md)
 - **Tutorials:** [../tutorials/](../tutorials/)
+
+## Normalisation
+
+Models in `alf-tools` support input normalisation and output standardisation via their train
+configs (see `alf_core.model.base_model.BaseTrainConfig`).
+
+| Model | `normalise_inputs` default | `standardise_outputs` default |
+|-------|---------------------------|-------------------------------|
+| `CNNModel` | `False` | `False` |
+| `GPModel` | `True` | `True` |
+
+**`GPTrainConfig`** overrides both defaults to `True`:
+- `normalise_inputs=True`: min-max scales features to [0, 1] — GP kernels measure distances and
+  benefit from inputs on a common scale.
+- `standardise_outputs=True`: Z-score standardises labels before training — improves marginal
+  log-likelihood optimisation. Predictions are inverse-transformed back to the original label
+  scale before being returned, so **all metrics are computed on the original label scale**.
+
+To disable normalisation for a GP, pass an explicit config:
+
+```python
+from alf_tools.models.gp import GPModel, GPTrainConfig
+
+model = GPModel(train_config=GPTrainConfig(normalise_inputs=False, standardise_outputs=False))
+```
+
+For implementation details see [`alf_core.model.normaliser`](../core/alf_core/model/normaliser.py)
+and the [Core README normalisation section](../core/README.md#9-normalisation-inputnormaliser-outputstandardiser).
 
 ## Creating Custom Components
 
