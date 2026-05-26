@@ -55,6 +55,7 @@ def _make_dataset(labels: np.ndarray, problem_type: ProblemType) -> BaseDataset:
     )
     dataset = _TestDataset(config)
     dataset._raw_dataset = dataset.load_dataset()
+    dataset.num_classes = dataset.determine_num_classes()
     return dataset
 
 
@@ -381,3 +382,183 @@ class TestEpochMetricsClassification:
         assert "final_train_mse" in summary
         assert "final_train_pearson" not in summary
         assert "final_train_spearman" not in summary
+
+
+class TestCNNLabelDtype:
+    """Tests for label_dtype resolution in CNNModel."""
+
+    def test_default_label_dtype_is_float32(self, sample_data):
+        """Without explicit label_dtype, label tensors must be float32."""
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=1),
+            device="cpu",
+        )
+        train_loader, _ = model._prepare_train_data(sample_data, None)
+        _, batch_y = next(iter(train_loader))
+        assert batch_y.dtype == torch.float32
+
+    def test_explicit_label_dtype_override_is_used(self, sample_data):
+        """When label_dtype=torch.float64 is set, label tensors must be float64."""
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=1, label_dtype=torch.float64),
+            device="cpu",
+        )
+        train_loader, _ = model._prepare_train_data(sample_data, None)
+        _, batch_y = next(iter(train_loader))
+        assert batch_y.dtype == torch.float64
+
+    def test_val_loader_label_dtype_matches_train(self, sample_data):
+        """Val label tensors must use the same resolved dtype as train labels."""
+        val_candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * 3
+        val_data = LabelledCandidates(val_candidates, np.random.randn(3))
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=1, label_dtype=torch.float64),
+            device="cpu",
+        )
+        _, val_loader = model._prepare_train_data(sample_data, val_data)
+        _, val_batch_y = next(iter(val_loader))
+        assert val_batch_y.dtype == torch.float64
+
+
+class TestCNNNormalisation:
+    """Tests for CNNModel input normalisation and output standardisation."""
+
+    def test_input_normalisation_enabled(self, sample_data, val_data):
+        """normalise_inputs=True must run without error."""
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=2, normalise_inputs=True),
+            device="cpu",
+        )
+        model.setup(_make_dataset(sample_data.labels, ProblemType.REGRESSION))
+        model.train(sample_data, val_data=val_data)
+        assert model._input_normaliser is not None
+        assert model._input_normaliser.is_fitted
+
+        predictions = model.predict(sample_data.candidates)
+        assert np.all(np.isfinite(predictions.means))
+
+    def test_input_normalisation_disabled(self, sample_data, val_data):
+        """normalise_inputs=False (the default) leaves _input_normaliser as None."""
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=2, normalise_inputs=False),
+            device="cpu",
+        )
+        model.setup(_make_dataset(sample_data.labels, ProblemType.REGRESSION))
+        model.train(sample_data, val_data=val_data)
+        assert model._input_normaliser is None
+
+        predictions = model.predict(sample_data.candidates)
+        assert np.all(np.isfinite(predictions.means))
+
+    def test_output_standardisation_enabled(self, sample_data, val_data):
+        """standardise_outputs=True trains in standardised space; predict returns original scale."""
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=2, standardise_outputs=True),
+            device="cpu",
+        )
+        model.setup(_make_dataset(sample_data.labels, ProblemType.REGRESSION))
+        model.train(sample_data, val_data=val_data)
+        assert model._output_standardiser is not None
+        assert model._output_standardiser.is_fitted
+
+        predictions = model.predict(sample_data.candidates)
+        assert np.all(np.isfinite(predictions.means))
+        # Predictions must be in original label scale (mean ≈ label mean, not ~0 from Z-score space)
+        label_mean = sample_data.labels.mean()
+        label_std = sample_data.labels.std()
+        assert np.abs(predictions.means.mean() - label_mean) < label_std * 5
+
+    def test_val_data_with_standardisation(self, sample_data, val_data):
+        """Val metrics are in original label scale when standardise_outputs=True."""
+        train_data = LabelledCandidates(sample_data.candidates[:6], sample_data.labels[:6])
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=2, standardise_outputs=True),
+            device="cpu",
+        )
+        model.setup(_make_dataset(sample_data.labels, ProblemType.REGRESSION))
+        model.train(train_data, val_data=val_data)
+
+        history = model.get_epoch_metrics()
+        assert len(history) == 2
+        for epoch_metrics in history:
+            assert epoch_metrics.val_loss is not None
+            # val_mse (if present) should be in original label scale
+            if "val_mse" in epoch_metrics.additional_metrics:
+                val_mse = epoch_metrics.additional_metrics["val_mse"]
+                label_range = float(np.ptp(sample_data.labels))
+                # MSE in original space: at most (label_range)^2 * 10 (loose upper bound)
+                assert val_mse < (label_range**2) * 10
+
+    def test_standardise_outputs_train_and_val_metrics_are_inverse_transformed(self):
+        """Both final_train_mse and final_val_mse must be in original label scale.
+
+        Labels have std=50.  In standardised (Z-score) space the CNN predicts near 0
+        and MSE against unit-variance targets ≈ 1.  After correct inverse-transform
+        both predictions and targets are in original space, so MSE ≈ var(labels) ≈ 2500.
+        A threshold of 100 cleanly separates the two cases for both train and val metrics.
+        """
+        rng = np.random.default_rng(0)
+        n_train, n_val = 10, 4
+        label_std = 50.0
+        train_labels = rng.standard_normal(n_train) * label_std
+        val_labels = rng.standard_normal(n_val) * label_std
+
+        train_data = LabelledCandidates(
+            [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * n_train,
+            train_labels,
+        )
+        val_data = LabelledCandidates(
+            [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * n_val,
+            val_labels,
+        )
+
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=5, standardise_outputs=True),
+            device="cpu",
+        )
+        model.setup(_make_dataset(train_labels, ProblemType.REGRESSION))
+        model.train(train_data, val_data=val_data)
+        metrics = model.get_training_summary_metrics()
+
+        # Correct (original scale): CNN converges toward predicting ≈ label mean in
+        # original space; MSE = E[(pred - target)²] ≈ var(labels) ≈ 2500.
+        # Bug (standardised scale): predictions ≈ 0 in Z-score space, targets ~ N(0,1)
+        # → MSE ≈ 1.  Threshold of 100 cleanly separates both cases.
+        assert "final_train_mse" in metrics
+        assert "final_val_mse" in metrics
+        assert metrics["final_train_mse"] > 100, (
+            f"final_train_mse={metrics['final_train_mse']:.3f} — "
+            "train metrics appear to be in standardised space, not original label scale"
+        )
+        assert metrics["final_val_mse"] > 100, (
+            f"final_val_mse={metrics['final_val_mse']:.3f} — "
+            "val metrics appear to be in standardised space, not original label scale"
+        )
+
+    def test_standardise_outputs_raises_for_binary_classification(self):
+        """standardise_outputs=True must raise ValueError for BINARY classification."""
+        binary_labels = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1], dtype=np.float32)
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=2, standardise_outputs=True),
+            device="cpu",
+        )
+        model.setup(_make_dataset(binary_labels, ProblemType.BINARY))
+        candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * 10
+        train_data = LabelledCandidates(candidates, binary_labels)
+
+        with pytest.raises(ValueError, match="standardise_outputs"):
+            model.train(train_data, val_data=LabelledCandidates([], np.array([])))
+
+    def test_standardise_outputs_raises_for_multiclass_classification(self):
+        """standardise_outputs=True must raise ValueError for MULTICLASS classification."""
+        multiclass_labels = np.array([0, 1, 2, 0, 1, 2, 0, 1, 2])
+        model = CNNModel(
+            train_config=CNNTrainConfig(num_epochs=2, standardise_outputs=True),
+            device="cpu",
+        )
+        model.setup(_make_dataset(multiclass_labels, ProblemType.MULTICLASS))
+        candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")] * 9
+        train_data = LabelledCandidates(candidates, multiclass_labels)
+
+        with pytest.raises(ValueError, match="standardise_outputs"):
+            model.train(train_data, val_data=LabelledCandidates([], np.array([])))
