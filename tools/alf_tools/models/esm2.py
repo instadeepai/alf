@@ -196,12 +196,14 @@ class ESM2Model(BaseModel):
 
         Returns:
             Predictions whose means are per-sequence embeddings as a numpy array.
+            If candidate_points is empty, returns Predictions with means of shape (0, hidden_dim).
         """
         if not candidate_points:
-            return Predictions(means=np.empty((0, self.esm_model.config.hidden_size), dtype=np.float32))
+            hidden_dim = self.esm_model.config.hidden_size
+            return Predictions(means=np.empty((0, hidden_dim), dtype=np.float32))
 
         batch = self.featurise(candidate_points)
-        all_input_ids = batch["input_ids"]        # (N, seq_len) — CPU
+        all_input_ids = batch["input_ids"]  # (N, seq_len) — CPU
         all_attention_mask = batch["attention_mask"]  # (N, seq_len) — CPU
 
         all_embeddings: list[torch.Tensor] = []

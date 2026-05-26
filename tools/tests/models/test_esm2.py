@@ -244,8 +244,8 @@ class TestPredict:
             Candidate(data="ACGT", modality="sequence"),
         ]
         predictions = esm2_small_batch_model.predict(candidates)
-        # mean pooling → (N, hidden_dim); hidden_dim for esm2_t6_8M is 320
-        assert predictions.means.shape == (5, 320)
+        hidden_dim = esm2_small_batch_model.esm_model.config.hidden_size
+        assert predictions.means.shape == (5, hidden_dim)
 
     def test_predict_batched_equals_single_batch(self, esm2_small_batch_model, esm2_model):
         """Embeddings from batched predict equal those from a single-pass predict."""
