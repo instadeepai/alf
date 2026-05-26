@@ -246,7 +246,7 @@ class MLPModel(BaseModel):
 
     def _train_epoch(
         self, loader: DataLoader, optimizer: optim.Optimizer, criterion: nn.Module
-    ) -> dict:
+    ) -> tuple[float, dict]:
         """Run one full training epoch.
 
         Args:
@@ -258,8 +258,8 @@ class MLPModel(BaseModel):
             ValueError: If the network was not initialised (i.e. train() has not been called).
 
         Returns:
-            Dict with keys ``loss`` (float) and any additional metrics from
-            ``Results.metrics`` (e.g. ``spearman``, ``mse``).
+            Tuple of (average_loss, metrics_dict). metrics_dict contains any additional
+            metrics from ``Results.metrics`` (e.g. ``spearman``, ``mse``).
         """
         if self.net is None:
             raise ValueError("Network not initialised; call train() before _train_epoch.")
@@ -291,9 +291,9 @@ class MLPModel(BaseModel):
         else:
             metrics = {"mse": float(np.mean((all_preds - all_targets) ** 2))}
 
-        return {"loss": avg_loss, **metrics}
+        return avg_loss, metrics
 
-    def _validate_epoch(self, loader: DataLoader, criterion: nn.Module) -> dict:
+    def _validate_epoch(self, loader: DataLoader, criterion: nn.Module) -> tuple[float, dict]:
         """Run one full validation epoch.
 
         Args:
@@ -304,8 +304,8 @@ class MLPModel(BaseModel):
             ValueError: If the network was not initialised (i.e. train() has not been called).
 
         Returns:
-            dict: Dict with key ``loss`` (float) and any additional metrics from
-            ``Results.metrics`` (e.g. ``spearman``, ``mse``).
+            Tuple of (average_loss, metrics_dict). metrics_dict contains any additional
+            metrics from ``Results.metrics`` (e.g. ``spearman``, ``mse``).
         """
         if self.net is None:
             raise ValueError("Network not initialised; call train() before _validate_epoch.")
@@ -335,7 +335,39 @@ class MLPModel(BaseModel):
         else:
             metrics = {"mse": float(np.mean((all_preds - all_targets) ** 2))}
 
-        return {"loss": avg_loss, **metrics}
+        return avg_loss, metrics
+
+    def _record_epoch_metrics(
+        self,
+        epoch: int,
+        avg_train_loss: float,
+        train_metrics: dict,
+        avg_val_loss: float | None = None,
+        val_metrics: dict[str, float] | None = None,
+    ) -> None:
+        """Record per-epoch metrics into self._epoch_metrics.
+
+        Args:
+            epoch: Current epoch index.
+            avg_train_loss: Average training loss for the epoch.
+            train_metrics: Dictionary of training metrics (e.g. spearman, mse).
+            avg_val_loss: Average validation loss, or None if no val set.
+            val_metrics: Dictionary of validation metrics, or None if no val set.
+        """
+        additional: dict[str, float] = {}
+        for k, v in train_metrics.items():
+            additional[f"train_{k}"] = float(v)
+        if val_metrics is not None:
+            for k, v in val_metrics.items():
+                additional[f"val_{k}"] = float(v)
+        self._epoch_metrics.append(
+            SurrogateEpochMetrics(
+                epoch=epoch,
+                train_loss=avg_train_loss,
+                val_loss=avg_val_loss,
+                additional_metrics=additional,
+            )
+        )
 
     def train(
         self,
@@ -424,34 +456,18 @@ class MLPModel(BaseModel):
         criterion = nn.MSELoss()
 
         train_metrics: dict = {}
-        val_metrics: dict = {}
+        val_metrics: dict[str, float] | None = None
         avg_train_loss = 0.0
         avg_val_loss: float | None = None
 
         for epoch in range(self.train_config.num_epochs):
-            train_result = self._train_epoch(train_loader, optimizer, criterion)
-            avg_train_loss = train_result["loss"]
-            train_metrics = {k: v for k, v in train_result.items() if k != "loss"}
+            avg_train_loss, train_metrics = self._train_epoch(train_loader, optimizer, criterion)
 
             if val_loader is not None:
-                val_result = self._validate_epoch(val_loader, criterion)
-                avg_val_loss = val_result["loss"]
-                val_metrics = {k: v for k, v in val_result.items() if k != "loss"}
+                avg_val_loss, val_metrics = self._validate_epoch(val_loader, criterion)
 
-            additional: dict[str, float] = {}
-            for k, v in train_metrics.items():
-                additional[f"train_{k}"] = float(v)
-            if val_loader is not None:
-                for k, v in val_metrics.items():
-                    additional[f"val_{k}"] = float(v)
-
-            self._epoch_metrics.append(
-                SurrogateEpochMetrics(
-                    epoch=epoch,
-                    train_loss=avg_train_loss,
-                    val_loss=avg_val_loss,
-                    additional_metrics=additional,
-                )
+            self._record_epoch_metrics(
+                epoch, avg_train_loss, train_metrics, avg_val_loss, val_metrics
             )
 
             if epoch % self.train_config.log_frequency == 0:
@@ -468,7 +484,9 @@ class MLPModel(BaseModel):
         if val_loader is not None:
             assert avg_val_loss is not None, "avg_val_loss should be set if val_loader is not None"
             self.training_metrics["final_val_loss"] = avg_val_loss
-            self.training_metrics.update({f"final_val_{k}": v for k, v in val_metrics.items()})
+            self.training_metrics.update({
+                f"final_val_{k}": v for k, v in (val_metrics or {}).items()
+            })
 
         self.net.eval()
 
