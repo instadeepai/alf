@@ -20,9 +20,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
+from alf_core import Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.dataset.base_dataset import BaseDataset
+from alf_core.model.base_model import BaseModel, BaseTrainConfig
+from alf_core.model.normaliser import (
+    InputNormaliser,
+    OutputStandardiser,
+)
 from alf_core.utils.enums import ProblemType
 from jaxtyping import Float
 from torch.utils.data import DataLoader, TensorDataset
@@ -31,6 +36,7 @@ from alf_tools.models.utils import (
     create_char_to_idx_mapping,
     get_device,
     one_hot_encode,
+    transform_data,
 )
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
@@ -62,7 +68,6 @@ class CNNModelConfig:
     """Configuration for CNN model architecture.
 
     Args:
-        problem_type: Type of problem. Required — no default to prevent silent misconfiguration.
         num_filters: Number of filters in convolutional layers.
         kernel_size: Size of convolutional kernels.
         num_conv_layers: Number of convolutional layers.
@@ -78,20 +83,22 @@ class CNNModelConfig:
 
 
 @dataclass
-class CNNTrainConfig:
+class CNNTrainConfig(BaseTrainConfig):
     """Configuration for CNN training.
 
     Args:
-        learning_rate: Learning rate for the optimizer.
         batch_size: Batch size for training.
         num_epochs: Number of epochs to train for.
-        log_frequency: Frequency of logging training metrics.
+        learning_rate: Inherited from BaseTrainConfig. Default: 1e-3.
+        log_frequency: Inherited from BaseTrainConfig. Default: 10.
+        normalise_inputs: Inherited from BaseTrainConfig. Default: False.
+        standardise_outputs: Inherited from BaseTrainConfig. Default: False.
+        label_dtype: Inherited from BaseTrainConfig. None uses the model
+            default (float32 for CNN regression). Override to force a dtype.
     """
 
-    learning_rate: float = 1e-3
     batch_size: int = 32
     num_epochs: int = 50
-    log_frequency: int = 10
 
 
 class SequenceCNN(nn.Module):
@@ -183,6 +190,8 @@ class CNNModel(BaseModel):
     One-hot encodes sequences, trains a simple 1D CNN with MSE loss.
     """
 
+    _default_label_dtype: torch.dtype = torch.float32
+
     def __init__(
         self,
         name: str = "cnn_model",
@@ -214,6 +223,11 @@ class CNNModel(BaseModel):
         self.model: SequenceCNN | None = None
         self.seq_length: int | None = None
 
+        # Input normaliser — fitted on each train() call, applied at predict() time
+        self._input_normaliser: InputNormaliser | None = None
+        self._output_standardiser: OutputStandardiser | None = None
+
+        # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
 
@@ -276,25 +290,74 @@ class CNNModel(BaseModel):
 
         return self._one_hot_encode(sequences)
 
-    def _prepare_data_loader(self, data: LabelledCandidates, shuffle: bool = False) -> DataLoader:
-        """Prepare a DataLoader from LabelledCandidates.
+    def _prepare_train_data(
+        self,
+        train_data: LabelledCandidates,
+        val_data: LabelledCandidates | None,
+    ) -> tuple[DataLoader, DataLoader | None]:
+        """Fit normalisers on training data and build DataLoaders for train and val.
+
+        Normalisers are fitted exclusively on training data. Val data is transformed
+        using train statistics to avoid data leakage.
 
         Args:
-            data: Data containing sequences and oracle values.
-            shuffle: Whether to shuffle the data.
+            train_data: Training data.
+            val_data: Optional validation data.
+
+        Raises:
+            ValueError: If standardise_outputs=True is set for a non-regression problem.
 
         Returns:
-            DataLoader for the data.
+            Tuple of (train_loader, val_loader). val_loader is None if val_data is None.
         """
-        x = self.featurise(data).to(self.device)
-        label_dtype = torch.long if self.problem_type == ProblemType.MULTICLASS else torch.float32
-        y = torch.tensor(data.labels, dtype=label_dtype).to(self.device)
-        dataset = TensorDataset(x, y)
-        return DataLoader(
-            dataset,
-            batch_size=self.train_config.batch_size,
-            shuffle=shuffle,
+        if self.train_config.label_dtype is not None:
+            label_dtype = self.train_config.label_dtype
+        elif getattr(self, "problem_type", None) == ProblemType.MULTICLASS:
+            label_dtype = torch.long
+        else:
+            label_dtype = self._default_label_dtype
+        problem_type = getattr(self, "problem_type", None)
+        if self.train_config.standardise_outputs and problem_type != ProblemType.REGRESSION:
+            raise ValueError(
+                f"standardise_outputs=True is not supported for {problem_type} — "
+                "standardisation only applies to regression targets."
+            )
+        train_x, train_y, self._input_normaliser, self._output_standardiser = transform_data(
+            self.featurise(train_data),
+            train_data.labels,
+            self.train_config.normalise_inputs,
+            self.train_config.standardise_outputs,
+            label_dtype,
+            self.device,
         )
+
+        train_loader = DataLoader(
+            TensorDataset(train_x, train_y),
+            batch_size=self.train_config.batch_size,
+            shuffle=True,
+            num_workers=0,
+        )
+
+        val_loader = None
+        if val_data is not None and len(val_data) > 0:
+            val_x_tensor = self.featurise(val_data)
+            if self._input_normaliser is not None:
+                val_x_np = self._input_normaliser.transform(np.array(val_x_tensor.cpu()))
+                val_x = torch.tensor(val_x_np, dtype=train_x.dtype).to(self.device)
+            else:
+                val_x = val_x_tensor.to(dtype=train_x.dtype).to(self.device)
+            val_y_np = val_data.labels
+            if self._output_standardiser is not None:
+                val_y_np = self._output_standardiser.transform(val_y_np)
+            val_y = torch.tensor(val_y_np, dtype=label_dtype).to(self.device)
+            val_loader = DataLoader(
+                TensorDataset(val_x, val_y),
+                batch_size=self.train_config.batch_size,
+                shuffle=False,
+                num_workers=0,
+            )
+
+        return train_loader, val_loader
 
     def _train_epoch(
         self,
@@ -340,6 +403,10 @@ class CNNModel(BaseModel):
         train_preds = np.concatenate(train_predictions_all)
         train_targets = np.concatenate(train_targets_all)
 
+        if self._output_standardiser is not None:
+            train_preds, _ = self._output_standardiser.inverse_transform(train_preds)
+            train_targets, _ = self._output_standardiser.inverse_transform(train_targets)
+
         train_metrics = Results(
             predictions=Predictions(means=train_preds, variances=None),
             targets=train_targets,
@@ -384,6 +451,10 @@ class CNNModel(BaseModel):
         avg_val_loss = float(np.mean(val_losses))
         val_preds = np.concatenate(val_predictions_all)
         val_targets = np.concatenate(val_targets_all)
+
+        if self._output_standardiser is not None:
+            val_preds, _ = self._output_standardiser.inverse_transform(val_preds)
+            val_targets, _ = self._output_standardiser.inverse_transform(val_targets)
 
         val_metrics = Results(
             predictions=Predictions(means=val_preds, variances=None),
@@ -477,11 +548,8 @@ class CNNModel(BaseModel):
         total_params = sum(p.numel() for p in self.model.parameters())
         logger.info(f"CNN initialized with {total_params:,} parameters")
 
-        # Prepare data loaders
-        train_loader = self._prepare_data_loader(train_data, shuffle=True)
-        val_loader = None
-        if len(val_data) > 0:
-            val_loader = self._prepare_data_loader(val_data, shuffle=False)
+        # Featurize, fit normalisers on train, and build DataLoaders
+        train_loader, val_loader = self._prepare_train_data(train_data, val_data)
 
         # Setup training
         optimizer = optim.Adam(self.model.parameters(), lr=self.train_config.learning_rate)
@@ -501,7 +569,7 @@ class CNNModel(BaseModel):
             # Train
             avg_train_loss, train_metrics = self._train_epoch(train_loader, optimizer, criterion)
 
-            # Validate
+            # Record metrics
             if val_loader is not None:
                 avg_val_loss, val_metrics = self._validate_epoch(val_loader, criterion)
                 self._record_epoch_metrics(
@@ -516,6 +584,13 @@ class CNNModel(BaseModel):
                     epoch,
                     avg_train_loss,
                     train_metrics,
+                )
+
+            # Log at configured frequency
+            if epoch % self.train_config.log_frequency == 0:
+                logger.info(
+                    f"Epoch {epoch}/{self.train_config.num_epochs}"
+                    f" - train_loss={avg_train_loss:.4f}"
                 )
 
         # Store final metrics
@@ -553,13 +628,24 @@ class CNNModel(BaseModel):
             raise RuntimeError("Model not trained. Call train() first.")
 
         self.model.eval()
-        x = self.featurise(candidate_points).to(self.device)
+        x = self.featurise(candidate_points)
+
+        if self._input_normaliser is not None:
+            x_np = x.cpu().numpy()
+            x_np = self._input_normaliser.transform(x_np)
+            x = torch.tensor(x_np, dtype=x.dtype).to(self.device)
+        else:
+            x = x.to(self.device)
 
         with torch.no_grad():
             logits = self.model(x)
 
-        probs = _apply_activation(logits, self.problem_type).cpu().numpy()  # (n, num_classes)
-        return Predictions(means=probs)
+        outputs = _apply_activation(logits, self.problem_type).cpu().numpy()  # (n, num_classes)
+
+        if self._output_standardiser is not None:
+            outputs, _ = self._output_standardiser.inverse_transform(outputs)
+
+        return Predictions(means=outputs)
 
     def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
         """Sample candidate points from the model."""

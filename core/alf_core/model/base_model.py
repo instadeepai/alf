@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import abc
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Union
 
 import numpy as np
@@ -25,6 +26,30 @@ from alf_core.utils.enums import ProblemType
 if TYPE_CHECKING:
     from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
     from alf_core.dataset.base_dataset import BaseDataset
+    from torch import dtype as TorchDtype
+
+
+@dataclass
+class BaseTrainConfig:
+    """Base configuration shared by all model training configs.
+
+    Args:
+        learning_rate: Learning rate for the optimizer.
+        log_frequency: How often (in epochs/iterations) to log training metrics.
+        normalise_inputs: Whether to apply min-max normalisation to input
+            features before training. Defaults to False.
+        standardise_outputs: Whether to apply Z-score standardisation to
+            outputs before training. Defaults to False.
+        label_dtype: dtype for label tensors during training. None means each
+            model uses its own default (e.g. float32 for regression, long for
+            classification). Override to force a specific dtype.
+    """
+
+    learning_rate: float = 1e-3
+    log_frequency: int = 10
+    normalise_inputs: bool = False
+    standardise_outputs: bool = False
+    label_dtype: "TorchDtype | None" = None
 
 
 class BaseModel(abc.ABC):
