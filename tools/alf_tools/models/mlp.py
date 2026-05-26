@@ -439,15 +439,11 @@ class MLPModel(BaseModel):
                 val_metrics = {k: v for k, v in val_result.items() if k != "loss"}
 
             additional: dict[str, float] = {}
-            if (v := train_metrics.get("spearman")) is not None:
-                additional["train_spearman"] = float(v)
-            if (v := train_metrics.get("mse")) is not None:
-                additional["train_mse"] = float(v)
+            for k, v in train_metrics.items():
+                additional[f"train_{k}"] = float(v)
             if val_loader is not None:
-                if (v := val_metrics.get("spearman")) is not None:
-                    additional["val_spearman"] = float(v)
-                if (v := val_metrics.get("mse")) is not None:
-                    additional["val_mse"] = float(v)
+                for k, v in val_metrics.items():
+                    additional[f"val_{k}"] = float(v)
 
             self._epoch_metrics.append(
                 SurrogateEpochMetrics(
