@@ -262,6 +262,16 @@ class TestPredict:
         batched = esm2_small_batch_model.predict(candidates)
         np.testing.assert_allclose(single.means, batched.means, rtol=1e-5, atol=1e-5)
 
+    def test_predict_empty_candidates(self, esm2_model):
+        """predict() with an empty list returns an empty Predictions."""
+        predictions = esm2_model.predict([])
+        assert predictions.means.shape == (0,)
+
+    def test_predict_single_candidate(self, esm2_model):
+        """predict() with a single candidate returns shape (1, 320)."""
+        predictions = esm2_model.predict([Candidate(data="ACGT", modality="sequence")])
+        assert predictions.means.shape == (1, 320)
+
 
 class TestMaskTokens:
     """Tests for ESM2Model._mask_tokens()."""
