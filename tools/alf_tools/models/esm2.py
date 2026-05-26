@@ -74,6 +74,18 @@ class ESM2TrainConfig:
     mask_splitting: tuple[float, float, float] = (0.8, 0.1, 0.1)  # mask / random / unchanged
     log_frequency: int = 1
     loss_type: Literal["mlm", "log_likelihood"] = "mlm"
+    
+    def __post_init__(self) -> None:
+        if not np.isclose(sum(self.mask_splitting), 1.0):
+            raise ValueError(f"mask_splitting probabilities must sum to 1, got {self.mask_splitting}")
+        if self.optimizer_type not in ("adam", "adamw"):
+            raise ValueError(
+                f"optimizer_type must be 'adam' or 'adamw', got {self.optimizer_type!r}"
+            )
+        if self.loss_type not in ("mlm", "log_likelihood"):
+            raise ValueError(
+                f"loss_type must be 'mlm' or 'log_likelihood', got {self.loss_type!r}"
+            )
 
 
 class ESM2Model(BaseModel):
@@ -119,6 +131,14 @@ class ESM2Model(BaseModel):
 
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
+        
+        self._post_init()
+        
+    def _post_init(self) -> None:
+        if self.train_config.optimizer_type not in ("adam", "adamw"):
+            raise ValueError(
+                f"optimizer_type must be 'adam' or 'adamw', got {self.train_config.optimizer_type!r}"
+            )
 
     def featurise(
         self, inputs: Union[LabelledCandidates, list[Candidate]]
@@ -516,10 +536,11 @@ class ESM2Model(BaseModel):
             optimizer: torch.optim.Optimizer = torch.optim.AdamW(
                 self.esm_model.parameters(), lr=self.train_config.learning_rate
             )
-        else:
+        elif self.train_config.optimizer_type == "adam":
             optimizer = torch.optim.Adam(
                 self.esm_model.parameters(), lr=self.train_config.learning_rate
             )
+            
         avg_train_loss = 0.0
         avg_val_loss: float | None = None
         train_metrics: dict[str, float] = {}
