@@ -39,8 +39,10 @@ def test_candidates_to_tensor_basic():
     X = candidates_to_tensor(candidates)
 
     assert X.shape == (3, 2)
-    assert torch.allclose(X, torch.tensor([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]))
-    assert X.dtype == torch.float32
+    assert torch.allclose(
+        X, torch.tensor([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], dtype=torch.float64)
+    )
+    assert X.dtype == torch.float64
 
 
 def test_candidates_to_tensor_with_torch_data():
@@ -53,7 +55,7 @@ def test_candidates_to_tensor_with_torch_data():
     X = candidates_to_tensor(candidates)
 
     assert X.shape == (2, 2)
-    assert torch.allclose(X, torch.tensor([[1.0, 2.0], [3.0, 4.0]]))
+    assert torch.allclose(X, torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float64))
 
 
 def test_candidates_to_tensor_empty_list():
@@ -87,6 +89,27 @@ def test_candidates_to_tensor_device():
     if torch.cuda.is_available():
         X_gpu = candidates_to_tensor(candidates, device=torch.device("cuda"))
         assert X_gpu.device.type == "cuda"
+
+
+def test_candidates_to_tensor_with_list_data():
+    """Test conversion when candidate data is a plain Python list (np.asarray fallback)."""
+    candidates = [
+        Candidate(data=[1.0, 2.0], modality=Modality.TABULAR),
+        Candidate(data=[3.0, 4.0], modality=Modality.TABULAR),
+    ]
+
+    X = candidates_to_tensor(candidates)
+
+    assert X.shape == (2, 2)
+    assert torch.allclose(X, torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float64))
+
+
+def test_tensor_to_candidates_non_2d_raises():
+    """Test that a non-2D tensor raises ValueError."""
+    X = torch.tensor([1.0, 2.0, 3.0])  # 1D
+
+    with pytest.raises(ValueError, match="Expected 2D tensor"):
+        tensor_to_candidates(X)
 
 
 def test_tensor_to_candidates_basic():
@@ -132,11 +155,23 @@ def test_predictions_to_posterior_basic():
     posterior = predictions_to_posterior(predictions)
 
     assert isinstance(posterior, GPyTorchPosterior)
-    # Posterior mean can be either [3] or [3, 1] depending on reshape
-    assert posterior.mean.shape in [torch.Size([3]), torch.Size([3, 1])]
+    assert posterior.mean.shape == torch.Size([3, 1])
     # Check values regardless of shape
     mean_flat = posterior.mean.flatten()
-    assert torch.allclose(mean_flat, torch.tensor([1.0, 2.0, 3.0]))
+    assert torch.allclose(mean_flat, torch.tensor([1.0, 2.0, 3.0], dtype=torch.float64))
+
+
+def test_predictions_to_posterior_single_point():
+    """Test posterior with a single prediction (n=1 edge case)."""
+    means = np.array([1.5])
+    variances = np.array([0.1])
+    predictions = Predictions(means=means, variances=variances)
+
+    posterior = predictions_to_posterior(predictions)
+
+    assert isinstance(posterior, GPyTorchPosterior)
+    assert posterior.mean.shape == torch.Size([1, 1])
+    assert torch.allclose(posterior.mean.flatten(), torch.tensor([1.5], dtype=torch.float64))
 
 
 def test_predictions_to_posterior_without_variances():
@@ -167,9 +202,20 @@ def test_predictions_to_posterior_shape_handling():
 
     posterior = predictions_to_posterior(predictions)
 
-    # Should handle shape correctly (mean can be [3] or [3, 1])
-    assert posterior.mean.shape in [torch.Size([3]), torch.Size([3, 1])]
+    assert posterior.mean.shape == torch.Size([3, 1])
     assert posterior.covariance_matrix.shape == torch.Size([3, 3])
+
+
+def test_predictions_to_posterior_variance_clamping():
+    """Test that near-zero or zero variances are clamped to at least 1e-6."""
+    means = np.array([1.0, 2.0, 3.0])
+    variances = np.array([0.0, 1e-9, 0.1])
+    predictions = Predictions(means=means, variances=variances)
+
+    posterior = predictions_to_posterior(predictions)
+
+    posterior_variance = posterior.variance.squeeze()
+    assert torch.all(posterior_variance >= 1e-6)
 
 
 def test_get_bounds_tensor_from_numpy():
@@ -179,8 +225,10 @@ def test_get_bounds_tensor_from_numpy():
     bounds_tensor = get_bounds_tensor(bounds)
 
     assert bounds_tensor.shape == torch.Size([2, 2])
-    assert torch.allclose(bounds_tensor, torch.tensor([[0.0, 0.0], [1.0, 1.0]]))
-    assert bounds_tensor.dtype == torch.float32
+    assert torch.allclose(
+        bounds_tensor, torch.tensor([[0.0, 0.0], [1.0, 1.0]], dtype=torch.float64)
+    )
+    assert bounds_tensor.dtype == torch.float64
 
 
 def test_get_bounds_tensor_from_list():
@@ -190,7 +238,7 @@ def test_get_bounds_tensor_from_list():
     bounds_tensor = get_bounds_tensor(bounds)
 
     assert bounds_tensor.shape == torch.Size([2, 3])
-    expected = torch.tensor([[0.0, 0.0, -1.0], [1.0, 1.0, 1.0]])
+    expected = torch.tensor([[0.0, 0.0, -1.0], [1.0, 1.0, 1.0]], dtype=torch.float64)
     assert torch.allclose(bounds_tensor, expected)
 
 
@@ -201,6 +249,14 @@ def test_get_bounds_tensor_device():
     bounds_tensor = get_bounds_tensor(bounds, device=torch.device("cpu"))
 
     assert bounds_tensor.device.type == "cpu"
+
+
+def test_get_bounds_tensor_invalid_bounds():
+    """Test that bounds where lower > upper raise ValueError."""
+    bounds = np.array([[1.0, 0.0], [0.0, 1.0]])  # lower[0]=1.0 > upper[0]=0.0
+
+    with pytest.raises(ValueError, match="lower bounds <= upper bounds"):
+        get_bounds_tensor(bounds)
 
 
 def test_roundtrip_conversion():
@@ -232,10 +288,10 @@ def test_predictions_posterior_statistics():
 
     # Check mean matches (flatten to handle different shapes)
     mean_flat = posterior.mean.flatten()
-    assert torch.allclose(mean_flat, torch.tensor(means, dtype=torch.float32), atol=1e-5)
+    assert torch.allclose(mean_flat, torch.tensor(means, dtype=torch.float64), atol=1e-5)
 
     # Check variance matches (diagonal of covariance)
     posterior_variance = posterior.variance.squeeze()
     assert torch.allclose(
-        posterior_variance, torch.tensor(variances, dtype=torch.float32), atol=1e-5
+        posterior_variance, torch.tensor(variances, dtype=torch.float64), atol=1e-5
     )

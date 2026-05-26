@@ -120,10 +120,13 @@ def random_seed():
         ...     data = np.random.randn(100)
     """
     seed = 42
+    np_state = np.random.get_state()
+    torch_state = torch.get_rng_state()
     np.random.seed(seed)
     torch.manual_seed(seed)
     yield seed
-    np.random.seed(None)
+    np.random.set_state(np_state)
+    torch.set_rng_state(torch_state)
 
 
 # =============================================================================
