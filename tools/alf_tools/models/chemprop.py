@@ -23,6 +23,7 @@ import torch.nn as nn
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_core.utils.enums import ProblemType
 from chemprop.data import (
     BatchMolGraph,
     MoleculeDatapoint,
@@ -299,7 +300,11 @@ class ChempropModel(BaseModel):
         preds_np = all_preds.numpy()
         targets_np = all_targets.numpy()
         if len(preds_np) >= 2:
-            raw = Results(targets=targets_np, predictions=Predictions(means=preds_np)).metrics
+            raw = Results(
+                targets=targets_np,
+                predictions=Predictions(means=preds_np),
+                problem_type=ProblemType.REGRESSION,
+            ).metrics
             metrics = {k: float(v) for k in ("spearman", "mse") if (v := raw.get(k)) is not None}
         else:
             metrics = {"mse": float(np.mean((preds_np - targets_np) ** 2))}
@@ -355,7 +360,11 @@ class ChempropModel(BaseModel):
         preds_np = all_preds.numpy()
         targets_np = all_targets.numpy()
         if len(preds_np) >= 2:
-            raw = Results(targets=targets_np, predictions=Predictions(means=preds_np)).metrics
+            raw = Results(
+                targets=targets_np,
+                predictions=Predictions(means=preds_np),
+                problem_type=ProblemType.REGRESSION,
+            ).metrics
             metrics = {k: float(v) for k in ("spearman", "mse") if (v := raw.get(k)) is not None}
         else:
             metrics = {"mse": float(np.mean((preds_np - targets_np) ** 2))}
