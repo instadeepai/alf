@@ -198,30 +198,39 @@ class ESM2Model(BaseModel):
             Predictions whose means are per-sequence embeddings as a numpy array.
         """
         batch = self.featurise(candidate_points)
-        input_ids = batch["input_ids"].to(self.device)
-        attention_mask = batch["attention_mask"].to(self.device)
+        all_input_ids = batch["input_ids"]        # (N, seq_len) — CPU
+        all_attention_mask = batch["attention_mask"]  # (N, seq_len) — CPU
+
+        all_embeddings: list[torch.Tensor] = []
+        batch_size = self.train_config.batch_size
 
         self.esm_model.eval()
         with torch.no_grad():
-            outputs = self.esm_model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                output_hidden_states=True,
-            )
+            for start in range(0, len(candidate_points), batch_size):
+                input_ids = all_input_ids[start : start + batch_size].to(self.device)
+                attention_mask = all_attention_mask[start : start + batch_size].to(self.device)
 
-        hidden_state = outputs.hidden_states[
-            self.model_config.repr_layer
-        ]  # (batch, seq_len, hidden_dim)
+                outputs = self.esm_model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    output_hidden_states=True,
+                )
 
-        if self.model_config.pooling == "mean":
-            mask = attention_mask.unsqueeze(-1).float()  # (batch, seq_len, 1)
-            embeddings = (hidden_state * mask).sum(1) / mask.sum(1)  # (batch, hidden_dim)
-        elif self.model_config.pooling == "cls":
-            embeddings = hidden_state[:, 0, :]  # (batch, hidden_dim)
-        else:  # last_hidden_state
-            embeddings = hidden_state  # (batch, seq_len, hidden_dim)
+                hidden_state = outputs.hidden_states[
+                    self.model_config.repr_layer
+                ]  # (mini_batch, seq_len, hidden_dim)
 
-        return Predictions(means=embeddings.cpu().numpy())
+                if self.model_config.pooling == "mean":
+                    mask = attention_mask.unsqueeze(-1).float()
+                    embeddings = (hidden_state * mask).sum(1) / mask.sum(1)
+                elif self.model_config.pooling == "cls":
+                    embeddings = hidden_state[:, 0, :]
+                else:  # last_hidden_state
+                    embeddings = hidden_state
+
+                all_embeddings.append(embeddings.cpu())
+
+        return Predictions(means=torch.cat(all_embeddings, dim=0).numpy())
 
     def _prepare_data_loader(self, data: LabelledCandidates, shuffle: bool = False) -> DataLoader:
         batch = self.featurise(data)
