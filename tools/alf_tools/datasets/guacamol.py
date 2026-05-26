@@ -15,7 +15,7 @@
 import copy
 import logging
 from pathlib import Path
-from typing import Callable, Final, Literal, Optional, TypedDict, Union, get_args
+from typing import Callable, Final, Literal, Optional, TypedDict, get_args
 
 import numpy as np
 import requests
@@ -39,6 +39,19 @@ FILENAME_TEST: str = "guacamol_v1_test.smiles"
 FILENAME_ALL: str = "guacamol_v1_all.smiles"
 
 GuacaMolSplitName = Literal["TRAIN", "VALID", "TEST", "ALL"]
+
+PROPERTY_FNS: dict[str, Callable[..., float]] = {
+    "BertzCT": lambda m: float(GraphDescriptors.BertzCT(m)),
+    "MolLogP": lambda m: float(Descriptors.MolLogP(m)),
+    "MolWt": lambda m: float(Descriptors.MolWt(m)),
+    "TPSA": lambda m: float(Descriptors.TPSA(m)),
+    "NumHAcceptors": lambda m: float(Descriptors.NumHAcceptors(m)),
+    "NumHDonors": lambda m: float(Descriptors.NumHDonors(m)),
+    "NumRotatableBonds": lambda m: float(Descriptors.NumRotatableBonds(m)),
+    "NumAliphaticRings": lambda m: float(rdMolDescriptors.CalcNumAliphaticRings(m)),
+    "NumAromaticRings": lambda m: float(rdMolDescriptors.CalcNumAromaticRings(m)),
+    "QED": lambda m: float(RDKitQED.qed(m)),
+}
 
 
 class GuacaMolFileInfo(TypedDict):
@@ -160,30 +173,23 @@ class GuacaMolConfig(BaseDatasetConfig):
         return self
 
 
-def _compute_properties(smiles: str, properties: list[str]) -> dict[str, Union[str, float]]:
+def _compute_properties(smiles: str, properties: list[str]) -> dict[str, float]:
     """Compute RDKit physicochemical properties for a SMILES string.
 
     Args:
         smiles: A valid SMILES string (caller must ensure mol parses correctly).
         properties: List of property names from GuacaMolPropertyName to compute.
 
+    Raises:
+        ValueError: If the SMILES string is invalid and cannot be parsed by RDKit.
+
     Returns:
         Dict mapping each property name to its computed float value.
     """
     mol = Chem.MolFromSmiles(smiles)
-    _property_fns: dict[str, Callable[..., float]] = {
-        "BertzCT": lambda m: float(GraphDescriptors.BertzCT(m)),
-        "MolLogP": lambda m: float(Descriptors.MolLogP(m)),
-        "MolWt": lambda m: float(Descriptors.MolWt(m)),
-        "TPSA": lambda m: float(Descriptors.TPSA(m)),
-        "NumHAcceptors": lambda m: float(Descriptors.NumHAcceptors(m)),
-        "NumHDonors": lambda m: float(Descriptors.NumHDonors(m)),
-        "NumRotatableBonds": lambda m: float(Descriptors.NumRotatableBonds(m)),
-        "NumAliphaticRings": lambda m: float(rdMolDescriptors.CalcNumAliphaticRings(m)),
-        "NumAromaticRings": lambda m: float(rdMolDescriptors.CalcNumAromaticRings(m)),
-        "QED": lambda m: float(RDKitQED.qed(m)),
-    }
-    return {name: _property_fns[name](mol) for name in properties}  # type: ignore[operator]
+    if mol is None:
+        raise ValueError(f"Cannot compute label for invalid SMILES: {smiles!r}")
+    return {name: PROPERTY_FNS[name](mol) for name in properties}  # type: ignore[operator]
 
 
 def _download_file(url: str, filepath: Path, max_lines: Optional[int] = None) -> Path:
@@ -274,15 +280,16 @@ def _label_smiles(
     candidates = []
     labels = []
     for smiles in smiles_list:
-        mol = Chem.MolFromSmiles(smiles)
-        if mol is None:
+        try:
+            props = _compute_properties(smiles, properties)
+        except ValueError:
             logger.warning("Skipping invalid SMILES: %r", smiles)
             continue
-        features = _compute_properties(smiles, properties)
+        features: dict = dict(props)
         if split_tag is not None:
             features["split"] = split_tag
         candidates.append(Candidate(data=smiles, modality=modality, features=features))
-        labels.append(features[target_property])
+        labels.append(props[target_property])
     return LabelledCandidates(candidates=candidates, labels=np.array(labels, dtype=float))
 
 
@@ -311,6 +318,11 @@ class GuacaMol(BaseDataset):
         """
         super().__init__(config)
         self.setup()
+        self._smiles_index: dict[str, int] = (
+            {c.data: i for i, c in enumerate(self._raw_dataset.candidates)}
+            if self._raw_dataset is not None
+            else {}
+        )
 
     def __repr__(self) -> str:
         """Return a string representation identifying dataset and target."""
@@ -417,23 +429,20 @@ class GuacaMol(BaseDataset):
         if self._raw_dataset is None:
             raise RuntimeError("Dataset must be loaded before querying")  # pragma: no cover
 
-        known_smiles_index = {c.data: i for i, c in enumerate(self._raw_dataset.candidates)}
         result_candidates: list[Candidate] = []
-        result_labels: list[Union[str, float]] = []
+        result_labels: list[float] = []
 
         for candidate in candidates:
-            if candidate.data in known_smiles_index:
-                idx = known_smiles_index[candidate.data]
+            if candidate.data in self._smiles_index:
+                idx = self._smiles_index[candidate.data]
                 result_labels.append(float(self._raw_dataset.labels[idx]))
+                result_candidates.append(self._raw_dataset.candidates[idx])
             else:
-                mol = Chem.MolFromSmiles(candidate.data)
-                if mol is None:
-                    raise ValueError(f"Cannot compute label for invalid SMILES: {candidate.data!r}")
                 label = _compute_properties(candidate.data, [self.config.target_property])[
                     self.config.target_property
                 ]
                 result_labels.append(label)
-            result_candidates.append(candidate)
+                result_candidates.append(candidate)
 
         return LabelledCandidates(
             candidates=result_candidates,
