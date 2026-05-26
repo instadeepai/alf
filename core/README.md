@@ -25,6 +25,8 @@ This README is organized into the following sections:
   candidate pool
 - **[8. State (`State`)](#8-state-state)** - Tracks the state of active
   learning tasks
+- **[9. Normalisation (`InputNormaliser`, `OutputStandardiser`)](#9-normalisation-inputnormaliser-outputstandardiser)**
+  - Feature and label preprocessing
 
 ### Task Types
 - **[1. Design Task (`DesignTask`)](#1-design-task-designtask)** - Multi-round optimisation loop
@@ -81,6 +83,17 @@ the framework. Models can serve multiple roles depending on the context:
 - `get_training_summary_metrics()`: Returns training metrics (e.g., loss, accuracy) -
   defaults to empty dict
 - `cleanup()`: Cleans up temporary files, checkpoints, or other resources - defaults to no-op
+
+**Training Configuration (`BaseTrainConfig`):**
+
+Concrete model implementations pair with a `BaseTrainConfig` dataclass that exposes normalisation
+flags alongside standard training hyperparameters:
+
+- `normalise_inputs: bool` — apply min-max input normalisation (default `False`)
+- `standardise_outputs: bool` — apply Z-score output standardisation (default `False`)
+
+See [section 9](#9-normalisation-inputnormaliser-outputstandardiser) for full details on both
+normalisation routines.
 
 **Implementation Notes:**
 - All concrete model implementations must inherit from `BaseModel` and implement all
@@ -168,6 +181,39 @@ The `State` dataclass tracks the complete state of an active learning task:
 
 **Key Methods:**
 - `update()`: Adds newly acquired candidates to history, updates dataset splits, and increments the round counter
+
+### 9. Normalisation (`InputNormaliser`, `OutputStandardiser`)
+
+ALF provides two preprocessing classes in `alf_core.model.normaliser` for feature and label scaling.
+Both are fitted exclusively on training data and applied consistently at predict time to avoid data leakage.
+
+**`InputNormaliser`** — min-max scaling of input features to [0, 1]:
+- Statistics (per-feature min and range) are computed over the batch dimension, so each feature
+  dimension is scaled independently.
+- Supports 2-D inputs `(n_samples, n_features)` and higher-dimensional tensors such as one-hot
+  encoded sequences `(n_samples, alphabet_size, seq_len)`.
+- Edge case: a feature with zero range is clamped to `_MIN_RANGE = 1e-8` to avoid division by zero.
+  For one-hot inputs, ensure all amino acids appear at all positions in training, or clip outputs.
+- Well suited for GP models, where kernels measure distances between inputs and benefit from inputs
+  spanning the unit cube [0, 1].
+
+**`OutputStandardiser`** — Z-score standardisation of output labels to zero mean and unit variance:
+- `inverse_transform(mean, var)` maps predictions back to the original label scale:
+  `mean_orig = mean_std * std + mean_train`, `var_orig = var_std * std²`
+- Edge case: near-zero training standard deviation is clamped to `_MIN_STD = 1e-8`.
+- **When `standardise_outputs=True`, all evaluation metrics are computed on the original
+  (inverse-transformed) label scale.** Predictions returned by `predict()` are always in the
+  original label space.
+
+Both are controlled via `BaseTrainConfig` flags (see section 2):
+
+| Flag | Default | Effect |
+|------|---------|--------|
+| `normalise_inputs` | `False` | Apply `InputNormaliser` (min-max) to input features |
+| `standardise_outputs` | `False` | Apply `OutputStandardiser` (Z-score) to output labels |
+
+Concrete model configs may override these defaults; for example, `GPTrainConfig` sets both to `True`
+because GP kernels operate in distance space and benefit from standardised targets.
 
 ## Task Types
 
@@ -322,6 +368,11 @@ the dataset's `problem_type`.
 
 Regression metrics accept predictions (means, variances, targets) and return a dictionary of
 computed values. Metrics requiring variance will validate that uncertainty estimates are provided.
+
+> **Normalisation and metrics:** When `standardise_outputs=True` in the model's train config,
+> predictions are inverse-transformed back to the original label scale before metrics are computed.
+> Metrics therefore always reflect performance in original label units, regardless of whether
+> output standardisation was used during training.
 
 ### Classification Metrics (`ProblemType.BINARY` and `ProblemType.MULTICLASS`)
 

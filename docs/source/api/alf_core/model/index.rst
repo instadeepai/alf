@@ -14,7 +14,11 @@ dataset config: ``problem_type`` (the ``ProblemType`` enum value) and ``output_d
 of output neurons — ``1`` for regression and binary classification, ``num_classes`` for
 multiclass).
 
-.. automodule:: alf_core.model.base_model
-   :members:
-   :show-inheritance:
-   :undoc-members:
+The ``BaseTrainConfig`` dataclass provides shared training flags — including ``normalise_inputs`` and
+``standardise_outputs`` — that all concrete training configs inherit from.
+
+.. toctree::
+   :maxdepth: 1
+
+   Base Model <base_model/index>
+   Normalisers <normaliser/index>
