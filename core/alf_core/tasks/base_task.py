@@ -56,9 +56,18 @@ class BaseTask(abc.ABC):
             dataset: The dataset containing train/validation/test splits.
             surrogate: The surrogate model to use for predictions.
 
+        Raises:
+            RuntimeError: If dataset.setup() has not been called before this method.
+
         Returns:
             Initialized task state with the provided dataset and surrogate.
         """
+        if dataset._raw_dataset is None:
+            raise RuntimeError(
+                "dataset.setup() must be called before task.setup(). "
+                "Call dataset.setup() to load and split the data first."
+            )
+        surrogate.setup(dataset)
         return State(
             dataset=dataset,
             surrogate=surrogate,
@@ -97,7 +106,11 @@ class BaseTask(abc.ABC):
         """
         if len(state.dataset.test_dataset) > 0:
             predictions = state.surrogate.predict(state.dataset.test_dataset.candidates)
-            results = Results(predictions=predictions, targets=state.dataset.test_dataset.labels)
+            results = Results(
+                predictions=predictions,
+                targets=state.dataset.test_dataset.labels,
+                problem_type=state.problem_type,
+            )
 
             state.round_predictions = predictions
             state.round_metrics.metrics.update({
