@@ -265,12 +265,14 @@ class TestPredict:
     def test_predict_empty_candidates(self, esm2_model):
         """predict() with an empty list returns an empty Predictions."""
         predictions = esm2_model.predict([])
-        assert predictions.means.shape == (0,)
+        hidden_dim = esm2_model.esm_model.config.hidden_size
+        assert predictions.means.shape == (0, hidden_dim)
 
     def test_predict_single_candidate(self, esm2_model):
-        """predict() with a single candidate returns shape (1, 320)."""
+        """predict() with a single candidate returns shape (1, hidden_dim)."""
         predictions = esm2_model.predict([Candidate(data="ACGT", modality="sequence")])
-        assert predictions.means.shape == (1, 320)
+        hidden_dim = esm2_model.esm_model.config.hidden_size
+        assert predictions.means.shape == (1, hidden_dim)
 
 
 class TestMaskTokens:

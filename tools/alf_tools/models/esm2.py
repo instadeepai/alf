@@ -198,7 +198,7 @@ class ESM2Model(BaseModel):
             Predictions whose means are per-sequence embeddings as a numpy array.
         """
         if not candidate_points:
-            return Predictions(means=np.empty((0,), dtype=np.float32))
+            return Predictions(means=np.empty((0, self.esm_model.config.hidden_size), dtype=np.float32))
 
         batch = self.featurise(candidate_points)
         all_input_ids = batch["input_ids"]        # (N, seq_len) — CPU
