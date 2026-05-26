@@ -27,6 +27,7 @@ from alf_core.dataclasses import (
     State,
     SurrogateEpochMetrics,
 )
+from alf_core.utils.enums import ProblemType
 
 logger = logging.getLogger("alf-core")
 
@@ -203,6 +204,7 @@ class FileStateLogger(StateLogger):
         candidates: list[Candidate],
         targets: np.ndarray,
         round_name: str,
+        problem_type: ProblemType = ProblemType.REGRESSION,
     ) -> None:
         """Log predictions to file.
 
@@ -213,9 +215,10 @@ class FileStateLogger(StateLogger):
             round_name: Name of the current round in the task, depending on the task type
                 e.g. "initial_train_round", "supervised evaluation", "zero-shot evaluation",
                 or the round number for design tasks.
+            problem_type: ProblemType to determine how predictions are formatted.
         """
         round_name = round_name.lower().replace(" ", "_")
-        predictions_df = predictions.to_dataframe(candidates, targets)
+        predictions_df = predictions.to_dataframe(candidates, targets, problem_type=problem_type)
         predictions_df.to_csv(self.output_path / f"{round_name}_predictions.csv", index=False)
 
     def log(self, state: State, round_name: str | None = None) -> None:
@@ -239,6 +242,7 @@ class FileStateLogger(StateLogger):
                 state.dataset.test_dataset.candidates,
                 state.dataset.test_dataset.labels,
                 round_name,
+                problem_type=state.problem_type,
             )
 
         if state.history:

@@ -22,7 +22,8 @@ from alf_core.dataclasses import (
     State,
 )
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
-from alf_core.model.base_model import BaseModel
+from alf_core.model.base_model import BaseModel, BaseTrainConfig
+from alf_core.model.normaliser import InputNormaliser, OutputStandardiser
 from alf_core.optimizer.acquisition_function import AcquisitionFunction
 from alf_core.optimizer.optimizer import Optimizer
 from alf_core.optimizer.search import (
@@ -39,6 +40,7 @@ from alf_core.tasks.base_task import BaseTask
 from alf_core.tasks.design_task import DesignTask
 from alf_core.tasks.supervised_task import SupervisedTask
 from alf_core.tasks.zeroshot_task import ZeroShotTask
+from alf_core.utils.enums import ProblemType
 from alf_core.utils.state_logger import (
     FileStateLogger,
     StateLogger,

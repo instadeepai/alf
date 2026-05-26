@@ -16,6 +16,7 @@ dependencies = [
     "torch>=2.10.0",
     "gpytorch>=1.9.0",
     "scipy>=1.9.0",
+    "botorch>=0.17.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -36,4 +37,9 @@ explicit = true
 alf_core = { path = "../core", editable = true }
 torch = [
   { index = "pytorch-cpu" },
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
 ]
