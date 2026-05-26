@@ -24,7 +24,7 @@ This module provides GP models built on BoTorch's SingleTaskGP, which offers:
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 import numpy as np
 import torch
@@ -34,7 +34,7 @@ from botorch.models import SingleTaskGP
 from botorch.optim.fit import fit_gpytorch_mll_torch
 from gpytorch.kernels import MaternKernel, RBFKernel, ScaleKernel
 from gpytorch.mlls import ExactMarginalLogLikelihood
-from torch.optim import Adam, AdamW
+from torch.optim import Adam
 
 from alf_tools.models.utils.torch_utils import get_device
 from alf_tools.utils.botorch_utils import candidates_to_tensor
@@ -68,8 +68,9 @@ class BoTorchGPModel(BaseModel):
         >>>
         >>> # Train model
         >>> model = BoTorchGPModel()
-        >>> results = model.fit(train_data)
-        >>> print(f"Final loss: {results.training_metrics['loss'][-1]:.4f}")
+        >>> model.train(train_data, val_data=None)
+        >>> metrics = model.get_training_summary_metrics()
+        >>> print(f"Final loss: {metrics['final_loss']:.4f}")
         >>>
         >>> # Make predictions
         >>> candidates = dataset.candidate_pool.candidates[:10]
@@ -195,8 +196,8 @@ class BoTorchGPModel(BaseModel):
         logger.info(f"Training BoTorch GP model on {len(train_data.candidates)} samples")
 
         # Convert candidates to tensors
-        self.train_X = candidates_to_tensor(train_data.candidates, device=self.device).to(
-            dtype=self.dtype
+        self.train_X = candidates_to_tensor(
+            train_data.candidates, device=self.device, dtype=self.dtype
         )
         self.train_Y = torch.tensor(
             train_data.labels, dtype=self.dtype, device=self.device
@@ -214,6 +215,8 @@ class BoTorchGPModel(BaseModel):
             covar_module = ScaleKernel(MaternKernel(nu=self.nu, ard_num_dims=ard_num_dims))
         elif self.kernel_type == "rbf":
             covar_module = ScaleKernel(RBFKernel(nu=self.nu, ard_num_dims=ard_num_dims))
+        elif self.kernel_type is None:
+            covar_module = None
         else:
             covar_module = None
             logger.warning(
@@ -241,13 +244,8 @@ class BoTorchGPModel(BaseModel):
                 )
             else:  # torch
                 # Use torch Adam optimizer
-                if self.optimizer == "adamw":
-                    optim = AdamW
-                else:
-                    optim = Adam
-                logging_optimizer = (
-                    f"torch {'Adam' if self.optimizer is None else self.optimizer.upper()}"
-                )
+                optim = Adam
+                logging_optimizer = "torch Adam"
 
                 fit_gpytorch_mll(
                     mll,
@@ -333,7 +331,7 @@ class BoTorchGPModel(BaseModel):
             "final_loss": float(self._training_metrics["loss"][-1]),
         }
 
-    def sample(self, condition: Any | None = None) -> list[Candidate]:
+    def sample(self, condition: object | None = None) -> list[Candidate]:
         """Sample from the GP model.
 
         Note: This is not typically used for BoTorch GPs, which are discriminative
@@ -352,7 +350,7 @@ class BoTorchGPModel(BaseModel):
         )
 
     @property
-    def botorch_model(self) -> Optional[SingleTaskGP]:
+    def botorch_model(self) -> SingleTaskGP:
         """Get the underlying BoTorch model.
 
         Returns:
@@ -363,4 +361,4 @@ class BoTorchGPModel(BaseModel):
         """
         if self.model is None:
             raise RuntimeError("Model must be trained before getting the underlying BoTorch model")
-        return self.model  # type: ignore[return-value]
+        return self.model
