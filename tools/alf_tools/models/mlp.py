@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Union
 
 import numpy as np
 import torch
@@ -173,7 +173,7 @@ class MLPModel(BaseModel):
         self.train_config = train_config or MLPTrainConfig()
         self.device = get_device(device)
         self.net: MLP | None = None
-        self.input_dim: Optional[int] = None
+        self.input_dim: int | None = None
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
 
@@ -470,7 +470,8 @@ class MLPModel(BaseModel):
         self.training_metrics = {"final_train_loss": avg_train_loss}
         self.training_metrics.update({f"final_train_{k}": v for k, v in train_metrics.items()})
         if val_loader is not None:
-            self.training_metrics["final_val_loss"] = avg_val_loss  # type: ignore[assignment]
+            assert avg_val_loss is not None, "avg_val_loss should be set if val_loader is not None"
+            self.training_metrics["final_val_loss"] = avg_val_loss
             self.training_metrics.update({f"final_val_{k}": v for k, v in val_metrics.items()})
 
         self.net.eval()
