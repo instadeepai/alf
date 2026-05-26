@@ -350,7 +350,9 @@ class TestLabelledCandidatesAppend:
 
         new_candidates = [Candidate(data="test2", modality=Modality.SEQUENCE)]
 
-        with pytest.raises(AssertionError, match="Candidates and labels must have the same length"):
+        with pytest.raises(
+            AssertionError, match="Labels must be provided when appending a list of Candidates"
+        ):
             labelled_candidates.append(new_candidates, None)
 
     def test_multiple_append_operations(self):
@@ -535,7 +537,7 @@ class TestLabelledCandidatesEquality:
         lc1 = LabelledCandidates(candidates=[c], labels=np.array([0.5]))
         lc2 = LabelledCandidates(candidates=[c], labels=np.array([1.5]))
         with pytest.raises(TypeError):
-            {lc1, lc2}
+            set({lc1, lc2})
 
     def test_remove_works_with_numpy_arrays_in_candidates(self):
         """Test that remove() works correctly after fixing equality (the original bug)."""

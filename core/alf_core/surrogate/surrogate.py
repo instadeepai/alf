@@ -18,6 +18,7 @@ from typing import Union
 import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.model.base_model import BaseModel
 
 
@@ -33,6 +34,14 @@ class Surrogate:
             model: The BaseModel instance to use as the surrogate model.
         """
         self.model = model
+
+    def setup(self, dataset: BaseDataset) -> None:
+        """Configure the surrogate model for the given dataset.
+
+        Args:
+            dataset: The dataset this surrogate will be trained on.
+        """
+        self.model.setup(dataset)
 
     def fit(
         self,
