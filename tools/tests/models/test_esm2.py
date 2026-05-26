@@ -91,6 +91,20 @@ def esm2_ll_model():
     return ESM2Model(name="test_esm2_ll", model_config=config, train_config=train_cfg, device="cpu")
 
 
+@pytest.fixture(scope="session")
+def esm2_small_batch_model():
+    """Frozen ESM-2 with batch_size=2 to exercise multi-batch predict.
+
+    Returns:
+        An ESM2Model with batch_size=2, frozen backbone, CPU.
+    """
+    config = ESM2ModelConfig(model_id=MODEL_ID)
+    train_cfg = ESM2TrainConfig(freeze_backbone=True, batch_size=2)
+    return ESM2Model(
+        name="test_esm2_small_batch", model_config=config, train_config=train_cfg, device="cpu"
+    )
+
+
 @pytest.fixture
 def sample_data():
     """Create a small LabelledCandidates dataset for testing.
@@ -219,6 +233,19 @@ class TestPredict:
         preds_final = model_final.predict(sample_data.candidates)
         preds_first = model_first.predict(sample_data.candidates)
         assert not np.allclose(preds_final.means, preds_first.means)
+
+    def test_predict_batched_matches_shape(self, esm2_small_batch_model):
+        """predict() with N > batch_size returns the same shape as N <= batch_size."""
+        candidates = [
+            Candidate(data="MKTIIALSYIFCLVFA", modality="sequence"),
+            Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence"),
+            Candidate(data="GASGAAS", modality="sequence"),
+            Candidate(data="PEPTIDE", modality="sequence"),
+            Candidate(data="ACGT", modality="sequence"),
+        ]
+        predictions = esm2_small_batch_model.predict(candidates)
+        # mean pooling → (N, hidden_dim); hidden_dim for esm2_t6_8M is 320
+        assert predictions.means.shape == (5, 320)
 
 
 class TestMaskTokens:
