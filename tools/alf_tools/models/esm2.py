@@ -123,8 +123,8 @@ class ESM2Model(BaseModel):
         self.train_config = train_config or ESM2TrainConfig()
         self.device = get_device(device)
 
-        self.tokenizer = AutoTokenizer.from_pretrained(model_config.model_id)
-        self.esm_model = AutoModelForMaskedLM.from_pretrained(model_config.model_id)
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_config.model_id)
+        self.esm_model = AutoModelForMaskedLM.from_pretrained(self.model_config.model_id)
         self.esm_model.to(self.device)
 
         self.criterion = (
@@ -134,7 +134,7 @@ class ESM2Model(BaseModel):
         )
 
         total_params = sum(p.numel() for p in self.esm_model.parameters())
-        logger.info(f"ESM-2 loaded: {model_config.model_id} ({total_params:,} parameters)")
+        logger.info(f"ESM-2 loaded: {self.model_config.model_id} ({total_params:,} parameters)")
 
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
@@ -146,6 +146,14 @@ class ESM2Model(BaseModel):
             raise ValueError(
                 f"optimizer_type must be 'adam' or 'adamw', "
                 f"got {self.train_config.optimizer_type!r}"
+            )
+        num_layers = self.esm_model.config.num_hidden_layers + 1  # +1 for embedding
+        valid_range = range(-num_layers, num_layers)
+        if self.model_config.repr_layer not in valid_range:
+            raise ValueError(
+                f"repr_layer={self.model_config.repr_layer} is out of range for "
+                f"{self.model_config.model_id} which has {num_layers} hidden states "
+                f"(valid: {-num_layers} to {num_layers - 1})"
             )
 
     def featurise(
