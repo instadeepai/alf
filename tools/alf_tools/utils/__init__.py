@@ -12,18 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.models.utils.data_utils import transform_data
-from alf_tools.models.utils.sequence_utils import (
-    create_char_to_idx_mapping,
-    extract_sequences_from_inputs,
-    one_hot_encode,
+from alf_tools.utils.botorch_utils import (
+    candidates_to_tensor,
+    get_bounds_tensor,
+    predictions_to_posterior,
+    tensor_to_candidates,
 )
-from alf_tools.models.utils.torch_utils import get_device
 
 __all__ = [
-    "create_char_to_idx_mapping",
-    "extract_sequences_from_inputs",
-    "get_device",
-    "one_hot_encode",
-    "transform_data",
+    "candidates_to_tensor",
+    "get_bounds_tensor",
+    "predictions_to_posterior",
+    "tensor_to_candidates",
 ]
