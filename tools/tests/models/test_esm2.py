@@ -247,6 +247,21 @@ class TestPredict:
         # mean pooling → (N, hidden_dim); hidden_dim for esm2_t6_8M is 320
         assert predictions.means.shape == (5, 320)
 
+    def test_predict_batched_equals_single_batch(self, esm2_small_batch_model, esm2_model):
+        """Embeddings from batched predict equal those from a single-pass predict."""
+        candidates = [
+            Candidate(data="MKTIIALSYIFCLVFA", modality="sequence"),
+            Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence"),
+            Candidate(data="GASGAAS", modality="sequence"),
+            Candidate(data="PEPTIDE", modality="sequence"),
+            Candidate(data="ACGT", modality="sequence"),
+        ]
+        # esm2_model has batch_size=8 (fits all 5 in one pass after refactor)
+        # esm2_small_batch_model has batch_size=2 (forces 3 mini-batches)
+        single = esm2_model.predict(candidates)
+        batched = esm2_small_batch_model.predict(candidates)
+        np.testing.assert_allclose(single.means, batched.means, rtol=1e-5, atol=1e-5)
+
 
 class TestMaskTokens:
     """Tests for ESM2Model._mask_tokens()."""
