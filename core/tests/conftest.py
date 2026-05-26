@@ -26,6 +26,7 @@ from alf_core.optimizer.optimizer import Optimizer
 from alf_core.optimizer.search import DatasetSearch
 from alf_core.oracle.oracle import Oracle
 from alf_core.surrogate.surrogate import Surrogate
+from alf_core.utils.enums import ProblemType
 
 
 class DummyDatasetConfig(BaseDatasetConfig):
@@ -63,6 +64,7 @@ def dummy_dataset():
         validation_frac=0.2,
         test_ratio=0.2,
         split_type="random",
+        problem_type="regression",
         num_samples=1000,
     )
     return DummyDataset(config)
@@ -95,7 +97,8 @@ def dummy_dataset_factory():
         train_ratio: float = 0.6,
         validation_frac: float = 0.2,
         test_ratio: float = 0.2,
-        split_type: Literal["random", "low_vs_high"] = "random",
+        split_type: Literal["random", "low_vs_high", "stratified"] = "random",
+        problem_type: ProblemType | str = ProblemType.REGRESSION,
         max_candidate_pool: int | None = None,
     ) -> DummyDataset:
         """Create a DummyDataset with the specified configuration.
@@ -110,6 +113,7 @@ def dummy_dataset_factory():
             validation_frac: Fraction of training data for validation.
             test_ratio: Fraction of data for testing.
             split_type: Type of split.
+            problem_type: Type of problem (regression, binary, multiclass).
             max_candidate_pool: Maximum candidate pool size.
 
         Returns:
@@ -124,6 +128,7 @@ def dummy_dataset_factory():
                 validation_frac=validation_frac,
                 test_ratio=test_ratio,
                 split_type=split_type,
+                problem_type=problem_type,
                 max_candidate_pool=max_candidate_pool,
                 num_samples=num_samples,
             )
