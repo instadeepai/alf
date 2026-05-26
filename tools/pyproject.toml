@@ -39,3 +39,8 @@ alf_core = { path = "../core", editable = true }
 torch = [
   { index = "pytorch-cpu" },
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]

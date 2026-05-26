@@ -24,13 +24,19 @@ import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.dataset.base_dataset import BaseDataset
+from alf_core.model.base_model import BaseTrainConfig
+from alf_core.model.normaliser import (
+    InputNormaliser,
+    OutputStandardiser,
+)
 from alf_core.utils.enums import ProblemType
 from jaxtyping import Float
 
-from alf_tools.models.utils.sequence_utils import (
+from alf_tools.models.utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
     one_hot_encode,
+    transform_data,
 )
 from alf_tools.models.utils.torch_utils import get_device
 from alf_tools.utils.constants import PROTEIN_ALPHABET
@@ -74,24 +80,37 @@ class GPModelConfig:
 
 
 @dataclass
-class GPTrainConfig:
+class GPTrainConfig(BaseTrainConfig):
     """Configuration for Gaussian Process training.
 
+    Overrides ``normalise_inputs`` to ``True`` because GP kernels measure
+    distances between inputs; scaling continuous features to [0, 1]
+    improves marginal log-likelihood optimisation.
+
     Args:
-        learning_rate: Learning rate for the optimizer.
-        num_iterations: Number of optimization iterations.
+        normalise_inputs: Whether to apply min-max normalisation to input
+            features before training. Defaults to True; GP kernels measure
+            distances so scaling continuous features to [0, 1] improves MLL.
+        standardise_outputs: Whether to apply Z-score standardisation to
+            output labels before training. Defaults to True; standardisation
+            can improve training. For constant labels, std is clamped to a
+            minimum value to avoid division by zero, but standardisation may
+            not be meaningful.
+        num_iterations: Number of optimisation iterations.
         optimizer_type: Type of optimizer to use ('adam' or 'lbfgs').
-        log_frequency: Frequency of logging training metrics (in iterations).
         early_stopping_patience: Number of iterations without improvement
             before stopping. If None, no early stopping is used.
         early_stopping_delta: Minimum change in loss to qualify as an
-            improvement. If None, no early stopping is used.
+            improvement.
+        learning_rate: Inherited from BaseTrainConfig. Default overridden to 0.01.
+        log_frequency: Inherited from BaseTrainConfig. Default: 10.
     """
 
-    learning_rate: float = 0.01
+    normalise_inputs: bool = True  # override BaseTrainConfig default
+    standardise_outputs: bool = True  # override BaseTrainConfig default
+    learning_rate: float = 0.01  # override BaseTrainConfig default
     num_iterations: int = 100
     optimizer_type: Literal["adam", "lbfgs"] = "adam"
-    log_frequency: int = 10
     early_stopping_patience: int | None = None
     early_stopping_delta: float = 1e-4
 
@@ -278,6 +297,8 @@ class GPModel(BaseModel):
     kernel selection, and uncertainty quantification.
     """
 
+    _default_label_dtype: torch.dtype = torch.float32
+
     def __init__(
         self,
         name: str = "gp_model",
@@ -318,6 +339,10 @@ class GPModel(BaseModel):
         # Store training data for GP predictions
         self.train_x: Float[torch.Tensor, "n_samples n_features"] | None = None
         self.train_y: Float[torch.Tensor, "n_samples"] | None = None
+
+        # Normalisers — fitted on each train() call, used at predict() time
+        self._input_normaliser: InputNormaliser | None = None
+        self._output_standardiser: OutputStandardiser | None = None
 
         # Track metrics
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
@@ -522,6 +547,12 @@ class GPModel(BaseModel):
 
             losses.append(loss_value)
 
+            # Log at configured frequency
+            if i % self.train_config.log_frequency == 0:
+                logger.info(
+                    f"Iteration {i}/{self.train_config.num_iterations} — loss={loss_value:.4f}"
+                )
+
             # Record per-iteration metrics
             self._epoch_metrics.append(
                 SurrogateEpochMetrics(
@@ -552,6 +583,32 @@ class GPModel(BaseModel):
 
         return metrics
 
+    def _prepare_train_data(
+        self,
+        train_data: LabelledCandidates,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Prepare the training data by featurising, normalising, and standardising.
+
+        Fits normalisers exclusively on training data; call transform separately
+        for validation data to avoid leakage. Converts numpy labels to tensors.
+
+        Args:
+            train_data: Training data containing sequences and oracle values.
+
+        Returns:
+            A tuple of training features and targets as tensors on the current device.
+        """
+        label_dtype = self.train_config.label_dtype or self._default_label_dtype
+        train_x, train_y, self._input_normaliser, self._output_standardiser = transform_data(
+            self.featurise(train_data),
+            train_data.labels,
+            self.train_config.normalise_inputs,
+            self.train_config.standardise_outputs,
+            label_dtype,
+            self.device,
+        )
+        return train_x, train_y
+
     def setup(self, dataset: "BaseDataset") -> None:
         """Validate that the dataset uses REGRESSION problem type.
 
@@ -581,13 +638,14 @@ class GPModel(BaseModel):
         Note:
             For exact GPs, all training data is used for predictions. Validation
             data is only used for logging validation metrics during training.
+
+            This method is not thread-safe. Concurrent calls to train() and predict()
+            on the same instance will produce undefined behaviour.
         """
         self._epoch_metrics = []
         logger.info(f"Training GP with {len(train_data)} samples")
 
-        # Featurize training data
-        train_x = self.featurise(train_data).to(self.device)
-        train_y = torch.tensor(train_data.labels, dtype=torch.float32).to(self.device)
+        train_x, train_y = self._prepare_train_data(train_data)
 
         # Store training data for later predictions
         self.train_x = train_x
@@ -610,13 +668,18 @@ class GPModel(BaseModel):
         # Store training metrics
         self.training_metrics = train_metrics
 
-        # Evaluate on training data
+        # Evaluate on training data — inverse-transform to original label scale for metrics
         self.gp_model.eval()
         self.likelihood.eval()
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
             train_preds = self.likelihood(self.gp_model(train_x))
             train_means = train_preds.mean.cpu().numpy()
             train_vars = train_preds.variance.cpu().numpy()
+
+        if self._output_standardiser is not None:
+            train_means, train_vars = self._output_standardiser.inverse_transform(
+                train_means, train_vars
+            )
 
         train_predictions_obj = Predictions(means=train_means, variances=train_vars)
         train_results = Results(
@@ -664,13 +727,21 @@ class GPModel(BaseModel):
         self.likelihood.eval()
 
         # Featurize input
-        test_x = self.featurise(candidate_points).to(self.device)
+        test_x_np = self.featurise(candidate_points).cpu().numpy()
+
+        # Apply input normalization if fitted
+        if self._input_normaliser is not None:
+            test_x_np = self._input_normaliser.transform(test_x_np)
+        test_x = torch.tensor(test_x_np, dtype=torch.float32).to(self.device)
 
         # Make predictions with fast predictive variance computation
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
             predictions = self.likelihood(self.gp_model(test_x))
             means = predictions.mean.cpu().numpy()
             variances = predictions.variance.cpu().numpy()
+
+        if self._output_standardiser is not None:
+            means, variances = self._output_standardiser.inverse_transform(means, variances)
 
         return Predictions(means=means, variances=variances)
 
@@ -706,7 +777,7 @@ class GPModel(BaseModel):
         return self.training_metrics
 
     def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
-        """Return per-epoch training metrics recorded during hyperparameter optimization.
+        """Return per-epoch training metrics recorded during hyperparameter optimisation.
 
         Returns:
             list[SurrogateEpochMetrics]: List of metrics for each epoch, including training
