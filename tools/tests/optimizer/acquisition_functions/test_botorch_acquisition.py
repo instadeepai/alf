@@ -18,7 +18,14 @@ import math
 
 import numpy as np
 import pytest
-from alf_core import BaseDatasetConfig, Candidate, LabelledCandidates, Modality, Surrogate
+from alf_core import (
+    BaseDatasetConfig,
+    Candidate,
+    LabelledCandidates,
+    Modality,
+    ProblemType,
+    Surrogate,
+)
 from alf_core.dataclasses.state import State
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
@@ -96,6 +103,7 @@ def simple_dataset() -> _InlineBraninDataset:
         validation_frac=0.2,
         test_ratio=0.1,
         split_type="random",
+        problem_type=ProblemType.REGRESSION,
     )
     dataset = _InlineBraninDataset(config=config, n_initial_samples=500)
     dataset.setup()
@@ -536,6 +544,7 @@ def test_high_dimensional_input(trained_surrogate):
         validation_frac=0.2,
         test_ratio=0.1,
         split_type="random",
+        problem_type=ProblemType.REGRESSION,
     )
 
     dataset = _InlineHartmann6Dataset(config=config, n_initial_samples=500)

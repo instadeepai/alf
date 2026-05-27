@@ -374,15 +374,6 @@ class BoTorchAcquisition(AcquisitionFunction):
 
         logger.info(f"Optimizing {self.acquisition_type} with {self.num_restarts} restarts")
 
-        # Convert bounds from list[list[float]] to list[tuple[float, float]]
-        bounds_tuples = [(b[0], b[1]) for b in self.bounds]
-        bounds_tensor = get_bounds_tensor(bounds_tuples, device=state.surrogate.model.device)
-
-        # Get training data for qNEI
-        X_baseline = None
-        if self.acquisition_type == "qNEI":
-            X_baseline = candidates_to_tensor(state.dataset.train_dataset.candidates)
-
         # For continuous optimization, prefer native BoTorch models for gradient support
         # Check if the model has a native BoTorch model (e.g., BoTorchGPModel.model)
         if hasattr(state.surrogate.model, "model") and state.surrogate.model.model is not None:
@@ -391,6 +382,22 @@ class BoTorchAcquisition(AcquisitionFunction):
         else:
             # Fall back to adapter for ALF models (uses numerical gradients)
             model = BoTorchModelAdapter(state.surrogate.model)
+
+        # Infer model dtype so bounds/data tensors match (avoids double != float errors)
+        model_dtype = next(model.parameters()).dtype
+
+        # Convert bounds from list[list[float]] to list[tuple[float, float]]
+        bounds_tuples = [(b[0], b[1]) for b in self.bounds]
+        bounds_tensor = get_bounds_tensor(
+            bounds_tuples, device=state.surrogate.model.device, dtype=model_dtype
+        )
+
+        # Get training data for qNEI
+        X_baseline = None
+        if self.acquisition_type == "qNEI":
+            X_baseline = candidates_to_tensor(
+                state.dataset.train_dataset.candidates, dtype=model_dtype
+            )
 
         acq_fn = self._create_acquisition_function(model, best_f, X_baseline)
 
