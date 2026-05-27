@@ -135,12 +135,14 @@ def test_posterior_alf_model_2d(mock_alf_model_with_variances, test_tensor_2d):
     assert mean_flat.shape[0] == 3
 
     # Check values match what mock model returns (0+5, 1+5, 2+5)
-    expected_means = torch.tensor([5.0, 6.0, 7.0])
+    expected_means = torch.tensor([5.0, 6.0, 7.0], dtype=torch.float64)
     assert torch.allclose(mean_flat, expected_means, atol=0.01)
 
     # Check variances match mock model (all 0.2)
     variance_flat = posterior.variance.flatten()
-    assert torch.allclose(variance_flat, torch.tensor([0.2, 0.2, 0.2]), atol=0.01)
+    assert torch.allclose(
+        variance_flat, torch.tensor([0.2, 0.2, 0.2], dtype=torch.float64), atol=0.01
+    )
 
 
 def test_posterior_alf_model_3d(mock_alf_model_with_variances, test_tensor_3d):
