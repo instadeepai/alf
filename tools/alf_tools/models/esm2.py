@@ -17,7 +17,6 @@ from dataclasses import dataclass
 from typing import Any, Literal, Union
 
 import numpy as np
-from sympy.series import sequences
 import torch
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
@@ -179,7 +178,7 @@ class ESM2Model(BaseModel):
             sequences = [c.data for c in inputs]
         else:
             raise ValueError("Input must be LabelledCandidates or list of Candidates")
-        
+
         if any(len(self.tokenizer.encode(s)) > self.max_length for s in sequences):
             logger.warning("Some sequences exceed max_length and will be truncated.")
 
