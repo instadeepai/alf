@@ -235,6 +235,10 @@ class BoTorchGPModel(BaseModel):
                     ),  # Default is a Positive constraint
                 )
             )
+            logger.warning(
+                "No kernel_type specified. Defaulting to RBF kernel with log normal "
+                f"lengthscale prior{' with ARD' if self.use_ard else ''}."
+            )
         else:
             covar_module = None
             logger.warning(
