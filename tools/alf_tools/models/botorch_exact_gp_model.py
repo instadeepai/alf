@@ -24,6 +24,7 @@ This module provides GP models built on BoTorch's SingleTaskGP, which offers:
 from __future__ import annotations
 
 import logging
+import math
 from typing import Optional, Union
 
 import numpy as np
@@ -32,8 +33,10 @@ from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
 from botorch.fit import fit_gpytorch_mll
 from botorch.models import SingleTaskGP
 from botorch.optim.fit import fit_gpytorch_mll_torch
+from gpytorch.constraints.constraints import GreaterThan
 from gpytorch.kernels import MaternKernel, RBFKernel, ScaleKernel
 from gpytorch.mlls import ExactMarginalLogLikelihood
+from gpytorch.priors.torch_priors import LogNormalPrior
 from torch.optim import Adam
 
 from alf_tools.models.utils.torch_utils import get_device
@@ -214,9 +217,22 @@ class BoTorchGPModel(BaseModel):
         if self.kernel_type == "matern":
             covar_module = ScaleKernel(MaternKernel(nu=self.nu, ard_num_dims=ard_num_dims))
         elif self.kernel_type == "rbf":
-            covar_module = ScaleKernel(RBFKernel(nu=self.nu, ard_num_dims=ard_num_dims))
+            covar_module = ScaleKernel(RBFKernel(ard_num_dims=ard_num_dims))
         elif self.kernel_type is None:
-            covar_module = None
+            if ard_num_dims is not None:
+                lengthscale_prior = LogNormalPrior(
+                    loc=math.sqrt(2) + math.log(ard_num_dims) * 0.5, scale=math.sqrt(3)
+                )
+            else:
+                lengthscale_prior = LogNormalPrior(loc=math.sqrt(2), scale=math.sqrt(3))
+            covar_module = RBFKernel(
+                ard_num_dims=ard_num_dims,
+                batch_shape=self.train_X.shape[:-2],
+                lengthscale_prior=lengthscale_prior,
+                lengthscale_constraint=GreaterThan(
+                    2.5e-2, transform=None, initial_value=lengthscale_prior.mode
+                ),
+            )
         else:
             covar_module = None
             logger.warning(
