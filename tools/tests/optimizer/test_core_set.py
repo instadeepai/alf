@@ -17,7 +17,7 @@ from typing import Any
 import numpy as np
 import pytest
 from alf_core import Candidate, LabelledCandidates, Predictions, State
-from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
+from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig, ProblemType
 from alf_core.model.base_model import BaseModel
 from alf_core.surrogate.surrogate import Surrogate
 from alf_tools.optimizer.acquisition_functions.core_set import CoreSet
@@ -100,6 +100,7 @@ class MockDataset(BaseDataset):
             train_ratio=1.0,
             validation_frac=0.0,
             test_ratio=0.0,
+            problem_type=ProblemType.REGRESSION,
         )
         super().__init__(config)
         self.splits["train"] = LabelledCandidates(
