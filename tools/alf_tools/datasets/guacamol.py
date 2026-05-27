@@ -261,7 +261,6 @@ def _label_smiles(
     properties: list[str],
     target_property: str,
     modality: object,
-    split_tag: str | None = None,
 ) -> LabelledCandidates:
     """Parse SMILES, compute properties, build LabelledCandidates.
 
@@ -272,7 +271,6 @@ def _label_smiles(
         properties: Property names to compute via RDKit.
         target_property: The property name whose value becomes the label.
         modality: Modality to assign to each Candidate.
-        split_tag: If provided, stored as features["split"] on each Candidate.
 
     Returns:
         LabelledCandidates with 1D labels of shape (N,).
@@ -285,10 +283,7 @@ def _label_smiles(
         except ValueError:
             logger.warning("Skipping invalid SMILES: %r", smiles)
             continue
-        features: dict = dict(props)
-        if split_tag is not None:
-            features["split"] = split_tag
-        candidates.append(Candidate(data=smiles, modality=modality, features=features))
+        candidates.append(Candidate(data=smiles, modality=modality, features=dict(props)))
         labels.append(props[target_property])
     return LabelledCandidates(candidates=candidates, labels=np.array(labels, dtype=float))
 
@@ -316,6 +311,7 @@ class GuacaMol(BaseDataset):
         Args:
             config: Configuration for the GuacaMol dataset.
         """
+        self._paper_splits: dict[str, LabelledCandidates] | None = None
         super().__init__(config)
         self.setup()
         self._smiles_index: dict[str, int] = (
@@ -373,15 +369,18 @@ class GuacaMol(BaseDataset):
     def _load_paper_splits(self) -> LabelledCandidates:
         """Download (if absent) train/valid/test files and label all candidates.
 
-        Each candidate is tagged with a "split" key in features ("train", "valid", "test").
-        The three split corpuses are combined into a single LabelledCandidates for storage
-        as _raw_dataset; _split_dataset() partitions them back by the tag.
+        Stores the three splits in ``self._paper_splits`` keyed by
+        ``"train"``, ``"validation"``, and ``"test"``. Returns a combined
+        LabelledCandidates (without any split tag in features) for use as
+        ``_raw_dataset`` — this powers the SMILES lookup index in :meth:`query`.
 
         Returns:
-            Combined LabelledCandidates with split tags stored in each candidate's features.
+            Combined LabelledCandidates across all three paper splits.
         """
-        split_files = {k: GUACAMOL_FILES[k] for k in GUACAMOL_FILES.keys() if k not in ("ALL",)}
+        split_files = {k: v for k, v in GUACAMOL_FILES.items() if k != "ALL"}
+        tag_to_key = {"TRAIN": "train", "VALID": "validation", "TEST": "test"}
         properties = list(self.config.computed_properties or ALL_PROPERTIES)
+        self._paper_splits = {}
         all_candidates: list[Candidate] = []
         all_labels: list[float] = []
         for tag, entry_info in split_files.items():
@@ -394,7 +393,7 @@ class GuacaMol(BaseDataset):
             if self.config.max_molecules is not None:
                 smiles_list = smiles_list[: self.config.max_molecules]
             split_lc = _label_smiles(
-                smiles_list, properties, self.config.target_property, self.modality, tag.lower()
+                smiles_list, properties, self.config.target_property, self.modality
             )
             logger.debug(
                 "Paper split '%s': %d SMILES → %d valid candidates",
@@ -402,6 +401,7 @@ class GuacaMol(BaseDataset):
                 len(smiles_list),
                 len(split_lc.candidates),
             )
+            self._paper_splits[tag_to_key[tag]] = split_lc
             all_candidates.extend(split_lc.candidates)
             all_labels.extend(split_lc.labels.tolist())
         return LabelledCandidates(
@@ -450,34 +450,25 @@ class GuacaMol(BaseDataset):
         )
 
     def _split_dataset(self) -> dict[str, LabelledCandidates]:
-        """Split by paper file tags when split_mode is 'paper'; else use base class.
+        """Split by pre-built paper splits when split_mode is 'paper'; else use base class.
 
         Raises:
             RuntimeError: If the raw dataset is None, indicating it was not initialized properly.
 
         Returns:
-            dict[str, LabelledCandidates]: Dict with keys "train",
-            "validation", "test", and "candidate_pool".
+            dict[str, LabelledCandidates]: Dict with keys "train", "validation", "test",
+            and "candidate_pool".
         """
         if self.config.split_mode != "paper":
             return super()._split_dataset()
 
-        if self._raw_dataset is None:
+        if self._paper_splits is None:
             raise RuntimeError("Dataset must be loaded before splitting")  # pragma: no cover
-        tag_to_key = {"train": "train", "valid": "validation", "test": "test"}
-        buckets: dict[str, tuple[list[Candidate], list[float]]] = {
-            "train": ([], []),
-            "validation": ([], []),
-            "test": ([], []),
-        }
-        for candidate, label in self._raw_dataset:
-            key = tag_to_key[candidate.features["split"]]
-            buckets[key][0].append(candidate)
-            buckets[key][1].append(float(label))
-        splits = {
-            key: LabelledCandidates(candidates=cands, labels=np.array(lbls, dtype=float))
-            for key, (cands, lbls) in buckets.items()
-        }
+
+        # Shallow copy: values still alias self._paper_splits entries.
+        # _paper_splits is not re-read after setup(), so in-place mutations via
+        # update_splits() do not cause bugs, but future callers should be aware.
+        splits = dict(self._paper_splits)
         splits["candidate_pool"] = LabelledCandidates(
             candidates=[], labels=np.array([], dtype=float)
         )

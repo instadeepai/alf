@@ -345,16 +345,17 @@ class TestGuacaMolPaperSplits:
         dataset = GuacaMol(_paper_config(data_dir=tmp_path))
         assert len(dataset.candidate_pool) == 0
 
-    def test_split_feature_tag_matches_source_file(self, tmp_path):
-        """Each candidate's features['split'] matches its source file's split tag."""
+    def test_paper_split_candidates_have_no_split_feature_tag(self, tmp_path):
+        """Candidate features must NOT contain a 'split' key for paper-split mode."""
         _write_paper_files(tmp_path)
         dataset = GuacaMol(_paper_config(data_dir=tmp_path))
-        for cand in dataset.train_dataset.candidates:
-            assert cand.features["split"] == "train"
-        for cand in dataset.validation_dataset.candidates:
-            assert cand.features["split"] == "valid"
-        for cand in dataset.test_dataset.candidates:
-            assert cand.features["split"] == "test"
+        all_candidates = (
+            dataset.train_dataset.candidates
+            + dataset.validation_dataset.candidates
+            + dataset.test_dataset.candidates
+        )
+        for cand in all_candidates:
+            assert "split" not in (cand.features or {})
 
 
 class TestGuacaMolQuery:
