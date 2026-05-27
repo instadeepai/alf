@@ -91,7 +91,7 @@ class BoTorchGPModel(BaseModel):
         optimizer: str = "scipy",
         max_attempts: int = 5,
         device: Optional[str] = None,
-        dtype: torch.dtype = torch.float32,
+        dtype: torch.dtype = torch.float64,
         kernel_type: str | None = None,
         nu: float = 2.5,
         use_ard: bool = False,
@@ -115,7 +115,7 @@ class BoTorchGPModel(BaseModel):
                 If fitting fails (e.g., due to numerical issues), it will retry
                 up to max_attempts times with different initializations.
             device: Device to run on ('cpu' or 'cuda'). If None, auto-detects.
-            dtype: Data type for tensors. Default: torch.float32.
+            dtype: Data type for tensors. Default: torch.float64.
             kernel_type: "matern" or None. If None, RBF is used by default.
             nu: nu value for Matern kernel. Default 2.5 aka Matern 5/2.
             use_ard: Whether to use ARD (Automatic Relevance Determination) in the

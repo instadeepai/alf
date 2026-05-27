@@ -83,7 +83,7 @@ class TestBoTorchGPModelInitialization:
         assert model.learning_rate == 0.1
         assert model.optimizer == "scipy"
         assert model.max_attempts == 5
-        assert model.dtype == torch.float32
+        assert model.dtype == torch.float64
         assert model.model is None
         assert model.train_X is None
         assert model.train_Y is None
@@ -146,7 +146,7 @@ class TestBoTorchGPModelFeaturisation:
 
         assert isinstance(features, torch.Tensor)
         assert features.shape == (3, 2)
-        assert features.dtype == torch.float32
+        assert features.dtype == torch.float64
 
     def test_featurise_single_candidate(self):
         """Test featurisation with single candidate."""
