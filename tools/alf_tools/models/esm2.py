@@ -19,7 +19,7 @@ from typing import Any, Literal, Union
 import numpy as np
 import torch
 import torch.optim as optim
-from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
+from alf_core import BaseModel, BaseTrainConfig, Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from torch.utils.data import DataLoader, TensorDataset
 from transformers import AutoModelForMaskedLM, AutoTokenizer
@@ -46,7 +46,7 @@ class ESM2ModelConfig:
 
 
 @dataclass
-class ESM2TrainConfig:
+class ESM2TrainConfig(BaseTrainConfig):
     """Configuration for ESM-2 training.
 
     Args:
