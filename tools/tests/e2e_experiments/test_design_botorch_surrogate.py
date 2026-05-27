@@ -361,8 +361,17 @@ class TestBoTorchAcquisitionDiscreteScoring:
             sampler=sampler,
         )
 
-        # Create discrete candidate pool
-        discrete_candidates = branin_dataset.test_dataset.candidates[:num_candidates]
+        # Select candidates spanning the quality range so qEI scores vary.
+        # Taking candidates[:num_candidates] risks picking points that all land in
+        # low-quality regions of the Branin space, causing qEI=0 for every candidate
+        # (especially for q=1 where individual EI is computed, not batch EI).
+        # Sorting by label and sampling evenly ensures a mix of good and bad candidates.
+        test_labels = branin_dataset.test_dataset.labels
+        test_cands_all = branin_dataset.test_dataset.candidates
+        sorted_idx = np.argsort(test_labels)  # ascending: worst → best
+        step = max(1, len(sorted_idx) // num_candidates)
+        selected_idx = sorted_idx[::step][:num_candidates]
+        discrete_candidates = [test_cands_all[i] for i in selected_idx]
 
         # Score candidates
         result = acq_fn(discrete_candidates, state)
