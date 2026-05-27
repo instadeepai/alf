@@ -21,9 +21,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
+from alf_core import BaseModel, BaseTrainConfig, Candidate, LabelledCandidates, Predictions, ProblemType, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
-from alf_core.utils.enums import ProblemType
 from chemprop.data import (
     BatchMolGraph,
     MoleculeDatapoint,
@@ -59,7 +58,7 @@ class ChempropModelConfig:
 
 
 @dataclass
-class ChempropTrainConfig:
+class ChempropTrainConfig(BaseTrainConfig):
     """Training hyperparameters for the Chemprop MPNN.
 
     Args:
@@ -79,18 +78,11 @@ class ChempropTrainConfig:
     seed: int | None = None
 
 
-def _get_aggregations() -> dict[str, type]:
-    """Return mapping of aggregation name to Chemprop aggregation class.
-
-    Returns:
-        Dictionary mapping aggregation name strings to aggregation classes.
-    """
-    return {
-        "mean": MeanAggregation,
-        "sum": SumAggregation,
-        "norm": NormAggregation,
-    }
-
+AGGREGATIONS = {
+    "mean": MeanAggregation,
+    "sum": SumAggregation,
+    "norm": NormAggregation,
+}
 
 _OPTIMIZERS: dict[str, type] = {
     "adam": optim.Adam,
@@ -217,7 +209,7 @@ class ChempropModel(BaseModel):
         """
         cfg = self.model_config
         mp = BondMessagePassing(d_h=cfg.hidden_size, depth=cfg.depth)
-        agg = _get_aggregations()[cfg.aggregation]()
+        agg = AGGREGATIONS[cfg.aggregation]()
         ffn = RegressionFFN(
             input_dim=mp.output_dim, n_layers=cfg.ffn_num_layers, dropout=cfg.dropout
         )
