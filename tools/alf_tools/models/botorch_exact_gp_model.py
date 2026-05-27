@@ -225,13 +225,15 @@ class BoTorchGPModel(BaseModel):
                 )
             else:
                 lengthscale_prior = LogNormalPrior(loc=math.sqrt(2), scale=math.sqrt(3))
-            covar_module = RBFKernel(
-                ard_num_dims=ard_num_dims,
-                batch_shape=self.train_X.shape[:-2],
-                lengthscale_prior=lengthscale_prior,
-                lengthscale_constraint=GreaterThan(
-                    2.5e-2, transform=None, initial_value=lengthscale_prior.mode
-                ),
+            covar_module = ScaleKernel(
+                RBFKernel(
+                    ard_num_dims=ard_num_dims,
+                    batch_shape=self.train_X.shape[:-2],
+                    lengthscale_prior=lengthscale_prior,
+                    lengthscale_constraint=GreaterThan(
+                        2.5e-2, transform=None, initial_value=lengthscale_prior.mode
+                    ),  # Default is a Positive constraint
+                )
             )
         else:
             covar_module = None
