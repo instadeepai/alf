@@ -421,9 +421,7 @@ class ChempropModel(BaseModel):
             val_data: Optional validation molecules and labels.
         """
         self._epoch_metrics = []
-        # TODO: also reset training_metrics = {} here; should be symmetric with _epoch_metrics
-        # reset across all model implementations (CNNModel, GPModel) so callers never read
-        # stale metrics after a failed train() call
+        self.training_metrics = {}
         logger.info("Training ChempropModel on %d samples", len(train_data))
 
         if self.train_config.seed is not None:

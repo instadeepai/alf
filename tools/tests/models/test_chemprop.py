@@ -251,6 +251,25 @@ class TestFineTuning:
         model.train(train_data)
         assert len(model.get_epoch_metrics()) == train_config.num_epochs
 
+    def test_second_train_resets_training_metrics(
+        self, train_data: LabelledCandidates, val_data: LabelledCandidates
+    ) -> None:
+        """training_metrics should reflect only the most recent train() call.
+
+        A second train() without val_data must not carry over val keys from the first.
+        """
+        model_config = ChempropModelConfig(hidden_size=32, depth=1, ffn_num_layers=1)
+        train_config = ChempropTrainConfig(batch_size=4, num_epochs=2)
+        model = ChempropModel(model_config=model_config, train_config=train_config, device="cpu")
+
+        model.train(train_data, val_data=val_data)
+        assert "final_val_loss" in model.get_training_summary_metrics()
+
+        model.train(train_data)
+        summary = model.get_training_summary_metrics()
+        assert "final_val_loss" not in summary
+        assert "final_train_loss" in summary
+
 
 class TestSeed:
     """Tests for ChempropModel seed reproducibility."""
