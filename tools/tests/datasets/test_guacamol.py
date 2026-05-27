@@ -392,6 +392,32 @@ class TestGuacaMolQuery:
         assert len(result) == 2
         assert result.labels.ndim == 1
 
+    def test_query_returns_caller_candidate_not_corpus_object(self, tmp_path):
+        """query() returns the caller's Candidate object, not the stored corpus object."""
+        dataset = self._loaded_dataset(tmp_path)
+        # Build a candidate whose SMILES is in the corpus but with extra metadata.
+        corpus_smiles = dataset._raw_dataset.candidates[0].data
+        caller_candidate = Candidate(
+            data=corpus_smiles,
+            modality=Modality.SEQUENCE,
+            features={"custom_tag": 999.0},
+        )
+        result = dataset.query([caller_candidate])
+        assert result.candidates[0] is caller_candidate
+        assert result.candidates[0].features is not None
+        assert result.candidates[0].features.get("custom_tag") == 999.0
+
+    def test_query_non_canonical_smiles_hits_corpus(self, tmp_path):
+        """Querying with a non-canonical SMILES for a corpus molecule returns the corpus label."""
+        dataset = self._loaded_dataset(tmp_path)
+        # "CCO" (ethanol, canonical) is in VALID_SMILES_LINES; "OCC" is the same molecule
+        # written differently.  Both should resolve to the same corpus label.
+        canonical_candidate = Candidate(data="CCO", modality=Modality.SEQUENCE)
+        non_canonical_candidate = Candidate(data="OCC", modality=Modality.SEQUENCE)
+        result_canonical = dataset.query([canonical_candidate])
+        result_non_canonical = dataset.query([non_canonical_candidate])
+        assert result_canonical.labels[0] == pytest.approx(result_non_canonical.labels[0], rel=1e-9)
+
 
 # ---------------------------------------------------------------------------
 # Fixture-based tests — cover gaps identified in audit
@@ -525,26 +551,32 @@ class TestGuacaMolWithFixtures:
     def test_query_benchmark_task_raises_not_implemented(self, tmp_path):
         """query() raises NotImplementedError when task_type is 'benchmark_task'."""
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
-        # Load with a valid property target first, then swap task_type to simulate benchmark
         config = self._config(tmp_path)
         dataset = GuacaMol(config)
-        dataset.config.task_type = "benchmark_task"
         assert dataset._raw_dataset is not None
         cand = dataset._raw_dataset.candidates[0]
+        # Benchmark tasks also raise in load_dataset(), preventing normal construction.
+        # Use model_copy to reach the guard in query() independently.
+        dataset.config = dataset.config.model_copy(update={"task_type": "benchmark_task"})
         with pytest.raises(NotImplementedError):
             dataset.query([cand])
 
     def test_paper_splits_cache_miss_triggers_download(self, tmp_path):
-        """When paper split files are absent, _download_file should be called."""
+        """When paper split files are absent, requests.get is called once per split file."""
+        smiles = ["c1ccccc1", "CCO", "CC(=O)O"]
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_resp.iter_lines.return_value = iter(
-            line.encode() for line in ["c1ccccc1", "CCO", "CC(=O)O"]
-        )
+        # Use side_effect so each call to iter_lines() gets a fresh iterator; return_value
+        # would share a single exhausted iterator across all three file downloads.
+        mock_resp.iter_lines.side_effect = lambda **kw: iter(ln.encode() for ln in smiles)
         config = self._config(tmp_path, split_mode="paper")
         with patch("requests.get", return_value=mock_resp) as mock_get:
-            GuacaMol(config)
+            dataset = GuacaMol(config)
         assert mock_get.call_count == 3
+        # Each split file produced real candidates (iterator was not exhausted).
+        assert len(dataset.train_dataset.candidates) > 0
+        assert len(dataset.validation_dataset.candidates) > 0
+        assert len(dataset.test_dataset.candidates) > 0
 
     def test_paper_splits_max_molecules_caps_each_split(self, tmp_path):
         """max_molecules caps the candidate count in each paper split independently."""

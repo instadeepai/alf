@@ -16,7 +16,7 @@ dependencies = [
     "torch>=2.10.0",
     "gpytorch>=1.9.0",
     "scipy>=1.9.0",
-    "rdkit>=2026.3.1",
+    "rdkit>=2022.9.0",
     "botorch>=0.17.0",
 ]
 

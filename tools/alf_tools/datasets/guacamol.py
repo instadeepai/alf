@@ -15,7 +15,7 @@
 import copy
 import logging
 from pathlib import Path
-from typing import Callable, Final, Literal, Optional, TypedDict, get_args
+from typing import Callable, Final, Literal, TypedDict, get_args
 
 import numpy as np
 import requests
@@ -55,10 +55,13 @@ PROPERTY_FNS: dict[str, Callable[..., float]] = {
 
 
 class GuacaMolFileInfo(TypedDict):
-    """Typed fields for file information for downloading GuacaMol.
+    """File metadata for a single GuacaMol download.
 
-    Args:
-        TypedDict (_type_): Includes name, url, md5, and size of the file.
+    Attributes:
+        name: Local filename (e.g. ``guacamol_v1_train.smiles``).
+        url: HTTPS download URL.
+        md5: Expected MD5 hex digest for future integrity checking.
+        size: Expected file size in bytes.
     """
 
     name: str
@@ -130,7 +133,6 @@ GuacaMolTaskName = Literal[
 ]
 
 ALL_PROPERTIES: frozenset[str] = frozenset(get_args(GuacaMolPropertyName))
-ALL_TASKS: frozenset[str] = frozenset(get_args(GuacaMolTaskName))
 
 
 class GuacaMolConfig(BaseDatasetConfig):
@@ -177,7 +179,7 @@ def _compute_properties(smiles: str, properties: list[str]) -> dict[str, float]:
     """Compute RDKit physicochemical properties for a SMILES string.
 
     Args:
-        smiles: A valid SMILES string (caller must ensure mol parses correctly).
+        smiles: A SMILES string to compute properties for.
         properties: List of property names from GuacaMolPropertyName to compute.
 
     Raises:
@@ -189,10 +191,10 @@ def _compute_properties(smiles: str, properties: list[str]) -> dict[str, float]:
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         raise ValueError(f"Cannot compute label for invalid SMILES: {smiles!r}")
-    return {name: PROPERTY_FNS[name](mol) for name in properties}  # type: ignore[operator]
+    return {name: PROPERTY_FNS[name](mol) for name in properties}  # type: ignore[operator]  # mypy cannot narrow str subscript to Literal key type
 
 
-def _download_file(url: str, filepath: Path, max_lines: Optional[int] = None) -> Path:
+def _download_file(url: str, filepath: Path, max_lines: int | None = None) -> Path:
     """Stream a text file from url to filepath, optionally truncating to max_lines lines.
 
     Skips the download if filepath already exists. Creates parent directories as needed.
@@ -206,6 +208,7 @@ def _download_file(url: str, filepath: Path, max_lines: Optional[int] = None) ->
         The resolved filepath.
 
     Raises:
+        OSError: If a network error occurs while connecting or streaming.
         FileNotFoundError: If the server returns a non-200 status code.
     """
     if filepath.exists():
@@ -219,7 +222,10 @@ def _download_file(url: str, filepath: Path, max_lines: Optional[int] = None) ->
     )
     filepath.parent.mkdir(parents=True, exist_ok=True)
     # allow_redirects=True is the default — requests follows the 302 → S3 automatically
-    resp = requests.get(url, stream=True, timeout=60)
+    try:
+        resp = requests.get(url, stream=True, timeout=60)
+    except requests.RequestException as exc:
+        raise OSError(f"Network error downloading {filepath.name} from {url}") from exc
     if resp.status_code != 200:
         raise FileNotFoundError(f"Failed to download from {url}. Status code: {resp.status_code}")
     with open(filepath, "wb") as f:
@@ -254,6 +260,22 @@ def download_guacamol(data_dir: Path = DATAPATH, max_lines: int | None = None) -
     data_dir.mkdir(parents=True, exist_ok=True)
     for file_info in GUACAMOL_FILES.values():
         _download_file(file_info["url"], data_dir / file_info["name"], max_lines)
+
+
+def _canonical_smiles(smiles: str) -> str:
+    """Return the RDKit canonical form of a SMILES string, or the original if invalid.
+
+    Used to normalise lookup keys so that structurally identical molecules with different
+    SMILES representations resolve to the same index entry in :meth:`GuacaMol.query`.
+
+    Args:
+        smiles: Input SMILES string.
+
+    Returns:
+        Canonical SMILES string, or the original string if RDKit cannot parse it.
+    """
+    mol = Chem.MolFromSmiles(smiles)
+    return Chem.MolToSmiles(mol) if mol is not None else smiles
 
 
 def _label_smiles(
@@ -315,7 +337,7 @@ class GuacaMol(BaseDataset):
         super().__init__(config)
         self.setup()
         self._smiles_index: dict[str, int] = (
-            {c.data: i for i, c in enumerate(self._raw_dataset.candidates)}
+            {_canonical_smiles(c.data): i for i, c in enumerate(self._raw_dataset.candidates)}
             if self._raw_dataset is not None
             else {}
         )
@@ -415,7 +437,8 @@ class GuacaMol(BaseDataset):
             candidates: Candidates to label. May include SMILES not present in _raw_dataset.
 
         Returns:
-            LabelledCandidates with 1D labels of shape (N,).
+            LabelledCandidates with 1D labels of shape (N,). The returned candidates are
+            always the caller's input objects — corpus lookup provides the label only.
 
         Raises:
             NotImplementedError: If task_type is "benchmark_task".
@@ -433,10 +456,11 @@ class GuacaMol(BaseDataset):
         result_labels: list[float] = []
 
         for candidate in candidates:
-            if candidate.data in self._smiles_index:
-                idx = self._smiles_index[candidate.data]
+            key = _canonical_smiles(candidate.data)
+            if key in self._smiles_index:
+                idx = self._smiles_index[key]
                 result_labels.append(float(self._raw_dataset.labels[idx]))
-                result_candidates.append(self._raw_dataset.candidates[idx])
+                result_candidates.append(candidate)
             else:
                 label = _compute_properties(candidate.data, [self.config.target_property])[
                     self.config.target_property
