@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.models.chemprop import ChempropModel, ChempropModelConfig, ChempropTrainConfig
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.utils import (
@@ -22,19 +21,36 @@ from alf_tools.models.utils import (
     one_hot_encode,
 )
 
-__all__ = [
-    "ChempropModel",
-    "ChempropModelConfig",
-    "ChempropTrainConfig",
-    "CNNModel",
-    "CNNModelConfig",
-    "CNNTrainConfig",
-    "create_char_to_idx_mapping",
-    "extract_sequences_from_inputs",
-    "FeaturizerConfig",
-    "get_device",
-    "GPModel",
-    "GPModelConfig",
-    "GPTrainConfig",
-    "one_hot_encode",
-]
+try:
+    from alf_tools.models.chemprop import ChempropModel, ChempropModelConfig, ChempropTrainConfig
+
+    __all__ = [
+        "ChempropModel",
+        "ChempropModelConfig",
+        "ChempropTrainConfig",
+        "CNNModel",
+        "CNNModelConfig",
+        "CNNTrainConfig",
+        "create_char_to_idx_mapping",
+        "extract_sequences_from_inputs",
+        "FeaturizerConfig",
+        "get_device",
+        "GPModel",
+        "GPModelConfig",
+        "GPTrainConfig",
+        "one_hot_encode",
+    ]
+except ImportError:
+    __all__ = [
+        "CNNModel",
+        "CNNModelConfig",
+        "CNNTrainConfig",
+        "create_char_to_idx_mapping",
+        "extract_sequences_from_inputs",
+        "FeaturizerConfig",
+        "get_device",
+        "GPModel",
+        "GPModelConfig",
+        "GPTrainConfig",
+        "one_hot_encode",
+    ]

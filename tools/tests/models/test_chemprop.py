@@ -14,6 +14,9 @@
 
 import numpy as np
 import pytest
+
+pytest.importorskip("chemprop", reason="chemprop not installed; install alf_tools[mpnn]")
+
 from alf_core import Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_tools.models.chemprop import ChempropModel, ChempropModelConfig, ChempropTrainConfig

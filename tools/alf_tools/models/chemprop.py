@@ -21,7 +21,15 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from alf_core import BaseModel, BaseTrainConfig, Candidate, LabelledCandidates, Predictions, ProblemType, Results
+from alf_core import (
+    BaseModel,
+    BaseTrainConfig,
+    Candidate,
+    LabelledCandidates,
+    Predictions,
+    ProblemType,
+    Results,
+)
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from chemprop.data import (
     BatchMolGraph,
