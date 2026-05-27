@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Any, Literal, Union
 
 import numpy as np
+from sympy.series import sequences
 import torch
 import torch.optim as optim
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
@@ -42,6 +43,7 @@ class ESM2ModelConfig:
     model_id: str
     pooling: Literal["mean", "cls", "last_hidden_state"] = "mean"
     repr_layer: int = -1
+    max_length: int | None = None
 
 
 @dataclass
@@ -124,6 +126,7 @@ class ESM2Model(BaseModel):
         self.device = get_device(device)
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_config.model_id)
+        self.max_length = self.model_config.max_length or self.tokenizer.model_max_length
         self.esm_model = AutoModelForMaskedLM.from_pretrained(self.model_config.model_id)
         self.esm_model.to(self.device)
 
@@ -176,6 +179,9 @@ class ESM2Model(BaseModel):
             sequences = [c.data for c in inputs]
         else:
             raise ValueError("Input must be LabelledCandidates or list of Candidates")
+        
+        if any(len(self.tokenizer.encode(s)) > self.max_length for s in sequences):
+            logger.warning("Some sequences exceed max_length and will be truncated.")
 
         encoding = self.tokenizer(
             sequences,
@@ -315,7 +321,6 @@ class ESM2Model(BaseModel):
                 "Tokenizer has no mask token. Cannot perform MLM masking. "
                 "Ensure the tokenizer is initialised with a [MASK] token."
             )
-        # masked_input_ids[masked] = self.tokenizer.mask_token_id
 
         # Apply 80 / 10 / 10 (or specified) replacement split
         masked_indices = masked.nonzero(as_tuple=False)  # (n_masked, 2)
@@ -407,8 +412,8 @@ class ESM2Model(BaseModel):
         """
         self.esm_model.train()
         epoch_losses: list[float] = []
-        all_logits: list[torch.Tensor] = []
-        all_labels: list[torch.Tensor] = []
+        correct_tokens = 0
+        total_tokens = 0
 
         for raw_ids, raw_mask in train_loader:
             batch_ids = raw_ids.to(self.device)
@@ -427,13 +432,12 @@ class ESM2Model(BaseModel):
             epoch_losses.append(outputs.loss.item())
 
             labeled_positions = labels != -100
-            all_logits.append(outputs.logits[labeled_positions].detach().cpu())
-            all_labels.append(labels[labeled_positions].detach().cpu())
+            preds = outputs.logits[labeled_positions].detach().argmax(dim=-1)
+            correct_tokens += (preds == labels[labeled_positions]).sum().item()
+            total_tokens += labeled_positions.sum().item()
 
         avg_train_loss = float(np.mean(epoch_losses))
-        logits = torch.cat(all_logits, dim=0)  # (N, vocab_size)
-        targets = torch.cat(all_labels, dim=0)  # (N,)
-        token_accuracy = (logits.argmax(dim=-1) == targets).float().mean().item()
+        token_accuracy = correct_tokens / total_tokens if total_tokens > 0 else 0.0
         train_metrics: dict[str, float] = {
             "perplexity": float(np.exp(avg_train_loss)),
             "token_accuracy": token_accuracy,
@@ -455,8 +459,8 @@ class ESM2Model(BaseModel):
         """
         self.esm_model.eval()
         val_losses: list[float] = []
-        all_logits: list[torch.Tensor] = []
-        all_labels: list[torch.Tensor] = []
+        correct_tokens = 0
+        total_tokens = 0
 
         with torch.no_grad():
             for raw_ids, raw_mask in val_loader:
@@ -473,13 +477,12 @@ class ESM2Model(BaseModel):
                 val_losses.append(outputs.loss.item())
 
                 labeled_positions = labels != -100
-                all_logits.append(outputs.logits[labeled_positions].cpu())
-                all_labels.append(labels[labeled_positions].cpu())
+                preds = outputs.logits[labeled_positions].argmax(dim=-1)
+                correct_tokens += (preds == labels[labeled_positions]).sum().item()
+                total_tokens += labeled_positions.sum().item()
 
         avg_val_loss = float(np.mean(val_losses))
-        logits = torch.cat(all_logits, dim=0)
-        targets = torch.cat(all_labels, dim=0)
-        token_accuracy = (logits.argmax(dim=-1) == targets).float().mean().item()
+        token_accuracy = correct_tokens / total_tokens if total_tokens > 0 else 0.0
         val_metrics: dict[str, float] = {
             "perplexity": float(np.exp(avg_val_loss)),
             "token_accuracy": token_accuracy,
