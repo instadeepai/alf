@@ -22,7 +22,7 @@ in later PRs.
 
 import math
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Union
 
 import numpy as np
 import pytest
@@ -170,11 +170,13 @@ class MockALFModelWithVariances(BaseModel):
         """Not implemented for mock model."""
         pass
 
-    def train(self, train_data: LabelledCandidates, val_data: LabelledCandidates = None) -> None:
+    def train(
+        self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None
+    ) -> None:
         """Not implemented for mock model."""
         pass
 
-    def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
+    def sample(self, *args: object, **kwargs: object) -> list[Candidate]:
         """Not implemented for mock model."""
         raise NotImplementedError()
 
@@ -202,11 +204,13 @@ class MockALFModelWithoutVariances(BaseModel):
         """Not implemented for mock model."""
         pass
 
-    def train(self, train_data: LabelledCandidates, val_data: LabelledCandidates = None) -> None:
+    def train(
+        self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None
+    ) -> None:
         """Not implemented for mock model."""
         pass
 
-    def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
+    def sample(self, *args: object, **kwargs: object) -> list[Candidate]:
         """Not implemented for mock model."""
         raise NotImplementedError()
 
@@ -348,5 +352,5 @@ def trained_surrogate(branin_dataset):
     """
     gp_model = BoTorchGPModel(num_iterations=50, learning_rate=0.1)
     surrogate = Surrogate(model=gp_model)
-    surrogate.fit(branin_dataset.train_dataset)
+    surrogate.fit(branin_dataset.train_dataset, branin_dataset.test_dataset)
     return surrogate

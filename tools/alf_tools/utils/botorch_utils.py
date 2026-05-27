@@ -175,15 +175,15 @@ def predictions_to_posterior(
     if device is None:
         device = torch.device("cpu")
 
+    # TODO: double check that we don't need .detach() here
     mean = torch.from_numpy(predictions.means).to(dtype).to(device)
     variance = torch.from_numpy(predictions.variances).to(dtype).to(device)
 
     min_variance = variance.min().item()
     if min_variance < -1e-4:
         raise RuntimeError(
-            "Predictions contain significantly negative variances (min=%.6g). "
-            "This may indicate a problem with the surrogate model.",
-            min_variance,
+            f"Predictions contain significantly negative variances (min={min_variance:.6g}). "
+            "This may indicate a problem with the surrogate model."
         )
 
     variance_clamped = torch.clamp(variance, min=1e-6)
