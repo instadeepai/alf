@@ -140,13 +140,16 @@ class EnsembleWrapper(BaseModel):
         self.members: list[BaseModel] = [model_factory(seed) for seed in seeds]
 
     def featurise(
-        self, inputs: Union[LabelledCandidates, list[Candidate]], model_index: int
+        self,
+        inputs: Union[LabelledCandidates, list[Candidate]],
+        model_index: int = 0,
     ) -> Any:
         """Delegate featurisation to the specified ensemble member.
 
         Args:
             inputs (Union[LabelledCandidates, list[Candidate]]): Input samples (training data)
-            model_index (int): Index of the ensemble member to use for featurisation
+            model_index (int): Index of the ensemble member to use for featurisation.
+                Defaults to 0 so the signature is compatible with BaseModel.featurise.
 
         Returns:
             Feature representation returned by the specified member's featurise().
@@ -208,7 +211,12 @@ class EnsembleWrapper(BaseModel):
             logger.info(
                 f"EnsembleWrapper '{self.name}': training member {i + 1}/{len(self.members)}"
             )
-            member.train(data, val_data)
+            effective_val = (
+                val_data
+                if val_data is not None
+                else LabelledCandidates(candidates=[], labels=np.array([]))
+            )
+            member.train(data, effective_val)
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Aggregate per-member predictions into a single Predictions object.
