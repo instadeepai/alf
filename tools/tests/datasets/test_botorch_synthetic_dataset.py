@@ -35,6 +35,7 @@ def base_config():
         validation_frac=0.2,
         test_ratio=0.1,
         split_type="random",
+        problem_type="regression",
     )
 
 
@@ -119,6 +120,7 @@ def test_wrong_modality_raises_error():
         validation_frac=0.2,
         test_ratio=0.1,
         split_type="random",
+        problem_type="regression",
     )
 
     with pytest.raises(ValueError, match="require modality=TABULAR"):
@@ -244,6 +246,7 @@ def test_negate_parameter(base_config):
         validation_frac=0.2,
         test_ratio=0.1,
         split_type="random",
+        problem_type="regression",
     )
     dataset_no_neg = BoTorchSyntheticDataset(
         config=config_no_neg,
