@@ -60,13 +60,11 @@ class GuacaMolFileInfo(TypedDict):
     Attributes:
         name: Local filename (e.g. ``guacamol_v1_train.smiles``).
         url: HTTPS download URL.
-        md5: Expected MD5 hex digest for future integrity checking.
         size: Expected file size in bytes.
     """
 
     name: str
     url: str
-    md5: str
     size: int
 
 
@@ -74,25 +72,21 @@ GUACAMOL_FILES: Final[dict[GuacaMolSplitName, GuacaMolFileInfo]] = {
     "TRAIN": {
         "name": FILENAME_TRAIN,
         "url": "https://ndownloader.figshare.com/files/13612760",
-        "md5": "05ad85d871958a05c02ab51a4fde8530",
         "size": 61_841_218,
     },
     "VALID": {
         "name": FILENAME_VALID,
         "url": "https://ndownloader.figshare.com/files/13612766",
-        "md5": "e53db4bff7dc4784123ae6df72e3b1f0",
         "size": 3_859_125,
     },
     "TEST": {
         "name": FILENAME_TEST,
         "url": "https://ndownloader.figshare.com/files/13612757",
-        "md5": "677b757ccec4809febd83850b43e1616",
         "size": 11_590_126,
     },
     "ALL": {
         "name": FILENAME_ALL,
         "url": "https://ndownloader.figshare.com/files/13612745",
-        "md5": "7d45bc95c33c10cb96ef5e78c38ac0b6",
         "size": 77_290_469,
     },
 }
