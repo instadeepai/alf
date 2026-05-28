@@ -359,8 +359,11 @@ class MLPModel(BaseModel):
         Raises:
             ValueError: If called after a previous train() with data of a different
                 feature dimension without calling cleanup() first.
+            RuntimeError: If val_data is provided but avg_val_loss or val_metrics are not set
+                after training. This indicates an internal error in the training loop.
         """
         self._epoch_metrics = []
+        self.training_metrics = {}
 
         # Featurise first so modality errors surface here with a clear message,
         # and so we know the true input_dim before building the network.

@@ -345,6 +345,24 @@ class TestMLPModelTrain:
         mlp_model.train(labelled_tabular)
         assert len(mlp_model.get_epoch_metrics()) == mlp_model.train_config.num_epochs
 
+    def test_metrics_reinitialised_on_retrain_without_val(
+        self, mlp_model, labelled_tabular, val_labelled_tabular
+    ):
+        """Val metrics from a first train() must not appear after a
+        second train() without val_data.
+        """
+        mlp_model.train(labelled_tabular, val_data=val_labelled_tabular)
+        assert "final_val_loss" in mlp_model.get_training_summary_metrics()
+        assert all(em.val_loss is not None for em in mlp_model.get_epoch_metrics())
+
+        mlp_model.train(labelled_tabular)
+
+        metrics = mlp_model.get_training_summary_metrics()
+        assert "final_val_loss" not in metrics
+        assert not any(key.startswith("final_val_") for key in metrics)
+        for em in mlp_model.get_epoch_metrics():
+            assert em.val_loss is None
+
     def test_epoch_metrics_are_surrogate_epoch_metrics(self, mlp_model, labelled_tabular):
         """Every epoch metric must be a SurrogateEpochMetrics instance."""
         mlp_model.train(labelled_tabular)
