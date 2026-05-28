@@ -249,15 +249,19 @@ class MLPModel(BaseModel):
         self._epoch_metrics = []
         self.training_metrics = {}
 
-    def _train_epoch(
-        self, loader: DataLoader, optimizer: optim.Optimizer, criterion: nn.Module
+    def _run_epoch(
+        self,
+        loader: DataLoader,
+        criterion: nn.Module,
+        optimizer: optim.Optimizer | None = None,
     ) -> tuple[float, dict]:
-        """Run one full training epoch.
+        """Run one full epoch in training or validation mode.
 
         Args:
-            loader: DataLoader over the training set.
-            optimizer: Optimiser used for gradient updates.
+            loader: DataLoader over the dataset.
             criterion: Loss function.
+            optimizer: If provided, performs gradient updates (training mode).
+                If None, runs in eval mode with gradients disabled (validation mode).
 
         Raises:
             ValueError: If the network was not initialised (i.e. train() has not been called).
@@ -267,69 +271,33 @@ class MLPModel(BaseModel):
             metrics from ``Results.metrics`` (e.g. ``spearman``, ``mse``).
         """
         if self.net is None:
-            raise ValueError("Network not initialised; call train() before _train_epoch.")
-        self.net.train()
-        train_losses: list[float] = []
-        train_preds_list: list[np.ndarray] = []
-        train_targets_list: list[np.ndarray] = []
+            raise ValueError("Network not initialised; call train() before _run_epoch.")
 
-        for batch_x, batch_y in loader:
-            optimizer.zero_grad()
-            preds = self.net(batch_x)
-            loss = criterion(preds, batch_y)
-            loss.backward()
-            optimizer.step()
-            train_losses.append(loss.item())
-            train_preds_list.append(preds.detach().cpu().numpy())
-            train_targets_list.append(batch_y.detach().cpu().numpy())
-
-        avg_loss = float(np.mean(train_losses))
-        all_preds = np.concatenate(train_preds_list)
-        all_targets = np.concatenate(train_targets_list)
-
-        if len(all_preds) >= 2:
-            metrics = Results(
-                predictions=Predictions(means=all_preds),
-                targets=all_targets,
-                problem_type=ProblemType.REGRESSION,
-            ).metrics
+        if optimizer is not None:
+            self.net.train()
         else:
-            metrics = {"mse": float(np.mean((all_preds - all_targets) ** 2))}
+            self.net.eval()
 
-        return avg_loss, metrics
+        losses: list[float] = []
+        preds_list: list[np.ndarray] = []
+        targets_list: list[np.ndarray] = []
 
-    def _validate_epoch(self, loader: DataLoader, criterion: nn.Module) -> tuple[float, dict]:
-        """Run one full validation epoch.
-
-        Args:
-            loader (DataLoader): DataLoader over the validation set.
-            criterion (nn.Module): Loss function.
-
-        Raises:
-            ValueError: If the network was not initialised (i.e. train() has not been called).
-
-        Returns:
-            Tuple of (average_loss, metrics_dict). metrics_dict contains any additional
-            metrics from ``Results.metrics`` (e.g. ``spearman``, ``mse``).
-        """
-        if self.net is None:
-            raise ValueError("Network not initialised; call train() before _validate_epoch.")
-        self.net.eval()
-        val_losses: list[float] = []
-        val_preds_list: list[np.ndarray] = []
-        val_targets_list: list[np.ndarray] = []
-
-        with torch.no_grad():
+        with torch.set_grad_enabled(optimizer is not None):
             for batch_x, batch_y in loader:
+                if optimizer is not None:
+                    optimizer.zero_grad()
                 preds = self.net(batch_x)
                 loss = criterion(preds, batch_y)
-                val_losses.append(loss.item())
-                val_preds_list.append(preds.cpu().numpy())
-                val_targets_list.append(batch_y.cpu().numpy())
+                if optimizer is not None:
+                    loss.backward()
+                    optimizer.step()
+                losses.append(loss.item())
+                preds_list.append(preds.detach().cpu().numpy())
+                targets_list.append(batch_y.detach().cpu().numpy())
 
-        avg_loss = float(np.mean(val_losses))
-        all_preds = np.concatenate(val_preds_list)
-        all_targets = np.concatenate(val_targets_list)
+        avg_loss = float(np.mean(losses))
+        all_preds = np.concatenate(preds_list)
+        all_targets = np.concatenate(targets_list)
 
         if len(all_preds) >= 2:
             metrics = Results(
@@ -466,10 +434,10 @@ class MLPModel(BaseModel):
         avg_val_loss: float | None = None
 
         for epoch in range(self.train_config.num_epochs):
-            avg_train_loss, train_metrics = self._train_epoch(train_loader, optimizer, criterion)
+            avg_train_loss, train_metrics = self._run_epoch(train_loader, criterion, optimizer)
 
             if val_loader is not None:
-                avg_val_loss, val_metrics = self._validate_epoch(val_loader, criterion)
+                avg_val_loss, val_metrics = self._run_epoch(val_loader, criterion)
 
             self._record_epoch_metrics(
                 epoch, avg_train_loss, train_metrics, avg_val_loss, val_metrics
