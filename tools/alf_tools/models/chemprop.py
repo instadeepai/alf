@@ -291,7 +291,7 @@ class ChempropModel(BaseModel):
                 preds = model(batch.bmg, V_d, X_d).squeeze(-1)
                 loss = criterion(preds, targets)
 
-                if is_train:
+                if optimizer is not None:
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
