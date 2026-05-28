@@ -23,6 +23,7 @@ from alf_tools.models.utils import (
 
 try:
     from alf_tools.models.esmfold import ESMFoldConfig, ESMFoldModel
+
     _ESMFOLD_AVAILABLE = True
 except ImportError:
     _ESMFOLD_AVAILABLE = False

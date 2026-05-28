@@ -227,6 +227,7 @@ class ESMFoldModel(BaseModel):
         elif metric == "mean_plddt":
             means = plddt_scores
         else:
+            assert ptm_scores is not None and plddt_scores is not None
             w = self.config.combined_ptm_weight
             means = w * ptm_scores + (1.0 - w) * plddt_scores
 
