@@ -74,7 +74,7 @@ class ChempropTrainConfig(BaseTrainConfig):
         batch_size: Number of molecules per batch.
         num_epochs: Training epochs.
         optimizer: Optimizer type.
-        weight_init: Weight initialisation strategy; None uses Chemprop's default.
+        weight_init: Weight initialisation strategy; None leaves Chemprop's default initialisation.
         seed: Random seed for reproducibility; None means no seeding.
     """
 
@@ -82,11 +82,11 @@ class ChempropTrainConfig(BaseTrainConfig):
     batch_size: int = 50
     num_epochs: int = 50
     optimizer: Literal["adam", "sgd", "adamw"] = "adam"
-    weight_init: Literal["default", "xavier_uniform", "kaiming_normal"] | None = None
+    weight_init: Literal["xavier_uniform", "kaiming_normal"] | None = None
     seed: int | None = None
 
 
-AGGREGATIONS = {
+_AGGREGATIONS = {
     "mean": MeanAggregation,
     "sum": SumAggregation,
     "norm": NormAggregation,
@@ -217,7 +217,7 @@ class ChempropModel(BaseModel):
         """
         cfg = self.model_config
         mp = BondMessagePassing(d_h=cfg.hidden_size, depth=cfg.depth)
-        agg = AGGREGATIONS[cfg.aggregation]()
+        agg = _AGGREGATIONS[cfg.aggregation]()
         ffn = RegressionFFN(
             input_dim=mp.output_dim, n_layers=cfg.ffn_num_layers, dropout=cfg.dropout
         )
@@ -246,18 +246,21 @@ class ChempropModel(BaseModel):
                     if m.bias is not None:
                         nn.init.zeros_(m.bias)
 
-    def _train_epoch(
+    def _run_epoch(
         self,
         loader: DataLoader,
         criterion: nn.Module,
-        optimizer: optim.Optimizer,
+        optimizer: optim.Optimizer | None = None,
     ) -> tuple[float, dict[str, float]]:
-        """Run one training pass over a DataLoader with gradient updates.
+        """Run one epoch over a DataLoader.
+
+        Performs a training pass with gradient updates when ``optimizer`` is provided,
+        or an evaluation pass without gradients when it is ``None``.
 
         Args:
             loader: DataLoader to iterate over.
             criterion: Loss function.
-            optimizer: Optimizer for gradient updates.
+            optimizer: Optimizer for gradient updates, or ``None`` for eval mode.
 
         Returns:
             Tuple of (average loss weighted by batch size, metrics dict).
@@ -266,78 +269,18 @@ class ChempropModel(BaseModel):
             RuntimeError: If called before model is initialised.
         """
         if self._model is None:
-            raise RuntimeError("_train_epoch called before model is initialised")
+            raise RuntimeError("_run_epoch called before model is initialised")
         model = self._model
-        n = len(loader.dataset)  # type: ignore[arg-type]
-        all_preds = torch.empty(n, device="cpu")
-        all_targets = torch.empty(n, device="cpu")
+        is_train = optimizer is not None
+        model.train(is_train)
+
+        all_preds: list[torch.Tensor] = []
+        all_targets: list[torch.Tensor] = []
         total_loss = 0.0
-        idx = 0
+        total_n = 0
 
-        model.train(True)
-        for batch in loader:
-            # BatchMolGraph.to() is in-place (no return value) — do not assign the result;
-            # unlike Tensor.to(), which returns a new tensor.
-            batch.bmg.to(self.device)
-            V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
-            X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
-            targets = batch.Y.squeeze(-1).to(self.device)
-            preds = model(batch.bmg, V_d, X_d).squeeze(-1)
-            loss = criterion(preds, targets)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            b = targets.shape[0]
-            total_loss += loss.item() * b
-            all_preds[idx : idx + b] = preds.detach().cpu()
-            all_targets[idx : idx + b] = targets.detach().cpu()
-            idx += b
-
-        all_preds = all_preds[:idx]
-        all_targets = all_targets[:idx]
-        avg_loss = total_loss / idx if idx > 0 else 0.0
-        preds_np = all_preds.numpy()
-        targets_np = all_targets.numpy()
-        if len(preds_np) >= 2:
-            raw = Results(
-                targets=targets_np,
-                predictions=Predictions(means=preds_np),
-                problem_type=ProblemType.REGRESSION,
-            ).metrics
-            metrics = {k: float(v) for k in ("spearman", "mse") if (v := raw.get(k)) is not None}
-        else:
-            metrics = {"mse": float(np.mean((preds_np - targets_np) ** 2))}
-        return avg_loss, metrics
-
-    def _eval_epoch(
-        self,
-        loader: DataLoader,
-        criterion: nn.Module,
-    ) -> tuple[float, dict[str, float]]:
-        """Run one evaluation pass over a DataLoader without gradient updates.
-
-        Args:
-            loader: DataLoader to iterate over.
-            criterion: Loss function.
-
-        Returns:
-            Tuple of (average loss weighted by batch size, metrics dict).
-
-        Raises:
-            RuntimeError: If called before model is initialised.
-        """
-        if self._model is None:
-            raise RuntimeError("_eval_epoch called before model is initialised")
-        model = self._model
-        n = len(loader.dataset)  # type: ignore[arg-type]
-        all_preds = torch.empty(n, device="cpu")
-        all_targets = torch.empty(n, device="cpu")
-        total_loss = 0.0
-        idx = 0
-
-        model.train(False)
-        with torch.no_grad():
+        ctx = torch.enable_grad() if is_train else torch.no_grad()
+        with ctx:
             for batch in loader:
                 # BatchMolGraph.to() is in-place (no return value) — do not assign the result;
                 # unlike Tensor.to(), which returns a new tensor.
@@ -348,17 +291,21 @@ class ChempropModel(BaseModel):
                 preds = model(batch.bmg, V_d, X_d).squeeze(-1)
                 loss = criterion(preds, targets)
 
+                if is_train:
+                    optimizer.zero_grad()
+                    loss.backward()
+                    optimizer.step()
+
                 b = targets.shape[0]
                 total_loss += loss.item() * b
-                all_preds[idx : idx + b] = preds.detach().cpu()
-                all_targets[idx : idx + b] = targets.detach().cpu()
-                idx += b
+                total_n += b
+                all_preds.append(preds.detach().cpu())
+                all_targets.append(targets.detach().cpu())
 
-        all_preds = all_preds[:idx]
-        all_targets = all_targets[:idx]
-        avg_loss = total_loss / idx if idx > 0 else 0.0
-        preds_np = all_preds.numpy()
-        targets_np = all_targets.numpy()
+        preds_np = torch.cat(all_preds).numpy() if all_preds else np.array([])
+        targets_np = torch.cat(all_targets).numpy() if all_targets else np.array([])
+        avg_loss = total_loss / total_n if total_n > 0 else 0.0
+
         if len(preds_np) >= 2:
             raw = Results(
                 targets=targets_np,
@@ -452,9 +399,9 @@ class ChempropModel(BaseModel):
             return
 
         for epoch in range(self.train_config.num_epochs):
-            avg_train_loss, train_metrics = self._train_epoch(train_loader, criterion, optimizer)
+            avg_train_loss, train_metrics = self._run_epoch(train_loader, criterion, optimizer)
             if val_loader is not None:
-                avg_val_loss, val_metrics = self._eval_epoch(val_loader, criterion)
+                avg_val_loss, val_metrics = self._run_epoch(val_loader, criterion)
                 self._record_epoch_metrics(
                     epoch, avg_train_loss, train_metrics, avg_val_loss, val_metrics
                 )
