@@ -185,30 +185,34 @@ def _compute_properties(smiles: str, properties: list[str]) -> dict[str, float]:
 def _download_file(url: str, filepath: Path, max_lines: int | None = None) -> Path:
     """Stream a text file from url to filepath, optionally truncating to max_lines lines.
 
-    When max_lines is set, ``_{max_lines}`` is appended to the filepath stem so that
-    requests with different limits do not collide. Writes to a ``.tmp`` file first and
-    renames on success to prevent partial downloads from appearing valid on the next call.
-    Skips the download if the target filepath already exists.
+    Writes to a ``.tmp`` file first and renames on success to prevent partial downloads
+    from appearing valid on the next call. Skips the download if the target filepath
+    already exists and contains at least max_lines non-empty lines (or max_lines is None).
+    If the cached file has fewer lines than max_lines, it is deleted and re-downloaded.
 
     Args:
         url: HTTPS URL to stream from.
-        filepath: Base destination file path (not a directory). The actual path will differ
-            when max_lines is set (``_{max_lines}`` is inserted before the extension).
-        max_lines: If set, stop writing after exactly this many lines.
+        filepath: Destination file path (not a directory).
+        max_lines: If set, stop writing after exactly this many lines. An existing file
+            with fewer than max_lines lines is treated as stale and re-downloaded.
 
     Returns:
-        The resolved filepath (may differ from the input when max_lines is set).
+        The resolved filepath.
 
     Raises:
         OSError: If a network error occurs while connecting or streaming.
         FileNotFoundError: If the server returns a non-200 status code.
     """
-    if max_lines is not None:
-        filepath = filepath.with_stem(f"{filepath.stem}_{max_lines}")
-
     if filepath.exists():
-        logger.info("  ✓ %s already exists, skipping.", filepath)
-        return filepath
+        if max_lines is None:
+            logger.info("  ✓ %s already exists, skipping.", filepath)
+            return filepath
+        with open(filepath, encoding="utf-8") as f:
+            cached_count = sum(1 for line in f if line.strip())
+        if cached_count >= max_lines:
+            logger.info("  ✓ %s already exists with sufficient lines, skipping.", filepath)
+            return filepath
+        filepath.unlink()
 
     logger.info(
         "  ↓ Downloading %s%s...",
