@@ -237,26 +237,37 @@ class BoTorchGPModel(BaseModel):
                 device=self.device,
             )
 
-        # Initialize SingleTaskGP
         ard_num_dims = self.train_X.shape[-1] if self.use_ard else None
+        # Apply Hvarfner et al. 2024 priors for both 'rbf' and default (None)
+        if ard_num_dims is not None:
+            lengthscale_prior = LogNormalPrior(
+                loc=math.sqrt(2) + math.log(ard_num_dims) * 0.5, scale=math.sqrt(3)
+            )
+        else:
+            lengthscale_prior = LogNormalPrior(loc=math.sqrt(2), scale=math.sqrt(3))
+        lengthscale_constraint = GreaterThan(
+            2.5e-2, transform=None, initial_value=lengthscale_prior.mode
+        )
+        # Initialize SingleTaskGP
+        # TODO: specify priors and constraints via Hydra config in a future PR
+        # which will require a Hydra PR first
         if self.kernel_type == "matern":
-            covar_module = ScaleKernel(MaternKernel(nu=self.nu, ard_num_dims=ard_num_dims))
-        elif self.kernel_type in ("rbf", None):
-            # Apply Hvarfner et al. 2024 priors for both 'rbf' and default (None)
-            if ard_num_dims is not None:
-                lengthscale_prior = LogNormalPrior(
-                    loc=math.sqrt(2) + math.log(ard_num_dims) * 0.5, scale=math.sqrt(3)
+            covar_module = ScaleKernel(
+                MaternKernel(
+                    nu=self.nu,
+                    ard_num_dims=ard_num_dims,
+                    batch_shape=self.train_X.shape[:-2],
+                    lengthscale_prior=lengthscale_prior,
+                    lengthscale_constraint=lengthscale_constraint,
                 )
-            else:
-                lengthscale_prior = LogNormalPrior(loc=math.sqrt(2), scale=math.sqrt(3))
+            )
+        elif self.kernel_type in ("rbf", None):
             covar_module = ScaleKernel(
                 RBFKernel(
                     ard_num_dims=ard_num_dims,
                     batch_shape=self.train_X.shape[:-2],
                     lengthscale_prior=lengthscale_prior,
-                    lengthscale_constraint=GreaterThan(
-                        2.5e-2, transform=None, initial_value=lengthscale_prior.mode
-                    ),
+                    lengthscale_constraint=lengthscale_constraint,
                 )
             )
             if self.kernel_type is None:
