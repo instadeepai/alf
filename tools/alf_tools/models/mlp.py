@@ -455,11 +455,13 @@ class MLPModel(BaseModel):
         self.training_metrics = {"final_train_loss": avg_train_loss}
         self.training_metrics.update({f"final_train_{k}": v for k, v in train_metrics.items()})
         if val_loader is not None:
-            assert avg_val_loss is not None, "avg_val_loss should be set if val_loader is not None"
+            if avg_val_loss is None or val_metrics is None:
+                raise RuntimeError(
+                    "val_loader was provided but avg_val_loss/val_metrics were not set after "
+                    "training. This is an internal error; please file a bug report."
+                )
             self.training_metrics["final_val_loss"] = avg_val_loss
-            self.training_metrics.update({
-                f"final_val_{k}": v for k, v in (val_metrics or {}).items()
-            })
+            self.training_metrics.update({f"final_val_{k}": v for k, v in val_metrics.items()})
 
         self.net.eval()
 
