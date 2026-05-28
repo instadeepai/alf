@@ -19,7 +19,7 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 - **FLIP** - Fitness Landscape Inference for Proteins benchmark (AAV, GB1, Meltome, SCL, SAV)
 
 ### Models
-- **CNNModel** - Convolutional neural network for sequence modeling with uncertainty quantification
+- **CNNModel** - Convolutional neural network for sequence modeling. Supports `ProblemType.REGRESSION`, `ProblemType.BINARY`, and `ProblemType.MULTICLASS`; output shape and activation are determined automatically from the dataset's `problem_type`
 - **GPModel** - Gaussian Process model for sequence fitness prediction with flexible kernel
   selection, input normalisation, and output standardisation enabled by default
 - **PyRosetta** - Rosetta energy function for protein design (requires PyRosetta installation)

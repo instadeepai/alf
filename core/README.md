@@ -338,7 +338,11 @@ The zero-shot task evaluates a pre-trained or untrained model without training:
 
 ## Evaluation Metrics
 
-ALF provides comprehensive utilities for evaluating surrogate model predictions through metrics (see `utils/metrics.py`). Metrics are automatically added to the regsistry and categorized by whether variance is needed in the calculation of the metric:
+ALF provides utilities for evaluating model predictions through two metric registries
+(see `utils/metrics.py`). The active registry is selected automatically by `Results` based on
+the dataset's `problem_type`.
+
+### Regression Metrics (`ProblemType.REGRESSION`)
 
 **Accuracy Metrics** (no variance required):
 - **MSE**: Mean Squared Error between predictions and targets
@@ -362,9 +366,21 @@ ALF provides comprehensive utilities for evaluating surrogate model predictions 
 - **Regret UCB Alpha**: UCB acquisition regret comparing selected vs optimal candidates
 - **Regret UCB Alpha Sweep**: UCB regret computed across multiple alpha exploration parameters
 
-All metrics accept predictions (means, variances, targets) and return a dictionary of computed values. Metrics requiring variance will validate that uncertainty estimates are provided.
+Regression metrics accept predictions (means, variances, targets) and return a dictionary of
+computed values. Metrics requiring variance will validate that uncertainty estimates are provided.
 
 > **Normalisation and metrics:** When `standardise_outputs=True` in the model's train config,
 > predictions are inverse-transformed back to the original label scale before metrics are computed.
 > Metrics therefore always reflect performance in original label units, regardless of whether
 > output standardisation was used during training.
+
+### Classification Metrics (`ProblemType.BINARY` and `ProblemType.MULTICLASS`)
+
+- **Accuracy**: Classification accuracy (fraction of correct predictions)
+- **F1**: Macro-averaged F1 score
+- **Precision**: Macro-averaged precision
+- **Recall**: Macro-averaged recall
+- **AUC-ROC**: Area under the ROC curve (binary or one-vs-rest for multiclass)
+
+Classification metrics accept class probability arrays (shape `(n_samples, n_classes)`) and
+integer target labels.
