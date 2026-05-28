@@ -54,7 +54,7 @@ def esm2_model(model_config, train_config):
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def esm2_finetune_model():
     """ESM-2 model with unfrozen backbone for fine-tuning tests.
 
@@ -72,7 +72,7 @@ def esm2_finetune_model():
     return ESM2Model(name="test_esm2_ft", model_config=config, train_config=train_cfg, device="cpu")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def esm2_ll_model():
     """ESM-2 model configured for log-likelihood training.
 
@@ -295,13 +295,13 @@ class TestMaskTokens:
         """Test that CLS, EOS, and PAD positions are always excluded from masking."""
         # Two sequences of different lengths to produce PAD tokens after collation
         seqs = ["ACDE", "ACDEFGHIKLMNPQRSTVWY"]
-        encoding = esm2_model.tokenizer(seqs, return_tensors="pt", padding=True)
+        encoding = esm2_model.tokeniser(seqs, return_tensors="pt", padding=True)
         input_ids = encoding["input_ids"]
 
         special_ids = {
-            esm2_model.tokenizer.cls_token_id,
-            esm2_model.tokenizer.eos_token_id,
-            esm2_model.tokenizer.pad_token_id,
+            esm2_model.tokeniser.cls_token_id,
+            esm2_model.tokeniser.eos_token_id,
+            esm2_model.tokeniser.pad_token_id,
         } - {None}
 
         _, labels = esm2_model._mask_tokens(input_ids)
@@ -319,7 +319,7 @@ class TestMaskTokens:
             name="zero_mask", model_config=config, train_config=train_cfg, device="cpu"
         )
         seqs = ["ACDEFGHIKL"] * 8
-        encoding = model.tokenizer(seqs, return_tensors="pt", padding=True)
+        encoding = model.tokeniser(seqs, return_tensors="pt", padding=True)
         input_ids = encoding["input_ids"]
 
         _, labels = model._mask_tokens(input_ids)
@@ -329,7 +329,7 @@ class TestMaskTokens:
     def test_selected_labels_equal_original_token(self, esm2_model):
         """Test that labels at selected positions store the original token ID."""
         seqs = ["ACDEFGHIKL", "MNPQRSTVWY"]
-        encoding = esm2_model.tokenizer(seqs, return_tensors="pt", padding=True)
+        encoding = esm2_model.tokeniser(seqs, return_tensors="pt", padding=True)
         input_ids = encoding["input_ids"]
 
         _, labels = esm2_model._mask_tokens(input_ids)
@@ -351,14 +351,14 @@ class TestMaskTokens:
         )
         # 100 sequences × 20 eligible tokens = ~2 000 selected positions
         seqs = ["ACDEFGHIKLMNPQRSTVWY"] * 100
-        encoding = model.tokenizer(seqs, return_tensors="pt", padding=True)
+        encoding = model.tokeniser(seqs, return_tensors="pt", padding=True)
         input_ids = encoding["input_ids"]
 
         masked_ids, labels = model._mask_tokens(input_ids)
 
         selected = labels != -100
         n = selected.sum().item()
-        n_mask = (masked_ids[selected] == model.tokenizer.mask_token_id).sum().item()
+        n_mask = (masked_ids[selected] == model.tokeniser.mask_token_id).sum().item()
         n_unchanged = (masked_ids[selected] == input_ids[selected]).sum().item()
         # random = not [MASK] and not unchanged
         # (chance of random token coinciding with original ≈ 1/vocab_size ≈ 3%, negligible)
@@ -375,13 +375,13 @@ class TestComputeLogLikelihoodLabels:
     def test_all_non_special_positions_labeled(self, esm2_model):
         """All non-special token positions should have labels != -100."""
         seqs = ["ACDE", "ACDEFGHIKLMNPQRSTVWY"]
-        encoding = esm2_model.tokenizer(seqs, return_tensors="pt", padding=True)
+        encoding = esm2_model.tokeniser(seqs, return_tensors="pt", padding=True)
         input_ids = encoding["input_ids"]
 
         special_ids = {
-            esm2_model.tokenizer.cls_token_id,
-            esm2_model.tokenizer.eos_token_id,
-            esm2_model.tokenizer.pad_token_id,
+            esm2_model.tokeniser.cls_token_id,
+            esm2_model.tokeniser.eos_token_id,
+            esm2_model.tokeniser.pad_token_id,
         } - {None}
         special_mask = torch.zeros_like(input_ids, dtype=torch.bool)
         for sid in special_ids:
@@ -395,13 +395,13 @@ class TestComputeLogLikelihoodLabels:
     def test_special_tokens_excluded_from_labels(self, esm2_model):
         """CLS, EOS, and PAD positions must have label -100."""
         seqs = ["ACDE", "ACDEFGHIKLMNPQRSTVWY"]
-        encoding = esm2_model.tokenizer(seqs, return_tensors="pt", padding=True)
+        encoding = esm2_model.tokeniser(seqs, return_tensors="pt", padding=True)
         input_ids = encoding["input_ids"]
 
         special_ids = {
-            esm2_model.tokenizer.cls_token_id,
-            esm2_model.tokenizer.eos_token_id,
-            esm2_model.tokenizer.pad_token_id,
+            esm2_model.tokeniser.cls_token_id,
+            esm2_model.tokeniser.eos_token_id,
+            esm2_model.tokeniser.pad_token_id,
         } - {None}
 
         _, labels = esm2_model._compute_log_likelihood_labels(input_ids)
@@ -414,13 +414,13 @@ class TestComputeLogLikelihoodLabels:
     def test_all_non_special_tokens_replaced_with_mask(self, esm2_model):
         """All non-special token positions in masked_ids should be mask_token_id."""
         seqs = ["ACDE", "ACDEFGHIKLMNPQRSTVWY"]
-        encoding = esm2_model.tokenizer(seqs, return_tensors="pt", padding=True)
+        encoding = esm2_model.tokeniser(seqs, return_tensors="pt", padding=True)
         input_ids = encoding["input_ids"]
 
         special_ids = {
-            esm2_model.tokenizer.cls_token_id,
-            esm2_model.tokenizer.eos_token_id,
-            esm2_model.tokenizer.pad_token_id,
+            esm2_model.tokeniser.cls_token_id,
+            esm2_model.tokeniser.eos_token_id,
+            esm2_model.tokeniser.pad_token_id,
         } - {None}
         special_mask = torch.zeros_like(input_ids, dtype=torch.bool)
         for sid in special_ids:
@@ -428,12 +428,12 @@ class TestComputeLogLikelihoodLabels:
 
         masked_ids, _ = esm2_model._compute_log_likelihood_labels(input_ids)
 
-        assert (masked_ids[~special_mask] == esm2_model.tokenizer.mask_token_id).all()
+        assert (masked_ids[~special_mask] == esm2_model.tokeniser.mask_token_id).all()
 
     def test_labels_equal_original_at_labeled_positions(self, esm2_model):
         """Labels at non-special positions must equal the original token IDs."""
         seqs = ["ACDEFGHIKL", "MNPQRSTVWY"]
-        encoding = esm2_model.tokenizer(seqs, return_tensors="pt", padding=True)
+        encoding = esm2_model.tokeniser(seqs, return_tensors="pt", padding=True)
         input_ids = encoding["input_ids"]
 
         _, labels = esm2_model._compute_log_likelihood_labels(input_ids)

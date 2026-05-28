@@ -127,12 +127,12 @@ class ESM2Model(BaseModel):
         self.train_config = train_config or ESM2TrainConfig()
         self.device = get_device(device)
 
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_config.model_id)
-        self.max_length = self.model_config.max_length or self.tokenizer.model_max_length
+        self.tokeniser = AutoTokenizer.from_pretrained(self.model_config.model_id)
+        self.max_length = self.model_config.max_length or self.tokeniser.model_max_length
         self.esm_model = AutoModelForMaskedLM.from_pretrained(self.model_config.model_id)
         self.esm_model.to(self.device)
 
-        self.criterion = (
+        self._prepare_labels = (
             self._mask_tokens
             if self.train_config.loss_type == "mlm"
             else self._compute_log_likelihood_labels
@@ -147,11 +147,6 @@ class ESM2Model(BaseModel):
         self._post_init()
 
     def _post_init(self) -> None:
-        if self.train_config.optimizer_type not in ("adam", "adamw"):
-            raise ValueError(
-                f"optimizer_type must be 'adam' or 'adamw', "
-                f"got {self.train_config.optimizer_type!r}"
-            )
         num_layers = self.esm_model.config.num_hidden_layers + 1  # +1 for embedding
         valid_range = range(-num_layers, num_layers)
         if self.model_config.repr_layer not in valid_range:
@@ -190,10 +185,7 @@ class ESM2Model(BaseModel):
         else:
             raise ValueError("Input must be LabelledCandidates or list of Candidates")
 
-        if any(len(self.tokenizer.encode(s)) > self.max_length for s in sequences):
-            logger.warning("Some sequences exceed max_length and will be truncated.")
-
-        encoding = self.tokenizer(
+        encoding = self.tokeniser(
             sequences,
             return_tensors="pt",
             padding=True,
@@ -268,7 +260,7 @@ class ESM2Model(BaseModel):
             input_ids: Token IDs of shape (batch, seq_len).
 
         Raises:
-            ValueError: If the tokenizer does not have a mask token.
+            ValueError: If the tokeniser does not have a mask token.
 
         Returns:
             Tuple of (masked_input_ids, labels), both of shape (batch, seq_len).
@@ -276,9 +268,9 @@ class ESM2Model(BaseModel):
         labels = input_ids.clone()
 
         special_ids = {
-            self.tokenizer.cls_token_id,
-            self.tokenizer.eos_token_id,
-            self.tokenizer.pad_token_id,
+            self.tokeniser.cls_token_id,
+            self.tokeniser.eos_token_id,
+            self.tokeniser.pad_token_id,
         } - {None}
 
         special_tokens_mask = torch.zeros_like(input_ids, dtype=torch.bool)
@@ -326,10 +318,10 @@ class ESM2Model(BaseModel):
         labels[~masked] = -100
 
         masked_input_ids = input_ids.clone()
-        if self.tokenizer.mask_token_id is None:
+        if self.tokeniser.mask_token_id is None:
             raise ValueError(
-                "Tokenizer has no mask token. Cannot perform MLM masking. "
-                "Ensure the tokenizer is initialised with a [MASK] token."
+                "Tokeniser has no mask token. Cannot perform MLM masking. "
+                "Ensure the tokeniser is initialised with a [MASK] token."
             )
 
         # Apply 80 / 10 / 10 (or specified) replacement split
@@ -344,7 +336,7 @@ class ESM2Model(BaseModel):
             replace_with_mask = split < p_mask
             if replace_with_mask.any():
                 idx = masked_indices[replace_with_mask]
-                masked_input_ids[idx[:, 0], idx[:, 1]] = self.tokenizer.mask_token_id
+                masked_input_ids[idx[:, 0], idx[:, 1]] = self.tokeniser.mask_token_id
 
             # Y %: replace with a uniformly random vocabulary token
             replace_with_random = (split >= p_mask) & (split < (p_mask + p_random))
@@ -352,7 +344,7 @@ class ESM2Model(BaseModel):
                 idx = masked_indices[replace_with_random]
                 random_ids = torch.randint(
                     low=0,
-                    high=self.tokenizer.vocab_size,
+                    high=self.tokeniser.vocab_size,
                     size=(idx.shape[0],),
                     device=self.device,
                 )
@@ -376,15 +368,15 @@ class ESM2Model(BaseModel):
             input_ids: Token IDs of shape (batch, seq_len).
 
         Raises:
-            ValueError: If the tokenizer does not have a mask token.
+            ValueError: If the tokeniser does not have a mask token.
 
         Returns:
             Tuple of (masked_input_ids, labels), both of shape (batch, seq_len).
         """
         special_ids = {
-            self.tokenizer.cls_token_id,
-            self.tokenizer.eos_token_id,
-            self.tokenizer.pad_token_id,
+            self.tokeniser.cls_token_id,
+            self.tokeniser.eos_token_id,
+            self.tokeniser.pad_token_id,
         } - {None}
 
         special_tokens_mask = torch.zeros_like(input_ids, dtype=torch.bool)
@@ -394,13 +386,13 @@ class ESM2Model(BaseModel):
         labels = input_ids.clone()
         labels[special_tokens_mask] = -100
 
-        if self.tokenizer.mask_token_id is None:
+        if self.tokeniser.mask_token_id is None:
             raise ValueError(
-                "Tokenizer has no mask token. Cannot perform log-likelihood masking. "
-                "Ensure the tokenizer is initialised with a [MASK] token."
+                "Tokeniser has no mask token. Cannot perform log-likelihood masking. "
+                "Ensure the tokeniser is initialised with a [MASK] token."
             )
         masked_input_ids = input_ids.clone()
-        masked_input_ids[~special_tokens_mask] = self.tokenizer.mask_token_id
+        masked_input_ids[~special_tokens_mask] = self.tokeniser.mask_token_id
 
         return masked_input_ids, labels
 
@@ -429,7 +421,7 @@ class ESM2Model(BaseModel):
             batch_ids = raw_ids.to(self.device)
             batch_mask = raw_mask.to(self.device)
 
-            masked_ids, labels = self.criterion(batch_ids)
+            masked_ids, labels = self._prepare_labels(batch_ids)
 
             optimizer.zero_grad()
             outputs = self.esm_model(
@@ -477,7 +469,7 @@ class ESM2Model(BaseModel):
                 batch_ids = raw_ids.to(self.device)
                 batch_mask = raw_mask.to(self.device)
 
-                masked_ids, labels = self.criterion(batch_ids)
+                masked_ids, labels = self._prepare_labels(batch_ids)
 
                 outputs = self.esm_model(
                     input_ids=masked_ids,
