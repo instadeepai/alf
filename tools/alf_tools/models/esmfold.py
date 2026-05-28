@@ -14,27 +14,34 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, NoReturn
 
 import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.candidate import Modality
-from transformers import AutoTokenizer, EsmForProteinFolding
+
+try:
+    from transformers import AutoTokenizer, EsmForProteinFolding
+except ImportError:
+    raise ImportError(
+        "transformers is not installed. Install ESMFold dependencies with:\n"
+        "  pip install transformers"
+    )
 
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 logger = logging.getLogger("alf-tools")
 
 
-_VALID_AA: frozenset[str] = frozenset(PROTEIN_ALPHABET)
+_VALID_AA: frozenset[str] = frozenset(PROTEIN_ALPHABET) | frozenset("XBZUO")
 
 
 @dataclass
 class ESMFoldConfig:
     """Configuration for ESMFold protein structure prediction model.
 
-    Attributes:
+    Args:
         model_name: HuggingFace hub ID or absolute local path to the ESMFold checkpoint.
         device: PyTorch device string ('cpu', 'cuda', 'cuda:0', 'mps').
         scoring_metric: Scalar metric returned as the oracle score.
@@ -92,7 +99,7 @@ class ESMFoldModel(BaseModel):
         self.config = config
         try:
             self.device = torch.device(config.device)
-        except RuntimeError as exc:
+        except (RuntimeError, ValueError) as exc:
             raise ValueError(f"Invalid device string in ESMFoldConfig: {config.device!r}") from exc
 
         self.tokenizer = AutoTokenizer.from_pretrained(config.model_name)
@@ -115,6 +122,8 @@ class ESMFoldModel(BaseModel):
                 "ESMFoldModel is running on CPU. Inference will be very slow for real proteins."
                 " Use device='cuda' for production workloads."
             )
+
+        self._cleaned_up = False
 
         logger.info(
             "ESMFoldModel loaded: model=%s device=%s scoring_metric=%s",
@@ -146,7 +155,7 @@ class ESMFoldModel(BaseModel):
             if invalid:
                 raise ValueError(
                     f"Candidate at index {i} contains invalid amino acid character(s): "
-                    f"{sorted(set(invalid))}. Valid characters: {PROTEIN_ALPHABET}"
+                    f"{sorted(set(invalid))}. Valid characters: {sorted(_VALID_AA)}"
                 )
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
@@ -164,6 +173,11 @@ class ESMFoldModel(BaseModel):
                 torch.cuda.OutOfMemoryError; reduce batch_size or enable chunk_size
                 in ESMFoldConfig to lower peak memory.
         """
+        if self._cleaned_up:
+            raise RuntimeError(
+                "predict() called after cleanup(). The model has been moved to CPU and is no "
+                "longer in a usable state. Create a new ESMFoldModel instance."
+            )
         self._validate_candidates(candidate_points)
 
         sequences = [c.data for c in candidate_points]
@@ -179,13 +193,6 @@ class ESMFoldModel(BaseModel):
             for i in range(0, n, self.config.batch_size):
                 batch = sequences[i : i + self.config.batch_size]
                 dest = slice(i, i + len(batch))  # handles partial last batch
-                # Runtime guard: catches config.batch_size mutation after construction.
-                if ptm_scores is not None and len(batch) > 1:
-                    raise RuntimeError(
-                        f"scoring_metric='{metric}' requires batch_size=1 because ESMFold "
-                        "returns a single pTM scalar per batch. config.batch_size was "
-                        f"changed after construction (current value: {self.config.batch_size})."
-                    )
 
                 tokens = self.tokenizer(
                     batch, return_tensors="pt", padding=True, add_special_tokens=False
@@ -200,36 +207,32 @@ class ESMFoldModel(BaseModel):
 
                 if plddt_scores is not None:
                     mask = tokens["attention_mask"]  # (B, L)
-                    n_atoms = output.plddt.shape[-1]
-                    # Cast to float32: avoids fp16 overflow (seq_len * n_atoms can exceed 65504).
-                    # Sum atoms first to avoid an O(B*L*n_atoms) broadcast copy.
-                    plddt_per_residue = output.plddt.float().sum(dim=-1)  # (B, L)
-                    real_count = mask.float().sum(dim=1) * n_atoms  # (B,)
-                    if (real_count == 0).any():
+                    # atom37_atom_exists: (B, L, 37) — which atom slots exist per residue.
+                    # Combine with the sequence mask so phantom atoms and padding are excluded.
+                    atom_exists = output.atom37_atom_exists.float()  # (B, L, 37)
+                    seq_mask = mask.float().unsqueeze(-1)  # (B, L, 1)
+                    valid = atom_exists * seq_mask  # (B, L, 37)
+                    atom_count = valid.sum(dim=(1, 2))  # (B,)
+                    if (atom_count == 0).any():
                         raise RuntimeError(
                             f"Batch at offset {i} contains sequences with all-padding "
                             "attention mask after tokenization."
                         )
-                    masked_sum = (plddt_per_residue * mask.float()).sum(dim=1)  # (B,)
-                    plddt_scores[dest] = (masked_sum / real_count).cpu().numpy()
+                    # Cast to float32: avoids fp16 overflow.
+                    masked_sum = (output.plddt.float() * valid).sum(dim=(1, 2))  # (B,)
+                    plddt_scores[dest] = (masked_sum / atom_count).cpu().numpy()
 
         if metric == "ptm":
-            if ptm_scores is None:
-                raise RuntimeError("ptm_scores is None but metric='ptm'; this is a bug")
             means = ptm_scores
         elif metric == "mean_plddt":
-            if plddt_scores is None:
-                raise RuntimeError("plddt_scores is None but metric='mean_plddt'; this is a bug")
             means = plddt_scores
         else:
-            if ptm_scores is None or plddt_scores is None:
-                raise RuntimeError("Score arrays are None but metric='combined'; this is a bug")
             w = self.config.combined_ptm_weight
             means = w * ptm_scores + (1.0 - w) * plddt_scores
 
         return Predictions(means=means)
 
-    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> None:
+    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> NoReturn:
         """Not implemented for ESMFoldModel.
 
         Raises:
@@ -266,7 +269,11 @@ class ESMFoldModel(BaseModel):
         return {}
 
     def cleanup(self) -> None:
-        """Move model to CPU and clear CUDA cache to free GPU memory."""
+        """Move model to CPU and clear CUDA cache to free GPU memory.
+
+        After cleanup(), predict() raises RuntimeError. Create a new ESMFoldModel instance
+        if inference is needed again.
+        """
         self.model = self.model.to("cpu")
         self.device = torch.device("cpu")
         # Restore full model to fp32: esm backbone was fp16 on GPU (fp16_esm=True default),
@@ -274,3 +281,4 @@ class ESMFoldModel(BaseModel):
         self.model.float()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+        self._cleaned_up = True

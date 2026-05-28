@@ -116,6 +116,7 @@ def mock_components():
         out = MagicMock()
         out.ptm = torch.tensor(MOCK_PTM, dtype=torch.float32)  # 0-dim scalar
         out.plddt = torch.full((n, seq_len, 37), MOCK_PLDDT, dtype=torch.float32)  # (B, L, 37)
+        out.atom37_atom_exists = torch.ones(n, seq_len, 37, dtype=torch.bool)  # all atoms exist
         return out
 
     with (
@@ -293,10 +294,11 @@ class TestESMFoldModelPredict:
         assert result.means.dtype in (np.float32, np.float64)
 
     def test_batch_5_returns_shape_5(self, mock_components, protein_candidates, default_model):
-        """5 candidates -> Predictions with means shape (5,)."""
+        """5 candidates -> Predictions with means shape (5,), all equal to mock ptm value."""
         result = default_model.predict(protein_candidates)
         assert result.means.shape == (5,)
         assert result.means.dtype in (np.float32, np.float64)
+        np.testing.assert_array_almost_equal(result.means, np.full(5, MOCK_PTM))
 
     def test_returns_predictions_instance(self, mock_components, default_model):
         """predict() returns a Predictions object."""
@@ -387,11 +389,18 @@ class TestESMFoldModelEdgeCases:
         with pytest.raises(ValueError, match="index 0"):
             default_model.predict([cand])
 
-    def test_predict_invalid_aa_char_X_raises(self, mock_components, default_model):
-        """Sequence containing 'X' (not a standard AA) raises ValueError."""
+    def test_predict_valid_aa_char_X_accepted(self, mock_components, default_model):
+        """Sequence containing 'X' (IUPAC unknown residue) is accepted by ESMFold."""
         cand = Candidate(data="ACDEFX", modality="sequence")
-        with pytest.raises(ValueError, match="X"):
-            default_model.predict([cand])
+        result = default_model.predict([cand])  # should not raise
+        assert result.means.shape == (1,)
+
+    def test_predict_valid_iupac_ambiguity_codes_accepted(self, mock_components, default_model):
+        """Sequences containing IUPAC ambiguity codes B, Z, U, O are accepted."""
+        for char in "BZUO":
+            cand = Candidate(data=f"ACDE{char}", modality="sequence")
+            result = default_model.predict([cand])  # should not raise
+            assert result.means.shape == (1,)
 
     def test_predict_invalid_aa_digit_raises(self, mock_components, default_model):
         """Sequence containing a digit raises ValueError."""
@@ -449,6 +458,7 @@ class TestESMFoldBatching:
         seqs = [Candidate(data="ACDE", modality="sequence")] * 7
         result = model.predict(seqs)
         assert np.all(np.isfinite(result.means))
+        np.testing.assert_array_almost_equal(result.means, np.full(7, MOCK_PLDDT))
 
     def test_batch_size_1_calls_n_times(self, mock_components):
         """batch_size=1 -> N forward calls for N sequences."""
@@ -533,6 +543,7 @@ class TestESMFoldSequenceLengths:
                 plddt = torch.full((n, seq_len, 37), 0.4, dtype=torch.float32)
                 plddt[:, 0, :] = 0.8
                 out.plddt = plddt
+                out.atom37_atom_exists = torch.ones(n, seq_len, 37, dtype=torch.bool)
                 return out
 
             mock_mdl = MagicMock()
@@ -575,6 +586,7 @@ class TestESMFoldPLDDTMasking:
                 out = MagicMock()
                 out.ptm = torch.tensor(0.5, dtype=torch.float32)
                 out.plddt = torch.full((2, 3, 37), 0.4, dtype=torch.float32)
+                out.atom37_atom_exists = torch.ones(2, 3, 37, dtype=torch.bool)
                 return out
 
             mock_mdl = MagicMock()
@@ -621,6 +633,7 @@ class TestESMFoldPLDDTMasking:
                 plddt[:, :2, :] = 0.6  # real residues
                 plddt[:, 2, :] = 1.0  # padding position — should be excluded
                 out.plddt = plddt
+                out.atom37_atom_exists = torch.ones(1, 3, 37, dtype=torch.bool)
                 return out
 
             mock_mdl = MagicMock()
@@ -715,6 +728,56 @@ class TestESMFoldCleanup:
         with patch("alf_tools.models.esmfold.torch.cuda.is_available", return_value=False):
             model.cleanup()
         mock_mdl.float.assert_called_once()
+
+    def test_predict_after_cleanup_raises_runtime_error(self, mock_components):
+        """predict() called after cleanup() raises RuntimeError."""
+        model = ESMFoldModel(ESMFoldConfig())
+        with patch("alf_tools.models.esmfold.torch.cuda.is_available", return_value=False):
+            model.cleanup()
+        with pytest.raises(RuntimeError, match="cleanup"):
+            model.predict([Candidate(data="ACDE", modality="sequence")])
+
+
+class TestESMFoldAllZeroAttentionMask:
+    """Tests that an all-zero attention mask triggers RuntimeError."""
+
+    def test_all_zero_attention_mask_raises_runtime_error(self):
+        """All-zeros attention_mask raises RuntimeError naming the batch offset."""
+
+        def _tok_call(seqs, return_tensors="pt", padding=True, add_special_tokens=False):
+            n = len(seqs)
+            seq_len = max(len(s) for s in seqs) if seqs else 1
+            return {
+                "input_ids": torch.ones(n, seq_len, dtype=torch.long),
+                "attention_mask": torch.zeros(n, seq_len, dtype=torch.long),  # all padding
+            }
+
+        with (
+            patch("alf_tools.models.esmfold.EsmForProteinFolding") as mock_cls,
+            patch("alf_tools.models.esmfold.AutoTokenizer") as mock_tok_cls,
+        ):
+            mock_tok = MagicMock()
+            mock_tok.side_effect = _tok_call
+            mock_tok_cls.from_pretrained.return_value = mock_tok
+
+            def _model_call(**tokens):
+                n = tokens["input_ids"].shape[0]
+                seq_len = tokens["input_ids"].shape[1]
+                out = MagicMock()
+                out.ptm = torch.tensor(0.5, dtype=torch.float32)
+                out.plddt = torch.full((n, seq_len, 37), 0.6, dtype=torch.float32)
+                out.atom37_atom_exists = torch.ones(n, seq_len, 37, dtype=torch.bool)
+                return out
+
+            mock_mdl = MagicMock()
+            mock_mdl.to.return_value = mock_mdl
+            mock_mdl.side_effect = _model_call
+            mock_mdl.esm = MagicMock()
+            mock_cls.from_pretrained.return_value = mock_mdl
+
+            model = ESMFoldModel(ESMFoldConfig(scoring_metric="mean_plddt"))
+            with pytest.raises(RuntimeError, match="all-padding"):
+                model.predict([Candidate(data="ACDE", modality="sequence")])
 
 
 class _StubModel(BaseModel):

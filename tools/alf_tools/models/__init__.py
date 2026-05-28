@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
-from alf_tools.models.esmfold import ESMFoldConfig, ESMFoldModel
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.utils import (
     create_char_to_idx_mapping,
@@ -22,14 +21,18 @@ from alf_tools.models.utils import (
     one_hot_encode,
 )
 
+try:
+    from alf_tools.models.esmfold import ESMFoldConfig, ESMFoldModel
+    _ESMFOLD_AVAILABLE = True
+except ImportError:
+    _ESMFOLD_AVAILABLE = False
+
 __all__ = [
     "CNNModel",
     "CNNModelConfig",
     "CNNTrainConfig",
     "create_char_to_idx_mapping",
     "extract_sequences_from_inputs",
-    "ESMFoldConfig",
-    "ESMFoldModel",
     "FeaturizerConfig",
     "get_device",
     "GPModel",
@@ -37,3 +40,6 @@ __all__ = [
     "GPTrainConfig",
     "one_hot_encode",
 ]
+
+if _ESMFOLD_AVAILABLE:
+    __all__ += ["ESMFoldConfig", "ESMFoldModel"]
