@@ -69,3 +69,5 @@ warn_unused_configs = true
 disable_error_code = ["name-defined"]
 # Use explicit package bases to avoid duplicate conftest.py module errors
 explicit_package_bases = true
+# Source roots so mypy resolves alf_tools/alf_core as top-level packages
+mypy_path = ["tools", "core", "tutorials"]
