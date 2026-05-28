@@ -160,6 +160,14 @@ class ESM2Model(BaseModel):
                 f"{self.model_config.model_id} which has {num_layers} hidden states "
                 f"(valid: {-num_layers} to {num_layers - 1})"
             )
+        if self.model_config.pooling == "last_hidden_state" and self.train_config.batch_size > 1:
+            raise ValueError(
+                "pooling='last_hidden_state' requires batch_size=1. "
+                "Each sequence has a different length, so per-sequence hidden-state tensors "
+                "have incompatible shapes along the sequence dimension and cannot be "
+                "concatenated across mini-batches. Set train_config.batch_size=1 or "
+                "use pooling='mean' or pooling='cls' instead."
+            )
 
     def featurise(
         self, inputs: Union[LabelledCandidates, list[Candidate]]
@@ -546,6 +554,9 @@ class ESM2Model(BaseModel):
         self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None
     ) -> None:
         """Fine-tune the ESM-2 backbone using the configured training objective.
+
+        Raises:
+            AssertionError: If means have no predictions or optimizer_type is invalid.
 
         Args:
             train_data: Training data containing sequences.

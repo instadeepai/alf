@@ -203,17 +203,26 @@ class TestPredict:
         hidden_dim = model.esm_model.config.hidden_size
         assert predictions.means.shape == (len(sample_data), hidden_dim)
 
-    def test_last_hidden_state_pooling_shape(self, model_config, train_config, sample_data):
+    def test_last_hidden_state_pooling_shape(self, model_config, sample_data):
         """Test that last_hidden_state pooling produces shape (n_seqs, seq_len, hidden_dim)."""
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
+        # batch_size=1 required; batch_size>1 raises ValueError (different seq lengths)
+        train_cfg = ESM2TrainConfig(freeze_backbone=True, batch_size=1)
         model = ESM2Model(
-            name="lhs_model", model_config=config, train_config=train_config, device="cpu"
+            name="lhs_model", model_config=config, train_config=train_cfg, device="cpu"
         )
         predictions = model.predict(sample_data.candidates)
         # Shape: (n_seqs, seq_len, hidden_dim) — seq_len includes special tokens and padding
         assert predictions.means.ndim == 3
         assert predictions.means.shape[0] == len(sample_data)
         assert predictions.means.shape[2] == model.esm_model.config.hidden_size
+
+    def test_last_hidden_state_batch_size_gt_1_raises(self):
+        """last_hidden_state pooling with batch_size > 1 must raise ValueError at init."""
+        config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
+        train_cfg = ESM2TrainConfig(freeze_backbone=True, batch_size=2)
+        with pytest.raises(ValueError, match="pooling='last_hidden_state' requires batch_size=1"):
+            ESM2Model(name="lhs_bad", model_config=config, train_config=train_cfg, device="cpu")
 
     def test_variances_are_none(self, esm2_model, sample_data):
         """Test that predict returns Predictions with variances=None."""
@@ -269,9 +278,8 @@ class TestPredict:
 
     def test_predict_empty_candidates(self, esm2_model):
         """predict() with an empty list returns an empty Predictions."""
-        predictions = esm2_model.predict([])
-        hidden_dim = esm2_model.esm_model.config.hidden_size
-        assert predictions.means.shape == (0, hidden_dim)
+        with pytest.raises(AssertionError):
+            esm2_model.predict([])
 
     def test_predict_single_candidate(self, esm2_model):
         """predict() with a single candidate returns shape (1, hidden_dim)."""

@@ -55,9 +55,9 @@ class TestPredictionsInitialization:
         np.testing.assert_array_equal(predictions.empirical_dist, empirical_dist)
 
     def test_predictions_with_empty_means(self):
-        """Empty means are allowed — predict([]) returns an empty Predictions."""
-        predictions = Predictions(means=np.array([]))
-        assert len(predictions.means) == 0
+        """Empty means are not allowed — predict([]) returns an empty Predictions."""
+        with pytest.raises(AssertionError):
+            Predictions(means=np.array([]))
 
     def test_predictions_with_large_arrays(self):
         """Test Predictions initialization with large arrays."""
