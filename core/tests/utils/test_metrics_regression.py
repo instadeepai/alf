@@ -18,11 +18,20 @@ import numpy as np
 import pytest
 from alf_core.utils.metrics.base import regression_metric_registry
 from alf_core.utils.metrics.regression import (
+    coverage,
     expected_calibration_error,
     mse,
+    pairwise_xent,
     pearson,
+    rank_coverage,
+    rank_expected_calibration_error,
+    rank_width,
     regret_ucb_alpha,
+    regret_ucb_alpha_sweep,
+    residual_pearson,
+    residual_spearman,
     spearman,
+    width,
 )
 
 
@@ -61,8 +70,8 @@ class TestPearsonGuard:
         assert np.isfinite(result["pearson"])
 
     def test_zero_samples_raises(self):
-        """Zero samples raises AssertionError from check_inputs."""
-        with pytest.raises(AssertionError):
+        """Zero samples raises ValueError from check_inputs."""
+        with pytest.raises(ValueError, match="empty"):
             pearson(np.array([]), None, np.array([]))
 
 
@@ -87,8 +96,8 @@ class TestSpearmanGuard:
         assert np.isfinite(result["spearman"])
 
     def test_zero_samples_raises(self):
-        """Zero samples raises AssertionError from check_inputs."""
-        with pytest.raises(AssertionError):
+        """Zero samples raises ValueError from check_inputs."""
+        with pytest.raises(ValueError, match="empty"):
             spearman(np.array([]), None, np.array([]))
 
 
@@ -162,3 +171,262 @@ class TestRegressionRegistryIntegration:
             "width",
             "regret_ucb_alpha_sweep",
         }.issubset(var_metrics)
+
+
+class TestWidth:
+    """Tests for width metric."""
+
+    def test_zero_range_targets_returns_empty(self):
+        """All-equal targets means range is zero — width returns {}."""
+        result = width(np.array([5.0, 5.0]), np.array([1.0, 1.0]), np.array([5.0, 5.0]))
+        assert result == {}
+
+    def test_positive_width_ratio(self):
+        """Standard inputs return a non-negative width ratio."""
+        result = width(
+            np.array([1.0, 2.0, 3.0]), np.array([0.5, 0.5, 0.5]), np.array([1.0, 2.0, 3.0])
+        )
+        assert len(result) > 0
+        for v in result.values():
+            assert v >= 0.0
+
+
+class TestRegretUcbAlphaSweep:
+    """Tests for regret_ucb_alpha_sweep."""
+
+    def test_empty_alpha_list_raises_value_error(self):
+        """Empty alpha list raises ValueError."""
+        means = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        variances = np.ones(5)
+        targets = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
+        with pytest.raises(ValueError):
+            regret_ucb_alpha_sweep(means, variances, targets, alpha=[])
+
+    def test_bad_alpha_type_raises_type_error(self):
+        """Non-float, non-list alpha raises TypeError."""
+        means = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        variances = np.ones(5)
+        targets = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
+        with pytest.raises(TypeError):
+            regret_ucb_alpha_sweep(means, variances, targets, alpha="bad")
+
+    def test_float_alpha_works(self):
+        """Single float alpha runs successfully."""
+        means = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        variances = np.ones(5)
+        targets = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
+        result = regret_ucb_alpha_sweep(means, variances, targets, alpha=0.5)
+        assert len(result) > 0
+
+
+class TestRegretUcbAlphaEdgeCases:
+    """Additional edge case tests for regret_ucb_alpha."""
+
+    def test_num_acquisitions_exceeds_dataset_warns_and_returns_result(self):
+        """num_acquisitions > len(means) warns and falls back."""
+        means = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        variances = np.zeros(5)
+        targets = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
+        with pytest.warns(UserWarning):
+            result = regret_ucb_alpha(means, variances, targets, alpha=0.0, num_acquisitions=100)
+        assert len(result) > 0
+
+
+class TestCoverage:
+    """Tests for coverage metric."""
+
+    def test_returns_coverage_key(self):
+        """Coverage returns a dict with coverage_{alpha:.2f} key."""
+        result = coverage(
+            np.array([0.0, 1.0, 2.0]),
+            np.array([1.0, 1.0, 1.0]),
+            np.array([0.0, 1.0, 2.0]),
+        )
+        assert "coverage_0.95" in result
+        assert 0.0 <= result["coverage_0.95"] <= 1.0
+
+    def test_one_sample_returns_coverage(self):
+        """Single sample still computes coverage (no min-samples guard)."""
+        result = coverage(np.array([1.0]), np.array([1.0]), np.array([1.0]))
+        assert "coverage_0.95" in result
+
+    def test_return_type_is_dict_of_float(self):
+        """Return value is dict with float values."""
+        result = coverage(
+            np.array([1.0, 2.0, 3.0]),
+            np.array([0.5, 0.5, 0.5]),
+            np.array([1.0, 2.0, 3.0]),
+        )
+        assert isinstance(result, dict)
+        for v in result.values():
+            assert isinstance(float(v), float)
+
+
+class TestRankCoverage:
+    """Tests for rank_coverage metric."""
+
+    def test_returns_rank_coverage_key(self):
+        """rank_coverage returns a dict with rank_coverage_{alpha:.2f} key."""
+        rng = np.random.default_rng(42)
+        means = rng.standard_normal(5)
+        variances = np.abs(rng.standard_normal(5)) + 0.1
+        targets = rng.standard_normal(5)
+        result = rank_coverage(means, variances, targets)
+        assert "rank_coverage_0.95" in result
+        assert 0.0 <= result["rank_coverage_0.95"] <= 1.0
+
+    def test_return_type_is_dict_of_float(self):
+        """Return value is dict with float values."""
+        rng = np.random.default_rng(0)
+        means = rng.standard_normal(4)
+        variances = np.abs(rng.standard_normal(4)) + 0.1
+        targets = rng.standard_normal(4)
+        result = rank_coverage(means, variances, targets)
+        assert isinstance(result, dict)
+        for v in result.values():
+            assert isinstance(float(v), float)
+
+
+class TestRankExpectedCalibrationError:
+    """Tests for rank_expected_calibration_error metric."""
+
+    def test_returns_rank_ece_key(self):
+        """rank_expected_calibration_error returns a dict with rank_ece key."""
+        rng = np.random.default_rng(42)
+        means = rng.standard_normal(5)
+        variances = np.abs(rng.standard_normal(5)) + 0.1
+        targets = rng.standard_normal(5)
+        result = rank_expected_calibration_error(means, variances, targets)
+        assert "rank_ece" in result
+        assert result["rank_ece"] >= 0.0
+
+    def test_return_type_is_dict_of_float(self):
+        """Return value is dict with float values."""
+        rng = np.random.default_rng(1)
+        means = rng.standard_normal(4)
+        variances = np.abs(rng.standard_normal(4)) + 0.1
+        targets = rng.standard_normal(4)
+        result = rank_expected_calibration_error(means, variances, targets)
+        assert isinstance(result, dict)
+        for v in result.values():
+            assert isinstance(float(v), float)
+
+
+class TestRankWidth:
+    """Tests for rank_width metric."""
+
+    def test_returns_rank_width_key(self):
+        """rank_width returns a dict with rank_width_{alpha:.2f} key."""
+        rng = np.random.default_rng(42)
+        means = rng.standard_normal(5)
+        variances = np.abs(rng.standard_normal(5)) + 0.1
+        targets = rng.standard_normal(5)
+        result = rank_width(means, variances, targets)
+        assert "rank_width_0.95" in result
+        assert result["rank_width_0.95"] >= 0.0
+
+    def test_return_type_is_dict_of_float(self):
+        """Return value is dict with float values."""
+        rng = np.random.default_rng(2)
+        means = rng.standard_normal(4)
+        variances = np.abs(rng.standard_normal(4)) + 0.1
+        targets = rng.standard_normal(4)
+        result = rank_width(means, variances, targets)
+        assert isinstance(result, dict)
+        for v in result.values():
+            assert isinstance(float(v), float)
+
+
+class TestResidualSpearman:
+    """Tests for residual_spearman metric."""
+
+    def test_returns_residual_spearman_key(self):
+        """residual_spearman returns a dict with residual_spearman key."""
+        rng = np.random.default_rng(42)
+        means = rng.standard_normal(5)
+        variances = np.abs(rng.standard_normal(5)) + 0.1
+        targets = rng.standard_normal(5)
+        result = residual_spearman(means, variances, targets)
+        assert "residual_spearman" in result
+
+    def test_value_in_range(self):
+        """residual_spearman value is in [-1, 1] or NaN for degenerate inputs."""
+        rng = np.random.default_rng(10)
+        means = rng.standard_normal(10)
+        variances = np.abs(rng.standard_normal(10)) + 0.1
+        targets = rng.standard_normal(10)
+        result = residual_spearman(means, variances, targets)
+        val = result["residual_spearman"]
+        assert np.isnan(val) or (-1.0 <= val <= 1.0)
+
+    def test_return_type_is_dict(self):
+        """Return value is dict."""
+        rng = np.random.default_rng(3)
+        means = rng.standard_normal(3)
+        variances = np.abs(rng.standard_normal(3)) + 0.1
+        targets = rng.standard_normal(3)
+        result = residual_spearman(means, variances, targets)
+        assert isinstance(result, dict)
+
+
+class TestResidualPearson:
+    """Tests for residual_pearson metric."""
+
+    def test_returns_residual_pearson_key(self):
+        """residual_pearson returns a dict with residual_pearson key."""
+        rng = np.random.default_rng(42)
+        means = rng.standard_normal(5)
+        variances = np.abs(rng.standard_normal(5)) + 0.1
+        targets = rng.standard_normal(5)
+        result = residual_pearson(means, variances, targets)
+        assert "residual_pearson" in result
+
+    def test_value_in_range(self):
+        """residual_pearson value is in [-1, 1] or NaN for degenerate inputs."""
+        rng = np.random.default_rng(20)
+        means = rng.standard_normal(10)
+        variances = np.abs(rng.standard_normal(10)) + 0.1
+        targets = rng.standard_normal(10)
+        result = residual_pearson(means, variances, targets)
+        val = result["residual_pearson"]
+        assert np.isnan(val) or (-1.0 <= val <= 1.0)
+
+    def test_return_type_is_dict(self):
+        """Return value is dict."""
+        rng = np.random.default_rng(4)
+        means = rng.standard_normal(3)
+        variances = np.abs(rng.standard_normal(3)) + 0.1
+        targets = rng.standard_normal(3)
+        result = residual_pearson(means, variances, targets)
+        assert isinstance(result, dict)
+
+
+class TestPairwiseXent:
+    """Tests for pairwise_xent metric."""
+
+    def test_returns_pairwise_xent_key(self):
+        """pairwise_xent returns a dict with pairwise_xent key."""
+        result = pairwise_xent(
+            np.array([1.0, 2.0, 3.0]),
+            None,
+            np.array([3.0, 2.0, 1.0]),
+        )
+        assert "pairwise_xent" in result
+
+    def test_value_is_non_negative(self):
+        """pairwise_xent value is non-negative."""
+        rng = np.random.default_rng(42)
+        means = rng.standard_normal(5)
+        targets = rng.standard_normal(5)
+        result = pairwise_xent(means, None, targets)
+        assert result["pairwise_xent"] >= 0.0
+
+    def test_return_type_is_dict_of_float(self):
+        """Return value is dict with float value."""
+        result = pairwise_xent(
+            np.array([0.0, 1.0, 2.0]),
+            None,
+            np.array([0.0, 1.0, 2.0]),
+        )
+        assert isinstance(result, dict)
+        assert isinstance(float(result["pairwise_xent"]), float)

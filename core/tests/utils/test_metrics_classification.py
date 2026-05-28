@@ -180,6 +180,18 @@ class TestAucRoc:
         targets = np.array([0, 1])
         assert isinstance(auc_roc(probs, targets)["auc_roc"], float)
 
+    def test_single_class_targets_returns_empty(self):
+        """Fewer than 2 unique classes returns empty dict."""
+        probs = np.array([[0.2, 0.8], [0.3, 0.7]])
+        targets = np.array([1, 1])
+        assert auc_roc(probs, targets) == {}
+
+    def test_one_sample_require_min_returns_empty(self):
+        """1 sample triggers require_min_samples guard and returns {}."""
+        probs = np.array([[0.4, 0.6]])
+        targets = np.array([1])
+        assert auc_roc(probs, targets) == {}
+
 
 class TestClassificationMetricInputValidation:
     """Tests for input validation in the classification_metric decorator."""

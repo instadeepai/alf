@@ -42,34 +42,26 @@ class TestRegisterBenchmarkingMetric:
 
     def test_decorator_registers_function(self):
         """Decorated function is added to the global benchmarking registry."""
-        initial_count = len(benchmarking_metric_registry.get_metrics())
+        fresh_registry = BenchmarkingMetricRegistry()
 
-        @register_benchmarking_metric
-        def my_test_metric(means, targets):
-            """Dummy benchmarking metric.
+        def my_isolated_test_metric(means, targets):
+            """Dummy metric. Returns: dict."""
+            return {"my_isolated_test_metric": 0.0}
 
-            Returns:
-                dict with a single key "my_test_metric".
-            """
-            return {"my_test_metric": 0.0}
-
-        assert len(benchmarking_metric_registry.get_metrics()) == initial_count + 1
-        assert "my_test_metric" in benchmarking_metric_registry.get_metrics()
+        fresh_registry.register(my_isolated_test_metric.__name__, my_isolated_test_metric)
+        assert "my_isolated_test_metric" in fresh_registry.get_metrics()
 
     def test_decorated_function_is_callable(self):
         """Decorated and registered function remains callable."""
 
         @register_benchmarking_metric
-        def another_metric(means, targets):
-            """Dummy benchmarking metric.
+        def another_isolated_metric(means, targets):
+            """Dummy metric. Returns: dict."""
+            return {"another_isolated_metric": float(len(means))}
 
-            Returns:
-                dict with a single key "another_metric".
-            """
-            return {"another_metric": float(len(means))}
-
-        result = another_metric(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0]))
-        assert result == {"another_metric": 3.0}
+        result = another_isolated_metric(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0]))
+        assert result == {"another_isolated_metric": 3.0}
+        assert "another_isolated_metric" in benchmarking_metric_registry.get_metrics()
 
 
 class TestGlobalBenchmarkingRegistryInstance:

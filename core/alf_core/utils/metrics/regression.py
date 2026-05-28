@@ -34,7 +34,7 @@ from alf_core.utils.metrics.base import (
 from jaxtyping import Float
 from scipy.stats import norm, pearsonr, spearmanr
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("alf-core")
 
 
 def register_requires_variance(metric_fn: Callable) -> Callable:
@@ -100,6 +100,7 @@ def monte_carlo_ranking(
     means: Float[np.ndarray, " b"],
     variances: Float[np.ndarray, " b"],
     num_samples: int = 10000,
+    seed: int = 42,
 ) -> tuple[Float[np.ndarray, " b"], Float[np.ndarray, " b"]]:
     """Compute ranks, their means and variances using Monte Carlo simulation.
 
@@ -111,17 +112,18 @@ def monte_carlo_ranking(
         variances: Array of shape (b,). Predicted variances.
         num_samples: Number of random samples to draw for the simulation.
             Defaults to 10000.
+        seed: Random seed for reproducibility. Defaults to 42.
 
     Returns:
         A tuple containing:
         - mean_rank: Mean rank for each candidate
         - rank_variances: Variance of ranks for each candidate
     """
-    np.random.seed(42)
+    rng = np.random.default_rng(seed)
     n = len(means)
 
     # Simulate Gaussian scores
-    mean_samples = np.random.normal(loc=means, scale=np.sqrt(variances), size=(num_samples, n))
+    mean_samples = rng.normal(loc=means, scale=np.sqrt(variances), size=(num_samples, n))
 
     # Compute hard ranks for each sample
     rank_samples = np.argsort(np.argsort(-mean_samples, axis=1), axis=1) + 1
@@ -300,7 +302,7 @@ def rank_expected_calibration_error(
     Returns:
         Dictionary with key "rank_ece" mapping to the ECE value.
     """
-    mean_rank, rank_variances = monte_carlo_ranking(means, variances)
+    mean_rank, rank_variances = monte_carlo_ranking(means, variances, seed=42)
     target_ranks = (-targets).argsort().argsort() + 1
 
     ece = expected_calibration_error(mean_rank, rank_variances, target_ranks)["ece"]
@@ -381,7 +383,7 @@ def rank_width(
     """
     assert (alpha >= 0) and (alpha <= 1), "alpha should be in [0,1]"
 
-    mean_rank, rank_variances = monte_carlo_ranking(means, variances)
+    mean_rank, rank_variances = monte_carlo_ranking(means, variances, seed=42)
     target_ranks = (-targets).argsort().argsort() + 1
 
     avg_width_ratio = width(mean_rank, rank_variances, target_ranks, alpha)[f"width_{alpha:.2f}"]
@@ -453,7 +455,7 @@ def rank_coverage(
     """
     assert (alpha >= 0) and (alpha <= 1), "alpha should be in [0,1]"
 
-    mean_rank, rank_variances = monte_carlo_ranking(means, variances)
+    mean_rank, rank_variances = monte_carlo_ranking(means, variances, seed=42)
     target_ranks = (-targets).argsort().argsort() + 1
     coverage_at_alpha = coverage(mean_rank, rank_variances, target_ranks, alpha)[
         f"coverage_{alpha:.2f}"

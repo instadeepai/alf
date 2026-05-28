@@ -33,7 +33,7 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("alf-core")
 
 
 def register_classification_metric(metric_fn: Callable) -> Callable:

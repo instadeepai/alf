@@ -35,23 +35,23 @@ class TestCheckInputs:
         check_inputs(np.array([1.0, 2.0]), np.array([1.0, 2.0]))
 
     def test_shape_mismatch_raises(self):
-        """Mismatched shapes raise AssertionError."""
-        with pytest.raises(AssertionError, match="shape"):
+        """Mismatched shapes raise ValueError."""
+        with pytest.raises(ValueError, match="shape"):
             check_inputs(np.array([1.0, 2.0]), np.array([1.0]))
 
     def test_empty_arrays_raise(self):
-        """Empty arrays raise AssertionError."""
-        with pytest.raises(AssertionError, match="empty"):
+        """Empty arrays raise ValueError."""
+        with pytest.raises(ValueError, match="empty"):
             check_inputs(np.array([]), np.array([]))
 
     def test_nan_means_raise(self):
-        """NaN in means raises AssertionError."""
-        with pytest.raises(AssertionError, match="NaN"):
+        """NaN in means raises ValueError."""
+        with pytest.raises(ValueError, match="NaN"):
             check_inputs(np.array([np.nan, 1.0]), np.array([1.0, 2.0]))
 
     def test_nan_targets_raise(self):
-        """NaN in targets raises AssertionError."""
-        with pytest.raises(AssertionError, match="NaN"):
+        """NaN in targets raises ValueError."""
+        with pytest.raises(ValueError, match="NaN"):
             check_inputs(np.array([1.0, 2.0]), np.array([np.nan, 2.0]))
 
 
@@ -63,23 +63,23 @@ class TestCheckVarianceValidity:
         check_variance_validity(np.array([0.1, 0.2]), np.array([1.0, 2.0]))
 
     def test_none_variances_raise(self):
-        """None variances raise AssertionError."""
-        with pytest.raises(AssertionError):
+        """None variances raise TypeError."""
+        with pytest.raises(TypeError, match="variances is None"):
             check_variance_validity(None, np.array([1.0, 2.0]))
 
     def test_negative_variance_raises(self):
-        """Negative variance raises AssertionError."""
-        with pytest.raises(AssertionError, match="non-negative"):
+        """Negative variance raises ValueError."""
+        with pytest.raises(ValueError, match="non-negative"):
             check_variance_validity(np.array([-0.1, 0.2]), np.array([1.0, 2.0]))
 
     def test_length_mismatch_raises(self):
-        """Length mismatch raises AssertionError."""
-        with pytest.raises(AssertionError, match="variances has"):
+        """Length mismatch raises ValueError."""
+        with pytest.raises(ValueError, match="variances has"):
             check_variance_validity(np.array([0.1]), np.array([1.0, 2.0]))
 
     def test_nan_variance_raises(self):
-        """NaN variance raises AssertionError with NaN message."""
-        with pytest.raises(AssertionError, match="NaN"):
+        """NaN variance raises ValueError with NaN message."""
+        with pytest.raises(ValueError, match="NaN"):
             check_variance_validity(np.array([np.nan, 0.2]), np.array([1.0, 2.0]))
 
 

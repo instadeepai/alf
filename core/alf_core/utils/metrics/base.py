@@ -20,7 +20,7 @@ from typing import Any, Callable
 
 import numpy as np
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("alf-core")
 
 
 def check_inputs(means: np.ndarray, targets: np.ndarray) -> None:
@@ -31,15 +31,19 @@ def check_inputs(means: np.ndarray, targets: np.ndarray) -> None:
         targets: Array of target values.
 
     Raises:
-        AssertionError: If shapes don't match, arrays are empty, or contain NaN values.
+        ValueError: If shapes don't match, arrays are empty, or contain NaN values.
     """
-    assert means.shape == targets.shape, (
-        f"Means shape {means.shape} does not match targets shape {targets.shape} "
-        f"(both must be (b,))"
-    )
-    assert len(means) != 0, "Means and targets must not be empty (expected shape (b,) with b > 0)"
-    assert not (np.any(np.isnan(means))), "Mean prediction array contains NaN values"
-    assert not (np.any(np.isnan(targets))), "Target array contains NaN values"
+    if means.shape != targets.shape:
+        raise ValueError(
+            f"Means shape {means.shape} does not match targets shape {targets.shape} "
+            f"(both must be (b,))"
+        )
+    if len(means) == 0:
+        raise ValueError("Means and targets must not be empty (expected shape (b,) with b > 0)")
+    if np.any(np.isnan(means)):
+        raise ValueError("Mean prediction array contains NaN values")
+    if np.any(np.isnan(targets)):
+        raise ValueError("Target array contains NaN values")
 
 
 def check_variance_validity(variances: np.ndarray, targets: np.ndarray) -> None:
@@ -50,30 +54,35 @@ def check_variance_validity(variances: np.ndarray, targets: np.ndarray) -> None:
         targets: Array of target values.
 
     Raises:
-        AssertionError: If variances is None, contains negative values, length
-            doesn't match targets, or contains NaN values.
+        TypeError: If variances is None.
+        ValueError: If variances contains negative values, length doesn't match targets,
+            or contains NaN values.
     """
-    assert variances is not None, (
-        "variances is None — this metric requires uncertainty estimates; "
-        "ensure your model's predict() returns a Predictions object with variances set "
-        "or that the problem type is correctly specified."
-    )
-    assert len(variances) == len(targets), (
-        f"variances has {len(variances)} elements but targets has {len(targets)} — "
-        f"both must have shape (b,)"
-    )
-    assert not (np.any(np.isnan(variances))), "Variance arrays contain NaN values"
-    assert np.all(variances >= 0), (
-        f"variances must be non-negative, but {np.sum(variances < 0)} values are negative "
-        f"(min={variances.min():.4g})"
-    )
+    if variances is None:
+        raise TypeError(
+            "variances is None — this metric requires uncertainty estimates; "
+            "ensure your model's predict() returns a Predictions object with variances set "
+            "or that the problem type is correctly specified."
+        )
+    if len(variances) != len(targets):
+        raise ValueError(
+            f"variances has {len(variances)} elements but targets has {len(targets)} — "
+            f"both must have shape (b,)"
+        )
+    if np.any(np.isnan(variances)):
+        raise ValueError("Variance arrays contain NaN values")
+    if not np.all(variances >= 0):
+        raise ValueError(
+            f"variances must be non-negative, but {np.sum(variances < 0)} values are negative "
+            f"(min={variances.min():.4g})"
+        )
 
 
 def require_min_samples(n: int) -> Callable:
     """Decorator factory that requires a minimum number of samples.
 
     If the decorated function is called with fewer than n samples (based on
-    the length of the means array), returns an empty dictionary instead of
+    the length of the first positional argument), returns an empty dictionary instead of
     calling the function.
 
     Args:
@@ -88,8 +97,10 @@ def require_min_samples(n: int) -> Callable:
         def wrapper(*args: Any, **kwargs: Any) -> dict[str, float]:
             if len(args[0]) < n:
                 logger.warning(
-                    f"Insufficient samples for metric {fn.__name__}: got "
-                    f"{len(args[0])}, expected at least {n}"
+                    "Insufficient samples for metric %s: got %d, expected at least %d",
+                    fn.__name__,
+                    len(args[0]),
+                    n,
                 )
                 return {}
             return fn(*args, **kwargs)
@@ -157,7 +168,7 @@ class ClassificationMetricRegistry:
         Returns:
             Dictionary mapping metric names to their functions.
         """
-        return {name: fn for name, fn in self.metrics.items()}
+        return dict(self.metrics)
 
 
 # Create the global registry instances
