@@ -54,7 +54,7 @@ def esm2_model(model_config, train_config):
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="class")
 def esm2_finetune_model():
     """ESM-2 model with unfrozen backbone for fine-tuning tests.
 
@@ -72,7 +72,7 @@ def esm2_finetune_model():
     return ESM2Model(name="test_esm2_ft", model_config=config, train_config=train_cfg, device="cpu")
 
 
-@pytest.fixture
+@pytest.fixture(scope="class")
 def esm2_ll_model():
     """ESM-2 model configured for log-likelihood training.
 
