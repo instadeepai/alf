@@ -206,8 +206,25 @@ def _download_file(url: str, filepath: Path, max_lines: int | None = None) -> Pa
         FileNotFoundError: If the server returns a non-200 status code.
     """
     if filepath.exists():
-        logger.info("  ✓ %s already exists, skipping.", filepath)
-        return filepath
+        if max_lines is not None:
+            # Validate the cached file has at least max_lines non-empty lines.
+            # If a prior run wrote fewer lines (smaller max_molecules), re-download.
+            with open(filepath, "rb") as fh:
+                cached_count = sum(1 for line in fh if line.strip())
+            if cached_count < max_lines:
+                logger.info(
+                    "  ↻ %s is stale (%d lines < %d requested); removing and re-downloading.",
+                    filepath.name,
+                    cached_count,
+                    max_lines,
+                )
+                filepath.unlink()
+            else:
+                logger.info("  ✓ %s already exists, skipping.", filepath)
+                return filepath
+        else:
+            logger.info("  ✓ %s already exists, skipping.", filepath)
+            return filepath
 
     logger.info(
         "  ↓ Downloading %s%s...",

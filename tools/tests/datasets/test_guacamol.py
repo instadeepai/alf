@@ -478,6 +478,32 @@ class TestDownloadFile:
         written = [ln for ln in out.read_text().splitlines() if ln.strip()]
         assert len(written) == 2
 
+    def test_stale_cache_re_downloads_when_too_small(self, tmp_path):
+        """If cached file has fewer lines than max_lines, it is deleted and re-downloaded."""
+        out = tmp_path / "out.smiles"
+        # Write a stale 2-line file
+        out.write_bytes(b"c1ccccc1\nCCO\n")
+
+        fresh_lines = [b"c1ccccc1", b"CCO", b"CC(=O)O", b"c1ccncc1", b"NCCc1ccc(O)c(O)c1"]
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.iter_lines.return_value = iter(fresh_lines)
+
+        with patch("requests.get", return_value=mock_resp):
+            _download_file("https://example.com/fake.smiles", out, max_lines=5)
+
+        written = [ln for ln in out.read_text().splitlines() if ln.strip()]
+        assert len(written) == 5  # re-downloaded, not the stale 2-line file
+
+    def test_cache_not_re_downloaded_when_sufficient(self, tmp_path):
+        """If cached file has at least max_lines lines, download is skipped."""
+        out = tmp_path / "out.smiles"
+        out.write_bytes(b"c1ccccc1\nCCO\nCC(=O)O\n")  # 3 lines
+
+        with patch("requests.get") as mock_get:
+            _download_file("https://example.com/fake.smiles", out, max_lines=2)
+            mock_get.assert_not_called()
+
 
 class TestGuacaMolWithFixtures:
     """Integration tests using synthetic fixtures — no network calls."""
