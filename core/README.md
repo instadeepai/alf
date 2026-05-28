@@ -376,7 +376,7 @@ computed values. Metrics requiring variance will validate that uncertainty estim
 
 ### Classification Metrics (`ProblemType.BINARY` and `ProblemType.MULTICLASS`)
 
-- **Accuracy**: Macro-averaged classification accuracy
+- **Accuracy**: Classification accuracy (fraction of correct predictions)
 - **F1**: Macro-averaged F1 score
 - **Precision**: Macro-averaged precision
 - **Recall**: Macro-averaged recall
