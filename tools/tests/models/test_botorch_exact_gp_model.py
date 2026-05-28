@@ -240,8 +240,8 @@ class TestBoTorchGPModelTraining:
         # Second training (should work)
         model.train(simple_2d_training_data)
 
-        # Metrics should have two entries now
-        assert len(model._training_metrics["loss"]) == 2
+        # Metrics reset on each train() call, so only 1 entry
+        assert len(model._training_metrics["loss"]) == 1
 
     def test_train_with_1d_output(self):
         """Test training with 1D output (automatically reshaped to 2D)."""
@@ -373,16 +373,16 @@ class TestBoTorchGPModelMetrics:
         assert metrics == {}
 
     def test_metrics_updated_after_multiple_trainings(self, simple_2d_training_data):
-        """Test that metrics accumulate across multiple trainings."""
+        """Test that metrics reset and reflect only the most recent training."""
         model = BoTorchGPModel(num_iterations=20)
 
         # Train twice
         model.train(simple_2d_training_data)
         model.train(simple_2d_training_data)
 
-        # Should have 2 loss values
-        assert len(model._training_metrics["loss"]) == 2
-        assert len(model._training_metrics["iteration"]) == 2
+        # Metrics reset on each train() call, so only 1 entry
+        assert len(model._training_metrics["loss"]) == 1
+        assert len(model._training_metrics["iteration"]) == 1
 
 
 class TestBoTorchGPModelSample:
@@ -617,3 +617,61 @@ class TestBoTorchGPModelIntegration:
         metrics = model.get_training_summary_metrics()
         assert "final_loss" in metrics
         assert np.isfinite(metrics["final_loss"])
+
+
+class TestBoTorchGPModelKernelTypes:
+    """Tests for kernel type selection, ARD, and Hvarfner priors."""
+
+    def test_matern_kernel_trains_without_error(self, simple_2d_training_data, test_2d_candidates):
+        """Training with kernel_type='matern' completes without error."""
+        model = BoTorchGPModel(kernel_type="matern", num_iterations=20)
+        model.train(simple_2d_training_data)
+        preds = model.predict(test_2d_candidates)
+        assert preds.means.shape == (5,)
+        assert np.all(np.isfinite(preds.means))
+
+    def test_rbf_kernel_trains_without_error(self, simple_2d_training_data, test_2d_candidates):
+        """Training with kernel_type='rbf' (explicit) completes without error."""
+        model = BoTorchGPModel(kernel_type="rbf", num_iterations=20)
+        model.train(simple_2d_training_data)
+        preds = model.predict(test_2d_candidates)
+        assert preds.means.shape == (5,)
+        assert np.all(np.isfinite(preds.means))
+
+    def test_ard_kernel_trains_without_error(self, simple_2d_training_data, test_2d_candidates):
+        """Training with use_ard=True completes without error."""
+        model = BoTorchGPModel(use_ard=True, num_iterations=20)
+        model.train(simple_2d_training_data)
+        preds = model.predict(test_2d_candidates)
+        assert preds.means.shape == (5,)
+        assert np.all(np.isfinite(preds.means))
+
+    def test_invalid_kernel_type_raises_value_error(self, simple_2d_training_data):
+        """Invalid kernel_type raises ValueError on train(), not silent fallback."""
+        model = BoTorchGPModel(num_iterations=10)
+        model.kernel_type = "invalid_kernel"  # Override after init
+        with pytest.raises(ValueError, match="Invalid kernel_type"):
+            model.train(simple_2d_training_data)
+
+    def test_default_kernel_has_hvarfner_priors(self, simple_2d_training_data):
+        """Default kernel (kernel_type=None) registers Hvarfner lengthscale prior."""
+        model = BoTorchGPModel(kernel_type=None, num_iterations=20)
+        model.train(simple_2d_training_data)
+        # The covar_module's base kernel should have a lengthscale_prior registered
+        base_kernel = model.model.covar_module.base_kernel
+        assert hasattr(base_kernel, "lengthscale_prior")
+        assert base_kernel.lengthscale_prior is not None
+
+    def test_rbf_kernel_has_hvarfner_priors(self, simple_2d_training_data):
+        """Explicit 'rbf' kernel also registers Hvarfner lengthscale prior."""
+        model = BoTorchGPModel(kernel_type="rbf", num_iterations=20)
+        model.train(simple_2d_training_data)
+        base_kernel = model.model.covar_module.base_kernel
+        assert hasattr(base_kernel, "lengthscale_prior")
+        assert base_kernel.lengthscale_prior is not None
+
+    def test_botorch_model_property_raises_before_training(self):
+        """botorch_model property raises RuntimeError if model is not trained."""
+        model = BoTorchGPModel()
+        with pytest.raises(RuntimeError, match="Model must be trained"):
+            _ = model.botorch_model

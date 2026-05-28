@@ -62,7 +62,7 @@ class BoTorchModelAdapter(Model):
 
     Example with BoTorch GP Model:
         >>> from botorch.models import SingleTaskGP
-        >>> from alf_tools.models.model_adapter import BoTorchModelAdapter
+        >>> from alf_tools.models.utils.botorch_model_adapter import BoTorchModelAdapter
         >>>
         >>> # Native BoTorch model
         >>> gp_model = SingleTaskGP(train_X, train_Y)
@@ -71,7 +71,7 @@ class BoTorchModelAdapter(Model):
 
     Example with ALF BaseModel:
         >>> from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
-        >>> from alf_tools.models.model_adapter import BoTorchModelAdapter
+        >>> from alf_tools.models.utils.botorch_model_adapter import BoTorchModelAdapter
         >>>
         >>> # ALF BaseModel wrapping BoTorch model
         >>> alf_model = BoTorchGPModel()
@@ -81,7 +81,7 @@ class BoTorchModelAdapter(Model):
 
     Example with acquisition function:
         >>> from botorch.acquisition import qExpectedImprovement
-        >>> from alf_tools.models.model_adapter import BoTorchModelAdapter
+        >>> from alf_tools.models.utils.botorch_model_adapter import BoTorchModelAdapter
         >>>
         >>> adapter = BoTorchModelAdapter(surrogate_model)
         >>> acq_fn = qExpectedImprovement(model=adapter, best_f=best_value)
@@ -187,7 +187,7 @@ class BoTorchModelAdapter(Model):
             )
 
         # Convert predictions to BoTorch posterior
-        posterior = predictions_to_posterior(predictions)
+        posterior = predictions_to_posterior(predictions, device=X_2d.device)
 
         # If input was 3D, reshape the posterior to have proper batch structure
         # BoTorch expects MVN with batch_shape=(batch_size,) and event_shape=(q,)

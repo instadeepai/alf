@@ -16,6 +16,7 @@ from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.utils import (
+    BoTorchModelAdapter,
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
     get_device,
@@ -24,6 +25,7 @@ from alf_tools.models.utils import (
 
 __all__ = [
     "BoTorchGPModel",
+    "BoTorchModelAdapter",
     "CNNModel",
     "CNNModelConfig",
     "CNNTrainConfig",

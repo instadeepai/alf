@@ -231,7 +231,7 @@ def get_bounds_tensor(
     if device is None:
         device = torch.device("cpu")
 
-    def is_valid_bounds_array(arr):
+    def is_valid_bounds_array(arr: np.ndarray) -> bool:
         return (
             isinstance(arr, np.ndarray)
             and arr.ndim == 2

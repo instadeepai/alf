@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from alf_tools.models.utils.botorch_model_adapter import BoTorchModelAdapter
 from alf_tools.models.utils.data_utils import transform_data
 from alf_tools.models.utils.sequence_utils import (
     create_char_to_idx_mapping,
@@ -21,6 +22,7 @@ from alf_tools.models.utils.sequence_utils import (
 from alf_tools.models.utils.torch_utils import get_device
 
 __all__ = [
+    "BoTorchModelAdapter",
     "create_char_to_idx_mapping",
     "extract_sequences_from_inputs",
     "get_device",

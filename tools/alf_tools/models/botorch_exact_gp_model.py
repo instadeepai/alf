@@ -25,13 +25,15 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
+from alf_core.model.normaliser import InputNormaliser
 from botorch.fit import fit_gpytorch_mll
 from botorch.models import SingleTaskGP
+from botorch.models.transforms.outcome import Standardize
 from botorch.optim.fit import fit_gpytorch_mll_torch
 from gpytorch.constraints.constraints import GreaterThan
 from gpytorch.kernels import MaternKernel, RBFKernel, ScaleKernel
@@ -92,7 +94,7 @@ class BoTorchGPModel(BaseModel):
         max_attempts: int = 5,
         device: Optional[str] = None,
         dtype: torch.dtype = torch.float32,
-        kernel_type: str | None = None,
+        kernel_type: Literal["matern", "rbf"] | None = None,
         nu: float = 2.5,
         use_ard: bool = False,
     ):
@@ -116,7 +118,10 @@ class BoTorchGPModel(BaseModel):
                 up to max_attempts times with different initializations.
             device: Device to run on ('cpu' or 'cuda'). If None, auto-detects.
             dtype: Data type for tensors. Default: torch.float32.
-            kernel_type: "matern" or None. If None, RBF is used by default.
+            kernel_type: Kernel type to use. Options: "matern", "rbf", or None.
+                If None (default), RBF with Hvarfner et al. 2024 priors is used.
+                If "rbf", RBF with Hvarfner priors is used (same as None but explicit).
+                If "matern", Matérn kernel with nu parameter is used (no priors).
             nu: nu value for Matern kernel. Default 2.5 aka Matern 5/2.
             use_ard: Whether to use ARD (Automatic Relevance Determination) in the
                 kernel. Default: False.
@@ -150,6 +155,7 @@ class BoTorchGPModel(BaseModel):
         self.model: Optional[SingleTaskGP] = None
         self.train_X: Optional[torch.Tensor] = None
         self.train_Y: Optional[torch.Tensor] = None
+        self._input_normaliser: InputNormaliser | None = None
 
         # Training metrics
         self._training_metrics: dict[str, list[float]] = {
@@ -175,6 +181,14 @@ class BoTorchGPModel(BaseModel):
         return candidates_to_tensor(inputs, device=self.device, dtype=self.dtype)
 
     def _validate_shape(self, tensor: torch.Tensor) -> None:
+        """Validate that a tensor is 2-D.
+
+        Args:
+            tensor: Tensor to validate.
+
+        Raises:
+            ValueError: If tensor is not 2-D.
+        """
         if tensor.ndim != 2:
             raise ValueError(f"Expected 2D input tensor, got shape {tensor.shape}")
 
@@ -193,6 +207,8 @@ class BoTorchGPModel(BaseModel):
         Raises:
             ValueError: If training data is empty or has invalid format.
         """
+        self._training_metrics = {"loss": [], "iteration": []}
+
         if len(train_data.candidates) == 0:
             raise ValueError("Training data cannot be empty")
 
@@ -210,15 +226,23 @@ class BoTorchGPModel(BaseModel):
         self._validate_shape(self.train_X)
         self._validate_shape(self.train_Y)
 
+        # Apply input normalisation if requested
+        if self.normalize_inputs:
+            train_x_np = self.train_X.cpu().numpy()
+            self._input_normaliser = InputNormaliser()
+            self._input_normaliser.fit(train_x_np)
+            self.train_X = torch.tensor(
+                self._input_normaliser.transform(train_x_np),
+                dtype=self.dtype,
+                device=self.device,
+            )
+
         # Initialize SingleTaskGP
-        # Note: SingleTaskGP automatically applies Standardize outcome transform
-        # if standardize_outputs=True (which is the default)
         ard_num_dims = self.train_X.shape[-1] if self.use_ard else None
         if self.kernel_type == "matern":
             covar_module = ScaleKernel(MaternKernel(nu=self.nu, ard_num_dims=ard_num_dims))
-        elif self.kernel_type == "rbf":
-            covar_module = ScaleKernel(RBFKernel(ard_num_dims=ard_num_dims))
-        elif self.kernel_type is None:
+        elif self.kernel_type in ("rbf", None):
+            # Apply Hvarfner et al. 2024 priors for both 'rbf' and default (None)
             if ard_num_dims is not None:
                 lengthscale_prior = LogNormalPrior(
                     loc=math.sqrt(2) + math.log(ard_num_dims) * 0.5, scale=math.sqrt(3)
@@ -232,21 +256,26 @@ class BoTorchGPModel(BaseModel):
                     lengthscale_prior=lengthscale_prior,
                     lengthscale_constraint=GreaterThan(
                         2.5e-2, transform=None, initial_value=lengthscale_prior.mode
-                    ),  # Default is a Positive constraint
+                    ),
                 )
             )
-            logger.warning(
-                "No kernel_type specified. Defaulting to RBF kernel with log normal "
-                f"lengthscale prior{' with ARD' if self.use_ard else ''}."
-            )
+            if self.kernel_type is None:
+                logger.info(
+                    "No kernel_type specified. Defaulting to RBF kernel with Hvarfner "
+                    f"log-normal lengthscale prior{' with ARD' if self.use_ard else ''}."
+                )
         else:
-            covar_module = None
-            logger.warning(
-                f"Invalid kernel_type '{self.kernel_type}' specified. Using default RBF kernel."
+            raise ValueError(
+                f"Invalid kernel_type '{self.kernel_type}'. "
+                "Must be 'matern', 'rbf', or None."
             )
 
+        outcome_transform = Standardize(m=1) if self.standardize_outputs else None
         self.model = SingleTaskGP(
-            train_X=self.train_X, train_Y=self.train_Y, covar_module=covar_module
+            train_X=self.train_X,
+            train_Y=self.train_Y,
+            covar_module=covar_module,
+            outcome_transform=outcome_transform,
         )
         self.model = self.model.to(device=self.device, dtype=self.dtype)
 
@@ -292,10 +321,17 @@ class BoTorchGPModel(BaseModel):
                 loss_tensor = -mll(output, self.train_Y.squeeze(-1))  # type: ignore
                 loss = float(loss_tensor.item())  # type: ignore
 
+            if not math.isfinite(loss):
+                logger.warning(
+                    f"NaN/Inf loss detected after training ({loss}). "
+                    "The model may be in a bad state."
+                )
+
             self._training_metrics["loss"].append(loss)
             self._training_metrics["iteration"].append(self.num_iterations)
 
         except Exception as e:
+            self.model = None  # Reset to avoid half-initialized state after failed fit
             logger.error(f"Error training BoTorch GP model: {e}")
             raise
 
@@ -326,6 +362,15 @@ class BoTorchGPModel(BaseModel):
         if self.train_X is not None and test_X.shape[1] != self.train_X.shape[1]:
             raise ValueError(
                 f"Input dimension mismatch: expected {self.train_X.shape[1]}, got {test_X.shape[1]}"
+            )
+
+        # Apply input normalisation if fitted
+        if self._input_normaliser is not None:
+            test_x_np = test_X.cpu().numpy()
+            test_X = torch.tensor(
+                self._input_normaliser.transform(test_x_np),
+                dtype=self.dtype,
+                device=self.device,
             )
 
         # Make predictions

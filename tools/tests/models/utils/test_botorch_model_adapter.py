@@ -332,3 +332,37 @@ def test_adapter_deterministic_predictions(mock_alf_model_with_variances):
 
     assert torch.allclose(posterior1.mean, posterior2.mean)
     assert torch.allclose(posterior1.variance, posterior2.variance)
+
+
+# =============================================================================
+# Integration Tests
+# =============================================================================
+
+
+def test_adapter_integration_with_real_botorch_gp_model():
+    """Integration smoke test: real BoTorchGPModel -> BoTorchModelAdapter -> posterior()."""
+    import numpy as np
+    from alf_core import Candidate, LabelledCandidates, Modality
+    from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
+
+    # Train a real BoTorchGPModel on tiny data
+    X_train = np.array([[0.1, 0.2], [0.4, 0.5], [0.7, 0.8], [0.3, 0.6]], dtype=np.float32)
+    y_train = np.array([1.0, 2.0, 1.5, 1.8])
+    candidates = [Candidate(data=x, modality=Modality.TABULAR) for x in X_train]
+    train_data = LabelledCandidates(candidates=candidates, labels=y_train)
+
+    gp_model = BoTorchGPModel(num_iterations=10, optimizer="scipy")
+    gp_model.train(train_data)
+
+    # Wrap in adapter
+    adapter = BoTorchModelAdapter(gp_model)
+
+    # Call posterior with 2D input
+    X_test = torch.tensor([[0.2, 0.3], [0.5, 0.6]], dtype=torch.float32)
+    posterior = adapter.posterior(X_test)
+
+    # Verify posterior has correct shape and finite values
+    assert posterior is not None
+    mean = posterior.mean
+    assert mean.shape[0] == 2
+    assert torch.all(torch.isfinite(mean))
