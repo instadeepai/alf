@@ -14,13 +14,21 @@
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from alf_core import BaseModel, Candidate, LabelledCandidates, Modality, Predictions, Results
+from alf_core import (
+    BaseModel,
+    BaseTrainConfig,
+    Candidate,
+    LabelledCandidates,
+    Modality,
+    Predictions,
+    Results,
+)
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.utils.enums import ProblemType
 from torch.utils.data import DataLoader, TensorDataset
@@ -70,7 +78,7 @@ class MLPModelConfig:
 
 
 @dataclass
-class MLPTrainConfig:
+class MLPTrainConfig(BaseTrainConfig):
     """Configuration for MLP training.
 
     Args:
@@ -174,10 +182,10 @@ class MLPModel(BaseModel):
         self.device = get_device(device)
         self.net: MLP | None = None
         self.input_dim: int | None = None
-        self.training_metrics: dict[str, Union[float, int, np.number]] = {}
+        self.training_metrics: dict[str, float | int | np.number] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
 
-    def featurise(self, inputs: Union[LabelledCandidates, list[Candidate]]) -> torch.Tensor:
+    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> torch.Tensor:
         """Convert TABULAR or EMBEDDING candidates to a float32 tensor.
 
         Args:
@@ -188,15 +196,12 @@ class MLPModel(BaseModel):
             Float32 tensor of shape (n_candidates, feature_dim).
 
         Raises:
-            ValueError: If any candidate has an unsupported modality, or if
-                inputs is not a LabelledCandidates or list.
+            ValueError: If any candidate has an unsupported modality.
         """
         if isinstance(inputs, LabelledCandidates):
             candidates = inputs.candidates
-        elif isinstance(inputs, list):
-            candidates = inputs
         else:
-            raise ValueError("Input must be LabelledCandidates or list of Candidate")
+            candidates = inputs
 
         for c in candidates:
             if c.modality not in (Modality.TABULAR, Modality.EMBEDDING):
@@ -225,7 +230,7 @@ class MLPModel(BaseModel):
         """
         return self._epoch_metrics
 
-    def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
+    def get_training_summary_metrics(self) -> dict[str, float | int | np.number]:
         """Return scalar summary metrics from the most recent train() call.
 
         Returns:
