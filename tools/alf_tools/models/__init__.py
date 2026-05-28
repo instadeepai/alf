@@ -14,6 +14,7 @@
 
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
+from alf_tools.models.mlp import MLP, MLPModel, MLPModelConfig, MLPTrainConfig
 from alf_tools.models.utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
@@ -39,6 +40,10 @@ try:
         "GPModelConfig",
         "GPTrainConfig",
         "one_hot_encode",
+        "MLP",
+        "MLPModel",
+        "MLPModelConfig",
+        "MLPTrainConfig",
     ]
 except ImportError:
     __all__ = [
@@ -53,4 +58,8 @@ except ImportError:
         "GPModelConfig",
         "GPTrainConfig",
         "one_hot_encode",
+        "MLP",
+        "MLPModel",
+        "MLPModelConfig",
+        "MLPTrainConfig",
     ]
