@@ -16,6 +16,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+import torch
 from alf_core import Candidate, LabelledCandidates, Predictions, State
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig, ProblemType
 from alf_core.model.base_model import BaseModel
@@ -243,7 +244,7 @@ class TestCoreSet:
         assert len(result.labels) == 0
 
     def test_featurise_returning_1d_array_raises_value_error(self) -> None:
-        """featurise returning a 1D array triggers a clear ValueError."""
+        """Featurise returning a 1D array triggers a clear ValueError."""
 
         class FlatModel(_BaseTestModel):
             def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> np.ndarray:
@@ -258,7 +259,7 @@ class TestCoreSet:
             CoreSet()(cands, state)
 
     def test_featurise_returning_none_raises_value_error(self) -> None:
-        """featurise returning None raises a clear ValueError from _to_numpy."""
+        """Featurise returning None raises a clear ValueError from _to_numpy."""
 
         class NoneModel(_BaseTestModel):
             def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> None:
@@ -273,18 +274,15 @@ class TestCoreSet:
 
     def test_featurise_returning_torch_tensor_produces_correct_scores(self) -> None:
         """_to_numpy correctly handles a torch.Tensor returned by featurise."""
-        import torch as _torch
 
         class TensorEmbeddingModel(_BaseTestModel):
             def __init__(self, embeddings: np.ndarray) -> None:
                 self._embeddings = embeddings
 
-            def featurise(
-                self, inputs: LabelledCandidates | list[Candidate]
-            ) -> "_torch.Tensor":
+            def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> "torch.Tensor":
                 candidates = inputs if isinstance(inputs, list) else inputs.candidates
                 indices = [int(c.data.split("_")[1]) for c in candidates]
-                return _torch.tensor(self._embeddings[indices])
+                return torch.tensor(self._embeddings[indices])
 
         embeddings = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 3.0]], dtype=np.float32)
         train_cands = [Candidate(data="emb_0", modality="sequence")]
