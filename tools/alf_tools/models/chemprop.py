@@ -119,14 +119,12 @@ class _MPNNWrapper(nn.Module):
         self,
         bmg: BatchMolGraph,
         V_d: torch.Tensor | None = None,
-        X_d: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """Run message passing, aggregate, and predict.
 
         Args:
             bmg: Batched molecular graph (already on the correct device).
             V_d: Optional node-level descriptors.
-            X_d: Optional molecule-level descriptors.
 
         Returns:
             Predictions tensor of shape (batch_size, 1).
@@ -286,9 +284,8 @@ class ChempropModel(BaseModel):
                 # unlike Tensor.to(), which returns a new tensor.
                 batch.bmg.to(self.device)
                 V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
-                X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
                 targets = batch.Y.squeeze(-1).to(self.device)
-                preds = model(batch.bmg, V_d, X_d).squeeze(-1)
+                preds = model(batch.bmg, V_d).squeeze(-1)
                 loss = criterion(preds, targets)
 
                 if optimizer is not None:
@@ -441,8 +438,7 @@ class ChempropModel(BaseModel):
             for batch in loader:
                 batch.bmg.to(self.device)
                 V_d = batch.V_d.to(self.device) if batch.V_d is not None else None
-                X_d = batch.X_d.to(self.device) if batch.X_d is not None else None
-                preds = model(batch.bmg, V_d, X_d).squeeze(-1)
+                preds = model(batch.bmg, V_d).squeeze(-1)
                 b = preds.shape[0]
                 all_preds[idx : idx + b] = preds.cpu()
                 idx += b
