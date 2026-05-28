@@ -29,6 +29,7 @@ from alf_tools.datasets.guacamol import (
     FILENAME_VALID,
     GuacaMol,
     GuacaMolConfig,
+    _cache_path,  # noqa: PLC2701
     _compute_properties,  # noqa: PLC2701
     _download_file,  # noqa: PLC2701
     _load_smiles_file,  # noqa: PLC2701
@@ -285,8 +286,8 @@ class TestGuacaMolSingleFileLoad:
 
     def test_no_download_if_file_already_cached(self, tmp_path):
         """requests.get is not called when the corpus file already exists on disk."""
-        (tmp_path / FILENAME_ALL).write_text("\n".join(VALID_SMILES_LINES[:3]))
-        config = _base_config(data_dir=tmp_path, max_molecules=3)
+        (tmp_path / FILENAME_ALL).write_text("\n".join(VALID_SMILES_LINES))
+        config = _base_config(data_dir=tmp_path)  # max_molecules=None → uses FILENAME_ALL directly
         with patch("requests.get") as mock_get:
             GuacaMol(config)
         mock_get.assert_not_called()
@@ -472,17 +473,16 @@ class TestDownloadFile:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.iter_lines.return_value = iter(lines)
-        out = tmp_path / "out.smiles"
+        out_base = tmp_path / "out.smiles"
         with patch("requests.get", return_value=mock_resp):
-            _download_file("https://example.com/fake.smiles", out, 2)
-        written = [ln for ln in out.read_text().splitlines() if ln.strip()]
+            result = _download_file("https://example.com/fake.smiles", out_base, 2)
+        written = [ln for ln in result.read_text().splitlines() if ln.strip()]
         assert len(written) == 2
 
-    def test_stale_cache_re_downloads_when_too_small(self, tmp_path):
-        """If cached file has fewer lines than max_lines, it is deleted and re-downloaded."""
-        out = tmp_path / "out.smiles"
-        # Write a stale 2-line file
-        out.write_bytes(b"c1ccccc1\nCCO\n")
+    def test_smaller_max_lines_cache_does_not_block_larger_request(self, tmp_path):
+        """A cached file from max_lines=2 does not prevent a fresh download for max_lines=5."""
+        out_base = tmp_path / "out.smiles"
+        _cache_path(out_base, 2).write_bytes(b"c1ccccc1\nCCO\n")
 
         fresh_lines = [b"c1ccccc1", b"CCO", b"CC(=O)O", b"c1ccncc1", b"NCCc1ccc(O)c(O)c1"]
         mock_resp = MagicMock()
@@ -490,19 +490,76 @@ class TestDownloadFile:
         mock_resp.iter_lines.return_value = iter(fresh_lines)
 
         with patch("requests.get", return_value=mock_resp):
-            _download_file("https://example.com/fake.smiles", out, max_lines=5)
+            result = _download_file("https://example.com/fake.smiles", out_base, max_lines=5)
 
-        written = [ln for ln in out.read_text().splitlines() if ln.strip()]
-        assert len(written) == 5  # re-downloaded, not the stale 2-line file
+        written = [ln for ln in result.read_text().splitlines() if ln.strip()]
+        assert len(written) == 5
 
     def test_cache_not_re_downloaded_when_sufficient(self, tmp_path):
-        """If cached file has at least max_lines lines, download is skipped."""
-        out = tmp_path / "out.smiles"
-        out.write_bytes(b"c1ccccc1\nCCO\nCC(=O)O\n")  # 3 lines
+        """If the exact max_lines-encoded cache file exists, download is skipped."""
+        out_base = tmp_path / "out.smiles"
+        _cache_path(out_base, 2).write_bytes(b"c1ccccc1\nCCO\n")
 
         with patch("requests.get") as mock_get:
-            _download_file("https://example.com/fake.smiles", out, max_lines=2)
+            _download_file("https://example.com/fake.smiles", out_base, max_lines=2)
             mock_get.assert_not_called()
+
+    def test_max_lines_encoded_in_returned_filename(self, tmp_path):
+        """When max_lines is set, the returned path encodes the count in its filename."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.iter_lines.return_value = iter([b"c1ccccc1", b"CCO"])
+        out_base = tmp_path / "out.smiles"
+        with patch("requests.get", return_value=mock_resp):
+            result = _download_file("https://example.com/fake.smiles", out_base, max_lines=2)
+        assert result == _cache_path(out_base, 2)
+        assert result.exists()
+        assert not out_base.exists()
+
+    def test_no_max_lines_uses_original_filename(self, tmp_path):
+        """When max_lines is None the returned path is the original filepath."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.iter_lines.return_value = iter([b"c1ccccc1"])
+        out = tmp_path / "out.smiles"
+        with patch("requests.get", return_value=mock_resp):
+            result = _download_file("https://example.com/fake.smiles", out, max_lines=None)
+        assert result == out
+
+    def test_different_max_lines_use_separate_cache_files(self, tmp_path):
+        """max_lines=2 and max_lines=3 each create a distinct file; neither shadows the other."""
+
+        def make_mock(lines):
+            m = MagicMock()
+            m.status_code = 200
+            m.iter_lines.return_value = iter(ln.encode() for ln in lines)
+            return m
+
+        out_base = tmp_path / "out.smiles"
+        with patch("requests.get", return_value=make_mock(["c1ccccc1", "CCO"])):
+            path2 = _download_file("https://example.com/fake.smiles", out_base, max_lines=2)
+        with patch("requests.get", return_value=make_mock(["c1ccccc1", "CCO", "CC(=O)O"])):
+            path3 = _download_file("https://example.com/fake.smiles", out_base, max_lines=3)
+
+        assert path2 != path3
+        assert path2.exists()
+        assert path3.exists()
+
+    def test_partial_download_leaves_no_stale_filepath(self, tmp_path):
+        """A mid-stream network failure leaves no file at the destination path."""
+
+        def failing_iter(**kw):
+            yield b"c1ccccc1"
+            raise OSError("connection reset")
+
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.iter_lines.side_effect = failing_iter
+        out = tmp_path / "out.smiles"
+        with patch("requests.get", return_value=mock_resp):
+            with pytest.raises(OSError):
+                _download_file("https://example.com/fake.smiles", out)
+        assert not out.exists()
 
 
 class TestGuacaMolWithFixtures:
@@ -606,9 +663,8 @@ class TestGuacaMolWithFixtures:
 
     def test_paper_splits_max_molecules_caps_each_split(self, tmp_path):
         """max_molecules caps the candidate count in each paper split independently."""
-        shutil.copy(LARGE_FIXTURE, tmp_path / FILENAME_TRAIN)
-        shutil.copy(LARGE_FIXTURE, tmp_path / FILENAME_VALID)
-        shutil.copy(LARGE_FIXTURE, tmp_path / FILENAME_TEST)
+        for filename in [FILENAME_TRAIN, FILENAME_VALID, FILENAME_TEST]:
+            shutil.copy(LARGE_FIXTURE, _cache_path(tmp_path / filename, 10))
         config = self._config(tmp_path, split_mode="paper", max_molecules=10)
         dataset = GuacaMol(config)
         train_count = len(dataset.train_dataset.candidates)
@@ -638,7 +694,7 @@ class TestGuacaMolEdgeCases:
 
     def test_max_molecules_zero_produces_empty_dataset(self, tmp_path):
         """max_molecules=0 should yield an empty dataset without raising."""
-        shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
+        shutil.copy(VALID_FIXTURE, _cache_path(tmp_path / FILENAME_ALL, 0))
         config = self._config(tmp_path, max_molecules=0)
         dataset = GuacaMol(config)
         total = (
@@ -723,7 +779,8 @@ class TestDownloadGuacaMol:
         with patch("requests.get", return_value=self._mock_response(many_lines)):
             download_guacamol(data_dir=tmp_path, max_lines=3)
         for filename in [FILENAME_ALL, FILENAME_TRAIN, FILENAME_VALID, FILENAME_TEST]:
-            lines = [ln for ln in (tmp_path / filename).read_text().splitlines() if ln.strip()]
+            cache_file = _cache_path(tmp_path / filename, 3)
+            lines = [ln for ln in cache_file.read_text().splitlines() if ln.strip()]
             assert 1 <= len(lines) <= 3
 
     def test_default_data_dir_is_datapath(self):

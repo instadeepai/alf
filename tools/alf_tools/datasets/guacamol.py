@@ -182,37 +182,49 @@ def _compute_properties(smiles: str, properties: list[str]) -> dict[str, float]:
     return {name: PROPERTY_FNS[name](mol) for name in properties}  # type: ignore[operator]  # mypy cannot narrow str subscript to Literal key type
 
 
+def _cache_path(base: Path, max_lines: int | None) -> Path:
+    """Return the cache filepath for a given base path and optional max_lines cap.
+
+    Args:
+        base: Base file path (e.g. ``~/.cache/alf/guacamol_v1_all.smiles``).
+        max_lines: Line cap. When set, the count is embedded in the filename so that
+            different caps never share the same cached file.
+
+    Returns:
+        ``base`` unchanged when max_lines is None, otherwise
+        ``base.parent / f"{base.stem}_{max_lines}lines{base.suffix}"``.
+    """
+    if max_lines is None:
+        return base
+    return base.parent / f"{base.stem}_{max_lines}lines{base.suffix}"
+
+
 def _download_file(url: str, filepath: Path, max_lines: int | None = None) -> Path:
     """Stream a text file from url to filepath, optionally truncating to max_lines lines.
 
-    Writes to a ``.tmp`` file first and renames on success to prevent partial downloads
-    from appearing valid on the next call. Skips the download if the target filepath
-    already exists and contains at least max_lines non-empty lines (or max_lines is None).
-    If the cached file has fewer lines than max_lines, it is deleted and re-downloaded.
+    When max_lines is given the line count is embedded in the filename via
+    :func:`_cache_path` (e.g. ``guacamol_v1_all_1000lines.smiles``) so that
+    different caps never collide in the cache.  Writes to a ``.tmp`` file first
+    and renames on success to prevent partial downloads from appearing valid.
 
     Args:
         url: HTTPS URL to stream from.
-        filepath: Destination file path (not a directory).
-        max_lines: If set, stop writing after exactly this many lines. An existing file
-            with fewer than max_lines lines is treated as stale and re-downloaded.
+        filepath: Base destination path. The actual path may differ when max_lines
+            is set — always use the returned value.
+        max_lines: If set, stop writing after exactly this many lines.
 
     Returns:
-        The resolved filepath.
+        The resolved filepath (may differ from the input when max_lines is set).
 
     Raises:
         OSError: If a network error occurs while connecting or streaming.
         FileNotFoundError: If the server returns a non-200 status code.
     """
+    filepath = _cache_path(filepath, max_lines)
+
     if filepath.exists():
-        if max_lines is None:
-            logger.info("  ✓ %s already exists, skipping.", filepath)
-            return filepath
-        with open(filepath, encoding="utf-8") as f:
-            cached_count = sum(1 for line in f if line.strip())
-        if cached_count >= max_lines:
-            logger.info("  ✓ %s already exists with sufficient lines, skipping.", filepath)
-            return filepath
-        filepath.unlink()
+        logger.info("  ✓ %s already exists, skipping.", filepath)
+        return filepath
 
     logger.info(
         "  ↓ Downloading %s%s...",
