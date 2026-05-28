@@ -258,7 +258,7 @@ class TestEnsembleWrapperConstruction:
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
-        x = wrapper.featurise(sequence_candidates, model_index=0)
+        x = wrapper.featurise(sequence_candidates)
         assert x.shape == (6, 20, 20)
 
     def test_featurise_with_labelled_candidates(self, labelled_sequences):
@@ -267,7 +267,7 @@ class TestEnsembleWrapperConstruction:
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
-        x = wrapper.featurise(labelled_sequences, model_index=0)
+        x = wrapper.featurise(labelled_sequences)
         assert x.shape == (6, 20, 20)
 
     def test_get_epoch_metrics_before_train_returns_empty(self):
@@ -604,17 +604,44 @@ class TestEnsembleWrapperPredict:
         np.random.seed(seed)
         w2.setup(dataset)
         w2.train(labelled_sequences)
-        # p1 = w1.predict(sequence_candidates)
-        # p2 = w2.predict(sequence_candidates)
+        p1 = w1.predict(sequence_candidates)
+        p2 = w2.predict(sequence_candidates)
+        np.testing.assert_allclose(p1.means, p2.means, rtol=1e-5)
+        np.testing.assert_allclose(p1.empirical_dist, p2.empirical_dist, rtol=1e-5)
 
-        assert (
-            w1.members[0].model.fc_layers[0].weight.data
-            == w2.members[0].model.fc_layers[0].weight.data
-        ).all()
-        assert (
-            w1.members[1].model.fc_layers[0].weight.data
-            == w2.members[1].model.fc_layers[0].weight.data
-        ).all()
+    def test_mixed_empirical_dist_widths_raises(self, sequence_candidates):
+        """predict() must raise ValueError when members return columns of different widths."""
+        from alf_core import Predictions
+
+        def wide_factory(seed: int):
+            m = MagicMock()
+            m.predict.return_value = Predictions(
+                means=np.zeros(len(sequence_candidates)),
+                empirical_dist=np.zeros((len(sequence_candidates), 3)),
+            )
+            return m
+
+        def narrow_factory(seed: int):
+            m = MagicMock()
+            m.predict.return_value = Predictions(
+                means=np.zeros(len(sequence_candidates)),
+            )
+            return m
+
+        factories = [wide_factory, narrow_factory]
+        call_count = [0]
+
+        def mixed_factory(seed: int):
+            idx = call_count[0]
+            call_count[0] += 1
+            return factories[idx](seed)
+
+        wrapper = EnsembleWrapper(
+            model_factory=mixed_factory,
+            config=EnsembleWrapperConfig(member_seeds=[0, 1]),
+        )
+        with pytest.raises(ValueError, match="different widths"):
+            wrapper.predict(sequence_candidates)
 
 
 # ---------------------------------------------------------------------------
@@ -658,7 +685,7 @@ class TestEnsembleWrapperWithCNN:
             model_factory=cnn_factory,
             config=EnsembleWrapperConfig(base_seed=0, n_members=2),
         )
-        x = wrapper.featurise(sequence_candidates, model_index=0)
+        x = wrapper.featurise(sequence_candidates)
         assert isinstance(x, torch.Tensor)
         assert x.shape == (6, 20, 20)
         assert x.dtype == torch.float32

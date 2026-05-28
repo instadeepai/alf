@@ -142,19 +142,16 @@ class EnsembleWrapper(BaseModel):
     def featurise(
         self,
         inputs: Union[LabelledCandidates, list[Candidate]],
-        model_index: int = 0,
     ) -> Any:
-        """Delegate featurisation to the specified ensemble member.
+        """Delegate featurisation to the first ensemble member.
 
         Args:
-            inputs (Union[LabelledCandidates, list[Candidate]]): Input samples (training data)
-            model_index (int): Index of the ensemble member to use for featurisation.
-                Defaults to 0 so the signature is compatible with BaseModel.featurise.
+            inputs: Input samples to featurise.
 
         Returns:
-            Feature representation returned by the specified member's featurise().
+            Feature representation returned by member 0's featurise().
         """
-        return self.members[model_index].featurise(inputs)
+        return self.members[0].featurise(inputs)
 
     def _subsample(self, data: LabelledCandidates, seed: int) -> LabelledCandidates:
         """Return a random subset of data using the given seed.
@@ -167,7 +164,8 @@ class EnsembleWrapper(BaseModel):
             A new LabelledCandidates containing k = max(1, round(fraction * n)) samples.
         """
         cfg = self.config.subsample
-        assert cfg is not None
+        if cfg is None:
+            raise RuntimeError("_subsample called but subsample config is None")
         rng = np.random.default_rng(seed)
         n = len(data)
         k = max(1, round(cfg.fraction * n))
@@ -232,6 +230,14 @@ class EnsembleWrapper(BaseModel):
                 columns.append(p_i.empirical_dist)
             else:
                 columns.append(p_i.means[:, np.newaxis])
+
+        widths = [c.shape[1] for c in columns]
+        if len(set(widths)) > 1:
+            raise ValueError(
+                f"EnsembleWrapper.predict(): members returned empirical_dist columns of "
+                f"different widths {widths}. All members must return the same number of "
+                "columns (use consistent MC-dropout samples or means-only outputs)."
+            )
 
         empirical_dist = np.concatenate(columns, axis=1)
         means = empirical_dist.mean(axis=1)
