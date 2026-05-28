@@ -15,6 +15,8 @@
 
 from typing import Any, Union
 
+import torch
+
 import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
@@ -73,16 +75,16 @@ class Surrogate:
         """
         return self.model.predict(candidates)
 
-    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> Any:
+    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> np.ndarray | torch.Tensor:
         """Featurise the given inputs using the surrogate model's featurisation method.
 
         Args:
-            inputs (LabelledCandidates | list[Candidate]): The inputs to featurise,
-                which can be either a list of Candidate objects or LabelledCandidates.
+            inputs: List of Candidate objects or a LabelledCandidates instance
+                to featurise.
 
         Returns:
-            Any: Outputs from the model's featurisation method, typically
-                np.ndarray or torch.Tensor.
+            Feature representation from the underlying model, typically
+            an np.ndarray or torch.Tensor.
         """
         return self.model.featurise(inputs)
 

@@ -212,7 +212,7 @@ class TestCoreSet:
 
         result = CoreSet()(search_candidates, state)
 
-        assert (result.labels > 0).all()
+        assert (result.labels > 0).all()  # all-selected
 
     def test_empty_training_set_selects_by_mutual_distance(self) -> None:
         """When training set is empty, greedy selection is driven by mutual candidate distances.
@@ -233,3 +233,68 @@ class TestCoreSet:
         result = CoreSet()(search_candidates, state)
 
         assert (result.labels > 0).all()
+
+    def test_empty_search_candidates_returns_empty_labelled_candidates(self) -> None:
+        """CoreSet with empty search_candidates returns an empty LabelledCandidates."""
+        embeddings = np.array([[0.0, 0.0], [1.0, 0.0]])
+        state, _ = _make_state(embeddings, n_train=1, acq_batch_size=5)
+        result = CoreSet()([], state)
+        assert len(result.candidates) == 0
+        assert len(result.labels) == 0
+
+    def test_featurise_returning_1d_array_raises_value_error(self) -> None:
+        """featurise returning a 1D array triggers a clear ValueError."""
+
+        class FlatModel(_BaseTestModel):
+            def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> np.ndarray:
+                n = len(inputs) if isinstance(inputs, list) else len(inputs.candidates)
+                return np.ones(n)  # 1-D, not 2-D
+
+        dataset = MockDataset(train_candidates=[], train_labels=np.zeros(0))
+        surrogate = Surrogate(model=FlatModel())
+        state = State(dataset=dataset, surrogate=surrogate, acq_batch_size=1)
+        cands = [Candidate(data="x", modality="sequence")]
+        with pytest.raises(ValueError, match="2-D array"):
+            CoreSet()(cands, state)
+
+    def test_featurise_returning_none_raises_value_error(self) -> None:
+        """featurise returning None raises a clear ValueError from _to_numpy."""
+
+        class NoneModel(_BaseTestModel):
+            def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> None:
+                return None
+
+        dataset = MockDataset(train_candidates=[], train_labels=np.zeros(0))
+        surrogate = Surrogate(model=NoneModel())
+        state = State(dataset=dataset, surrogate=surrogate, acq_batch_size=1)
+        cands = [Candidate(data="x", modality="sequence")]
+        with pytest.raises(ValueError, match="returned None"):
+            CoreSet()(cands, state)
+
+    def test_featurise_returning_torch_tensor_produces_correct_scores(self) -> None:
+        """_to_numpy correctly handles a torch.Tensor returned by featurise."""
+        import torch as _torch
+
+        class TensorEmbeddingModel(_BaseTestModel):
+            def __init__(self, embeddings: np.ndarray) -> None:
+                self._embeddings = embeddings
+
+            def featurise(
+                self, inputs: LabelledCandidates | list[Candidate]
+            ) -> "_torch.Tensor":
+                candidates = inputs if isinstance(inputs, list) else inputs.candidates
+                indices = [int(c.data.split("_")[1]) for c in candidates]
+                return _torch.tensor(self._embeddings[indices])
+
+        embeddings = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 3.0]], dtype=np.float32)
+        train_cands = [Candidate(data="emb_0", modality="sequence")]
+        search_cands = [
+            Candidate(data="emb_1", modality="sequence"),
+            Candidate(data="emb_2", modality="sequence"),
+        ]
+        dataset = MockDataset(train_candidates=train_cands, train_labels=np.zeros(1))
+        surrogate = Surrogate(model=TensorEmbeddingModel(embeddings))
+        state = State(dataset=dataset, surrogate=surrogate, acq_batch_size=1)
+        result = CoreSet()(search_cands, state)
+        # emb_2 at (0, 3) is farther from training point (0, 0) than emb_1 at (1, 0)
+        assert result.labels[1] > result.labels[0]

@@ -15,13 +15,12 @@
 import numpy as np
 import torch
 from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
-from jaxtyping import Float
 from scipy.spatial.distance import cdist
 
 _CDIST_CHUNK_SIZE = 512
 
 
-def _to_numpy(features: Float[np.ndarray | torch.Tensor, "n_samples n_features"]) -> np.ndarray:
+def _to_numpy(features: np.ndarray | torch.Tensor) -> np.ndarray:
     """Convert model features to a numpy array.
 
     Args:
@@ -33,6 +32,8 @@ def _to_numpy(features: Float[np.ndarray | torch.Tensor, "n_samples n_features"]
     Raises:
         ValueError: If features is None or cannot be converted to a numpy array.
     """
+    if features is None:
+        raise ValueError("featurise returned None; expected a numpy array or torch.Tensor")
     if isinstance(features, torch.Tensor):
         return features.detach().cpu().numpy()
     try:
@@ -74,8 +75,10 @@ class CoreSet(AcquisitionFunction):
         Returns:
             LabelledCandidates with CoreSet acquisition values.
         """
+        if not search_candidates:
+            return LabelledCandidates(candidates=[], labels=np.zeros(0))
+
         training_candidates = state.dataset.train_dataset.candidates
-        # Surrogate has no featurise() delegation method; access the underlying model directly.
         features = state.surrogate.featurise(training_candidates + search_candidates)
         embeddings = _to_numpy(features)
 
@@ -106,6 +109,10 @@ class CoreSet(AcquisitionFunction):
             for _i in range(0, n_cands, _CDIST_CHUNK_SIZE):
                 _sl = candidate_embs[_i : _i + _CDIST_CHUNK_SIZE]
                 min_dists[_i : _i + _CDIST_CHUNK_SIZE] = cdist(_sl, training_embs).min(axis=1)
+        # Guard against re-selection: np.minimum zeroes selected entries in the
+        # common case, but if remaining candidates share identical embeddings
+        # (all pairwise distances = 0), selected_mask prevents argmax from
+        # re-picking an already-selected index.
         selected_mask = np.zeros(n_cands, dtype=bool)
         acquisition_values = np.zeros(n_cands)
 

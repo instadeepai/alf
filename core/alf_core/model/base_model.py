@@ -66,7 +66,8 @@ class BaseModel(abc.ABC):
         """Convert inputs into feature representations.
 
         Args:
-            inputs: List of Candidate objects to featurize.
+            inputs: List of Candidate objects, or a LabelledCandidates instance,
+                to featurize.
 
         Returns:
             Feature representation of the inputs (format depends on implementation).
