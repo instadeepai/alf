@@ -162,6 +162,9 @@ class EnsembleWrapper(BaseModel):
 
         Returns:
             A new LabelledCandidates containing k = max(1, round(fraction * n)) samples.
+
+        Raises:
+            RuntimeError: If subsample config is None.
         """
         cfg = self.config.subsample
         if cfg is None:
@@ -222,6 +225,9 @@ class EnsembleWrapper(BaseModel):
         Returns:
             Predictions with means, variances, and empirical_dist assembled from
             all member outputs concatenated along the sample axis.
+
+        Raises:
+            ValueError: If members return empirical_dist columns of different widths.
         """
         columns: list[np.ndarray] = []
         for member in self.members:

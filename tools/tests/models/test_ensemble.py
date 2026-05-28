@@ -17,7 +17,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 import torch
-from alf_core import Candidate, LabelledCandidates
+from alf_core import Candidate, LabelledCandidates, Predictions
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.utils.enums import ProblemType
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
@@ -611,7 +611,6 @@ class TestEnsembleWrapperPredict:
 
     def test_mixed_empirical_dist_widths_raises(self, sequence_candidates):
         """predict() must raise ValueError when members return columns of different widths."""
-        from alf_core import Predictions
 
         def wide_factory(seed: int):
             m = MagicMock()
