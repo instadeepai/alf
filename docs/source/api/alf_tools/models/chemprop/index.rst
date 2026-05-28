@@ -18,8 +18,17 @@ Key properties:
 
 .. note::
 
-   This model requires the ``chemprop>=2.0.0`` package. Install the tools package
-   with ``pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools``.
+   This model requires the optional ``chemprop`` dependency. Install it with the ``[mpnn]`` extra:
+
+   .. code-block:: bash
+
+      pip install "alf-tools[mpnn]"
+
+   or from source:
+
+   .. code-block:: bash
+
+      pip install "git+https://github.com/instadeepai/alf.git#subdirectory=tools[mpnn]"
 
 .. automodule:: alf_tools.models.chemprop
    :members:
