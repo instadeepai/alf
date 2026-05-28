@@ -27,8 +27,11 @@ Note: This module uses shared fixtures from tools/tests/conftest.py including:
 - test_tensor_3d
 """
 
+import numpy as np
 import pytest
 import torch
+from alf_core import Candidate, LabelledCandidates, Modality
+from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
 from alf_tools.models.utils.botorch_model_adapter import BoTorchModelAdapter
 from alf_tools.utils.botorch_utils import candidates_to_tensor
 from botorch.posteriors import Posterior
@@ -341,10 +344,6 @@ def test_adapter_deterministic_predictions(mock_alf_model_with_variances):
 
 def test_adapter_integration_with_real_botorch_gp_model():
     """Integration smoke test: real BoTorchGPModel -> BoTorchModelAdapter -> posterior()."""
-    import numpy as np
-    from alf_core import Candidate, LabelledCandidates, Modality
-    from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
-
     # Train a real BoTorchGPModel on tiny data
     X_train = np.array([[0.1, 0.2], [0.4, 0.5], [0.7, 0.8], [0.3, 0.6]], dtype=np.float32)
     y_train = np.array([1.0, 2.0, 1.5, 1.8])

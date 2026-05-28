@@ -266,8 +266,7 @@ class BoTorchGPModel(BaseModel):
                 )
         else:
             raise ValueError(
-                f"Invalid kernel_type '{self.kernel_type}'. "
-                "Must be 'matern', 'rbf', or None."
+                f"Invalid kernel_type '{self.kernel_type}'. Must be 'matern', 'rbf', or None."
             )
 
         outcome_transform = Standardize(m=1) if self.standardize_outputs else None
