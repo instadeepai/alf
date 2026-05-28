@@ -225,17 +225,27 @@ class TestCNNClassificationSummaryMetrics:
     def test_binary_summary_metrics_contains_all_classification_keys(self, binary_model):
         """Binary training produces all 5 classification metric keys in summary."""
         data = make_data([0, 1, 0, 1, 0, 1, 0, 1])
-        binary_model.train(data)
+        binary_model.train(data, val_data=data)
         metrics = binary_model.get_training_summary_metrics()
-        for key in ("final_train_accuracy", "final_train_f1", "final_train_precision",
-                    "final_train_recall", "final_train_auc_roc"):
+        for key in (
+            "final_train_accuracy",
+            "final_train_f1",
+            "final_train_precision",
+            "final_train_recall",
+            "final_train_auc_roc",
+        ):
             assert key in metrics, f"Expected key '{key}' missing from summary metrics"
 
     def test_multiclass_summary_metrics_contains_all_classification_keys(self, multiclass_model):
         """Multiclass training produces all 5 classification metric keys in summary."""
         data = make_data([0, 1, 2, 0, 1, 2, 0, 1, 2])
-        multiclass_model.train(data)
+        multiclass_model.train(data, val_data=data)
         metrics = multiclass_model.get_training_summary_metrics()
-        for key in ("final_train_accuracy", "final_train_f1", "final_train_precision",
-                    "final_train_recall", "final_train_auc_roc"):
+        for key in (
+            "final_train_accuracy",
+            "final_train_f1",
+            "final_train_precision",
+            "final_train_recall",
+            "final_train_auc_roc",
+        ):
             assert key in metrics, f"Expected key '{key}' missing from summary metrics"
