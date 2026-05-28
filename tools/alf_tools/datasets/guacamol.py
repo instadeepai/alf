@@ -60,34 +60,28 @@ class GuacaMolFileInfo(TypedDict):
     Attributes:
         name: Local filename (e.g. ``guacamol_v1_train.smiles``).
         url: HTTPS download URL.
-        size: Expected file size in bytes.
     """
 
     name: str
     url: str
-    size: int
 
 
 GUACAMOL_FILES: Final[dict[GuacaMolSplitName, GuacaMolFileInfo]] = {
     "TRAIN": {
         "name": FILENAME_TRAIN,
         "url": "https://ndownloader.figshare.com/files/13612760",
-        "size": 61_841_218,
     },
     "VALID": {
         "name": FILENAME_VALID,
         "url": "https://ndownloader.figshare.com/files/13612766",
-        "size": 3_859_125,
     },
     "TEST": {
         "name": FILENAME_TEST,
         "url": "https://ndownloader.figshare.com/files/13612757",
-        "size": 11_590_126,
     },
     "ALL": {
         "name": FILENAME_ALL,
         "url": "https://ndownloader.figshare.com/files/13612745",
-        "size": 77_290_469,
     },
 }
 
@@ -191,40 +185,30 @@ def _compute_properties(smiles: str, properties: list[str]) -> dict[str, float]:
 def _download_file(url: str, filepath: Path, max_lines: int | None = None) -> Path:
     """Stream a text file from url to filepath, optionally truncating to max_lines lines.
 
-    Skips the download if filepath already exists. Creates parent directories as needed.
+    When max_lines is set, ``_{max_lines}`` is appended to the filepath stem so that
+    requests with different limits do not collide. Writes to a ``.tmp`` file first and
+    renames on success to prevent partial downloads from appearing valid on the next call.
+    Skips the download if the target filepath already exists.
 
     Args:
         url: HTTPS URL to stream from.
-        filepath: Destination file path (not a directory).
+        filepath: Base destination file path (not a directory). The actual path will differ
+            when max_lines is set (``_{max_lines}`` is inserted before the extension).
         max_lines: If set, stop writing after exactly this many lines.
 
     Returns:
-        The resolved filepath.
+        The resolved filepath (may differ from the input when max_lines is set).
 
     Raises:
         OSError: If a network error occurs while connecting or streaming.
         FileNotFoundError: If the server returns a non-200 status code.
     """
+    if max_lines is not None:
+        filepath = filepath.with_stem(f"{filepath.stem}_{max_lines}")
+
     if filepath.exists():
-        if max_lines is not None:
-            # Validate the cached file has at least max_lines non-empty lines.
-            # If a prior run wrote fewer lines (smaller max_molecules), re-download.
-            with open(filepath, "rb") as fh:
-                cached_count = sum(1 for line in fh if line.strip())
-            if cached_count < max_lines:
-                logger.info(
-                    "  ↻ %s is stale (%d lines < %d requested); removing and re-downloading.",
-                    filepath.name,
-                    cached_count,
-                    max_lines,
-                )
-                filepath.unlink()
-            else:
-                logger.info("  ✓ %s already exists, skipping.", filepath)
-                return filepath
-        else:
-            logger.info("  ✓ %s already exists, skipping.", filepath)
-            return filepath
+        logger.info("  ✓ %s already exists, skipping.", filepath)
+        return filepath
 
     logger.info(
         "  ↓ Downloading %s%s...",
@@ -232,6 +216,7 @@ def _download_file(url: str, filepath: Path, max_lines: int | None = None) -> Pa
         f" (first {max_lines} lines)" if max_lines is not None else "",
     )
     filepath.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = filepath.with_suffix(".tmp")
     # allow_redirects=True is the default — requests follows the 302 → S3 automatically
     try:
         resp = requests.get(url, stream=True, timeout=60)
@@ -239,11 +224,12 @@ def _download_file(url: str, filepath: Path, max_lines: int | None = None) -> Pa
         raise OSError(f"Network error downloading {filepath.name} from {url}") from exc
     if resp.status_code != 200:
         raise FileNotFoundError(f"Failed to download from {url}. Status code: {resp.status_code}")
-    with open(filepath, "wb") as f:
+    with open(tmp_path, "wb") as f:
         for idx, raw_line in enumerate(resp.iter_lines()):
             f.write(raw_line + b"\n")
             if max_lines is not None and idx + 1 >= max_lines:
                 break
+    tmp_path.rename(filepath)
     logger.info("  ✓ %s written to %s.", filepath.name, filepath.parent)
     return filepath
 
