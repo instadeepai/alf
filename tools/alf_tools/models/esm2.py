@@ -80,10 +80,13 @@ class ESM2TrainConfig(BaseTrainConfig):
         """Post-initialization checks for ESM2TrainConfig.
 
         Raises:
+            ValueError: If num_epochs < 1.
             ValueError: mask splitting probabilities must sum to 1.
             ValueError: optimizer_type must be 'adam' or 'adamw'.
             ValueError: loss_type must be 'mlm' or 'log_likelihood'.
         """
+        if self.num_epochs < 1:
+            raise ValueError(f"num_epochs must be >= 1, got {self.num_epochs}")
         if not np.isclose(sum(self.mask_splitting), 1.0):
             raise ValueError(
                 f"mask_splitting probabilities must sum to 1, got {self.mask_splitting}"
@@ -508,7 +511,8 @@ class ESM2Model(BaseModel):
             avg_val_loss: Average validation loss for the epoch.
             val_metrics: Dictionary of validation metrics (same keys as train_metrics).
         """
-        if (epoch + 1) % self.train_config.log_frequency == 0:
+        is_last_epoch = epoch == self.train_config.num_epochs - 1
+        if (epoch + 1) % self.train_config.log_frequency == 0 or is_last_epoch:
             additional: dict[str, float] = {}
             if (v := train_metrics.get("perplexity")) is not None:
                 additional["train_perplexity"] = float(v)
@@ -571,6 +575,11 @@ class ESM2Model(BaseModel):
         elif self.train_config.optimizer_type == "adam":
             optimizer = torch.optim.Adam(
                 self.esm_model.parameters(), lr=self.train_config.learning_rate
+            )
+        else:
+            raise AssertionError(
+                f"Unreachable: optimizer_type={self.train_config.optimizer_type!r} "
+                "should have been caught by ESM2TrainConfig.__post_init__"
             )
 
         avg_train_loss = 0.0

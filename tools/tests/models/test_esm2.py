@@ -145,6 +145,11 @@ class TestConfigs:
         assert config.log_frequency == 1
         assert config.loss_type == "mlm"
 
+    def test_train_config_num_epochs_zero_raises(self):
+        """ESM2TrainConfig with num_epochs=0 must raise ValueError."""
+        with pytest.raises(ValueError, match="num_epochs must be >= 1"):
+            ESM2TrainConfig(num_epochs=0)
+
 
 class TestFeaturise:
     """Tests for ESM2Model.featurise()."""
