@@ -146,8 +146,9 @@ End-to-end guides for running active learning experiments:
 
 ### Model Tutorials
 
-Deep-dives into specific built-in models:
+Deep-dives into specific model types including configuration, uncertainty quantification, and comparison:
 
+- **[Ensemble Tutorial](tutorials/models/ensemble_tutorial.ipynb)** - Seed ensembles, MC dropout, and combined ensembles for uncertainty-aware prediction
 - **[Chemprop MPNN Tutorial](tutorials/models/chemprop_tutorial.ipynb)** - Active learning for small molecules using SMILES inputs and the Chemprop MPNN
 - **[GP Tutorial](tutorials/models/gp_tutorial.ipynb)** - Gaussian Process surrogate model usage
 

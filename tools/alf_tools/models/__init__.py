@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
+from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, SubsampleConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.mlp import MLP, MLPModel, MLPModelConfig, MLPTrainConfig
 from alf_tools.models.utils import (
@@ -33,6 +34,9 @@ __all__ = [
     "GPModel",
     "GPModelConfig",
     "GPTrainConfig",
+    "EnsembleWrapper",
+    "EnsembleWrapperConfig",
+    "SubsampleConfig",
     "one_hot_encode",
     "MLP",
     "MLPModel",

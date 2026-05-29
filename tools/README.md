@@ -27,6 +27,9 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
   no hand-crafted features required. Requires the `[chemprop]` optional extra:
   `pip install "alf-tools[chemprop]"`
 - **PyRosetta** - Rosetta energy function for protein design (requires PyRosetta installation)
+- **EnsembleWrapper** - Generic wrapper composing N `BaseModel` instances into a seed ensemble,
+  MC dropout ensemble, or combined (seed + dropout) ensemble for uncertainty quantification.
+  Configured via `EnsembleWrapperConfig`; optional per-member data subsampling via `SubsampleConfig`
 
 ### Acquisition Functions
 - **Greedy** - Select candidates with highest predicted values
