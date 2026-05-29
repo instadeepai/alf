@@ -15,7 +15,8 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, TypeAlias, Union
 
 import gpytorch
@@ -57,25 +58,33 @@ class GPModelConfig:
             Only used when kernel_type='matern'.
         ard: Whether to use Automatic Relevance Determination (separate lengthscale
             per dimension).
-        lengthscale_prior: Prior distribution for kernel lengthscale. If None, uses
-            GPyTorch defaults.
-        outputscale_prior: Prior distribution for kernel output scale. If None, uses
-            GPyTorch defaults.
-        noise_constraint: Constraint on the likelihood noise. If None, uses reasonable
-            defaults (e.g., GreaterThan(1e-4)).
         mean_type: Type of mean function ('constant' or 'zero').
+        lengthscale_prior: Prior for the kernel lengthscale, as a ``_target_`` dict.
+            Defaults to LogNormal(sqrt(2), sqrt(3)) (Hvarfner et al. 2024 fixed form).
+            Set to ``None`` to use no prior.
+        lengthscale_constraint: Constraint on the kernel lengthscale, as a
+            ``_target_`` dict. Defaults to ``None`` (no constraint).
+        outputscale_prior: Prior for the kernel output scale, as a ``_target_`` dict.
+            Defaults to ``None``.
+        noise_constraint: Constraint on the likelihood noise, as a ``_target_`` dict.
+            Defaults to ``None`` (a GreaterThan(1e-4) fallback is applied internally).
         build_kernel_fn: Optional custom function to build the kernel. If provided,
-            it will be used instead of the default kernel construction logic. Should take
-            the same arguments as _build_kernel and return a gpytorch.kernels.Kernel.
+            used instead of the default kernel construction logic. Not serializable —
+            for advanced Python-only use. Should return a gpytorch.kernels.Kernel.
     """
 
     kernel_type: KernelTypes = "rbf"
     matern_nu: float = 2.5
     ard: bool = True
-    lengthscale_prior: gpytorch.priors.Prior | None = None
-    outputscale_prior: gpytorch.priors.Prior | None = None
-    noise_constraint: gpytorch.constraints.Interval | None = None
     mean_type: Literal["constant", "zero"] = "constant"
+    lengthscale_prior: dict | None = field(default_factory=lambda: {
+        "_target_": "gpytorch.priors.LogNormalPrior",
+        "loc": math.sqrt(2),
+        "scale": math.sqrt(3),
+    })
+    lengthscale_constraint: dict | None = None
+    outputscale_prior: dict | None = None
+    noise_constraint: dict | None = None
     build_kernel_fn: Callable[..., gpytorch.kernels.Kernel] | None = None
 
 

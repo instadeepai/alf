@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
+
 import numpy as np
 import pytest
 import torch
@@ -23,6 +25,7 @@ from alf_tools.models.gp import (
     GPTrainConfig,
 )
 from alf_tools.models.utils import one_hot_encode
+from alf_tools.models.utils.config_utils import build_from_target
 
 
 @pytest.fixture
@@ -497,3 +500,52 @@ class TestGPNormalisation:
             f"final_val_coverage_0.95={metrics['final_val_coverage_0.95']:.3f} — "
             "val metrics appear to be in standardised space, not original label scale"
         )
+
+
+class TestGPModelConfigDefaults:
+    """Tests for the updated GPModelConfig dict-based fields."""
+
+    def test_lengthscale_prior_defaults_to_lognormal_dict(self):
+        cfg = GPModelConfig()
+        assert isinstance(cfg.lengthscale_prior, dict)
+        assert cfg.lengthscale_prior["_target_"] == "gpytorch.priors.LogNormalPrior"
+        assert cfg.lengthscale_prior["loc"] == pytest.approx(math.sqrt(2))
+        assert cfg.lengthscale_prior["scale"] == pytest.approx(math.sqrt(3))
+
+    def test_lengthscale_constraint_defaults_to_none(self):
+        cfg = GPModelConfig()
+        assert cfg.lengthscale_constraint is None
+
+    def test_outputscale_prior_defaults_to_none(self):
+        cfg = GPModelConfig()
+        assert cfg.outputscale_prior is None
+
+    def test_noise_constraint_defaults_to_none(self):
+        cfg = GPModelConfig()
+        assert cfg.noise_constraint is None
+
+    def test_custom_gamma_prior_accepted(self):
+        prior_cfg = {
+            "_target_": "gpytorch.priors.GammaPrior",
+            "concentration": 3.0,
+            "rate": 6.0,
+        }
+        cfg = GPModelConfig(lengthscale_prior=prior_cfg)
+        assert cfg.lengthscale_prior["_target_"] == "gpytorch.priors.GammaPrior"
+
+    def test_lengthscale_prior_can_be_set_to_none(self):
+        cfg = GPModelConfig(lengthscale_prior=None)
+        assert cfg.lengthscale_prior is None
+
+    def test_build_from_target_works_with_default_prior(self):
+        import gpytorch
+
+        cfg = GPModelConfig()
+        prior = build_from_target(cfg.lengthscale_prior)
+        assert isinstance(prior, gpytorch.priors.LogNormalPrior)
+
+    def test_default_prior_dicts_are_independent(self):
+        """Each GPModelConfig() gets its own dict, not a shared reference."""
+        cfg1 = GPModelConfig()
+        cfg2 = GPModelConfig()
+        assert cfg1.lengthscale_prior is not cfg2.lengthscale_prior
