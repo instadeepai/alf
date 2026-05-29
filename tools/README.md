@@ -22,6 +22,10 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 - **CNNModel** - Convolutional neural network for sequence modeling. Supports `ProblemType.REGRESSION`, `ProblemType.BINARY`, and `ProblemType.MULTICLASS`; output shape and activation are determined automatically from the dataset's `problem_type`
 - **GPModel** - Gaussian Process model for sequence fitness prediction with flexible kernel
   selection, input normalisation, and output standardisation enabled by default
+- **ESM2Model** - Protein language model surrogate backed by
+  [ESM-2](https://huggingface.co/docs/transformers/model_doc/esm). Accepts amino acid sequences
+  directly; embeddings can also be extracted via `featurise()`. Requires the `[esm2]` optional
+  extra: `pip install "alf-tools[esm2]"`
 - **ChempropModel** - Message Passing Neural Network (MPNN) for small-molecule fitness prediction,
   backed by [Chemprop v2.x](https://chemprop.readthedocs.io/). Accepts SMILES strings directly;
   no hand-crafted features required. Requires the `[chemprop]` optional extra:

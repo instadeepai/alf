@@ -149,6 +149,7 @@ End-to-end guides for running active learning experiments:
 Deep-dives into specific model types including configuration, uncertainty quantification, and comparison:
 
 - **[Ensemble Tutorial](tutorials/models/ensemble_tutorial.ipynb)** - Seed ensembles, MC dropout, and combined ensembles for uncertainty-aware prediction
+- **[ESM2 Tutorial](tutorials/models/esm2_tutorial.ipynb)** - Fine-tuning ESM-2 as a protein fitness surrogate
 - **[Chemprop MPNN Tutorial](tutorials/models/chemprop_tutorial.ipynb)** - Active learning for small molecules using SMILES inputs and the Chemprop MPNN
 - **[GP Tutorial](tutorials/models/gp_tutorial.ipynb)** - Gaussian Process surrogate model usage
 
