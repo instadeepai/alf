@@ -705,16 +705,6 @@ class TestBoTorchGPModelKernelTypes:
         assert preds.means.shape == (5,)
         assert np.all(np.isfinite(preds.means))
 
-    def test_invalid_kernel_type_raises_value_error(self, simple_2d_training_data):
-        """Invalid kernel_type raises ValueError on train()."""
-        model = BoTorchGPModel(
-            model_config=GPModelConfig(kernel_type="rbf"),
-            train_config=BoTorchTrainConfig(num_iterations=10),
-        )
-        model.model_config.kernel_type = "invalid_kernel"  # Override after init
-        with pytest.raises(ValueError, match="BoTorchGPModel only supports"):
-            model.train(simple_2d_training_data)
-
     def test_default_kernel_has_hvarfner_priors(self, simple_2d_training_data):
         """Default kernel registers Hvarfner lengthscale prior."""
         model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=20))

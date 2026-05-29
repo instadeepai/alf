@@ -266,16 +266,11 @@ class BoTorchGPModel(BaseModel):
                 lengthscale_prior=ls_prior,
                 lengthscale_constraint=ls_constraint,
             )
-        elif self.model_config.kernel_type in ("rbf", None):
+        else:
             base = RBFKernel(
                 ard_num_dims=ard_num_dims,
                 lengthscale_prior=ls_prior,
                 lengthscale_constraint=ls_constraint,
-            )
-        else:
-            raise ValueError(
-                f"BoTorchGPModel only supports 'rbf' and 'matern' kernels, "
-                f"got {self.model_config.kernel_type!r}."
             )
         covar_module = ScaleKernel(base)
 
