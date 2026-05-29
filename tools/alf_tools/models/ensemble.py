@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable, Union
+from typing import Any, Callable
 
 import numpy as np
 from alf_core import BaseDataset, BaseModel, Candidate, LabelledCandidates, Predictions
@@ -74,7 +74,7 @@ class EnsembleWrapperConfig:
     member_seeds: list[int] | None = None
     n_members: int | None = None
     subsample: SubsampleConfig | None = None
-    _resolved_seeds: list[int] = field(init=False, repr=False, compare=False)
+    seeds: list[int] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         """Validate that exactly one seed strategy is specified, then resolve seeds.
@@ -83,8 +83,6 @@ class EnsembleWrapperConfig:
             ValueError: If neither or both seed strategies are provided, or if
                 base_seed is set without n_members, or if n_members < 1, or if
                 member_seeds is empty.
-            AssertionError: If the logic for resolving seeds is somehow
-                incorrect (should be unreachable).
         """
         if self.base_seed is None and self.member_seeds is None:
             raise ValueError("Exactly one of base_seed or member_seeds must be set; got neither.")
@@ -96,27 +94,36 @@ class EnsembleWrapperConfig:
             raise ValueError(f"n_members must be >= 1, got {self.n_members}")
         if self.member_seeds is not None and len(self.member_seeds) == 0:
             raise ValueError("member_seeds must not be empty.")
+        if self.member_seeds is not None and self.n_members is not None:
+            logger.warning(
+                "EnsembleWrapperConfig: n_members=%d is ignored because "
+                "member_seeds is provided (len=%d).",
+                self.n_members,
+                len(self.member_seeds),
+            )
 
         if self.member_seeds is not None:
-            self._resolved_seeds = list(self.member_seeds)
+            self.seeds = list(self.member_seeds)
         elif self.base_seed is not None and self.n_members is not None:
-            self._resolved_seeds = [self.base_seed + i for i in range(self.n_members)]
+            self.seeds = [self.base_seed + i for i in range(self.n_members)]
         else:
             raise AssertionError("unreachable: validation above guarantees one branch is taken")
+
+        negative = [s for s in self.seeds if s < 0]
+        if negative:
+            raise ValueError(
+                f"All member seeds must be non-negative; got negative seed(s): {negative}"
+            )
 
         if (
             self.subsample is not None
             and self.subsample.seeds is not None
-            and len(self.subsample.seeds) != len(self._resolved_seeds)
+            and len(self.subsample.seeds) != len(self.seeds)
         ):
             raise ValueError(
                 f"subsample.seeds length ({len(self.subsample.seeds)}) must equal "
-                f"the number of ensemble members ({len(self._resolved_seeds)})."
+                f"the number of ensemble members ({len(self.seeds)})."
             )
-
-    def resolve_seeds(self) -> list[int]:
-        """Return the ordered list of per-member seeds."""
-        return self._resolved_seeds
 
 
 class EnsembleWrapper(BaseModel):
@@ -131,27 +138,28 @@ class EnsembleWrapper(BaseModel):
         self,
         model_factory: Callable[[int], BaseModel],
         config: EnsembleWrapperConfig,
-        name: str = "ensemble_wrapper",
     ):
         """Instantiate members by calling model_factory with each resolved seed."""
-        self.name = name
         self.config = config
-        seeds = config.resolve_seeds()
-        self.members: list[BaseModel] = [model_factory(seed) for seed in seeds]
+        self.members: list[BaseModel] = [model_factory(seed) for seed in config.seeds]
 
     def featurise(
         self,
-        inputs: Union[LabelledCandidates, list[Candidate]],
+        inputs: LabelledCandidates | list[Candidate],
+        member_index: int = 0,
     ) -> Any:
-        """Delegate featurisation to the first ensemble member.
+        """Delegate featurisation to the specified ensemble member.
 
         Args:
             inputs: Input samples to featurise.
+            member_index: Index of the member to use for featurisation.
+                Defaults to 0. Use non-zero values for heterogeneous ensembles
+                where members have distinct featurise implementations.
 
         Returns:
-            Feature representation returned by member 0's featurise().
+            Feature representation returned by the specified member's featurise().
         """
-        return self.members[0].featurise(inputs)
+        return self.members[member_index].featurise(inputs)
 
     def _subsample(self, data: LabelledCandidates, seed: int) -> LabelledCandidates:
         """Return a random subset of data using the given seed.
@@ -195,10 +203,17 @@ class EnsembleWrapper(BaseModel):
 
         When subsample is configured, each member receives a random subset of
         train_data. The subsample seed is taken from subsample.seeds[i] if
-        provided, otherwise from the member's model-init seed. val_data is
-        always passed through unchanged.
+        provided, otherwise from the member's model-init seed.
+
+        val_data is forwarded directly to each member unchanged (including None).
+        Members that require a validation set must handle None gracefully.
+
+        If any member's train() call raises, a warning is logged for that member,
+        training continues for the remaining members, and a summary RuntimeError
+        is raised at the end listing all failures.
         """
-        resolved_seeds = self.config.resolve_seeds()
+        errors: list[tuple[int, Exception]] = []
+        resolved_seeds = self.config.seeds
         for i, member in enumerate(self.members):
             if self.config.subsample is not None:
                 subsample_seed = (
@@ -209,15 +224,22 @@ class EnsembleWrapper(BaseModel):
                 data = self._subsample(train_data, subsample_seed)
             else:
                 data = train_data
-            logger.info(
-                f"EnsembleWrapper '{self.name}': training member {i + 1}/{len(self.members)}"
+            logger.info("EnsembleWrapper: training member %d/%d", i + 1, len(self.members))
+            try:
+                member.train(data, val_data)
+            except Exception as exc:
+                logger.warning(
+                    "EnsembleWrapper: member %d/%d training failed: %s",
+                    i + 1,
+                    len(self.members),
+                    exc,
+                )
+                errors.append((i, exc))
+        if errors:
+            summary = "; ".join(f"member {i}: {exc}" for i, exc in errors)
+            raise RuntimeError(
+                f"EnsembleWrapper.train() failed for {len(errors)} member(s): {summary}"
             )
-            effective_val = (
-                val_data
-                if val_data is not None
-                else LabelledCandidates(candidates=[], labels=np.array([]))
-            )
-            member.train(data, effective_val)
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Aggregate per-member predictions into a single Predictions object.
@@ -230,18 +252,29 @@ class EnsembleWrapper(BaseModel):
             ValueError: If members return empirical_dist columns of different widths.
         """
         columns: list[np.ndarray] = []
-        for member in self.members:
+        for i, member in enumerate(self.members):
             p_i = member.predict(candidate_points)
             if p_i.empirical_dist is not None:
                 columns.append(p_i.empirical_dist)
-            else:
+            elif p_i.means is None:
+                raise ValueError(
+                    f"EnsembleWrapper.predict(): member {i} returned Predictions "
+                    "with both means and empirical_dist as None."
+                )
+            elif p_i.means.ndim == 1:
                 columns.append(p_i.means[:, np.newaxis])
+            else:
+                columns.append(p_i.means)
 
-        widths = [c.shape[1] for c in columns]
-        if len(set(widths)) > 1:
+        # Width check is deferred until all members have predicted because column
+        # widths (MC samples vs. means-only) are not known until predict() returns.
+        width_map = {i: c.shape[1] for i, c in enumerate(columns)}
+        unique_widths = set(width_map.values())
+        if len(unique_widths) > 1:
+            detail = ", ".join(f"member {i}: {w}" for i, w in width_map.items())
             raise ValueError(
                 f"EnsembleWrapper.predict(): members returned empirical_dist columns of "
-                f"different widths {widths}. All members must return the same number of "
+                f"different widths ({detail}). All members must return the same number of "
                 "columns (use consistent MC-dropout samples or means-only outputs)."
             )
 
@@ -270,15 +303,28 @@ class EnsembleWrapper(BaseModel):
                 )
         return result
 
-    def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
+    def get_training_summary_metrics(self) -> dict[str, float | int | np.number]:
         """Return summary metrics from all members, tagged with member index."""
-        result: dict[str, Union[float, int, np.number]] = {}
+        result: dict[str, float | int | np.number] = {}
         for i, member in enumerate(self.members):
             for k, v in member.get_training_summary_metrics().items():
                 result[f"member_{i}/{k}"] = v
         return result
 
     def cleanup(self) -> None:
-        """Delegate cleanup to each ensemble member."""
-        for member in self.members:
-            member.cleanup()
+        """Delegate cleanup to each ensemble member.
+
+        Attempts cleanup on every member regardless of individual failures,
+        then raises a summary RuntimeError if any cleanup calls failed.
+        """
+        errors: list[tuple[int, Exception]] = []
+        for i, member in enumerate(self.members):
+            try:
+                member.cleanup()
+            except Exception as exc:
+                errors.append((i, exc))
+        if errors:
+            summary = "; ".join(f"member {i}: {exc}" for i, exc in errors)
+            raise RuntimeError(
+                f"EnsembleWrapper.cleanup() failed for {len(errors)} member(s): {summary}"
+            )
