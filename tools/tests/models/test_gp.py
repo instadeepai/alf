@@ -14,6 +14,7 @@
 
 import math
 
+import gpytorch
 import numpy as np
 import pytest
 import torch
@@ -549,3 +550,84 @@ class TestGPModelConfigDefaults:
         cfg1 = GPModelConfig()
         cfg2 = GPModelConfig()
         assert cfg1.lengthscale_prior is not cfg2.lengthscale_prior
+
+
+class TestGPModelPriorWiring:
+    """Integration tests: confirm prior and constraint reach the kernel."""
+
+    _train_cfg = GPTrainConfig(num_iterations=5, log_frequency=5)
+    _feat_cfg = FeaturizerConfig(
+        featurizer_type="custom",
+        custom_featurizer=lambda x: torch.tensor(x, dtype=torch.float32),
+    )
+
+    def test_default_lognormal_prior_is_registered(
+        self, sample_sinusoidal_data, val_sinusoidal_data
+    ):
+        model = GPModel(
+            model_config=GPModelConfig(),
+            train_config=self._train_cfg,
+            featurizer_config=self._feat_cfg,
+        )
+        model.train(sample_sinusoidal_data, val_sinusoidal_data)
+        base_kernel = model.gp_model.covar_module.base_kernel
+        # Prior should be registered on the base kernel
+        prior_names = {name for name, *_ in base_kernel.named_priors()}
+        assert "lengthscale_prior" in prior_names
+
+    def test_gamma_prior_is_registered(
+        self, sample_sinusoidal_data, val_sinusoidal_data
+    ):
+        cfg = GPModelConfig(
+            lengthscale_prior={
+                "_target_": "gpytorch.priors.GammaPrior",
+                "concentration": 3.0,
+                "rate": 6.0,
+            }
+        )
+        model = GPModel(
+            model_config=cfg,
+            train_config=self._train_cfg,
+            featurizer_config=self._feat_cfg,
+        )
+        model.train(sample_sinusoidal_data, val_sinusoidal_data)
+        base_kernel = model.gp_model.covar_module.base_kernel
+        named = {name: prior for name, _module, prior, *_ in base_kernel.named_priors()}
+        assert "lengthscale_prior" in named
+        assert isinstance(named["lengthscale_prior"], gpytorch.priors.GammaPrior)
+
+    def test_no_prior_when_lengthscale_prior_is_none(
+        self, sample_sinusoidal_data, val_sinusoidal_data
+    ):
+        cfg = GPModelConfig(lengthscale_prior=None)
+        model = GPModel(
+            model_config=cfg,
+            train_config=self._train_cfg,
+            featurizer_config=self._feat_cfg,
+        )
+        model.train(sample_sinusoidal_data, val_sinusoidal_data)
+        base_kernel = model.gp_model.covar_module.base_kernel
+        prior_names = {name for name, *_ in base_kernel.named_priors()}
+        assert "lengthscale_prior" not in prior_names
+
+    def test_lengthscale_constraint_is_applied(
+        self, sample_sinusoidal_data, val_sinusoidal_data
+    ):
+        cfg = GPModelConfig(
+            lengthscale_constraint={
+                "_target_": "gpytorch.constraints.GreaterThan",
+                "lower_bound": 0.05,
+            }
+        )
+        model = GPModel(
+            model_config=cfg,
+            train_config=self._train_cfg,
+            featurizer_config=self._feat_cfg,
+        )
+        model.train(sample_sinusoidal_data, val_sinusoidal_data)
+        base_kernel = model.gp_model.covar_module.base_kernel
+        assert hasattr(base_kernel, "raw_lengthscale_constraint")
+        assert isinstance(
+            base_kernel.raw_lengthscale_constraint,
+            gpytorch.constraints.GreaterThan,
+        )
