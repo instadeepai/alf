@@ -45,7 +45,8 @@ class Predictions:
         """Validate prediction arrays have consistent lengths.
 
         Raises:
-            AssertionError: If variances or empirical_dist don't match the length of means.
+            AssertionError: If means is empty, or if variances or empirical_dist
+                don't match the length of means.
         """
         assert len(self.means) > 0, (
             "Means must have at least one prediction — expected shape (num_candidates,)"

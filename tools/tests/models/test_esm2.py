@@ -491,27 +491,39 @@ class TestComputeLogLikelihoodLabels:
         assert (labels[labeled] == input_ids[labeled]).all()
 
 
+@pytest.fixture
+def frozen_train_model():
+    """Function-scoped frozen ESM-2 model for TestTrainFrozen — avoids polluting session state.
+
+    Returns:
+        An ESM2Model with freeze_backbone=True on CPU.
+    """
+    config = ESM2ModelConfig(model_id=MODEL_ID)
+    train_cfg = ESM2TrainConfig(freeze_backbone=True)
+    return ESM2Model(name="test_esm2_frozen_train", model_config=config, train_config=train_cfg, device="cpu")
+
+
 class TestTrainFrozen:
     """Tests for ESM2Model.train() when freeze_backbone=True."""
 
-    def test_frozen_train_is_noop(self, esm2_model, sample_data):
+    def test_frozen_train_is_noop(self, frozen_train_model, sample_data):
         """Test that train() does not update any weights when freeze_backbone=True."""
         initial_params = {
-            name: param.clone() for name, param in esm2_model.esm_model.named_parameters()
+            name: param.clone() for name, param in frozen_train_model.esm_model.named_parameters()
         }
-        esm2_model.train(sample_data)
-        for name, param in esm2_model.esm_model.named_parameters():
+        frozen_train_model.train(sample_data)
+        for name, param in frozen_train_model.esm_model.named_parameters():
             assert torch.equal(initial_params[name], param), f"Parameter {name} changed"
 
-    def test_frozen_epoch_metrics_empty(self, esm2_model, sample_data):
+    def test_frozen_epoch_metrics_empty(self, frozen_train_model, sample_data):
         """Test that get_epoch_metrics returns an empty list after frozen train()."""
-        esm2_model.train(sample_data)
-        assert esm2_model.get_epoch_metrics() == []
+        frozen_train_model.train(sample_data)
+        assert frozen_train_model.get_epoch_metrics() == []
 
-    def test_frozen_summary_metrics_empty(self, esm2_model, sample_data):
+    def test_frozen_summary_metrics_empty(self, frozen_train_model, sample_data):
         """Test that get_training_summary_metrics returns an empty dict after frozen train()."""
-        esm2_model.train(sample_data)
-        assert esm2_model.get_training_summary_metrics() == {}
+        frozen_train_model.train(sample_data)
+        assert frozen_train_model.get_training_summary_metrics() == {}
 
 
 class TestTrainFinetune:

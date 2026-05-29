@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Literal, Union
+from typing import Any, Literal
 
 import numpy as np
 import torch
@@ -67,6 +67,7 @@ class ESM2TrainConfig(BaseTrainConfig):
         mask_splitting: Tuple of (p_mask, p_random, p_unchanged) probabilities
             for masked token replacement.
         log_frequency: Record epoch metrics every N epochs.
+        max_grad_norm: Maximum norm for gradient clipping. None disables clipping.
         loss_type: Training objective. 'mlm' masks a random fraction of tokens
             (controlled by mask_probability and mask_splitting) and computes
             cross-entropy over those positions. 'log_likelihood' masks ALL
@@ -83,6 +84,7 @@ class ESM2TrainConfig(BaseTrainConfig):
     mask_probability: float = 0.15
     mask_splitting: tuple[float, float, float] = (0.8, 0.1, 0.1)  # mask / random / unchanged
     log_frequency: int = 1
+    max_grad_norm: float | None = None
     loss_type: Literal["mlm", "log_likelihood"] = "mlm"
 
     def __post_init__(self) -> None:
@@ -149,9 +151,17 @@ class ESM2Model(BaseModel):
         self.device = get_device(device)
 
         self.tokeniser = AutoTokenizer.from_pretrained(self.model_config.model_id)
-        self.max_length = self.model_config.max_length or self.tokeniser.model_max_length
         self.esm_model = AutoModelForMaskedLM.from_pretrained(self.model_config.model_id)
         self.esm_model.to(self.device)
+        _raw_max = self.model_config.max_length or self.tokeniser.model_max_length
+        _arch_limit = self.esm_model.config.max_position_embeddings
+        if _raw_max > 10_000:
+            logger.info(
+                f"Tokeniser model_max_length={_raw_max} looks like a sentinel value; "
+                f"clamping to architectural limit {_arch_limit}."
+            )
+            _raw_max = _arch_limit
+        self.max_length = _raw_max
         self._validate_esm_config()
 
         self._prepare_labels = (
@@ -164,7 +174,7 @@ class ESM2Model(BaseModel):
         logger.info(f"ESM-2 loaded: {self.model_config.model_id} ({total_params:,} parameters)")
 
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
-        self.training_metrics: dict[str, Union[float, int, np.number]] = {}
+        self.training_metrics: dict[str, float | int | np.number] = {}
 
     def _validate_esm_config(self) -> None:
         num_layers = self.esm_model.config.num_hidden_layers + 1  # +1 for embedding
@@ -177,17 +187,20 @@ class ESM2Model(BaseModel):
             )
 
     def _validate_model_config(self) -> None:
-        if self.model_config.pooling == "last_hidden_state" and self.train_config.batch_size > 1:
+        bsi = self.train_config.batch_size_inference or self.train_config.batch_size
+        if self.model_config.pooling == "last_hidden_state" and (
+            self.train_config.batch_size > 1 or bsi > 1
+        ):
             raise ValueError(
-                "pooling='last_hidden_state' requires batch_size=1. "
+                "pooling='last_hidden_state' requires batch_size=1 and batch_size_inference=1. "
                 "Each sequence has a different length, so per-sequence hidden-state tensors "
                 "have incompatible shapes along the sequence dimension and cannot be "
-                "concatenated across mini-batches. Set train_config.batch_size=1 or "
+                "concatenated across mini-batches. Set both to 1 or "
                 "use pooling='mean' or pooling='cls' instead."
             )
 
     def featurise(
-        self, inputs: Union[LabelledCandidates, list[Candidate]]
+        self, inputs: LabelledCandidates | list[Candidate]
     ) -> dict[str, torch.Tensor]:
         """Tokenize sequences into input tensors for the ESM-2 model.
 
@@ -207,6 +220,13 @@ class ESM2Model(BaseModel):
         else:
             raise ValueError("Input must be LabelledCandidates or list of Candidates")
 
+        for seq in sequences:
+            if not isinstance(seq, str):
+                raise ValueError(
+                    f"Expected string sequences, got {type(seq).__name__!r}. "
+                    "Ensure Candidate.data contains amino acid sequence strings."
+                )
+
         encoding = self.tokeniser(
             sequences,
             max_length=self.max_length,
@@ -214,6 +234,12 @@ class ESM2Model(BaseModel):
             padding=True,
             truncation=True,
         )
+        if self.tokeniser.unk_token_id is not None:
+            if encoding["input_ids"].eq(self.tokeniser.unk_token_id).any():
+                logger.warning(
+                    "Input sequences contain unknown tokens (UNK). Non-standard amino acid "
+                    "characters will be excluded from masking and scoring. Check your sequences."
+                )
         return {
             "input_ids": encoding["input_ids"],
             "attention_mask": encoding["attention_mask"],
@@ -235,6 +261,11 @@ class ESM2Model(BaseModel):
 
         Raises:
             ValueError: If candidate_points is empty.
+
+        Note:
+            All sequences are tokenized in one pass before batching the forward pass.
+            ``batch_size_inference`` controls only the model forward pass. For very
+            large candidate lists, consider chunking externally.
         """
         if not candidate_points:
             raise ValueError("candidate_points must be non-empty")
@@ -267,7 +298,14 @@ class ESM2Model(BaseModel):
 
                 token_log_probs = log_probs.gather(2, safe_labels.unsqueeze(2)).squeeze(2)
                 token_log_probs = token_log_probs * labeled.float()
-                seq_lls = token_log_probs.sum(dim=1) / labeled.float().sum(dim=1)
+                labeled_counts = labeled.float().sum(dim=1)
+                if (labeled_counts == 0).any():
+                    raise ValueError(
+                        "One or more sequences have no scoreable positions (all special tokens "
+                        "after masking). Ensure each sequence contains at least one amino acid "
+                        "residue, or increase max_length to avoid full truncation."
+                    )
+                seq_lls = token_log_probs.sum(dim=1) / labeled_counts
 
                 log_likelihoods.extend(seq_lls.cpu().tolist())
 
@@ -283,6 +321,11 @@ class ESM2Model(BaseModel):
             Numpy array of shape (n_candidates, hidden_dim) for mean or cls pooling,
             or (n_candidates, seq_len, hidden_dim) for last_hidden_state pooling.
             Returns shape (0, hidden_dim) if candidate_points is empty.
+
+        Note:
+            All sequences are tokenized in one pass before batching the forward pass.
+            ``batch_size_inference`` controls only the model forward pass. For very
+            large candidate lists, consider chunking externally.
         """
         if not candidate_points:
             return np.empty((0, self.esm_model.config.hidden_size), dtype=np.float32)
@@ -325,6 +368,18 @@ class ESM2Model(BaseModel):
         dataset = TensorDataset(batch["input_ids"], batch["attention_mask"])
         return DataLoader(dataset, batch_size=self.train_config.batch_size, shuffle=shuffle)
 
+    def _special_tokens_mask(self, input_ids: torch.Tensor) -> torch.Tensor:
+        special_ids = {
+            self.tokeniser.cls_token_id,
+            self.tokeniser.eos_token_id,
+            self.tokeniser.pad_token_id,
+            self.tokeniser.unk_token_id,
+        } - {None}
+        mask = torch.zeros_like(input_ids, dtype=torch.bool)
+        for sid in special_ids:
+            mask |= input_ids.eq(sid)
+        return mask
+
     def _mask_tokens(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Apply random token masking for MLM.
 
@@ -342,22 +397,14 @@ class ESM2Model(BaseModel):
         """
         labels = input_ids.clone()
 
-        special_ids = {
-            self.tokeniser.cls_token_id,
-            self.tokeniser.eos_token_id,
-            self.tokeniser.pad_token_id,
-        } - {None}
-
-        special_tokens_mask = torch.zeros_like(input_ids, dtype=torch.bool)
-        for sid in special_ids:
-            special_tokens_mask |= input_ids.eq(sid)
+        special_tokens_mask = self._special_tokens_mask(input_ids)
 
         # eligible[i, j] is True when position (i, j) may be masked
         eligible = ~special_tokens_mask  # (batch, seq_len)
 
         # Sample masked positions
         prob_matrix = torch.full(
-            input_ids.shape, self.train_config.mask_probability, device=self.device
+            input_ids.shape, self.train_config.mask_probability, device=input_ids.device
         )
         prob_matrix.masked_fill_(special_tokens_mask, 0.0)
         masked = torch.bernoulli(prob_matrix).bool()
@@ -405,7 +452,7 @@ class ESM2Model(BaseModel):
         n_masked = masked_indices.shape[0]
         p_mask, p_random, p_unchanged = self.train_config.mask_splitting
         if n_masked > 0:
-            split = torch.rand(n_masked, device=self.device)
+            split = torch.rand(n_masked, device=input_ids.device)
 
             # X %: replace with [MASK]
             replace_with_mask = split < p_mask
@@ -421,7 +468,7 @@ class ESM2Model(BaseModel):
                     low=0,
                     high=self.tokeniser.vocab_size,
                     size=(idx.shape[0],),
-                    device=self.device,
+                    device=input_ids.device,
                 )
                 masked_input_ids[idx[:, 0], idx[:, 1]] = random_ids
 
@@ -448,15 +495,7 @@ class ESM2Model(BaseModel):
         Returns:
             Tuple of (masked_input_ids, labels), both of shape (batch, seq_len).
         """
-        special_ids = {
-            self.tokeniser.cls_token_id,
-            self.tokeniser.eos_token_id,
-            self.tokeniser.pad_token_id,
-        } - {None}
-
-        special_tokens_mask = torch.zeros_like(input_ids, dtype=torch.bool)
-        for sid in special_ids:
-            special_tokens_mask |= input_ids.eq(sid)
+        special_tokens_mask = self._special_tokens_mask(input_ids)
 
         labels = input_ids.clone()
         labels[special_tokens_mask] = -100
@@ -475,7 +514,7 @@ class ESM2Model(BaseModel):
         self,
         train_loader: DataLoader,
         optimizer: optim.Optimizer,
-    ) -> tuple[float, dict]:
+    ) -> tuple[float, dict[str, float]]:
         """Train for one epoch.
 
         Args:
@@ -504,7 +543,16 @@ class ESM2Model(BaseModel):
                 attention_mask=batch_mask,
                 labels=labels,
             )
+            if not torch.isfinite(outputs.loss):
+                raise RuntimeError(
+                    f"Training loss is {outputs.loss.item():.6g} at epoch batch. "
+                    "Check for degenerate sequences or reduce the learning rate."
+                )
             outputs.loss.backward()
+            if self.train_config.max_grad_norm is not None:
+                torch.nn.utils.clip_grad_norm_(
+                    self.esm_model.parameters(), self.train_config.max_grad_norm
+                )
             optimizer.step()
             epoch_losses.append(outputs.loss.item())
 
@@ -513,6 +561,11 @@ class ESM2Model(BaseModel):
             correct_tokens += (preds == labels[labeled_positions]).sum().item()
             total_tokens += labeled_positions.sum().item()
 
+        if not epoch_losses:
+            raise ValueError(
+                "Training DataLoader produced no batches. Ensure train_data is non-empty "
+                "and batch_size does not exceed the number of training sequences."
+            )
         avg_train_loss = float(np.mean(epoch_losses))
         token_accuracy = correct_tokens / total_tokens if total_tokens > 0 else 0.0
         train_metrics: dict[str, float] = {
@@ -523,7 +576,7 @@ class ESM2Model(BaseModel):
             train_metrics["log_likelihood"] = -avg_train_loss
         return avg_train_loss, train_metrics
 
-    def _validate_epoch(self, val_loader: DataLoader) -> tuple[float, dict]:
+    def _validate_epoch(self, val_loader: DataLoader) -> tuple[float, dict[str, float]]:
         """Validate for one epoch.
 
         Args:
@@ -708,7 +761,7 @@ class ESM2Model(BaseModel):
         """
         return self._epoch_metrics
 
-    def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
+    def get_training_summary_metrics(self) -> dict[str, float | int | np.number]:
         """Return summary metrics from the most recent train() call.
 
         Returns:
