@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates, Predictions, State
+from scipy.spatial.distance import cdist
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig, ProblemType
 from alf_core.model.base_model import BaseModel
 from alf_core.surrogate.surrogate import Surrogate
@@ -271,6 +272,35 @@ class TestCoreSet:
         cands = [Candidate(data="x", modality="sequence")]
         with pytest.raises(ValueError, match="returned None"):
             CoreSet()(cands, state)
+
+    def test_chunked_cdist_selects_globally_farthest_first(self) -> None:
+        """With n_cands > 512, chunked cdist still picks the globally farthest candidate first.
+
+        Places 599 random 2-D candidates near the origin plus one outlier at (1000, 1000).
+        Brute-force single-call cdist identifies the outlier as the max-distance candidate;
+        CoreSet (which internally chunks at 512) must assign it the highest score.
+        """
+        rng = np.random.default_rng(0)
+        n_train = 5
+        n_cands = 600  # exceeds _CDIST_CHUNK_SIZE=512
+
+        train_embs = rng.standard_normal((n_train, 2)) * 0.1
+        cand_embs = np.concatenate(
+            [rng.standard_normal((n_cands - 1, 2)) * 0.5, [[1000.0, 1000.0]]], axis=0
+        )
+        outlier_idx = n_cands - 1
+
+        embeddings = np.concatenate([train_embs, cand_embs], axis=0)
+        state, search_candidates = _make_state(embeddings, n_train=n_train, acq_batch_size=1)
+
+        result = CoreSet()(search_candidates, state)
+
+        brute_min_dists = cdist(cand_embs, train_embs).min(axis=1)
+        expected_best = int(np.argmax(brute_min_dists))
+
+        assert expected_best == outlier_idx
+        assert result.labels[expected_best] == pytest.approx(1.0)
+        assert all(result.labels[i] == 0.0 for i in range(n_cands) if i != expected_best)
 
     def test_featurise_returning_torch_tensor_produces_correct_scores(self) -> None:
         """_to_numpy correctly handles a torch.Tensor returned by featurise."""
