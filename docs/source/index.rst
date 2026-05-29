@@ -95,11 +95,11 @@ Tutorials
 **Experiment tutorials:**
 - `Offline Design Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/experiments/offline_design_tutorial.ipynb>`_ — Step-by-step guide to offline design experiments
 - `Online Design Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/experiments/online_design_tutorial.ipynb>`_ — Guide to online design experiments
-- `Ensemble Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/models/ensemble_tutorial.ipynb>`_ — Seed ensembles, MC dropout, and combined ensembles for uncertainty-aware prediction
 
 **Model tutorials:**
 - `Chemprop MPNN Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/models/chemprop_tutorial.ipynb>`_ — Active learning for small molecules using SMILES inputs and the Chemprop MPNN
 - `GP Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/models/gp_tutorial.ipynb>`_ — Gaussian Process surrogate model usage
+- `Ensemble Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/models/ensemble_tutorial.ipynb>`_ — Seed ensembles, MC dropout, and combined ensembles for uncertainty-aware prediction
 
 
 Contents
