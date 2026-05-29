@@ -77,13 +77,14 @@ class BaseModel(abc.ABC):
     def train(
         self,
         train_data: LabelledCandidates,
-        val_data: LabelledCandidates,
+        val_data: LabelledCandidates | None = None,
     ) -> None:
         """Train the model on the provided training and validation data.
 
         Args:
             train_data: Labeled candidates for training.
-            val_data: Labeled candidates for validation.
+            val_data: Labeled candidates for validation. When None, the model
+                should skip validation metrics or handle the absence gracefully.
         """
         pass
 
