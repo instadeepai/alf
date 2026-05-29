@@ -63,7 +63,7 @@ class BoTorchGPModel(BaseModel):
     - Outputs are standardised (handled automatically)
 
     Example:
-        >>> from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel  
+        >>> from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
         >>> from alf_tools.datasets.botorch_synthetic_dataset import BoTorchSyntheticDataset
         >>>
         >>> # Create dataset
@@ -230,7 +230,7 @@ class BoTorchGPModel(BaseModel):
         self._validate_shape(self.train_Y)
 
         # Apply input normalisation if requested
-        if self.normalize_inputs:
+        if self.normalise_inputs:
             train_x_np = self.train_X.cpu().numpy()
             self._input_normaliser = InputNormaliser()
             self._input_normaliser.fit(train_x_np)
@@ -278,6 +278,10 @@ class BoTorchGPModel(BaseModel):
                     "No kernel_type specified. Defaulting to RBF kernel with Hvarfner "
                     f"log-normal lengthscale prior{' with ARD' if self.use_ard else ''}."
                 )
+        else:
+            raise ValueError(
+                f"Invalid kernel_type '{self.kernel_type}'. Must be 'matern', 'rbf', or None."
+            )
 
         outcome_transform = Standardize(m=1) if self.standardise_outputs else None
         self.model = SingleTaskGP(
