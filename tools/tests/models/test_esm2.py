@@ -54,7 +54,7 @@ def esm2_model(model_config, train_config):
     )
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture
 def esm2_finetune_model():
     """ESM-2 model with unfrozen backbone for fine-tuning tests.
 
@@ -72,7 +72,7 @@ def esm2_finetune_model():
     return ESM2Model(name="test_esm2_ft", model_config=config, train_config=train_cfg, device="cpu")
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture
 def esm2_ll_model():
     """ESM-2 model configured for log-likelihood training.
 
@@ -187,35 +187,11 @@ class TestFeaturise:
 class TestPredict:
     """Tests for ESM2Model.predict()."""
 
-    def test_mean_pooling_shape(self, esm2_model, sample_data):
-        """Test that mean pooling produces embeddings of shape (n_seqs, hidden_dim)."""
+    def test_predict_shape(self, esm2_model, sample_data):
+        """predict() returns means of shape (n_candidates,) — one scalar per sequence."""
         predictions = esm2_model.predict(sample_data.candidates)
-        hidden_dim = esm2_model.esm_model.config.hidden_size
-        assert predictions.means.shape == (len(sample_data), hidden_dim)
-
-    def test_cls_pooling_shape(self, model_config, train_config, sample_data):
-        """Test that CLS pooling produces embeddings of shape (n_seqs, hidden_dim)."""
-        config = ESM2ModelConfig(model_id=MODEL_ID, pooling="cls")
-        model = ESM2Model(
-            name="cls_model", model_config=config, train_config=train_config, device="cpu"
-        )
-        predictions = model.predict(sample_data.candidates)
-        hidden_dim = model.esm_model.config.hidden_size
-        assert predictions.means.shape == (len(sample_data), hidden_dim)
-
-    def test_last_hidden_state_pooling_shape(self, model_config, sample_data):
-        """Test that last_hidden_state pooling produces shape (n_seqs, seq_len, hidden_dim)."""
-        config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
-        # batch_size=1 required; batch_size>1 raises ValueError (different seq lengths)
-        train_cfg = ESM2TrainConfig(freeze_backbone=True, batch_size=1)
-        model = ESM2Model(
-            name="lhs_model", model_config=config, train_config=train_cfg, device="cpu"
-        )
-        predictions = model.predict(sample_data.candidates)
-        # Shape: (n_seqs, seq_len, hidden_dim) — seq_len includes special tokens and padding
-        assert predictions.means.ndim == 3
-        assert predictions.means.shape[0] == len(sample_data)
-        assert predictions.means.shape[2] == model.esm_model.config.hidden_size
+        assert predictions.means.ndim == 1
+        assert predictions.means.shape == (len(sample_data),)
 
     def test_last_hidden_state_batch_size_gt_1_raises(self):
         """last_hidden_state pooling with batch_size > 1 must raise ValueError at init."""
@@ -225,31 +201,22 @@ class TestPredict:
             ESM2Model(name="lhs_bad", model_config=config, train_config=train_cfg, device="cpu")
 
     def test_variances_are_none(self, esm2_model, sample_data):
-        """Test that predict returns Predictions with variances=None."""
+        """predict() returns Predictions with variances=None."""
         predictions = esm2_model.predict(sample_data.candidates)
         assert predictions.variances is None
 
-    def test_embeddings_are_finite(self, esm2_model, sample_data):
-        """Test that all embedding values are finite (no NaN or inf)."""
+    def test_log_likelihoods_are_finite(self, esm2_model, sample_data):
+        """predict() returns finite log-likelihood scores (no NaN or inf)."""
         predictions = esm2_model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
 
-    def test_repr_layer_produces_different_embeddings(self, train_config, sample_data):
-        """Test that extracting from different layers produces different embeddings."""
-        config_final = ESM2ModelConfig(model_id=MODEL_ID, repr_layer=-1)
-        config_first = ESM2ModelConfig(model_id=MODEL_ID, repr_layer=1)
-        model_final = ESM2Model(
-            name="final", model_config=config_final, train_config=train_config, device="cpu"
-        )
-        model_first = ESM2Model(
-            name="first", model_config=config_first, train_config=train_config, device="cpu"
-        )
-        preds_final = model_final.predict(sample_data.candidates)
-        preds_first = model_first.predict(sample_data.candidates)
-        assert not np.allclose(preds_final.means, preds_first.means)
+    def test_log_likelihoods_are_negative(self, esm2_model, sample_data):
+        """predict() returns negative values since log-probabilities are always <= 0."""
+        predictions = esm2_model.predict(sample_data.candidates)
+        assert np.all(predictions.means <= 0)
 
     def test_predict_batched_matches_shape(self, esm2_small_batch_model):
-        """predict() with N > batch_size returns the same shape as N <= batch_size."""
+        """predict() with N > batch_size returns shape (N,)."""
         candidates = [
             Candidate(data="MKTIIALSYIFCLVFA", modality="sequence"),
             Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence"),
@@ -258,11 +225,10 @@ class TestPredict:
             Candidate(data="ACGT", modality="sequence"),
         ]
         predictions = esm2_small_batch_model.predict(candidates)
-        hidden_dim = esm2_small_batch_model.esm_model.config.hidden_size
-        assert predictions.means.shape == (5, hidden_dim)
+        assert predictions.means.shape == (5,)
 
     def test_predict_batched_equals_single_batch(self, esm2_small_batch_model, esm2_model):
-        """Embeddings from batched predict equal those from a single-pass predict."""
+        """Log-likelihoods from batched predict equal those from a single-pass predict."""
         candidates = [
             Candidate(data="MKTIIALSYIFCLVFA", modality="sequence"),
             Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence"),
@@ -270,22 +236,102 @@ class TestPredict:
             Candidate(data="PEPTIDE", modality="sequence"),
             Candidate(data="ACGT", modality="sequence"),
         ]
-        # esm2_model has batch_size=8 (fits all 5 in one pass after refactor)
-        # esm2_small_batch_model has batch_size=2 (forces 3 mini-batches)
         single = esm2_model.predict(candidates)
         batched = esm2_small_batch_model.predict(candidates)
         np.testing.assert_allclose(single.means, batched.means, rtol=1e-5, atol=1e-5)
 
-    def test_predict_empty_candidates(self, esm2_model):
-        """predict() with an empty list returns an empty Predictions."""
-        with pytest.raises(AssertionError):
+    def test_predict_empty_candidates_raises(self, esm2_model):
+        """predict() with an empty list raises ValueError."""
+        with pytest.raises(ValueError, match="non-empty"):
             esm2_model.predict([])
 
     def test_predict_single_candidate(self, esm2_model):
-        """predict() with a single candidate returns shape (1, hidden_dim)."""
+        """predict() with a single candidate returns shape (1,)."""
         predictions = esm2_model.predict([Candidate(data="ACGT", modality="sequence")])
+        assert predictions.means.shape == (1,)
+
+
+class TestEmbed:
+    """Tests for ESM2Model.embed()."""
+
+    def test_embed_mean_pooling_shape(self, esm2_model, sample_data):
+        """embed() with mean pooling returns shape (n_seqs, hidden_dim)."""
+        embeddings = esm2_model.embed(sample_data.candidates)
         hidden_dim = esm2_model.esm_model.config.hidden_size
-        assert predictions.means.shape == (1, hidden_dim)
+        assert embeddings.shape == (len(sample_data), hidden_dim)
+
+    def test_embed_cls_pooling_shape(self, train_config, sample_data):
+        """embed() with cls pooling returns shape (n_seqs, hidden_dim)."""
+        config = ESM2ModelConfig(model_id=MODEL_ID, pooling="cls")
+        model = ESM2Model(
+            name="cls_model", model_config=config, train_config=train_config, device="cpu"
+        )
+        embeddings = model.embed(sample_data.candidates)
+        hidden_dim = model.esm_model.config.hidden_size
+        assert embeddings.shape == (len(sample_data), hidden_dim)
+
+    def test_embed_last_hidden_state_shape(self, sample_data):
+        """embed() with last_hidden_state pooling returns shape (n_seqs, seq_len, hidden_dim)."""
+        config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
+        train_cfg = ESM2TrainConfig(freeze_backbone=True, batch_size=1)
+        model = ESM2Model(
+            name="lhs_model", model_config=config, train_config=train_cfg, device="cpu"
+        )
+        embeddings = model.embed(sample_data.candidates)
+        assert embeddings.ndim == 3
+        assert embeddings.shape[0] == len(sample_data)
+        assert embeddings.shape[2] == model.esm_model.config.hidden_size
+
+    def test_embed_empty_candidates(self, esm2_model):
+        """embed() with an empty list returns shape (0, hidden_dim)."""
+        hidden_dim = esm2_model.esm_model.config.hidden_size
+        result = esm2_model.embed([])
+        assert result.shape == (0, hidden_dim)
+
+    def test_embed_repr_layer_produces_different_embeddings(self, train_config, sample_data):
+        """embed() extracts from different layers, producing different embeddings."""
+        config_final = ESM2ModelConfig(model_id=MODEL_ID, repr_layer=-1)
+        config_first = ESM2ModelConfig(model_id=MODEL_ID, repr_layer=1)
+        model_final = ESM2Model(
+            name="final", model_config=config_final, train_config=train_config, device="cpu"
+        )
+        model_first = ESM2Model(
+            name="first", model_config=config_first, train_config=train_config, device="cpu"
+        )
+        emb_final = model_final.embed(sample_data.candidates)
+        emb_first = model_first.embed(sample_data.candidates)
+        assert not np.allclose(emb_final, emb_first)
+
+    def test_embed_finite(self, esm2_model, sample_data):
+        """embed() returns finite values (no NaN or inf)."""
+        embeddings = esm2_model.embed(sample_data.candidates)
+        assert np.all(np.isfinite(embeddings))
+
+    def test_embed_batched_matches_shape(self, esm2_small_batch_model):
+        """embed() with N > batch_size returns shape (N, hidden_dim)."""
+        candidates = [
+            Candidate(data="MKTIIALSYIFCLVFA", modality="sequence"),
+            Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence"),
+            Candidate(data="GASGAAS", modality="sequence"),
+            Candidate(data="PEPTIDE", modality="sequence"),
+            Candidate(data="ACGT", modality="sequence"),
+        ]
+        embeddings = esm2_small_batch_model.embed(candidates)
+        hidden_dim = esm2_small_batch_model.esm_model.config.hidden_size
+        assert embeddings.shape == (5, hidden_dim)
+
+    def test_embed_batched_equals_single_batch(self, esm2_small_batch_model, esm2_model):
+        """Embeddings from batched embed() equal those from a single-pass embed()."""
+        candidates = [
+            Candidate(data="MKTIIALSYIFCLVFA", modality="sequence"),
+            Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence"),
+            Candidate(data="GASGAAS", modality="sequence"),
+            Candidate(data="PEPTIDE", modality="sequence"),
+            Candidate(data="ACGT", modality="sequence"),
+        ]
+        single = esm2_model.embed(candidates)
+        batched = esm2_small_batch_model.embed(candidates)
+        np.testing.assert_allclose(single, batched, rtol=1e-5, atol=1e-5)
 
 
 class TestMaskTokens:
