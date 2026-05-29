@@ -217,7 +217,7 @@ def get_bounds_tensor(
 
     Raises:
         ValueError: If bounds are not in a valid format or if lower
-        bounds are not <= upper bounds.
+            bounds are not <= upper bounds.
 
     Returns:
         Tensor of shape (2, d) in BoTorch format.

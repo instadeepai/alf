@@ -120,7 +120,7 @@ class BoTorchGPModel(BaseModel):
             kernel_type: Kernel type to use. Options: "matern", "rbf", or None.
                 If None (default), RBF with Hvarfner et al. 2024 priors is used.
                 If "rbf", RBF with Hvarfner priors is used (same as None but explicit).
-                If "matern", Matérn kernel with nu parameter is used (no priors).
+                If "matern", Matérn kernel with nu parameter is used (with Hvarfner priors).
             nu: nu value for Matern kernel. Default 2.5 aka Matern 5/2.
             use_ard: Whether to use ARD (Automatic Relevance Determination) in the
                 kernel. Default: False.
@@ -241,7 +241,7 @@ class BoTorchGPModel(BaseModel):
             )
 
         ard_num_dims = self.train_X.shape[-1] if self.use_ard else None
-        # Apply Hvarfner et al. 2024 priors for both 'rbf' and default (None)
+        # Apply Hvarfner et al. 2024 priors for all kernel types
         if ard_num_dims is not None:
             lengthscale_prior = LogNormalPrior(
                 loc=math.sqrt(2) + math.log(ard_num_dims) * 0.5, scale=math.sqrt(3)
