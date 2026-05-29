@@ -31,7 +31,7 @@ import numpy as np
 import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates, Modality
-from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
+from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel, BoTorchTrainConfig
 from alf_tools.models.utils.botorch_model_adapter import BoTorchModelAdapter
 from alf_tools.utils.botorch_utils import candidates_to_tensor
 from botorch.posteriors import Posterior
@@ -350,7 +350,7 @@ def test_adapter_integration_with_real_botorch_gp_model():
     candidates = [Candidate(data=x, modality=Modality.TABULAR) for x in X_train]
     train_data = LabelledCandidates(candidates=candidates, labels=y_train)
 
-    gp_model = BoTorchGPModel(num_iterations=10, optimizer="scipy")
+    gp_model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=10, optimizer="scipy"))
     gp_model.train(train_data)
 
     # Wrap in adapter
