@@ -14,6 +14,7 @@
 
 """Tests for the benchmarking metric registry scaffold."""
 
+import alf_core.utils.metrics.benchmarking as bm_module
 import numpy as np
 from alf_core.utils.metrics.benchmarking import (
     BenchmarkingMetricRegistry,
@@ -53,8 +54,6 @@ class TestRegisterBenchmarkingMetric:
 
     def test_decorated_function_is_callable(self, monkeypatch):
         """Decorated and registered function remains callable."""
-        import alf_core.utils.metrics.benchmarking as bm_module
-
         isolated_registry = BenchmarkingMetricRegistry()
         monkeypatch.setattr(bm_module, "benchmarking_metric_registry", isolated_registry)
 
