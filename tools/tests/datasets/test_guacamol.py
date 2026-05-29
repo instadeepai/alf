@@ -33,6 +33,7 @@ from alf_tools.datasets.guacamol import (
     _compute_properties,  # noqa: PLC2701
     _download_file,  # noqa: PLC2701
     _load_smiles_file,  # noqa: PLC2701
+    _mol_from_smiles,  # noqa: PLC2701
     download_guacamol,
 )
 
@@ -210,6 +211,37 @@ class TestComputeProperties:
         """QED is always in [0, 1] for any valid molecule."""
         result = _compute_properties("CC(=O)Nc1ccc(O)cc1", ["QED"])
         assert 0.0 <= float(result["QED"]) <= 1.0
+
+
+class TestMolFromSmiles:
+    """Unit tests for the module-level mol parse cache."""
+
+    def setup_method(self):
+        _mol_from_smiles.cache_clear()
+
+    def test_valid_smiles_returns_mol(self):
+        assert _mol_from_smiles("CCO") is not None
+
+    def test_invalid_smiles_returns_none(self):
+        assert _mol_from_smiles("NOT_A_SMILES_XYZ") is None
+
+    def test_same_object_returned_on_repeated_calls(self):
+        """Cache hit: identical object identity, not just equal value."""
+        mol1 = _mol_from_smiles("CCO")
+        mol2 = _mol_from_smiles("CCO")
+        assert mol1 is mol2
+
+    def test_different_smiles_return_different_objects(self):
+        mol1 = _mol_from_smiles("CCO")
+        mol2 = _mol_from_smiles("c1ccccc1")
+        assert mol1 is not mol2
+
+    def test_cache_info_shows_hits_after_repeated_call(self):
+        _mol_from_smiles("CCO")
+        _mol_from_smiles("CCO")
+        info = _mol_from_smiles.cache_info()
+        assert info.hits >= 1
+        assert info.misses == 1
 
 
 VALID_SMILES_LINES = [

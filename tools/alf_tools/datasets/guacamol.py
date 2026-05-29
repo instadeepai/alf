@@ -15,6 +15,7 @@
 import copy
 import logging
 from pathlib import Path
+from functools import lru_cache
 from typing import Callable, Final, Literal, TypedDict, get_args
 
 import numpy as np
@@ -176,7 +177,7 @@ def _compute_properties(smiles: str, properties: list[str]) -> dict[str, float]:
     Returns:
         Dict mapping each property name to its computed float value.
     """
-    mol = Chem.MolFromSmiles(smiles)
+    mol = _mol_from_smiles(smiles)
     if mol is None:
         raise ValueError(f"Cannot compute label for invalid SMILES: {smiles!r}")
     return {name: PROPERTY_FNS[name](mol) for name in properties}  # type: ignore[operator]  # mypy cannot narrow str subscript to Literal key type
@@ -240,7 +241,7 @@ def _download_file(url: str, filepath: Path, max_lines: int | None = None) -> Pa
         raise OSError(f"Network error downloading {filepath.name} from {url}") from exc
     if resp.status_code != 200:
         raise FileNotFoundError(f"Failed to download from {url}. Status code: {resp.status_code}")
-    
+
     try:
         with open(tmp_path, "wb") as f:
             for idx, raw_line in enumerate(resp.iter_lines()):
@@ -250,7 +251,7 @@ def _download_file(url: str, filepath: Path, max_lines: int | None = None) -> Pa
     except OSError:
         tmp_path.unlink(missing_ok=True)
         raise
-    
+
     tmp_path.rename(filepath)
     logger.info("  ✓ %s written to %s.", filepath.name, filepath.parent)
     return filepath
@@ -281,6 +282,12 @@ def download_guacamol(data_dir: Path = DATAPATH, max_lines: int | None = None) -
         _download_file(file_info["url"], data_dir / file_info["name"], max_lines)
 
 
+@lru_cache(maxsize=None)
+def _mol_from_smiles(smiles: str) -> "Chem.Mol | None":
+    """Return the RDKit Mol for smiles, or None if invalid. Result is cached per unique string."""
+    return Chem.MolFromSmiles(smiles)
+
+
 def _canonical_smiles(smiles: str) -> str:
     """Return the RDKit canonical form of a SMILES string, or the original if invalid.
 
@@ -293,7 +300,7 @@ def _canonical_smiles(smiles: str) -> str:
     Returns:
         Canonical SMILES string, or the original string if RDKit cannot parse it.
     """
-    mol = Chem.MolFromSmiles(smiles)
+    mol = _mol_from_smiles(smiles)
     return Chem.MolToSmiles(mol) if mol is not None else smiles
 
 
@@ -475,16 +482,16 @@ class GuacaMol(BaseDataset):
         result_labels: list[float] = []
 
         for candidate in candidates:
-            key = _canonical_smiles(candidate.data)
+            mol = _mol_from_smiles(candidate.data)
+            key = Chem.MolToSmiles(mol) if mol is not None else candidate.data
             if key in self._smiles_index:
                 idx = self._smiles_index[key]
                 result_labels.append(float(self._raw_dataset.labels[idx]))
                 result_candidates.append(candidate)
             else:
-                label = _compute_properties(candidate.data, [self.config.target_property])[
-                    self.config.target_property
-                ]
-                result_labels.append(label)
+                if mol is None:
+                    raise ValueError(f"Cannot compute label for invalid SMILES: {candidate.data!r}")
+                result_labels.append(PROPERTY_FNS[self.config.target_property](mol))
                 result_candidates.append(candidate)
 
         return LabelledCandidates(
