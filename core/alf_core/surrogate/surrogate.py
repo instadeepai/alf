@@ -73,7 +73,7 @@ class Surrogate:
         """
         return self.model.predict(candidates)
 
-    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> Any:
+    def featurise(self, inputs: list[Candidate]) -> Any:
         """Featurise the given inputs using the surrogate model's featurisation method.
 
         Args:

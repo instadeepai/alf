@@ -18,9 +18,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
-from alf_core.model.base_model import BaseModel
-from alf_core.surrogate.surrogate import Surrogate
+from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Surrogate
 
 
 class _FeaturiseModel(BaseModel):

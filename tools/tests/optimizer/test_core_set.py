@@ -17,10 +17,17 @@ from typing import Any
 import numpy as np
 import pytest
 import torch
-from alf_core import Candidate, LabelledCandidates, Predictions, State
-from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig, ProblemType
-from alf_core.model.base_model import BaseModel
-from alf_core.surrogate.surrogate import Surrogate
+from alf_core import (
+    BaseDataset,
+    BaseDatasetConfig,
+    BaseModel,
+    Candidate,
+    LabelledCandidates,
+    Predictions,
+    ProblemType,
+    State,
+    Surrogate,
+)
 from alf_tools.optimizer.acquisition_functions.core_set import CoreSet
 from scipy.spatial.distance import cdist
 
