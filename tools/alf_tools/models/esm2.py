@@ -37,6 +37,7 @@ class ESM2ModelConfig:
         model_id: HuggingFace model identifier, e.g. 'facebook/esm2_t6_8M_UR50D'.
         pooling: Strategy for reducing per-token hidden states to a sequence embedding.
         repr_layer: Transformer layer index to extract embeddings from. -1 = final layer.
+        max_length: Maximum tokenisation length. Defaults to the tokeniser's model_max_length.
     """
 
     model_id: str
@@ -103,8 +104,9 @@ class ESM2Model(BaseModel):
     """ESM-2 protein language model wrapper.
 
     Loads a pre-trained ESM-2 checkpoint from HuggingFace and exposes it as a
-    BaseModel. predict() returns per-sequence embeddings. Optionally fine-tunes
-    the backbone with masked language modelling (MLM).
+    BaseModel. predict() returns per-sequence pseudo-log-likelihood scores;
+    embed() returns per-sequence embeddings. Optionally fine-tunes the backbone
+    with masked language modelling (MLM) or full log-likelihood masking.
     """
 
     def __init__(
@@ -124,6 +126,7 @@ class ESM2Model(BaseModel):
         """
         self.name = name
         self.model_config = model_config
+        self._validate_model_config()
         self.train_config = train_config or ESM2TrainConfig()
         self.device = get_device(device)
 
@@ -144,9 +147,7 @@ class ESM2Model(BaseModel):
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
 
-        self._post_init()
-
-    def _post_init(self) -> None:
+    def _validate_model_config(self) -> None:
         num_layers = self.esm_model.config.num_hidden_layers + 1  # +1 for embedding
         valid_range = range(-num_layers, num_layers)
         if self.model_config.repr_layer not in valid_range:
@@ -600,7 +601,7 @@ class ESM2Model(BaseModel):
         """Fine-tune the ESM-2 backbone using the configured training objective.
 
         Raises:
-            AssertionError: If means have no predictions or optimizer_type is invalid.
+            AssertionError: Unreachable — if optimizer_type bypasses __post_init__ validation.
 
         Args:
             train_data: Training data containing sequences.
