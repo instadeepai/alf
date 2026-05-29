@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from typing import Union
+from typing import Any, Union
 
 import numpy as np
 import torch
@@ -74,7 +74,7 @@ class Surrogate:
         """
         return self.model.predict(candidates)
 
-    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> np.ndarray | torch.Tensor:
+    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> Any:
         """Featurise the given inputs using the surrogate model's featurisation method.
 
         Args:

@@ -62,12 +62,11 @@ class BaseModel(abc.ABC):
     output_dim: int
 
     @abc.abstractmethod
-    def featurise(self, inputs: list[Candidate] | LabelledCandidates) -> Any:
+    def featurise(self, inputs: list[Candidate]) -> Any:
         """Convert inputs into feature representations.
 
         Args:
-            inputs: List of Candidate objects, or a LabelledCandidates instance,
-                to featurize.
+            inputs: List of Candidate objects to featurize.
 
         Returns:
             Feature representation of the inputs (format depends on implementation).
