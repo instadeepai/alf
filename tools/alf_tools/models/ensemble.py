@@ -140,8 +140,16 @@ class EnsembleWrapper(BaseModel):
         self,
         model_factory: Callable[[int], BaseModel],
         config: EnsembleWrapperConfig,
+        name: str = "ensemble",
     ):
-        """Instantiate members by calling model_factory with each resolved seed."""
+        """Instantiate members by calling model_factory with each resolved seed.
+
+        Args:
+            model_factory: Callable that takes a seed integer and returns a BaseModel instance.
+            config: Configuration specifying seeds, member count, and optional subsampling.
+            name: Name identifier for this ensemble, used in logging.
+        """
+        self.name = name
         self.config = config
         self.members: list[BaseModel] = [model_factory(seed) for seed in config.seeds]
 
@@ -230,7 +238,9 @@ class EnsembleWrapper(BaseModel):
                 data = self._subsample(train_data, subsample_seed)
             else:
                 data = train_data
-            logger.info("EnsembleWrapper: training member %d/%d", i + 1, len(self.members))
+            logger.info(
+                "EnsembleWrapper '%s': training member %d/%d", self.name, i + 1, len(self.members)
+            )
             try:
                 member.train(data, val_data)
             except Exception as exc:

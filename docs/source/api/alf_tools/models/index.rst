@@ -10,6 +10,7 @@ prediction, and sampling.
 
    CNN Model <cnn/index>
    GP Model <gp/index>
+   Chemprop Model <chemprop/index>
    PyRosetta Model <pyrosetta/index>
    Ensemble Wrapper <ensemble/index>
    Utilities <utils/index>

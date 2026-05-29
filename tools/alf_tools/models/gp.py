@@ -694,7 +694,7 @@ class GPModel(BaseModel):
         logger.info(f"Training complete with metrics: {self.training_metrics}")
 
         # Evaluate on validation data if provided
-        if val_data is not None:
+        if val_data is not None and len(val_data) > 0:
             val_predictions = self.predict(val_data.candidates)
             val_results = Results(
                 predictions=val_predictions,
