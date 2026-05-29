@@ -94,6 +94,7 @@ Tutorials
 
 - `Offline Design Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/offline_design_tutorial.ipynb>`_ — Step-by-step guide to offline design experiments
 - `Online Design Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/online_design_tutorial.ipynb>`_ — Guide to online design experiments
+- `GuacaMol Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/datasets/guacamol_tutorial.ipynb>`_ — Drug-like molecule corpus: download, property analysis, and SMILES querying
 
 
 Contents
