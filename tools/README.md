@@ -36,6 +36,9 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 - **UCB** - Upper Confidence Bound for exploration-exploitation
 - **ExpectedImprovement** - Expected improvement over current best
 - **ThompsonSampling** - Bayesian sampling for exploration
+- **CoreSet** - Greedy k-centres selection for input-space diversity (coverage-based); uses
+  `surrogate.featurise()` rather than predictions, so it is compatible with any model and
+  does not require uncertainty estimates
 
 ### Search Strategies
 - **SingleMutantSearch** - Generate single-mutation variants of reference sequences
@@ -59,6 +62,22 @@ task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
 state = task.setup(dataset=dataset, surrogate=surrogate)
 task.run(state=state, optimizer=optimizer, oracle=oracle)
 ```
+
+### Diversity-based Selection with CoreSet
+
+`CoreSet` selects candidates that maximise coverage of the input space rather than
+predicted fitness. It is a drop-in replacement for any other acquisition function:
+
+```python
+from alf_tools.optimizer.acquisition_functions import CoreSet
+
+optimizer = Optimizer(acquisition_fn=CoreSet(), search_fn=DatasetSearch())
+```
+
+Candidates are ranked by their greedy k-centres selection order; the first chosen
+candidate receives the highest score and unselected candidates receive 0. Because
+`CoreSet` calls `surrogate.featurise()` internally — not `predict()` — it works with
+any model and requires no uncertainty estimates.
 
 ## Documentation
 

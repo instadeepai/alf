@@ -116,6 +116,7 @@ and provides:
 **Key Methods:**
 - `fit()`: Trains the surrogate on train/validation data
 - `predict()`: Generates predictions (means and uncertainties) for candidates
+- `featurise()`: Returns feature representations for candidates or `LabelledCandidates` by delegating to the underlying model — used by diversity-based acquisition functions such as `CoreSet`
 - `get_training_summary_metrics()`: Returns training metrics
 
 ### 4. Oracle (`Oracle`)
@@ -149,6 +150,7 @@ Acquisition functions determine which candidates are most promising to evaluate.
 score candidates based on:
 
 - Surrogate model predictions (means and uncertainties)
+- Model feature representations (for diversity-based selection)
 - Current task state (training data, round number, etc.)
 
 **Common Acquisition Functions:**
@@ -156,6 +158,7 @@ score candidates based on:
 - **UCB (Upper Confidence Bound)**: Balances exploitation and exploration
 - **Expected Improvement**: Selects candidates with highest expected improvement
 - **Thompson Sampling**: Uses Bayesian sampling for exploration
+- **CoreSet**: Greedy k-centres selection maximising input-space coverage — calls `state.surrogate.featurise()` rather than `predict()`, so it is independent of model uncertainty estimates
 
 ### 7. Search Strategy (`BaseSearch`)
 
