@@ -240,11 +240,17 @@ def _download_file(url: str, filepath: Path, max_lines: int | None = None) -> Pa
         raise OSError(f"Network error downloading {filepath.name} from {url}") from exc
     if resp.status_code != 200:
         raise FileNotFoundError(f"Failed to download from {url}. Status code: {resp.status_code}")
-    with open(tmp_path, "wb") as f:
-        for idx, raw_line in enumerate(resp.iter_lines()):
-            f.write(raw_line + b"\n")
-            if max_lines is not None and idx + 1 >= max_lines:
-                break
+    
+    try:
+        with open(tmp_path, "wb") as f:
+            for idx, raw_line in enumerate(resp.iter_lines()):
+                f.write(raw_line + b"\n")
+                if max_lines is not None and idx + 1 >= max_lines:
+                    break
+    except OSError:
+        tmp_path.unlink(missing_ok=True)
+        raise
+    
     tmp_path.rename(filepath)
     logger.info("  ✓ %s written to %s.", filepath.name, filepath.parent)
     return filepath
