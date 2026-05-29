@@ -22,6 +22,10 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 - **CNNModel** - Convolutional neural network for sequence modeling. Supports `ProblemType.REGRESSION`, `ProblemType.BINARY`, and `ProblemType.MULTICLASS`; output shape and activation are determined automatically from the dataset's `problem_type`
 - **GPModel** - Gaussian Process model for sequence fitness prediction with flexible kernel
   selection, input normalisation, and output standardisation enabled by default
+- **ChempropModel** - Message Passing Neural Network (MPNN) for small-molecule fitness prediction,
+  backed by [Chemprop v2.x](https://chemprop.readthedocs.io/). Accepts SMILES strings directly;
+  no hand-crafted features required. Requires the `[chemprop]` optional extra:
+  `pip install "alf-tools[chemprop]"`
 - **PyRosetta** - Rosetta energy function for protein design (requires PyRosetta installation)
 
 ### Acquisition Functions
@@ -70,6 +74,7 @@ configs (see `alf_core.model.base_model.BaseTrainConfig`).
 |-------|---------------------------|-------------------------------|
 | `CNNModel` | `False` | `False` |
 | `GPModel` | `True` | `True` |
+| `ChempropModel` | `False` | `False` |
 
 **`GPTrainConfig`** overrides both defaults to `True`:
 - `normalise_inputs=True`: min-max scales features to [0, 1] — GP kernels measure distances and

@@ -51,7 +51,7 @@ class TestBaseTrainConfig:
         config = BaseTrainConfig(label_dtype=torch.float64)
         assert config.label_dtype == torch.float64
 
-    def test_subclass_inherits_fields(self):
+    def test_subclass_inherits_fields(self) -> None:
         """Subclass must inherit learning_rate and log_frequency from BaseTrainConfig."""
 
         @dataclass
@@ -63,7 +63,7 @@ class TestBaseTrainConfig:
         assert config.log_frequency == 10
         assert config.extra_field == 99
 
-    def test_subclass_inherits_label_dtype(self):
+    def test_subclass_inherits_label_dtype(self) -> None:
         """Subclass must inherit label_dtype from BaseTrainConfig."""
 
         @dataclass

@@ -28,14 +28,27 @@ __all__ = [
     "CNNTrainConfig",
     "create_char_to_idx_mapping",
     "extract_sequences_from_inputs",
-    "get_device",
-    "one_hot_encode",
     "FeaturizerConfig",
-    "GPModelConfig",
+    "get_device",
     "GPModel",
+    "GPModelConfig",
     "GPTrainConfig",
+    "one_hot_encode",
     "MLP",
     "MLPModel",
     "MLPModelConfig",
     "MLPTrainConfig",
 ]
+
+_chemprop_available = False
+try:
+    import chemprop as _chemprop  # noqa: F401
+
+    _chemprop_available = True
+except ImportError:
+    pass
+
+if _chemprop_available:
+    from alf_tools.models.chemprop import ChempropModel, ChempropModelConfig, ChempropTrainConfig
+
+    __all__ += ["ChempropModel", "ChempropModelConfig", "ChempropTrainConfig"]
