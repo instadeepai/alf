@@ -22,13 +22,23 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 - **CNNModel** - Convolutional neural network for sequence modeling. Supports `ProblemType.REGRESSION`, `ProblemType.BINARY`, and `ProblemType.MULTICLASS`; output shape and activation are determined automatically from the dataset's `problem_type`
 - **GPModel** - Gaussian Process model for sequence fitness prediction with flexible kernel
   selection, input normalisation, and output standardisation enabled by default
+- **ChempropModel** - Message Passing Neural Network (MPNN) for small-molecule fitness prediction,
+  backed by [Chemprop v2.x](https://chemprop.readthedocs.io/). Accepts SMILES strings directly;
+  no hand-crafted features required. Requires the `[chemprop]` optional extra:
+  `pip install "alf-tools[chemprop]"`
 - **PyRosetta** - Rosetta energy function for protein design (requires PyRosetta installation)
+- **EnsembleWrapper** - Generic wrapper composing N `BaseModel` instances into a seed ensemble,
+  MC dropout ensemble, or combined (seed + dropout) ensemble for uncertainty quantification.
+  Configured via `EnsembleWrapperConfig`; optional per-member data subsampling via `SubsampleConfig`
 
 ### Acquisition Functions
 - **Greedy** - Select candidates with highest predicted values
 - **UCB** - Upper Confidence Bound for exploration-exploitation
 - **ExpectedImprovement** - Expected improvement over current best
 - **ThompsonSampling** - Bayesian sampling for exploration
+- **CoreSet** - Greedy k-centres selection for input-space diversity (coverage-based); uses
+  `surrogate.featurise()` rather than predictions, so it is compatible with any model and
+  does not require uncertainty estimates
 
 ### Search Strategies
 - **SingleMutantSearch** - Generate single-mutation variants of reference sequences
@@ -53,6 +63,22 @@ state = task.setup(dataset=dataset, surrogate=surrogate)
 task.run(state=state, optimizer=optimizer, oracle=oracle)
 ```
 
+### Diversity-based Selection with CoreSet
+
+`CoreSet` selects candidates that maximise coverage of the input space rather than
+predicted fitness. It is a drop-in replacement for any other acquisition function:
+
+```python
+from alf_tools.optimizer.acquisition_functions import CoreSet
+
+optimizer = Optimizer(acquisition_fn=CoreSet(), search_fn=DatasetSearch())
+```
+
+Candidates are ranked by their greedy k-centres selection order; the first chosen
+candidate receives the highest score and unselected candidates receive 0. Because
+`CoreSet` calls `surrogate.featurise()` internally — not `predict()` — it works with
+any model and requires no uncertainty estimates.
+
 ## Documentation
 
 For detailed API documentation and tutorials, see:
@@ -70,6 +96,7 @@ configs (see `alf_core.model.base_model.BaseTrainConfig`).
 |-------|---------------------------|-------------------------------|
 | `CNNModel` | `False` | `False` |
 | `GPModel` | `True` | `True` |
+| `ChempropModel` | `False` | `False` |
 
 **`GPTrainConfig`** overrides both defaults to `True`:
 - `normalise_inputs=True`: min-max scales features to [0, 1] — GP kernels measure distances and
