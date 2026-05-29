@@ -11,5 +11,7 @@ prediction, and sampling.
    BoTorch GP Model <botorch_exact_gp_model/index>
    CNN Model <cnn/index>
    GP Model <gp/index>
+   Chemprop Model <chemprop/index>
    PyRosetta Model <pyrosetta/index>
+   Ensemble Wrapper <ensemble/index>
    Utilities <utils/index>

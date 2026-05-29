@@ -498,13 +498,13 @@ class CNNModel(BaseModel):
     def train(
         self,
         train_data: LabelledCandidates,
-        val_data: LabelledCandidates,
+        val_data: LabelledCandidates | None = None,
     ) -> None:
         """Train the CNN model.
 
         Args:
             train_data: Training data containing sequences and oracle values.
-            val_data: Validation data.
+            val_data: Optional validation data.
 
         Raises:
             ValueError: If the model's problem_type disagrees with the dataset's.
