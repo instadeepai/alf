@@ -686,4 +686,3 @@ class TestEnsembleWrapperPredict:
         )
         with pytest.raises(ValueError, match="different widths"):
             wrapper.predict(sequence_candidates)
-

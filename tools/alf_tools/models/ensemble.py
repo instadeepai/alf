@@ -83,6 +83,8 @@ class EnsembleWrapperConfig:
             ValueError: If neither or both seed strategies are provided, or if
                 base_seed is set without n_members, or if n_members < 1, or if
                 member_seeds is empty.
+            AssertionError: If the code logic is incorrect and fails to resolve seeds when
+                one valid strategy is provided (should be unreachable due to validation above).
         """
         if self.base_seed is None and self.member_seeds is None:
             raise ValueError("Exactly one of base_seed or member_seeds must be set; got neither.")
@@ -211,6 +213,10 @@ class EnsembleWrapper(BaseModel):
         If any member's train() call raises, a warning is logged for that member,
         training continues for the remaining members, and a summary RuntimeError
         is raised at the end listing all failures.
+
+        Raises:
+            RuntimeError: If one or more members raise an exception during training.
+                The exception message will summarize all failures.
         """
         errors: list[tuple[int, Exception]] = []
         resolved_seeds = self.config.seeds
@@ -316,6 +322,10 @@ class EnsembleWrapper(BaseModel):
 
         Attempts cleanup on every member regardless of individual failures,
         then raises a summary RuntimeError if any cleanup calls failed.
+
+        Raises:
+            RuntimeError: If one or more members raise an exception during cleanup.
+                The exception message will summarize all failures.
         """
         errors: list[tuple[int, Exception]] = []
         for i, member in enumerate(self.members):
