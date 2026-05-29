@@ -25,12 +25,11 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Literal, Optional, Union
+from typing import Literal
 
 import numpy as np
 import torch
-from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
-from alf_core.model.normaliser import InputNormaliser
+from alf_core import BaseModel, Candidate, InputNormaliser, LabelledCandidates, Predictions
 from botorch.fit import fit_gpytorch_mll
 from botorch.models import SingleTaskGP
 from botorch.models.transforms.outcome import Standardize
@@ -92,7 +91,7 @@ class BoTorchGPModel(BaseModel):
         learning_rate: float = 0.1,
         optimizer: str = "scipy",
         max_attempts: int = 5,
-        device: Optional[str] = None,
+        device: str | None = None,
         dtype: torch.dtype = torch.float32,
         kernel_type: Literal["matern", "rbf"] | None = None,
         nu: float = 2.5,
@@ -152,9 +151,9 @@ class BoTorchGPModel(BaseModel):
             self.device = torch.device(device)
 
         # Model will be initialized during fit
-        self.model: Optional[SingleTaskGP] = None
-        self.train_X: Optional[torch.Tensor] = None
-        self.train_Y: Optional[torch.Tensor] = None
+        self.model: SingleTaskGP | None = None
+        self.train_X: torch.Tensor | None = None
+        self.train_Y: torch.Tensor | None = None
         self._input_normaliser: InputNormaliser | None = None
 
         # Training metrics
@@ -195,7 +194,7 @@ class BoTorchGPModel(BaseModel):
     def train(
         self,
         train_data: LabelledCandidates,
-        val_data: Optional[LabelledCandidates] = None,
+        val_data: LabelledCandidates | None = None,
     ) -> None:
         """Train the GP model on training data.
 
@@ -395,7 +394,7 @@ class BoTorchGPModel(BaseModel):
             variances=variance,
         )
 
-    def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
+    def get_training_summary_metrics(self) -> dict[str, float | int | np.number]:
         """Get summary metrics from the most recent training run.
 
         Returns:
