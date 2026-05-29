@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
-from alf_tools.models.esm2 import ESM2Model, ESM2ModelConfig, ESM2TrainConfig
 from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, SubsampleConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.mlp import MLP, MLPModel, MLPModelConfig, MLPTrainConfig
@@ -28,9 +27,6 @@ __all__ = [
     "CNNModel",
     "CNNModelConfig",
     "CNNTrainConfig",
-    "ESM2Model",
-    "ESM2ModelConfig",
-    "ESM2TrainConfig",
     "create_char_to_idx_mapping",
     "extract_sequences_from_inputs",
     "FeaturizerConfig",
@@ -60,3 +56,16 @@ if _chemprop_available:
     from alf_tools.models.chemprop import ChempropModel, ChempropModelConfig, ChempropTrainConfig
 
     __all__ += ["ChempropModel", "ChempropModelConfig", "ChempropTrainConfig"]
+
+_esm2_available = False
+try:
+    import transformers as _transformers  # noqa: F401
+
+    _esm2_available = True
+except ImportError:
+    pass
+
+if _esm2_available:
+    from alf_tools.models.esm2 import ESM2Model, ESM2ModelConfig, ESM2TrainConfig
+
+    __all__ += ["ESM2Model", "ESM2ModelConfig", "ESM2TrainConfig"]
