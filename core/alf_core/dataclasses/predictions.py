@@ -48,8 +48,6 @@ class Predictions:
             AssertionError: If means is empty, or if variances or empirical_dist
                 don't match the length of means.
         """
-        # TODO: add explicit `assert self.means is not None` with a ValueError so that
-        # callers that pass means=None get a clear error rather than TypeError from len().
         assert len(self.means) > 0, (
             "Means must have at least one prediction — expected shape (num_candidates,)"
         )

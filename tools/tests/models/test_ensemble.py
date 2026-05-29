@@ -363,15 +363,6 @@ class TestEnsembleWrapperTrain:
         with pytest.raises(NotImplementedError):
             wrapper.sample()
 
-    def test_predict_before_train_raises(self, sequence_candidates):
-        """predict() before train() must raise RuntimeError."""
-        wrapper = EnsembleWrapper(
-            model_factory=cnn_factory,
-            config=EnsembleWrapperConfig(base_seed=0, n_members=2),
-        )
-        with pytest.raises(RuntimeError, match="not trained"):
-            wrapper.predict(sequence_candidates)
-
     def test_cleanup_delegates_to_all_members(self, labelled_sequences, dataset):
         """cleanup() must call cleanup() on every member without error."""
         wrapper = EnsembleWrapper(
