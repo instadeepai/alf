@@ -125,7 +125,7 @@ alf/
 ├── tools/                 # Example implementations and tools (see tools/README.md)
 │   └── alf_tools/         # Tools package
 │       ├── datasets/      # Example datasets (e.g., GFP)
-│       ├── models/        # Example models (CNN, Random)
+│       ├── models/        # Example models (CNN, GP, Chemprop MPNN)
 │       └── optimizer/     # Example acquisition functions (UCB, Thompson Sampling, etc.) and search strategies
 ├── tutorials/             # Tutorials and example scripts
 └── docs/                  # Documentation
@@ -143,6 +143,13 @@ End-to-end guides for running active learning experiments:
 
 - **[Offline Design Tutorial](tutorials/experiments/offline_design_tutorial.ipynb)** - Dataset-based optimization
 - **[Online Design Tutorial](tutorials/experiments/online_design_tutorial.ipynb)** - Model-based optimization
+
+### Model Tutorials
+
+Deep-dives into specific built-in models:
+
+- **[Chemprop MPNN Tutorial](tutorials/models/chemprop_tutorial.ipynb)** - Active learning for small molecules using SMILES inputs and the Chemprop MPNN
+- **[GP Tutorial](tutorials/models/gp_tutorial.ipynb)** - Gaussian Process surrogate model usage
 
 ### Extension Tutorials
 
