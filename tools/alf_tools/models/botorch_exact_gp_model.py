@@ -16,7 +16,7 @@
 
 This module provides GP models built on BoTorch's SingleTaskGP, which offers:
 - Better default hyperparameter priors
-- Built-in input/output transforms (normalization, standardization)
+- Built-in input/output transforms (normalisation, standardisation)
 - Simplified model fitting with fit_gpytorch_mll
 - Seamless integration with BoTorch acquisition functions
 """
@@ -54,16 +54,16 @@ class BoTorchGPModel(BaseModel):
 
     Key Features:
     - Modern hyperparameter priors from Hvarfner et al. 2024
-    - Automatic output standardization (zero mean, unit variance)
+    - Automatic output standardisation (zero mean, unit variance)
     - Efficient model fitting with fit_gpytorch_mll
     - Compatible with all BoTorch acquisition functions
 
     The model expects continuous inputs (tensors) and works best when:
-    - Inputs are normalized to [0, 1]^d
-    - Outputs are standardized (handled automatically)
+    - Inputs are normalised to [0, 1]^d
+    - Outputs are standardised (handled automatically)
 
     Example:
-        >>> from alf_tools.models.botorch_gp_models import BoTorchGPModel
+        >>> from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel  
         >>> from alf_tools.datasets.botorch_synthetic_dataset import BoTorchSyntheticDataset
         >>>
         >>> # Create dataset
@@ -85,8 +85,8 @@ class BoTorchGPModel(BaseModel):
 
     def __init__(
         self,
-        normalize_inputs: bool = True,
-        standardize_outputs: bool = True,
+        normalise_inputs: bool = True,
+        standardise_outputs: bool = True,
         num_iterations: int = 100,
         learning_rate: float = 0.1,
         optimizer: str = "scipy",
@@ -100,9 +100,9 @@ class BoTorchGPModel(BaseModel):
         """Initialize BoTorch GP model.
 
         Args:
-            normalize_inputs: Whether to normalize inputs to [0, 1]. Default: True.
-                If your data is already normalized, set to False.
-            standardize_outputs: Whether to standardize outputs (zero mean, unit variance).
+            normalise_inputs: Whether to normalise inputs to [0, 1]. Default: True.
+                If your data is already normalised, set to False.
+            standardise_outputs: Whether to standardise outputs (zero mean, unit variance).
                 Default: True. BoTorch handles this automatically with Standardize transform.
             num_iterations: Number of optimization iterations for MLL. Default: 100.
                 For scipy optimizer: controls 'maxiter' in L-BFGS-B.
@@ -131,13 +131,17 @@ class BoTorchGPModel(BaseModel):
             Exception: If model fitting fails after max_attempts.
         """
         super().__init__()
-        self.normalize_inputs = normalize_inputs
-        self.standardize_outputs = standardize_outputs
+        self.normalise_inputs = normalise_inputs
+        self.standardise_outputs = standardise_outputs
         self.num_iterations = num_iterations
         self.learning_rate = learning_rate
         self.optimizer = optimizer
         self.max_attempts = max_attempts
         self.dtype = dtype
+        if kernel_type not in ["matern", "rbf", None]:
+            raise ValueError(
+                f"Invalid kernel_type '{kernel_type}'. Must be 'matern', 'rbf', or None."
+            )
         self.kernel_type = kernel_type
         self.nu = nu
         self.use_ard = use_ard
@@ -274,12 +278,8 @@ class BoTorchGPModel(BaseModel):
                     "No kernel_type specified. Defaulting to RBF kernel with Hvarfner "
                     f"log-normal lengthscale prior{' with ARD' if self.use_ard else ''}."
                 )
-        else:
-            raise ValueError(
-                f"Invalid kernel_type '{self.kernel_type}'. Must be 'matern', 'rbf', or None."
-            )
 
-        outcome_transform = Standardize(m=1) if self.standardize_outputs else None
+        outcome_transform = Standardize(m=1) if self.standardise_outputs else None
         self.model = SingleTaskGP(
             train_X=self.train_X,
             train_Y=self.train_Y,

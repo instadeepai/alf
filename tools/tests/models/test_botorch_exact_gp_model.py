@@ -77,8 +77,8 @@ class TestBoTorchGPModelInitialization:
         """Test model initialization with default parameters."""
         model = BoTorchGPModel()
 
-        assert model.normalize_inputs is True
-        assert model.standardize_outputs is True
+        assert model.normalise_inputs is True
+        assert model.standardise_outputs is True
         assert model.num_iterations == 100
         assert model.learning_rate == 0.1
         assert model.optimizer == "scipy"
@@ -92,8 +92,8 @@ class TestBoTorchGPModelInitialization:
     def test_custom_initialization(self):
         """Test model initialization with custom parameters."""
         model = BoTorchGPModel(
-            normalize_inputs=False,
-            standardize_outputs=False,
+            normalise_inputs=False,
+            standardise_outputs=False,
             num_iterations=50,
             learning_rate=0.05,
             optimizer="torch",
@@ -101,8 +101,8 @@ class TestBoTorchGPModelInitialization:
             dtype=torch.float64,
         )
 
-        assert model.normalize_inputs is False
-        assert model.standardize_outputs is False
+        assert model.normalise_inputs is False
+        assert model.standardise_outputs is False
         assert model.num_iterations == 50
         assert model.learning_rate == 0.05
         assert model.optimizer == "torch"
