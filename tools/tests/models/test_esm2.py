@@ -17,6 +17,9 @@ import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+
+pytest.importorskip("transformers")
+
 from alf_tools.models.esm2 import ESM2Model, ESM2ModelConfig, ESM2TrainConfig
 
 MODEL_ID = "facebook/esm2_t6_8M_UR50D"

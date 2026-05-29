@@ -22,7 +22,12 @@ import torch.optim as optim
 from alf_core import BaseModel, BaseTrainConfig, Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from torch.utils.data import DataLoader, TensorDataset
-from transformers import AutoModelForMaskedLM, AutoTokenizer
+try:
+    from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+    _TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    _TRANSFORMERS_AVAILABLE = False
 
 from alf_tools.models.utils import get_device
 
@@ -124,6 +129,11 @@ class ESM2Model(BaseModel):
             train_config: Configuration for fine-tuning. Defaults to ESM2TrainConfig().
             device: Device to run on ('cuda', 'cpu', or None for auto-detect).
         """
+        if not _TRANSFORMERS_AVAILABLE:
+            raise ImportError(
+                "The 'transformers' package is required for ESM2Model. "
+                "Install it with: pip install transformers"
+            )
         self.name = name
         self.model_config = model_config
         self.train_config = train_config or ESM2TrainConfig()
