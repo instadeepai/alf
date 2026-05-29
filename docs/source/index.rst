@@ -92,9 +92,17 @@ Run an active learning design experiment:
 Tutorials
 ~~~~~~~~~
 
-- `Offline Design Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/offline_design_tutorial.ipynb>`_ — Step-by-step guide to offline design experiments
-- `Online Design Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/online_design_tutorial.ipynb>`_ — Guide to online design experiments
+**Experiment tutorials:**
+- `Offline Design Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/experiments/offline_design_tutorial.ipynb>`_ — Step-by-step guide to offline design experiments
+- `Online Design Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/experiments/online_design_tutorial.ipynb>`_ — Guide to online design experiments
+
+**Dataset tutorials:**
 - `GuacaMol Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/datasets/guacamol_tutorial.ipynb>`_ — Drug-like molecule corpus: download, property analysis, and SMILES querying
+
+**Model tutorials:**
+- `Chemprop MPNN Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/models/chemprop_tutorial.ipynb>`_ — Active learning for small molecules using SMILES inputs and the Chemprop MPNN
+- `GP Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/models/gp_tutorial.ipynb>`_ — Gaussian Process surrogate model usage
+- `Ensemble Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/models/ensemble_tutorial.ipynb>`_ — Seed ensembles, MC dropout, and combined ensembles for uncertainty-aware prediction
 
 
 Contents

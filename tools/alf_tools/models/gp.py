@@ -627,7 +627,7 @@ class GPModel(BaseModel):
     def train(
         self,
         train_data: LabelledCandidates,
-        val_data: LabelledCandidates,
+        val_data: LabelledCandidates | None = None,
     ) -> None:
         """Train the GP model by optimizing hyperparameters.
 
@@ -694,7 +694,7 @@ class GPModel(BaseModel):
         logger.info(f"Training complete with metrics: {self.training_metrics}")
 
         # Evaluate on validation data if provided
-        if len(val_data) > 0:
+        if val_data is not None and len(val_data) > 0:
             val_predictions = self.predict(val_data.candidates)
             val_results = Results(
                 predictions=val_predictions,

@@ -22,3 +22,9 @@ packages = []  # No Python packages, just notebooks
 [tool.uv.sources]
 alf_core = {path = "../core", editable = true}
 alf_tools = {path = "../tools", editable = true}
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+    "nbconvert>=7.17.1",
+]
