@@ -55,13 +55,16 @@ def register_classification_metric(metric_fn: Callable) -> Callable:
     def wrapper(
         probs: Float[np.ndarray, "n_samples num_classes"], targets: Float[np.ndarray, " n_samples"]
     ) -> dict[str, float]:
-        assert probs.ndim == 2, (
-            f"probs must be with shape (n_samples, num_classes), got shape {probs.shape}"
-        )
-        assert len(probs) != 0, "Empty input arrays"
-        assert probs.shape[0] == targets.shape[0], (
-            f"probs and targets batch size mismatch: {probs.shape[0]} vs {targets.shape[0]}"
-        )
+        if probs.ndim != 2:
+            raise ValueError(
+                f"probs must be with shape (n_samples, num_classes), got shape {probs.shape}"
+            )
+        if len(probs) == 0:
+            raise ValueError("Empty input arrays")
+        if probs.shape[0] != targets.shape[0]:
+            raise ValueError(
+                f"probs and targets batch size mismatch: {probs.shape[0]} vs {targets.shape[0]}"
+            )
         targets = targets.astype(int)
         return metric_fn(probs, targets)
 
