@@ -126,14 +126,15 @@ class ESM2Model(BaseModel):
         """
         self.name = name
         self.model_config = model_config
-        self._validate_model_config()
         self.train_config = train_config or ESM2TrainConfig()
+        self._validate_model_config()
         self.device = get_device(device)
 
         self.tokeniser = AutoTokenizer.from_pretrained(self.model_config.model_id)
         self.max_length = self.model_config.max_length or self.tokeniser.model_max_length
         self.esm_model = AutoModelForMaskedLM.from_pretrained(self.model_config.model_id)
         self.esm_model.to(self.device)
+        self._validate_esm_config()
 
         self._prepare_labels = (
             self._mask_tokens
@@ -147,7 +148,7 @@ class ESM2Model(BaseModel):
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
         self.training_metrics: dict[str, Union[float, int, np.number]] = {}
 
-    def _validate_model_config(self) -> None:
+    def _validate_esm_config(self) -> None:
         num_layers = self.esm_model.config.num_hidden_layers + 1  # +1 for embedding
         valid_range = range(-num_layers, num_layers)
         if self.model_config.repr_layer not in valid_range:
@@ -156,6 +157,8 @@ class ESM2Model(BaseModel):
                 f"{self.model_config.model_id} which has {num_layers} hidden states "
                 f"(valid: {-num_layers} to {num_layers - 1})"
             )
+
+    def _validate_model_config(self) -> None:
         if self.model_config.pooling == "last_hidden_state" and self.train_config.batch_size > 1:
             raise ValueError(
                 "pooling='last_hidden_state' requires batch_size=1. "
