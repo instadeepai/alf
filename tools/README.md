@@ -23,6 +23,9 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 - **GPModel** - Gaussian Process model for sequence fitness prediction with flexible kernel
   selection, input normalisation, and output standardisation enabled by default
 - **PyRosetta** - Rosetta energy function for protein design (requires PyRosetta installation)
+- **EnsembleWrapper** - Generic wrapper composing N `BaseModel` instances into a seed ensemble,
+  MC dropout ensemble, or combined (seed + dropout) ensemble for uncertainty quantification.
+  Configured via `EnsembleWrapperConfig`; optional per-member data subsampling via `SubsampleConfig`
 
 ### Acquisition Functions
 - **Greedy** - Select candidates with highest predicted values

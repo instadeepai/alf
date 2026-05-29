@@ -94,6 +94,7 @@ Tutorials
 
 - `Offline Design Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/offline_design_tutorial.ipynb>`_ — Step-by-step guide to offline design experiments
 - `Online Design Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/online_design_tutorial.ipynb>`_ — Guide to online design experiments
+- `Ensemble Tutorial <https://github.com/instadeepai/alf/blob/main/tutorials/models/ensemble_tutorial.ipynb>`_ — Seed ensembles, MC dropout, and combined ensembles for uncertainty-aware prediction
 
 
 Contents

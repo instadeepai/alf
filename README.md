@@ -144,6 +144,12 @@ End-to-end guides for running active learning experiments:
 - **[Offline Design Tutorial](tutorials/experiments/offline_design_tutorial.ipynb)** - Dataset-based optimization
 - **[Online Design Tutorial](tutorials/experiments/online_design_tutorial.ipynb)** - Model-based optimization
 
+### Model Tutorials
+
+Deep-dives into specific model types including configuration, uncertainty quantification, and comparison:
+
+- **[Ensemble Tutorial](tutorials/models/ensemble_tutorial.ipynb)** - Seed ensembles, MC dropout, and combined ensembles for uncertainty-aware prediction
+
 ### Extension Tutorials
 
 Learn how to extend ALF's base classes for custom implementations:
