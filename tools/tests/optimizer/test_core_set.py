@@ -18,11 +18,11 @@ import numpy as np
 import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates, Predictions, State
-from scipy.spatial.distance import cdist
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig, ProblemType
 from alf_core.model.base_model import BaseModel
 from alf_core.surrogate.surrogate import Surrogate
 from alf_tools.optimizer.acquisition_functions.core_set import CoreSet
+from scipy.spatial.distance import cdist
 
 
 class _BaseTestModel(BaseModel):

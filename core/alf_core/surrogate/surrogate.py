@@ -16,7 +16,6 @@
 from typing import Any, Union
 
 import numpy as np
-import torch
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.dataset.base_dataset import BaseDataset
