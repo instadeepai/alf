@@ -19,7 +19,7 @@ and ALF BaseModel instances to work seamlessly with BoTorch acquisition
 functions. This essentially wraps the ALF models to be used as BoTorch models
 """
 
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import torch
 from alf_core.model.base_model import BaseModel
@@ -96,7 +96,7 @@ class BoTorchModelAdapter(Model):
         TypeError: If the model is neither a BoTorch Model nor ALF BaseModel.
     """
 
-    def __init__(self, model: Union[Model, BaseModel]):
+    def __init__(self, model: Model | BaseModel):
         """Initialize the adapter with a model.
 
         Args:
@@ -118,9 +118,9 @@ class BoTorchModelAdapter(Model):
     def posterior(
         self,
         X: torch.Tensor,
-        output_indices: Optional[list[int]] = None,
+        output_indices: list[int] | None = None,
         observation_noise: bool | Tensor = False,
-        posterior_transform: Optional["PosteriorTransform"] = None,
+        posterior_transform: "PosteriorTransform | None" = None,
     ) -> Posterior:
         """Compute the posterior distribution at input points.
 
