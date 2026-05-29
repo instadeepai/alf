@@ -51,8 +51,12 @@ class TestRegisterBenchmarkingMetric:
         fresh_registry.register(my_isolated_test_metric.__name__, my_isolated_test_metric)
         assert "my_isolated_test_metric" in fresh_registry.get_metrics()
 
-    def test_decorated_function_is_callable(self):
+    def test_decorated_function_is_callable(self, monkeypatch):
         """Decorated and registered function remains callable."""
+        import alf_core.utils.metrics.benchmarking as bm_module
+
+        isolated_registry = BenchmarkingMetricRegistry()
+        monkeypatch.setattr(bm_module, "benchmarking_metric_registry", isolated_registry)
 
         @register_benchmarking_metric
         def another_isolated_metric(means, targets):
@@ -61,7 +65,7 @@ class TestRegisterBenchmarkingMetric:
 
         result = another_isolated_metric(np.array([1.0, 2.0, 3.0]), np.array([1.0, 2.0, 3.0]))
         assert result == {"another_isolated_metric": 3.0}
-        assert "another_isolated_metric" in benchmarking_metric_registry.get_metrics()
+        assert "another_isolated_metric" in isolated_registry.get_metrics()
 
 
 class TestGlobalBenchmarkingRegistryInstance:
