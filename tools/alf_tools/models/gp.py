@@ -78,11 +78,13 @@ class GPModelConfig:
     matern_nu: float = 2.5
     ard: bool = True
     mean_type: Literal["constant", "zero"] = "constant"
-    lengthscale_prior: dict | None = field(default_factory=lambda: {
-        "_target_": "gpytorch.priors.LogNormalPrior",
-        "loc": math.sqrt(2),
-        "scale": math.sqrt(3),
-    })
+    lengthscale_prior: dict | None = field(
+        default_factory=lambda: {
+            "_target_": "gpytorch.priors.LogNormalPrior",
+            "loc": math.sqrt(2),
+            "scale": math.sqrt(3),
+        }
+    )
     lengthscale_constraint: dict | None = None
     outputscale_prior: dict | None = None
     noise_constraint: dict | None = None

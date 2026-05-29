@@ -22,6 +22,7 @@ This module tests the BoTorch-based GP model implementation, including:
 - Device management (CPU/CUDA)
 """
 
+import logging
 import math
 
 import gpytorch
@@ -78,6 +79,9 @@ class TestBoTorchGPModelInitialization:
     """Test BoTorchGPModel initialization with config objects."""
 
     def test_default_initialization(self):
+        """Test that the model initializes with default configs and
+        has expected attributes.
+        """
         model = BoTorchGPModel()
         assert isinstance(model.model_config, GPModelConfig)
         assert isinstance(model.train_config, BoTorchTrainConfig)
@@ -86,6 +90,10 @@ class TestBoTorchGPModelInitialization:
         assert model.train_Y is None
 
     def test_default_train_config_values(self):
+        """Test that the default training config values are set correctly,
+        including normalisation, standardisation, number of iterations,
+        learning rate, optimizer type, max attempts, and dtype.
+        """
         model = BoTorchGPModel()
         assert model.train_config.normalise_inputs is True
         assert model.train_config.standardise_outputs is True
@@ -96,6 +104,9 @@ class TestBoTorchGPModelInitialization:
         assert model.train_config.dtype == torch.float32
 
     def test_default_model_config_values(self):
+        """Test that the default model config values are set correctly,
+        including the default kernel type, ARD setting, and lengthscale prior.
+        """
         model = BoTorchGPModel()
         assert model.model_config.kernel_type == "rbf"
         # BoTorchGPModel preserves prior use_ard=False default via GPModelConfig(ard=False)
@@ -103,8 +114,12 @@ class TestBoTorchGPModelInitialization:
         assert isinstance(model.model_config.lengthscale_prior, dict)
         assert model.model_config.lengthscale_prior["_target_"] == "gpytorch.priors.LogNormalPrior"
         assert model.model_config.lengthscale_prior["loc"] == pytest.approx(math.sqrt(2))
+        assert model.model_config.lengthscale_prior["scale"] == pytest.approx(math.sqrt(3))
 
     def test_custom_train_config(self):
+        """Test that custom training config values are accepted and
+        stored correctly.
+        """
         train_cfg = BoTorchTrainConfig(
             num_iterations=50,
             optimizer="torch",
@@ -117,6 +132,7 @@ class TestBoTorchGPModelInitialization:
         assert model.train_config.normalise_inputs is False
 
     def test_custom_model_config(self):
+        """Test that custom model config values are accepted and stored correctly."""
         model_cfg = GPModelConfig(
             kernel_type="matern",
             matern_nu=1.5,
@@ -131,16 +147,25 @@ class TestBoTorchGPModelInitialization:
         assert model.model_config.matern_nu == 1.5
 
     def test_device_auto_detection(self):
+        """Test that the model automatically detects and uses CUDA if available,
+        otherwise falls back to CPU.
+        """
         model = BoTorchGPModel()
         assert model.device is not None
         assert isinstance(model.device, torch.device)
 
     def test_explicit_cpu_device(self):
+        """Test that explicitly setting device to 'cpu' results in the model
+        using CPU.
+        """
         train_cfg = BoTorchTrainConfig(device="cpu")
         model = BoTorchGPModel(train_config=train_cfg)
         assert model.device == torch.device("cpu")
 
     def test_invalid_optimizer_raises(self):
+        """Test that providing an invalid optimizer name raises a ValueError
+        with the expected message.
+        """
         train_cfg = BoTorchTrainConfig(optimizer="invalid")
         with pytest.raises(ValueError, match="optimizer must be 'scipy' or 'torch'"):
             BoTorchGPModel(train_config=train_cfg)
@@ -183,7 +208,9 @@ class TestBoTorchGPModelTraining:
 
     def test_train_with_valid_data_scipy(self, simple_2d_training_data):
         """Test training with valid data using scipy optimizer."""
-        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=50, optimizer="scipy"))
+        model = BoTorchGPModel(
+            train_config=BoTorchTrainConfig(num_iterations=50, optimizer="scipy")
+        )
 
         # Training should complete without error
         model.train(simple_2d_training_data)
@@ -201,7 +228,9 @@ class TestBoTorchGPModelTraining:
 
     def test_train_with_valid_data_torch(self, simple_2d_training_data):
         """Test training with valid data using torch optimizer."""
-        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=20, optimizer="torch", learning_rate=0.1))
+        model = BoTorchGPModel(
+            train_config=BoTorchTrainConfig(num_iterations=20, optimizer="torch", learning_rate=0.1)
+        )
 
         # Training should complete without error
         model.train(simple_2d_training_data)
@@ -582,7 +611,9 @@ class TestBoTorchGPModelIntegration:
 
         # Create model
         model = BoTorchGPModel(
-            train_config=BoTorchTrainConfig(num_iterations=30, optimizer="torch", learning_rate=0.1, max_attempts=3),
+            train_config=BoTorchTrainConfig(
+                num_iterations=30, optimizer="torch", learning_rate=0.1, max_attempts=3
+            ),
         )
 
         # Create training data
@@ -610,7 +641,9 @@ class TestBoTorchGPModelIntegration:
 
     def test_branin_function_optimization(self, branin_dataset):
         """Test on real Branin synthetic dataset."""
-        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=50, optimizer="scipy"))
+        model = BoTorchGPModel(
+            train_config=BoTorchTrainConfig(num_iterations=50, optimizer="scipy")
+        )
 
         # Train on dataset
         model.train(branin_dataset.train_dataset)
@@ -708,14 +741,14 @@ class TestBoTorchGPModelPriorWiring:
     """Integration: confirm prior and constraint reach the kernel after training."""
 
     def test_default_lognormal_prior_registered(self, simple_2d_training_data):
-        model = BoTorchGPModel(
-            train_config=BoTorchTrainConfig(num_iterations=5)
-        )
+        """Test that the default LogNormalPrior is registered on the kernel."""
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=5))
         model.train(simple_2d_training_data)
         base_kernel = model.model.covar_module.base_kernel
         assert "lengthscale_prior" in {name for name, *_ in base_kernel.named_priors()}
 
     def test_gamma_prior_registered(self, simple_2d_training_data):
+        """Test that a custom GammaPrior is registered on the kernel when specified."""
         model_cfg = GPModelConfig(
             lengthscale_prior={
                 "_target_": "gpytorch.priors.GammaPrior",
@@ -733,6 +766,9 @@ class TestBoTorchGPModelPriorWiring:
         assert isinstance(named["lengthscale_prior"], gpytorch.priors.GammaPrior)
 
     def test_no_prior_when_none(self, simple_2d_training_data):
+        """Test that if lengthscale_prior=None, no prior is registered on
+        the kernel.
+        """
         model_cfg = GPModelConfig(lengthscale_prior=None)
         model = BoTorchGPModel(
             model_config=model_cfg,
@@ -743,7 +779,9 @@ class TestBoTorchGPModelPriorWiring:
         assert "lengthscale_prior" not in {name for name, *_ in base_kernel.named_priors()}
 
     def test_ard_warning_with_default_prior(self, simple_2d_training_data, caplog):
-        import logging
+        """Test that enabling ARD with the default LogNormalPrior triggers
+        a warning about Hvarfner priors.
+        """
         model_cfg = GPModelConfig(ard=True)
         model = BoTorchGPModel(
             model_config=model_cfg,

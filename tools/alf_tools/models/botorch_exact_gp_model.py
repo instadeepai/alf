@@ -25,8 +25,8 @@ from __future__ import annotations
 
 import logging
 import math
-from dataclasses import dataclass, field
-from typing import Literal, Optional, Union
+from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 import torch
@@ -145,9 +145,9 @@ class BoTorchGPModel(BaseModel):
         else:
             self.device = torch.device(self.train_config.device)
 
-        self.model: Optional[SingleTaskGP] = None
-        self.train_X: Optional[torch.Tensor] = None
-        self.train_Y: Optional[torch.Tensor] = None
+        self.model: SingleTaskGP | None = None
+        self.train_X: torch.Tensor | None = None
+        self.train_Y: torch.Tensor | None = None
         self._input_normaliser: InputNormaliser | None = None
         self._training_metrics: dict[str, list[float]] = {"loss": [], "iteration": []}
 
@@ -233,7 +233,8 @@ class BoTorchGPModel(BaseModel):
         if (
             self.model_config.ard
             and self.model_config.lengthscale_prior is not None
-            and self.model_config.lengthscale_prior.get("_target_") == "gpytorch.priors.LogNormalPrior"
+            and self.model_config.lengthscale_prior.get("_target_")
+            == "gpytorch.priors.LogNormalPrior"
             and abs(self.model_config.lengthscale_prior.get("loc", 0) - math.sqrt(2)) < 1e-9
         ):
             logger.warning(
@@ -296,7 +297,9 @@ class BoTorchGPModel(BaseModel):
                     optimizer=fit_gpytorch_mll_torch,
                     optimizer_kwargs={
                         "step_limit": self.train_config.num_iterations,
-                        "optimizer": lambda params: optim(params, lr=self.train_config.learning_rate),
+                        "optimizer": lambda params: optim(
+                            params, lr=self.train_config.learning_rate
+                        ),
                     },
                     max_attempts=self.train_config.max_attempts,
                 )
@@ -304,7 +307,11 @@ class BoTorchGPModel(BaseModel):
                 f"Successfully trained BoTorch GP model using {logging_optimizer} "
                 f"(step_limit={self.train_config.num_iterations}, "
                 f"max_attempts={self.train_config.max_attempts})"
-                + (f", lr={self.train_config.learning_rate}" if self.train_config.optimizer == "torch" else "")
+                + (
+                    f", lr={self.train_config.learning_rate}"
+                    if self.train_config.optimizer == "torch"
+                    else ""
+                )
             )
 
             # Record final loss
@@ -348,7 +355,9 @@ class BoTorchGPModel(BaseModel):
             raise ValueError("Candidates list cannot be empty")
 
         # Convert candidates to tensor
-        test_X = candidates_to_tensor(candidate_points, device=self.device, dtype=self.train_config.dtype)
+        test_X = candidates_to_tensor(
+            candidate_points, device=self.device, dtype=self.train_config.dtype
+        )
 
         # Validate shapes
         self._validate_shape(test_X)

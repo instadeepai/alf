@@ -18,10 +18,15 @@ from alf_tools.models.utils.config_utils import build_from_target
 
 
 def test_build_from_target_none_returns_none():
+    """Tests that build_from_target returns None when given None as input."""
     assert build_from_target(None) is None
 
 
 def test_build_from_target_lognormal_prior():
+    """Tests that build_from_target can construct a LogNormalPrior from a
+    valid configuration. This verifies that the function correctly resolves
+    the class and initializes it with the provided parameters.
+    """
     cfg = {
         "_target_": "gpytorch.priors.LogNormalPrior",
         "loc": 0.0,
@@ -32,6 +37,10 @@ def test_build_from_target_lognormal_prior():
 
 
 def test_build_from_target_gamma_prior():
+    """Tests that build_from_target can construct a GammaPrior from a valid
+    configuration. This verifies that the function correctly resolves the
+    class and initializes it with the provided parameters.
+    """
     cfg = {
         "_target_": "gpytorch.priors.GammaPrior",
         "concentration": 3.0,
@@ -42,6 +51,10 @@ def test_build_from_target_gamma_prior():
 
 
 def test_build_from_target_greater_than_constraint():
+    """Tests that build_from_target can construct a GreaterThan constraint
+    from a valid configuration. This verifies that the function correctly
+    resolves the class and initializes it with the provided parameters.
+    """
     cfg = {
         "_target_": "gpytorch.constraints.GreaterThan",
         "lower_bound": 0.01,
@@ -51,6 +64,10 @@ def test_build_from_target_greater_than_constraint():
 
 
 def test_build_from_target_does_not_mutate_input():
+    """Tests that the input configuration dictionary is not mutated by
+    build_from_target. This ensures that the original configuration can be
+    reused or inspected after building.
+    """
     cfg = {
         "_target_": "gpytorch.priors.LogNormalPrior",
         "loc": 0.0,
@@ -62,6 +79,7 @@ def test_build_from_target_does_not_mutate_input():
 
 
 def test_build_from_target_invalid_target_raises():
+    """Tests that an invalid _target_ value raises an AttributeError."""
     cfg = {"_target_": "gpytorch.priors.NonExistentPrior"}
     with pytest.raises(AttributeError):
         build_from_target(cfg)
