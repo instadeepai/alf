@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-mpnn = [
+chemprop = [
     "chemprop>=2.0.0,<3.0.0",
 ]
 

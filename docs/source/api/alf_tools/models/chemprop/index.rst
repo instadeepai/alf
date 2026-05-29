@@ -1,5 +1,5 @@
-MPNN Model (Chemprop)
-====================
+Chemprop Model
+==============
 
 A Message Passing Neural Network (MPNN) surrogate model using `Chemprop v2.x <https://chemprop.readthedocs.io/>`_
 as the backbone. Accepts SMILES strings as inputs and returns scalar fitness predictions.
@@ -18,11 +18,11 @@ Key properties:
 
 .. note::
 
-   This model requires the optional ``chemprop`` dependency. Install it with the ``[mpnn]`` extra:
+   This model requires the optional ``chemprop`` dependency. Install it with the ``[chemprop]`` extra:
 
    .. code-block:: bash
 
-      pip install "alf-tools[mpnn]"
+      pip install "alf-tools[chemprop]"
 
    or from source:
 

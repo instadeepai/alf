@@ -24,8 +24,8 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
   selection, input normalisation, and output standardisation enabled by default
 - **ChempropModel** - Message Passing Neural Network (MPNN) for small-molecule fitness prediction,
   backed by [Chemprop v2.x](https://chemprop.readthedocs.io/). Accepts SMILES strings directly;
-  no hand-crafted features required. Requires the `[mpnn]` optional extra:
-  `pip install "alf-tools[mpnn]"`
+  no hand-crafted features required. Requires the `[chemprop]` optional extra:
+  `pip install "alf-tools[chemprop]"`
 - **PyRosetta** - Rosetta energy function for protein design (requires PyRosetta installation)
 
 ### Acquisition Functions

@@ -10,6 +10,6 @@ prediction, and sampling.
 
    CNN Model <cnn/index>
    GP Model <gp/index>
-   MPNN Model (Chemprop) <chemprop/index>
+   Chemprop Model <chemprop/index>
    PyRosetta Model <pyrosetta/index>
    Utilities <utils/index>
