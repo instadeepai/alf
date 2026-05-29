@@ -61,6 +61,7 @@ class ESM2TrainConfig(BaseTrainConfig):
         learning_rate: Learning rate for the optimizer.
         optimizer_type: Which optimizer to use ('adam' or 'adamw').
         batch_size: Batch size for training.
+        batch_size_inference: Batch size for predict() and embed(). None defaults to batch_size.
         num_epochs: Number of epochs to train for.
         mask_probability: Fraction of non-special tokens to randomly mask (MLM).
         mask_splitting: Tuple of (p_mask, p_random, p_unchanged) probabilities
@@ -77,6 +78,7 @@ class ESM2TrainConfig(BaseTrainConfig):
     learning_rate: float = 1e-4
     optimizer_type: Literal["adam", "adamw"] = "adamw"
     batch_size: int = 8
+    batch_size_inference: int | None = None
     num_epochs: int = 10
     mask_probability: float = 0.15
     mask_splitting: tuple[float, float, float] = (0.8, 0.1, 0.1)  # mask / random / unchanged
@@ -141,6 +143,8 @@ class ESM2Model(BaseModel):
         self.name = name
         self.model_config = model_config
         self.train_config = train_config or ESM2TrainConfig()
+        if self.train_config.batch_size_inference is None:
+            self.train_config.batch_size_inference = self.train_config.batch_size
         self._validate_model_config()
         self.device = get_device(device)
 
@@ -205,6 +209,7 @@ class ESM2Model(BaseModel):
 
         encoding = self.tokeniser(
             sequences,
+            max_length=self.max_length,
             return_tensors="pt",
             padding=True,
             truncation=True,
@@ -239,7 +244,7 @@ class ESM2Model(BaseModel):
         all_attention_mask = batch["attention_mask"]
 
         log_likelihoods: list[float] = []
-        batch_size = self.train_config.batch_size
+        batch_size = self.train_config.batch_size_inference
 
         self.esm_model.eval()
         with torch.no_grad():
@@ -287,7 +292,7 @@ class ESM2Model(BaseModel):
         all_attention_mask = batch["attention_mask"]
 
         all_embeddings: list[torch.Tensor] = []
-        batch_size = self.train_config.batch_size
+        batch_size = self.train_config.batch_size_inference
 
         self.esm_model.eval()
         with torch.no_grad():
