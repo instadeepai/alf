@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
+import requests
 from alf_core import Candidate, Modality
 from alf_tools.datasets.guacamol import (
     ALL_PROPERTIES,
@@ -30,12 +31,14 @@ from alf_tools.datasets.guacamol import (
     GuacaMol,
     GuacaMolConfig,
     _cache_path,  # noqa: PLC2701
+    _canonical_smiles,  # noqa: PLC2701
     _compute_properties,  # noqa: PLC2701
     _download_file,  # noqa: PLC2701
     _load_smiles_file,  # noqa: PLC2701
     _mol_from_smiles,  # noqa: PLC2701
     download_guacamol,
 )
+from pydantic import ValidationError
 
 pytestmark = [pytest.mark.guacamol, pytest.mark.rdkit]
 
@@ -217,12 +220,15 @@ class TestMolFromSmiles:
     """Unit tests for the module-level mol parse cache."""
 
     def setup_method(self):
+        """Clear the parse cache before each test."""
         _mol_from_smiles.cache_clear()
 
     def test_valid_smiles_returns_mol(self):
+        """A valid SMILES string returns an RDKit Mol object."""
         assert _mol_from_smiles("CCO") is not None
 
     def test_invalid_smiles_returns_none(self):
+        """An unparseable SMILES string returns None."""
         assert _mol_from_smiles("NOT_A_SMILES_XYZ") is None
 
     def test_same_object_returned_on_repeated_calls(self):
@@ -232,11 +238,13 @@ class TestMolFromSmiles:
         assert mol1 is mol2
 
     def test_different_smiles_return_different_objects(self):
+        """Distinct SMILES strings produce distinct cached Mol objects."""
         mol1 = _mol_from_smiles("CCO")
         mol2 = _mol_from_smiles("c1ccccc1")
         assert mol1 is not mol2
 
     def test_cache_info_shows_hits_after_repeated_call(self):
+        """Cache records at least one hit after the same SMILES is parsed twice."""
         _mol_from_smiles("CCO")
         _mol_from_smiles("CCO")
         info = _mol_from_smiles.cache_info()
@@ -390,6 +398,20 @@ class TestGuacaMolPaperSplits:
         for cand in all_candidates:
             assert "split" not in (cand.features or {})
 
+    def test_init_candidate_pool_is_empty_for_paper_splits(self, tmp_path):
+        """init_candidate_pool is set and empty after paper-split construction."""
+        _write_paper_files(tmp_path)
+        dataset = GuacaMol(_paper_config(data_dir=tmp_path))
+        assert hasattr(dataset, "init_candidate_pool")
+        assert len(dataset.init_candidate_pool) == 0
+
+    def test_raw_dataset_total_count_equals_sum_of_splits(self, tmp_path):
+        """_raw_dataset length equals the sum of all paper split file line counts."""
+        _write_paper_files(tmp_path)
+        dataset = GuacaMol(_paper_config(data_dir=tmp_path))
+        expected = len(TRAIN_SMILES) + len(PAPER_VALID_SMILES) + len(PAPER_TEST_SMILES)
+        assert len(dataset._raw_dataset) == expected
+
 
 class TestGuacaMolQuery:
     """Tests for GuacaMol.query(), including in-corpus lookup and on-the-fly RDKit labelling."""
@@ -450,6 +472,13 @@ class TestGuacaMolQuery:
         result_canonical = dataset.query([canonical_candidate])
         result_non_canonical = dataset.query([non_canonical_candidate])
         assert result_canonical.labels[0] == pytest.approx(result_non_canonical.labels[0], rel=1e-9)
+
+    def test_query_empty_candidates_list_returns_empty(self, tmp_path):
+        """query([]) returns a LabelledCandidates with zero entries."""
+        dataset = self._loaded_dataset(tmp_path)
+        result = dataset.query([])
+        assert len(result) == 0
+        assert result.labels.shape == (0,)
 
 
 # ---------------------------------------------------------------------------
@@ -593,28 +622,35 @@ class TestDownloadFile:
                 _download_file("https://example.com/fake.smiles", out)
         assert not out.exists()
 
+    def test_connection_error_raises_os_error(self, tmp_path):
+        """OSError is raised when requests.get() raises a network connection error."""
+        with patch("requests.get", side_effect=requests.ConnectionError("connection refused")):
+            with pytest.raises(OSError, match="Network error"):
+                _download_file("https://example.com/fake.smiles", tmp_path / "out.smiles", None)
+
+
+class TestCanonicalSmiles:
+    """Unit tests for the _canonical_smiles helper."""
+
+    def test_invalid_smiles_returns_original(self):
+        """_canonical_smiles returns the original string when RDKit cannot parse it."""
+        _mol_from_smiles.cache_clear()
+        assert _canonical_smiles("NOTASMILES") == "NOTASMILES"
+
+    def test_valid_smiles_returns_canonical(self):
+        """_canonical_smiles returns the RDKit canonical form for a valid SMILES."""
+        _mol_from_smiles.cache_clear()
+        result = _canonical_smiles("OCC")
+        assert result == "CCO"
+
 
 class TestGuacaMolWithFixtures:
     """Integration tests using synthetic fixtures — no network calls."""
 
-    def _config(self, tmp_path, **overrides):
-        defaults = dict(
-            name="guacamol",
-            modality="sequence",
-            seed=42,
-            train_ratio=0.6,
-            validation_frac=0.1,
-            test_ratio=0.2,
-            target_property="TPSA",
-            data_dir=tmp_path,
-        )
-        defaults.update(overrides)
-        return GuacaMolConfig(**defaults)
-
     def test_load_from_valid_fixture_returns_candidates(self, tmp_path):
         """Loading from a valid SMILES fixture produces at least one candidate."""
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
-        config = self._config(tmp_path)
+        config = _base_config(data_dir=tmp_path)
         dataset = GuacaMol(config)
         assert dataset._raw_dataset is not None
         assert len(dataset._raw_dataset) > 0
@@ -622,26 +658,28 @@ class TestGuacaMolWithFixtures:
     def test_candidate_data_field_is_smiles_string(self, tmp_path):
         """Each candidate's data field is a non-empty SMILES string."""
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
-        config = self._config(tmp_path)
+        config = _base_config(data_dir=tmp_path)
         dataset = GuacaMol(config)
         assert dataset._raw_dataset is not None
         candidate = dataset._raw_dataset.candidates[0]
         assert isinstance(candidate.data, str)
         assert len(candidate.data) > 0
 
-    def test_computed_properties_none_stores_all_ten_in_features(self, tmp_path):
-        """computed_properties=None stores all 10 GuacaMol properties in candidate features."""
+    def test_computed_properties_none_stores_only_target_property_in_features(self, tmp_path):
+        """computed_properties=None stores only the target_property in candidate features."""
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
-        config = self._config(tmp_path, computed_properties=None)
+        config = _base_config(data_dir=tmp_path, computed_properties=None)
         dataset = GuacaMol(config)
         assert dataset._raw_dataset is not None
         for cand in dataset._raw_dataset.candidates:
-            assert ALL_PROPERTIES.issubset(set(cand.features.keys()))
+            assert "TPSA" in cand.features
+            # Only the target property is computed when computed_properties is None
+            assert len(cand.features) == 1
 
     def test_empty_smiles_file_produces_empty_dataset(self, tmp_path):
         """An empty fixture file results in a dataset with zero candidates."""
         shutil.copy(EMPTY_FIXTURE, tmp_path / FILENAME_ALL)
-        config = self._config(tmp_path)
+        config = _base_config(data_dir=tmp_path)
         dataset = GuacaMol(config)
         assert dataset._raw_dataset is not None
         assert len(dataset._raw_dataset) == 0
@@ -649,7 +687,7 @@ class TestGuacaMolWithFixtures:
     def test_all_invalid_smiles_skipped_leaves_empty_dataset(self, tmp_path):
         """A fixture containing only invalid SMILES results in an empty dataset."""
         shutil.copy(INVALID_FIXTURE, tmp_path / FILENAME_ALL)
-        config = self._config(tmp_path)
+        config = _base_config(data_dir=tmp_path)
         dataset = GuacaMol(config)
         assert dataset._raw_dataset is not None
         assert len(dataset._raw_dataset) == 0
@@ -658,7 +696,7 @@ class TestGuacaMolWithFixtures:
     def test_large_fixture_loads_without_crash(self, tmp_path):
         """A 1000-SMILES fixture loads successfully without errors."""
         shutil.copy(LARGE_FIXTURE, tmp_path / FILENAME_ALL)
-        config = self._config(tmp_path)
+        config = _base_config(data_dir=tmp_path)
         dataset = GuacaMol(config)
         assert dataset._raw_dataset is not None
         assert len(dataset._raw_dataset) > 0
@@ -666,7 +704,7 @@ class TestGuacaMolWithFixtures:
     def test_query_benchmark_task_raises_not_implemented(self, tmp_path):
         """query() raises NotImplementedError when task_type is 'benchmark_task'."""
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
-        config = self._config(tmp_path)
+        config = _base_config(data_dir=tmp_path)
         dataset = GuacaMol(config)
         assert dataset._raw_dataset is not None
         cand = dataset._raw_dataset.candidates[0]
@@ -684,7 +722,7 @@ class TestGuacaMolWithFixtures:
         # Use side_effect so each call to iter_lines() gets a fresh iterator; return_value
         # would share a single exhausted iterator across all three file downloads.
         mock_resp.iter_lines.side_effect = lambda **kw: iter(ln.encode() for ln in smiles)
-        config = self._config(tmp_path, split_mode="paper")
+        config = _base_config(data_dir=tmp_path, split_mode="paper")
         with patch("requests.get", return_value=mock_resp) as mock_get:
             dataset = GuacaMol(config)
         assert mock_get.call_count == 3
@@ -697,7 +735,7 @@ class TestGuacaMolWithFixtures:
         """max_molecules caps the candidate count in each paper split independently."""
         for filename in [FILENAME_TRAIN, FILENAME_VALID, FILENAME_TEST]:
             shutil.copy(LARGE_FIXTURE, _cache_path(tmp_path / filename, 10))
-        config = self._config(tmp_path, split_mode="paper", max_molecules=10)
+        config = _base_config(data_dir=tmp_path, split_mode="paper", max_molecules=10)
         dataset = GuacaMol(config)
         train_count = len(dataset.train_dataset.candidates)
         valid_count = len(dataset.validation_dataset.candidates)
@@ -706,41 +744,28 @@ class TestGuacaMolWithFixtures:
         assert valid_count <= 10
         assert test_count <= 10
 
+    def test_repr_contains_key_fields(self, tmp_path):
+        """repr() includes the target_property and split_mode."""
+        shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
+        config = _base_config(data_dir=tmp_path)
+        dataset = GuacaMol(config)
+        r = repr(dataset)
+        assert "TPSA" in r
+        assert "random" in r
+
 
 class TestGuacaMolEdgeCases:
     """Edge-case tests for truncation, invalid SMILES in query, and featurise paths."""
 
-    def _config(self, tmp_path, **overrides):
-        defaults = dict(
-            name="guacamol",
-            modality="sequence",
-            seed=42,
-            train_ratio=0.6,
-            validation_frac=0.1,
-            test_ratio=0.2,
-            target_property="TPSA",
-            data_dir=tmp_path,
-        )
-        defaults.update(overrides)
-        return GuacaMolConfig(**defaults)
-
-    def test_max_molecules_zero_produces_empty_dataset(self, tmp_path):
-        """max_molecules=0 should yield an empty dataset without raising."""
-        shutil.copy(VALID_FIXTURE, _cache_path(tmp_path / FILENAME_ALL, 0))
-        config = self._config(tmp_path, max_molecules=0)
-        dataset = GuacaMol(config)
-        total = (
-            len(dataset.train_dataset)
-            + len(dataset.validation_dataset)
-            + len(dataset.test_dataset)
-            + len(dataset.candidate_pool)
-        )
-        assert total == 0
+    def test_max_molecules_zero_raises_validation_error(self, tmp_path):
+        """max_molecules=0 should raise a ValidationError (minimum is 1)."""
+        with pytest.raises(ValidationError, match="greater than or equal to 1"):
+            _base_config(data_dir=tmp_path, max_molecules=0)
 
     def test_query_invalid_novel_smiles_raises_value_error(self, tmp_path):
         """query() must raise ValueError for a novel candidate with an unparseable SMILES."""
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
-        config = self._config(tmp_path, target_property="MolWt")
+        config = _base_config(data_dir=tmp_path, target_property="MolWt")
         dataset = GuacaMol(config)
         bad = Candidate(data="not_a_smiles!!!", modality="sequence")
         with pytest.raises(ValueError, match="invalid SMILES"):
@@ -749,8 +774,8 @@ class TestGuacaMolEdgeCases:
     def test_computed_properties_stored_as_candidate_features(self, tmp_path):
         """Each Candidate must carry exactly the requested computed_properties as features."""
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
-        config = self._config(
-            tmp_path,
+        config = _base_config(
+            data_dir=tmp_path,
             target_property="MolWt",
             computed_properties=["MolWt", "MolLogP"],
         )

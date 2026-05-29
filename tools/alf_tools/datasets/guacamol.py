@@ -13,17 +13,20 @@
 # limitations under the License.
 
 import copy
+import hashlib
 import logging
-from pathlib import Path
+import os
 from functools import lru_cache
-from typing import Callable, Final, Literal, TypedDict, get_args
+from pathlib import Path
+from typing import Callable, Final, Literal, NotRequired, TypedDict, cast, get_args
 
 import numpy as np
 import requests
 from alf_core import BaseDataset, Candidate, LabelledCandidates
+from alf_core.dataclasses.candidate import Modality
 from alf_core.dataset.base_dataset import BaseDatasetConfig
 from alf_core.utils.enums import ProblemType
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from rdkit import Chem
 from rdkit.Chem import QED as RDKitQED
 from rdkit.Chem import Descriptors, GraphDescriptors, rdMolDescriptors
@@ -38,8 +41,6 @@ FILENAME_TRAIN: str = "guacamol_v1_train.smiles"
 FILENAME_VALID: str = "guacamol_v1_valid.smiles"
 FILENAME_TEST: str = "guacamol_v1_test.smiles"
 FILENAME_ALL: str = "guacamol_v1_all.smiles"
-
-GuacaMolSplitName = Literal["TRAIN", "VALID", "TEST", "ALL"]
 
 PROPERTY_FNS: dict[str, Callable[..., float]] = {
     "BertzCT": lambda m: float(GraphDescriptors.BertzCT(m)),
@@ -61,13 +62,16 @@ class GuacaMolFileInfo(TypedDict):
     Attributes:
         name: Local filename (e.g. ``guacamol_v1_train.smiles``).
         url: HTTPS download URL.
+        sha256: Expected SHA-256 hex digest. When present, the downloaded file is
+            verified against this value. Set to None or omit to skip verification.
     """
 
     name: str
     url: str
+    sha256: NotRequired[str | None]
 
 
-GUACAMOL_FILES: Final[dict[GuacaMolSplitName, GuacaMolFileInfo]] = {
+GUACAMOL_FILES: Final[dict[Literal["TRAIN", "VALID", "TEST", "ALL"], GuacaMolFileInfo]] = {
     "TRAIN": {
         "name": FILENAME_TRAIN,
         "url": "https://ndownloader.figshare.com/files/13612760",
@@ -121,7 +125,10 @@ GuacaMolTaskName = Literal[
     "aripiprazole_decorator_hop",
 ]
 
-ALL_PROPERTIES: frozenset[str] = frozenset(get_args(GuacaMolPropertyName))
+ALL_PROPERTIES: frozenset[GuacaMolPropertyName] = frozenset(get_args(GuacaMolPropertyName))
+# Stable ordered tuple — use ``computed_properties=list(_ALL_PROPERTIES_ORDERED)`` when
+# deterministic iteration over all 10 properties is required.
+_ALL_PROPERTIES_ORDERED: tuple[GuacaMolPropertyName, ...] = get_args(GuacaMolPropertyName)
 
 
 class GuacaMolConfig(BaseDatasetConfig):
@@ -129,10 +136,12 @@ class GuacaMolConfig(BaseDatasetConfig):
 
     Attributes:
         target_property: Property or task name used as labels in LabelledCandidates.
-        task_type: Auto-derived from target_property — "property" or "benchmark_task".
-            Never set directly.
+        task_type: Always auto-derived from target_property in the model validator.
+            Any value supplied at construction is silently overwritten. Do not set.
         computed_properties: RDKit properties computed and stored in Candidate.features.
-            None means all 10 GuacaMol properties. Only applies when task_type == "property".
+            None defaults to computing only [target_property]. Pass
+            ``list(_ALL_PROPERTIES_ORDERED)`` to compute all 10. Only applies when
+            task_type == "property".
         max_molecules: Cap on SMILES lines written to disk and loaded per file. None = full corpus.
         split_mode: "random" and "low_vs_high" use BaseDataset splitting on the combined
             corpus file. "paper" uses the original train/valid/test figshare file boundaries.
@@ -144,7 +153,7 @@ class GuacaMolConfig(BaseDatasetConfig):
     target_property: GuacaMolPropertyName | GuacaMolTaskName
     task_type: Literal["property", "benchmark_task"] = "property"
     computed_properties: list[GuacaMolPropertyName] | None = None
-    max_molecules: int | None = None
+    max_molecules: int | None = Field(default=None, ge=1)
     split_mode: Literal["random", "low_vs_high", "paper"] = "random"
     data_dir: Path = DATAPATH
 
@@ -160,27 +169,31 @@ class GuacaMolConfig(BaseDatasetConfig):
                 "computed_properties when computed_properties is explicitly set."
             )
         if self.split_mode != "paper":
-            self.split_type = self.split_mode  # type: ignore[assignment]
+            # split_mode values "random" and "low_vs_high" are valid SplitType values;
+            # cast is safe here since BaseDatasetConfig.split_type accepts them.
+            from alf_core.dataset.splitting_utils import SplitType  # noqa: PLC0415
+
+            self.split_type = cast(SplitType, self.split_mode)
         return self
 
 
-def _compute_properties(smiles: str, properties: list[str]) -> dict[str, float]:
+def _compute_properties(
+    smiles: str, properties: list[GuacaMolPropertyName]
+) -> dict[str, float] | None:
     """Compute RDKit physicochemical properties for a SMILES string.
 
     Args:
         smiles: A SMILES string to compute properties for.
         properties: List of property names from GuacaMolPropertyName to compute.
 
-    Raises:
-        ValueError: If the SMILES string is invalid and cannot be parsed by RDKit.
-
     Returns:
-        Dict mapping each property name to its computed float value.
+        Dict mapping each property name to its computed float value, or None if
+        the SMILES string is invalid and cannot be parsed by RDKit.
     """
     mol = _mol_from_smiles(smiles)
     if mol is None:
-        raise ValueError(f"Cannot compute label for invalid SMILES: {smiles!r}")
-    return {name: PROPERTY_FNS[name](mol) for name in properties}  # type: ignore[operator]  # mypy cannot narrow str subscript to Literal key type
+        return None
+    return {name: PROPERTY_FNS[name](mol) for name in properties}
 
 
 def _cache_path(base: Path, max_lines: int | None) -> Path:
@@ -200,7 +213,12 @@ def _cache_path(base: Path, max_lines: int | None) -> Path:
     return base.parent / f"{base.stem}_{max_lines}lines{base.suffix}"
 
 
-def _download_file(url: str, filepath: Path, max_lines: int | None = None) -> Path:
+def _download_file(
+    url: str,
+    filepath: Path,
+    max_lines: int | None = None,
+    sha256: str | None = None,
+) -> Path:
     """Stream a text file from url to filepath, optionally truncating to max_lines lines.
 
     When max_lines is given the line count is embedded in the filename via
@@ -213,6 +231,9 @@ def _download_file(url: str, filepath: Path, max_lines: int | None = None) -> Pa
         filepath: Base destination path. The actual path may differ when max_lines
             is set — always use the returned value.
         max_lines: If set, stop writing after exactly this many lines.
+        sha256: Expected SHA-256 hex digest. When provided (and max_lines is None),
+            the written file is verified against this digest. Omit or pass None to
+            skip verification.
 
     Returns:
         The resolved filepath (may differ from the input when max_lines is set).
@@ -220,6 +241,7 @@ def _download_file(url: str, filepath: Path, max_lines: int | None = None) -> Pa
     Raises:
         OSError: If a network error occurs while connecting or streaming.
         FileNotFoundError: If the server returns a non-200 status code.
+        ValueError: If sha256 is provided and the downloaded file does not match.
     """
     filepath = _cache_path(filepath, max_lines)
 
@@ -233,7 +255,7 @@ def _download_file(url: str, filepath: Path, max_lines: int | None = None) -> Pa
         f" (first {max_lines} lines)" if max_lines is not None else "",
     )
     filepath.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = filepath.with_suffix(".tmp")
+    tmp_path = filepath.with_name(f"{filepath.stem}.{os.getpid()}.tmp")
     # allow_redirects=True is the default — requests follows the 302 → S3 automatically
     try:
         resp = requests.get(url, stream=True, timeout=60)
@@ -248,11 +270,25 @@ def _download_file(url: str, filepath: Path, max_lines: int | None = None) -> Pa
                 f.write(raw_line + b"\n")
                 if max_lines is not None and idx + 1 >= max_lines:
                     break
-    except OSError:
+        tmp_path.rename(filepath)
+    except requests.RequestException as exc:
+        tmp_path.unlink(missing_ok=True)
+        raise OSError(f"Network error streaming {filepath.name} from {url}") from exc
+    except Exception:
         tmp_path.unlink(missing_ok=True)
         raise
 
-    tmp_path.rename(filepath)
+    if sha256 is None:
+        logger.warning(
+            "No SHA-256 checksum configured for %s — integrity not verified.", filepath.name
+        )
+    else:
+        digest = hashlib.sha256(filepath.read_bytes()).hexdigest()
+        if digest != sha256:
+            filepath.unlink(missing_ok=True)
+            raise ValueError(
+                f"SHA-256 mismatch for {filepath.name}: expected {sha256!r}, got {digest!r}"
+            )
     logger.info("  ✓ %s written to %s.", filepath.name, filepath.parent)
     return filepath
 
@@ -306,9 +342,9 @@ def _canonical_smiles(smiles: str) -> str:
 
 def _label_smiles(
     smiles_list: list[str],
-    properties: list[str],
+    properties: list[GuacaMolPropertyName],
     target_property: str,
-    modality: object,
+    modality: Modality | str,
 ) -> LabelledCandidates:
     """Parse SMILES, compute properties, build LabelledCandidates.
 
@@ -326,9 +362,8 @@ def _label_smiles(
     candidates = []
     labels = []
     for smiles in smiles_list:
-        try:
-            props = _compute_properties(smiles, properties)
-        except ValueError:
+        props = _compute_properties(smiles, properties)
+        if props is None:
             logger.warning("Skipping invalid SMILES: %r", smiles)
             continue
         candidates.append(Candidate(data=smiles, modality=modality, features=dict(props)))
@@ -360,9 +395,14 @@ class GuacaMol(BaseDataset):
             config: Configuration for the GuacaMol dataset.
         """
         self._paper_splits: dict[str, LabelledCandidates] | None = None
+        self._smiles_index: dict[str, int] = {}
         super().__init__(config)
         self.setup()
-        self._smiles_index: dict[str, int] = (
+
+    def setup(self) -> None:
+        """Set up the dataset and rebuild the SMILES lookup index."""
+        super().setup()
+        self._smiles_index = (
             {_canonical_smiles(c.data): i for i, c in enumerate(self._raw_dataset.candidates)}
             if self._raw_dataset is not None
             else {}
@@ -411,8 +451,9 @@ class GuacaMol(BaseDataset):
         smiles_list = _load_smiles_file(filepath)
         if self.config.max_molecules is not None:
             smiles_list = smiles_list[: self.config.max_molecules]
-        properties = list(self.config.computed_properties or ALL_PROPERTIES)
-        return _label_smiles(smiles_list, properties, self.config.target_property, self.modality)
+        target = cast(GuacaMolPropertyName, self.config.target_property)
+        properties = list(self.config.computed_properties or [target])
+        return _label_smiles(smiles_list, properties, target, self.modality)
 
     def _load_paper_splits(self) -> LabelledCandidates:
         """Download (if absent) train/valid/test files and label all candidates.
@@ -427,7 +468,8 @@ class GuacaMol(BaseDataset):
         """
         split_files = {k: v for k, v in GUACAMOL_FILES.items() if k != "ALL"}
         tag_to_key = {"TRAIN": "train", "VALID": "validation", "TEST": "test"}
-        properties = list(self.config.computed_properties or ALL_PROPERTIES)
+        target = cast(GuacaMolPropertyName, self.config.target_property)
+        properties = list(self.config.computed_properties or [target])
         self._paper_splits = {}
         all_candidates: list[Candidate] = []
         all_labels: list[float] = []
@@ -515,10 +557,7 @@ class GuacaMol(BaseDataset):
         if self._paper_splits is None:
             raise RuntimeError("Dataset must be loaded before splitting")  # pragma: no cover
 
-        # Shallow copy: values still alias self._paper_splits entries.
-        # _paper_splits is not re-read after setup(), so in-place mutations via
-        # update_splits() do not cause bugs, but future callers should be aware.
-        splits = dict(self._paper_splits)
+        splits = {k: copy.deepcopy(v) for k, v in self._paper_splits.items()}
         splits["candidate_pool"] = LabelledCandidates(
             candidates=[], labels=np.array([], dtype=float)
         )
