@@ -41,16 +41,17 @@ class TestBenchmarkingMetricRegistry:
 class TestRegisterBenchmarkingMetric:
     """Tests for register_benchmarking_metric decorator."""
 
-    def test_decorator_registers_function(self):
+    def test_decorator_registers_function(self, monkeypatch):
         """Decorated function is added to the global benchmarking registry."""
-        fresh_registry = BenchmarkingMetricRegistry()
+        isolated_registry = BenchmarkingMetricRegistry()
+        monkeypatch.setattr(bm_module, "benchmarking_metric_registry", isolated_registry)
 
+        @register_benchmarking_metric
         def my_isolated_test_metric(means, targets):
             """Dummy metric. Returns: dict."""
             return {"my_isolated_test_metric": 0.0}
 
-        fresh_registry.register(my_isolated_test_metric.__name__, my_isolated_test_metric)
-        assert "my_isolated_test_metric" in fresh_registry.get_metrics()
+        assert "my_isolated_test_metric" in isolated_registry.get_metrics()
 
     def test_decorated_function_is_callable(self, monkeypatch):
         """Decorated and registered function remains callable."""
