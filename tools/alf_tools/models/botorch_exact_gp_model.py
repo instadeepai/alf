@@ -140,6 +140,12 @@ class BoTorchGPModel(BaseModel):
                 f"optimizer must be 'scipy' or 'torch', got {self.train_config.optimizer!r}"
             )
 
+        if self.model_config.kernel_type not in ("rbf", "matern"):
+            raise ValueError(
+                f"BoTorchGPModel only supports 'rbf' and 'matern' kernels, "
+                f"got {self.model_config.kernel_type!r}."
+            )
+
         if self.train_config.device is None:
             self.device = get_device()
         else:
@@ -244,6 +250,15 @@ class BoTorchGPModel(BaseModel):
                 self.train_X.shape[-1],
             )
 
+        if self.model_config.ard and self.model_config.lengthscale_prior is None:
+            logger.warning(
+                "ARD is enabled with no lengthscale prior. "
+                "Consider setting a dimension-aware prior such as "
+                "LogNormal(loc=sqrt(2) + log(d)*0.5, scale=sqrt(3)) "
+                "where d is the input dimensionality (%d).",
+                self.train_X.shape[-1],
+            )
+
         if self.model_config.kernel_type == "matern":
             base = MaternKernel(
                 nu=self.model_config.matern_nu,
@@ -331,7 +346,10 @@ class BoTorchGPModel(BaseModel):
             self._training_metrics["iteration"].append(self.train_config.num_iterations)
 
         except Exception as e:
-            self.model = None  # Reset to avoid half-initialized state after failed fit
+            self.model = None
+            self.train_X = None
+            self.train_Y = None
+            self._input_normaliser = None
             logger.error(f"Error training BoTorch GP model: {e}")
             raise
 

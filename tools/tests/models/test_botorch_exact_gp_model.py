@@ -170,6 +170,11 @@ class TestBoTorchGPModelInitialization:
         with pytest.raises(ValueError, match="optimizer must be 'scipy' or 'torch'"):
             BoTorchGPModel(train_config=train_cfg)
 
+    def test_unsupported_kernel_type_raises_at_init(self):
+        """Test that an unsupported kernel_type raises ValueError at init."""
+        with pytest.raises(ValueError, match="only supports"):
+            BoTorchGPModel(model_config=GPModelConfig(kernel_type="linear"))
+
 
 class TestBoTorchGPModelFeaturisation:
     """Test featurisation method."""
