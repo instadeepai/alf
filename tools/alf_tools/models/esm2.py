@@ -197,22 +197,76 @@ class ESM2Model(BaseModel):
         }
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
-        """Compute sequence embeddings for the given candidates.
+        """Compute pseudo-log-likelihood scores for the given candidates.
+
+        Masks all non-special tokens, forward-passes through the model, and
+        averages the per-token log-probabilities at the true token identities.
+        Higher values indicate sequences the model considers more probable.
 
         Args:
-            candidate_points: List of candidates to generate embeddings for.
+            candidate_points: List of candidates to score. Must be non-empty.
 
         Returns:
-            Predictions whose means are per-sequence embeddings as a numpy array.
-            If candidate_points is empty, returns Predictions with means of shape (0, hidden_dim).
+            Predictions whose means are per-sequence pseudo-log-likelihoods,
+            shape (n_candidates,). variances is always None.
+
+        Raises:
+            ValueError: If candidate_points is empty.
         """
         if not candidate_points:
-            hidden_dim = self.esm_model.config.hidden_size
-            return Predictions(means=np.empty((0, hidden_dim), dtype=np.float32))
+            raise ValueError("candidate_points must be non-empty")
 
         batch = self.featurise(candidate_points)
-        all_input_ids = batch["input_ids"]  # (N, seq_len) — CPU
-        all_attention_mask = batch["attention_mask"]  # (N, seq_len) — CPU
+        all_input_ids = batch["input_ids"]
+        all_attention_mask = batch["attention_mask"]
+
+        log_likelihoods: list[float] = []
+        batch_size = self.train_config.batch_size
+
+        self.esm_model.eval()
+        with torch.no_grad():
+            for start in range(0, len(candidate_points), batch_size):
+                input_ids = all_input_ids[start : start + batch_size].to(self.device)
+                attention_mask = all_attention_mask[start : start + batch_size].to(self.device)
+
+                masked_ids, labels = self._compute_log_likelihood_labels(input_ids)
+
+                outputs = self.esm_model(
+                    input_ids=masked_ids,
+                    attention_mask=attention_mask,
+                )
+
+                log_probs = torch.nn.functional.log_softmax(outputs.logits, dim=-1)
+                labeled = labels != -100
+
+                safe_labels = labels.clone()
+                safe_labels[~labeled] = 0
+
+                token_log_probs = log_probs.gather(2, safe_labels.unsqueeze(2)).squeeze(2)
+                token_log_probs = token_log_probs * labeled.float()
+                seq_lls = token_log_probs.sum(dim=1) / labeled.float().sum(dim=1)
+
+                log_likelihoods.extend(seq_lls.cpu().tolist())
+
+        return Predictions(means=np.array(log_likelihoods, dtype=np.float32))
+
+    def embed(self, candidate_points: list[Candidate]) -> np.ndarray:
+        """Compute sequence embeddings using the configured pooling strategy.
+
+        Args:
+            candidate_points: List of candidates to embed.
+
+        Returns:
+            Numpy array of shape (n_candidates, hidden_dim) for mean or cls pooling,
+            or (n_candidates, seq_len, hidden_dim) for last_hidden_state pooling.
+            Returns shape (0, hidden_dim) if candidate_points is empty.
+        """
+        if not candidate_points:
+            return np.empty((0, self.esm_model.config.hidden_size), dtype=np.float32)
+
+        batch = self.featurise(candidate_points)
+        all_input_ids = batch["input_ids"]
+        all_attention_mask = batch["attention_mask"]
 
         all_embeddings: list[torch.Tensor] = []
         batch_size = self.train_config.batch_size
@@ -229,9 +283,7 @@ class ESM2Model(BaseModel):
                     output_hidden_states=True,
                 )
 
-                hidden_state = outputs.hidden_states[
-                    self.model_config.repr_layer
-                ]  # (mini_batch, seq_len, hidden_dim)
+                hidden_state = outputs.hidden_states[self.model_config.repr_layer]
 
                 if self.model_config.pooling == "mean":
                     mask = attention_mask.unsqueeze(-1).float()
@@ -243,7 +295,7 @@ class ESM2Model(BaseModel):
 
                 all_embeddings.append(embeddings.cpu())
 
-        return Predictions(means=torch.cat(all_embeddings, dim=0).numpy())
+        return torch.cat(all_embeddings, dim=0).numpy()
 
     def _prepare_data_loader(self, data: LabelledCandidates, shuffle: bool = False) -> DataLoader:
         batch = self.featurise(data)
