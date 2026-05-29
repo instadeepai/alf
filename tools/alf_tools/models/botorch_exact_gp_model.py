@@ -25,25 +25,55 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Literal
+from dataclasses import dataclass, field
+from typing import Literal, Optional, Union
 
 import numpy as np
 import torch
-from alf_core import BaseModel, Candidate, InputNormaliser, LabelledCandidates, Predictions
+from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
+from alf_core.model.base_model import BaseTrainConfig
+from alf_core.model.normaliser import InputNormaliser
 from botorch.fit import fit_gpytorch_mll
 from botorch.models import SingleTaskGP
 from botorch.models.transforms.outcome import Standardize
 from botorch.optim.fit import fit_gpytorch_mll_torch
-from gpytorch.constraints.constraints import GreaterThan
 from gpytorch.kernels import MaternKernel, RBFKernel, ScaleKernel
 from gpytorch.mlls import ExactMarginalLogLikelihood
-from gpytorch.priors.torch_priors import LogNormalPrior
 from torch.optim import Adam
 
+from alf_tools.models.gp import GPModelConfig
+from alf_tools.models.utils.config_utils import build_from_target
 from alf_tools.models.utils.torch_utils import get_device
 from alf_tools.utils.botorch_utils import candidates_to_tensor
 
 logger = logging.getLogger("alf-tools")
+
+
+@dataclass
+class BoTorchTrainConfig(BaseTrainConfig):
+    """Training configuration for BoTorchGPModel.
+
+    Args:
+        normalise_inputs: Whether to normalise inputs to [0, 1]. Default: True.
+        standardise_outputs: Whether to standardise outputs. Default: True.
+        learning_rate: Learning rate for Adam optimizer. Default: 0.1.
+            Only used when optimizer='torch'.
+        num_iterations: Number of optimisation iterations. Default: 100.
+        optimizer: Optimisation backend. 'scipy' uses L-BFGS-B (default);
+            'torch' uses Adam.
+        max_attempts: Maximum fitting attempts on numerical failure. Default: 5.
+        device: Device string ('cpu', 'cuda'). None auto-detects. Default: None.
+        dtype: Tensor dtype. Default: torch.float32.
+    """
+
+    normalise_inputs: bool = True
+    standardise_outputs: bool = True
+    learning_rate: float = 0.1
+    num_iterations: int = 100
+    optimizer: Literal["scipy", "torch"] = "scipy"
+    max_attempts: int = 5
+    device: str | None = None
+    dtype: torch.dtype = torch.float32
 
 
 class BoTorchGPModel(BaseModel):
@@ -85,86 +115,41 @@ class BoTorchGPModel(BaseModel):
 
     def __init__(
         self,
-        normalise_inputs: bool = True,
-        standardise_outputs: bool = True,
-        num_iterations: int = 100,
-        learning_rate: float = 0.1,
-        optimizer: str = "scipy",
-        max_attempts: int = 5,
-        device: str | None = None,
-        dtype: torch.dtype = torch.float32,
-        kernel_type: Literal["matern", "rbf"] | None = None,
-        nu: float = 2.5,
-        use_ard: bool = False,
+        model_config: GPModelConfig | None = None,
+        train_config: BoTorchTrainConfig | None = None,
     ):
         """Initialize BoTorch GP model.
 
         Args:
-            normalise_inputs: Whether to normalise inputs to [0, 1]. Default: True.
-                If your data is already normalised, set to False.
-            standardise_outputs: Whether to standardise outputs (zero mean, unit variance).
-                Default: True. BoTorch handles this automatically with Standardize transform.
-            num_iterations: Number of optimization iterations for MLL. Default: 100.
-                For scipy optimizer: controls 'maxiter' in L-BFGS-B.
-                For torch optimizer: controls step_limit.
-            learning_rate: Learning rate for Adam optimizer. Default: 0.1.
-                Only used if optimizer='torch'. Ignored for scipy optimizer.
-            optimizer: Optimization backend to use. Default: 'scipy'.
-                - 'scipy': Uses L-BFGS-B (faster, better for small-medium datasets)
-                - 'torch': Uses Adam (more flexible, better for large datasets)
-            max_attempts: Maximum number of fitting attempts. Default: 5.
-                If fitting fails (e.g., due to numerical issues), it will retry
-                up to max_attempts times with different initializations.
-            device: Device to run on ('cpu' or 'cuda'). If None, auto-detects.
-            dtype: Data type for tensors. Default: torch.float32.
-            kernel_type: Kernel type to use. Options: "matern", "rbf", or None.
-                If None (default), RBF with Hvarfner et al. 2024 priors is used.
-                If "rbf", RBF with Hvarfner priors is used (same as None but explicit).
-                If "matern", Matérn kernel with nu parameter is used (with Hvarfner priors).
-            nu: nu value for Matern kernel. Default 2.5 aka Matern 5/2.
-            use_ard: Whether to use ARD (Automatic Relevance Determination) in the
-                kernel. Default: False.
+            model_config: Kernel and prior configuration. Defaults to
+                GPModelConfig(ard=False) which uses an RBF kernel with a LogNormal
+                lengthscale prior and no ARD.
+            train_config: Training hyperparameters. Defaults to
+                BoTorchTrainConfig().
 
         Raises:
-            ValueError: If optimizer is not 'scipy' or 'torch'.
-            RuntimeError: If device cannot be determined or is unavailable.
-            Exception: If model fitting fails after max_attempts.
+            ValueError: If train_config.optimizer is not 'scipy' or 'torch'.
         """
         super().__init__()
-        self.normalise_inputs = normalise_inputs
-        self.standardise_outputs = standardise_outputs
-        self.num_iterations = num_iterations
-        self.learning_rate = learning_rate
-        self.optimizer = optimizer
-        self.max_attempts = max_attempts
-        self.dtype = dtype
-        if kernel_type not in ["matern", "rbf", None]:
-            raise ValueError(
-                f"Invalid kernel_type '{kernel_type}'. Must be 'matern', 'rbf', or None."
-            )
-        self.kernel_type = kernel_type
-        self.nu = nu
-        self.use_ard = use_ard
-        if optimizer not in ["scipy", "torch"]:
-            raise ValueError(f"optimizer must be 'scipy' or 'torch', got {optimizer}")
+        # Default ard=False preserves prior BoTorchGPModel behaviour (was use_ard=False)
+        self.model_config = model_config or GPModelConfig(ard=False)
+        self.train_config = train_config or BoTorchTrainConfig()
 
-        # Device setup
-        if device is None:
+        if self.train_config.optimizer not in ("scipy", "torch"):
+            raise ValueError(
+                f"optimizer must be 'scipy' or 'torch', got {self.train_config.optimizer!r}"
+            )
+
+        if self.train_config.device is None:
             self.device = get_device()
         else:
-            self.device = torch.device(device)
+            self.device = torch.device(self.train_config.device)
 
-        # Model will be initialized during fit
-        self.model: SingleTaskGP | None = None
-        self.train_X: torch.Tensor | None = None
-        self.train_Y: torch.Tensor | None = None
+        self.model: Optional[SingleTaskGP] = None
+        self.train_X: Optional[torch.Tensor] = None
+        self.train_Y: Optional[torch.Tensor] = None
         self._input_normaliser: InputNormaliser | None = None
-
-        # Training metrics
-        self._training_metrics: dict[str, list[float]] = {
-            "loss": [],
-            "iteration": [],
-        }
+        self._training_metrics: dict[str, list[float]] = {"loss": [], "iteration": []}
 
     def featurise(self, inputs: list[Candidate]) -> torch.Tensor:
         """Convert candidates to feature tensors.
@@ -181,7 +166,7 @@ class BoTorchGPModel(BaseModel):
         Raises:
             ValueError: If candidates don't contain valid tensor data.
         """
-        return candidates_to_tensor(inputs, device=self.device, dtype=self.dtype)
+        return candidates_to_tensor(inputs, device=self.device, dtype=self.train_config.dtype)
 
     def _validate_shape(self, tensor: torch.Tensor) -> None:
         """Validate that a tensor is 2-D.
@@ -219,10 +204,10 @@ class BoTorchGPModel(BaseModel):
 
         # Convert candidates to tensors
         self.train_X = candidates_to_tensor(
-            train_data.candidates, device=self.device, dtype=self.dtype
+            train_data.candidates, device=self.device, dtype=self.train_config.dtype
         )
         self.train_Y = torch.tensor(
-            train_data.labels, dtype=self.dtype, device=self.device
+            train_data.labels, dtype=self.train_config.dtype, device=self.device
         ).unsqueeze(-1)
 
         # Validate shapes
@@ -230,81 +215,76 @@ class BoTorchGPModel(BaseModel):
         self._validate_shape(self.train_Y)
 
         # Apply input normalisation if requested
-        if self.normalise_inputs:
+        if self.train_config.normalise_inputs:
             train_x_np = self.train_X.cpu().numpy()
             self._input_normaliser = InputNormaliser()
             self._input_normaliser.fit(train_x_np)
             self.train_X = torch.tensor(
                 self._input_normaliser.transform(train_x_np),
-                dtype=self.dtype,
+                dtype=self.train_config.dtype,
                 device=self.device,
             )
 
-        ard_num_dims = self.train_X.shape[-1] if self.use_ard else None
-        # Apply Hvarfner et al. 2024 priors for all kernel types
-        if ard_num_dims is not None:
-            lengthscale_prior = LogNormalPrior(
-                loc=math.sqrt(2) + math.log(ard_num_dims) * 0.5, scale=math.sqrt(3)
-            )
-        else:
-            lengthscale_prior = LogNormalPrior(loc=math.sqrt(2), scale=math.sqrt(3))
-        lengthscale_constraint = GreaterThan(
-            2.5e-2, transform=None, initial_value=lengthscale_prior.mode
-        )
-        # Initialize SingleTaskGP
-        # TODO: specify priors and constraints via Hydra config in a future PR
-        # which will require a Hydra PR first
-        if self.kernel_type == "matern":
-            covar_module = ScaleKernel(
-                MaternKernel(
-                    nu=self.nu,
-                    ard_num_dims=ard_num_dims,
-                    batch_shape=self.train_X.shape[:-2],
-                    lengthscale_prior=lengthscale_prior,
-                    lengthscale_constraint=lengthscale_constraint,
-                )
-            )
-        elif self.kernel_type in ("rbf", None):
-            covar_module = ScaleKernel(
-                RBFKernel(
-                    ard_num_dims=ard_num_dims,
-                    batch_shape=self.train_X.shape[:-2],
-                    lengthscale_prior=lengthscale_prior,
-                    lengthscale_constraint=lengthscale_constraint,
-                )
-            )
-            if self.kernel_type is None:
-                logger.info(
-                    "No kernel_type specified. Defaulting to RBF kernel with Hvarfner "
-                    f"log-normal lengthscale prior{' with ARD' if self.use_ard else ''}."
-                )
-        else:
-            raise ValueError(
-                f"Invalid kernel_type '{self.kernel_type}'. Must be 'matern', 'rbf', or None."
+        # Build kernel from model_config
+        ls_prior = build_from_target(self.model_config.lengthscale_prior)
+        ls_constraint = build_from_target(self.model_config.lengthscale_constraint)
+        ard_num_dims = self.train_X.shape[-1] if self.model_config.ard else None
+
+        if (
+            self.model_config.ard
+            and self.model_config.lengthscale_prior is not None
+            and self.model_config.lengthscale_prior.get("_target_") == "gpytorch.priors.LogNormalPrior"
+            and abs(self.model_config.lengthscale_prior.get("loc", 0) - math.sqrt(2)) < 1e-9
+        ):
+            logger.warning(
+                "ARD is enabled with the default LogNormal prior (loc=sqrt(2)). "
+                "Consider setting loc=sqrt(2) + log(d)*0.5 for dimension-aware Hvarfner "
+                "priors, where d is the input dimensionality (%d).",
+                self.train_X.shape[-1],
             )
 
-        outcome_transform = Standardize(m=1) if self.standardise_outputs else None
+        if self.model_config.kernel_type == "matern":
+            base = MaternKernel(
+                nu=self.model_config.matern_nu,
+                ard_num_dims=ard_num_dims,
+                lengthscale_prior=ls_prior,
+                lengthscale_constraint=ls_constraint,
+            )
+        elif self.model_config.kernel_type in ("rbf", None):
+            base = RBFKernel(
+                ard_num_dims=ard_num_dims,
+                lengthscale_prior=ls_prior,
+                lengthscale_constraint=ls_constraint,
+            )
+        else:
+            raise ValueError(
+                f"BoTorchGPModel only supports 'rbf' and 'matern' kernels, "
+                f"got {self.model_config.kernel_type!r}."
+            )
+        covar_module = ScaleKernel(base)
+
+        outcome_transform = Standardize(m=1) if self.train_config.standardise_outputs else None
         self.model = SingleTaskGP(
             train_X=self.train_X,
             train_Y=self.train_Y,
             covar_module=covar_module,
             outcome_transform=outcome_transform,
         )
-        self.model = self.model.to(device=self.device, dtype=self.dtype)
+        self.model = self.model.to(device=self.device, dtype=self.train_config.dtype)
 
         # Set up MLL and optimizer
         mll = ExactMarginalLogLikelihood(self.model.likelihood, self.model)
 
         # Fit model using BoTorch's fit_gpytorch_mll
         try:
-            if self.optimizer == "scipy":
+            if self.train_config.optimizer == "scipy":
                 # Use L-BFGS-B optimizer with scipy
                 logging_optimizer = "scipy L-BFGS-B"
 
                 fit_gpytorch_mll(
                     mll,
-                    optimizer_kwargs={"options": {"maxiter": self.num_iterations}},
-                    max_attempts=self.max_attempts,
+                    optimizer_kwargs={"options": {"maxiter": self.train_config.num_iterations}},
+                    max_attempts=self.train_config.max_attempts,
                 )
             else:  # torch
                 # Use torch Adam optimizer
@@ -315,16 +295,16 @@ class BoTorchGPModel(BaseModel):
                     mll,
                     optimizer=fit_gpytorch_mll_torch,
                     optimizer_kwargs={
-                        "step_limit": self.num_iterations,
-                        "optimizer": lambda params: optim(params, lr=self.learning_rate),
+                        "step_limit": self.train_config.num_iterations,
+                        "optimizer": lambda params: optim(params, lr=self.train_config.learning_rate),
                     },
-                    max_attempts=self.max_attempts,
+                    max_attempts=self.train_config.max_attempts,
                 )
             logger.info(
                 f"Successfully trained BoTorch GP model using {logging_optimizer} "
-                f"(step_limit={self.num_iterations}, "
-                f"max_attempts={self.max_attempts})"
-                + (f", lr={self.learning_rate}" if self.optimizer == "torch" else "")
+                f"(step_limit={self.train_config.num_iterations}, "
+                f"max_attempts={self.train_config.max_attempts})"
+                + (f", lr={self.train_config.learning_rate}" if self.train_config.optimizer == "torch" else "")
             )
 
             # Record final loss
@@ -341,7 +321,7 @@ class BoTorchGPModel(BaseModel):
                 )
 
             self._training_metrics["loss"].append(loss)
-            self._training_metrics["iteration"].append(self.num_iterations)
+            self._training_metrics["iteration"].append(self.train_config.num_iterations)
 
         except Exception as e:
             self.model = None  # Reset to avoid half-initialized state after failed fit
@@ -368,7 +348,7 @@ class BoTorchGPModel(BaseModel):
             raise ValueError("Candidates list cannot be empty")
 
         # Convert candidates to tensor
-        test_X = candidates_to_tensor(candidate_points, device=self.device, dtype=self.dtype)
+        test_X = candidates_to_tensor(candidate_points, device=self.device, dtype=self.train_config.dtype)
 
         # Validate shapes
         self._validate_shape(test_X)
@@ -382,7 +362,7 @@ class BoTorchGPModel(BaseModel):
             test_x_np = test_X.cpu().numpy()
             test_X = torch.tensor(
                 self._input_normaliser.transform(test_x_np),
-                dtype=self.dtype,
+                dtype=self.train_config.dtype,
                 device=self.device,
             )
 

@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
+from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel, BoTorchTrainConfig
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.mlp import MLP, MLPModel, MLPModelConfig, MLPTrainConfig
 from alf_tools.models.utils import (
     BoTorchModelAdapter,
+    build_from_target,
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
     get_device,
@@ -27,19 +28,21 @@ from alf_tools.models.utils import (
 __all__ = [
     "BoTorchGPModel",
     "BoTorchModelAdapter",
+    "BoTorchTrainConfig",
+    "build_from_target",
     "CNNModel",
     "CNNModelConfig",
     "CNNTrainConfig",
     "create_char_to_idx_mapping",
     "extract_sequences_from_inputs",
-    "get_device",
-    "one_hot_encode",
     "FeaturizerConfig",
-    "GPModelConfig",
+    "get_device",
     "GPModel",
+    "GPModelConfig",
     "GPTrainConfig",
     "MLP",
     "MLPModel",
     "MLPModelConfig",
     "MLPTrainConfig",
+    "one_hot_encode",
 ]

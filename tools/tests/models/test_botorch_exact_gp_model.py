@@ -22,11 +22,15 @@ This module tests the BoTorch-based GP model implementation, including:
 - Device management (CPU/CUDA)
 """
 
+import math
+
+import gpytorch
 import numpy as np
 import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates, Modality
-from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
+from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel, BoTorchTrainConfig
+from alf_tools.models.gp import GPModelConfig
 
 
 @pytest.fixture
@@ -71,62 +75,75 @@ def test_2d_candidates():
 
 
 class TestBoTorchGPModelInitialization:
-    """Test BoTorchGPModel initialization and configuration."""
+    """Test BoTorchGPModel initialization with config objects."""
 
     def test_default_initialization(self):
-        """Test model initialization with default parameters."""
         model = BoTorchGPModel()
-
-        assert model.normalise_inputs is True
-        assert model.standardise_outputs is True
-        assert model.num_iterations == 100
-        assert model.learning_rate == 0.1
-        assert model.optimizer == "scipy"
-        assert model.max_attempts == 5
-        assert model.dtype == torch.float32
+        assert isinstance(model.model_config, GPModelConfig)
+        assert isinstance(model.train_config, BoTorchTrainConfig)
         assert model.model is None
         assert model.train_X is None
         assert model.train_Y is None
-        assert model._training_metrics == {"loss": [], "iteration": []}
 
-    def test_custom_initialization(self):
-        """Test model initialization with custom parameters."""
-        model = BoTorchGPModel(
-            normalise_inputs=False,
-            standardise_outputs=False,
+    def test_default_train_config_values(self):
+        model = BoTorchGPModel()
+        assert model.train_config.normalise_inputs is True
+        assert model.train_config.standardise_outputs is True
+        assert model.train_config.num_iterations == 100
+        assert model.train_config.learning_rate == 0.1
+        assert model.train_config.optimizer == "scipy"
+        assert model.train_config.max_attempts == 5
+        assert model.train_config.dtype == torch.float32
+
+    def test_default_model_config_values(self):
+        model = BoTorchGPModel()
+        assert model.model_config.kernel_type == "rbf"
+        # BoTorchGPModel preserves prior use_ard=False default via GPModelConfig(ard=False)
+        assert model.model_config.ard is False
+        assert isinstance(model.model_config.lengthscale_prior, dict)
+        assert model.model_config.lengthscale_prior["_target_"] == "gpytorch.priors.LogNormalPrior"
+        assert model.model_config.lengthscale_prior["loc"] == pytest.approx(math.sqrt(2))
+
+    def test_custom_train_config(self):
+        train_cfg = BoTorchTrainConfig(
             num_iterations=50,
-            learning_rate=0.05,
             optimizer="torch",
-            max_attempts=3,
-            dtype=torch.float64,
+            learning_rate=0.05,
+            normalise_inputs=False,
         )
+        model = BoTorchGPModel(train_config=train_cfg)
+        assert model.train_config.num_iterations == 50
+        assert model.train_config.optimizer == "torch"
+        assert model.train_config.normalise_inputs is False
 
-        assert model.normalise_inputs is False
-        assert model.standardise_outputs is False
-        assert model.num_iterations == 50
-        assert model.learning_rate == 0.05
-        assert model.optimizer == "torch"
-        assert model.max_attempts == 3
-        assert model.dtype == torch.float64
+    def test_custom_model_config(self):
+        model_cfg = GPModelConfig(
+            kernel_type="matern",
+            matern_nu=1.5,
+            lengthscale_prior={
+                "_target_": "gpytorch.priors.GammaPrior",
+                "concentration": 3.0,
+                "rate": 6.0,
+            },
+        )
+        model = BoTorchGPModel(model_config=model_cfg)
+        assert model.model_config.kernel_type == "matern"
+        assert model.model_config.matern_nu == 1.5
 
     def test_device_auto_detection(self):
-        """Test automatic device detection."""
         model = BoTorchGPModel()
-
-        # Should auto-detect device
         assert model.device is not None
         assert isinstance(model.device, torch.device)
 
     def test_explicit_cpu_device(self):
-        """Test explicit CPU device specification."""
-        model = BoTorchGPModel(device="cpu")
-
+        train_cfg = BoTorchTrainConfig(device="cpu")
+        model = BoTorchGPModel(train_config=train_cfg)
         assert model.device == torch.device("cpu")
 
-    def test_invalid_optimizer_raises_error(self):
-        """Test that invalid optimizer raises ValueError."""
+    def test_invalid_optimizer_raises(self):
+        train_cfg = BoTorchTrainConfig(optimizer="invalid")
         with pytest.raises(ValueError, match="optimizer must be 'scipy' or 'torch'"):
-            BoTorchGPModel(optimizer="invalid")
+            BoTorchGPModel(train_config=train_cfg)
 
 
 class TestBoTorchGPModelFeaturisation:
@@ -166,7 +183,7 @@ class TestBoTorchGPModelTraining:
 
     def test_train_with_valid_data_scipy(self, simple_2d_training_data):
         """Test training with valid data using scipy optimizer."""
-        model = BoTorchGPModel(num_iterations=50, optimizer="scipy")
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=50, optimizer="scipy"))
 
         # Training should complete without error
         model.train(simple_2d_training_data)
@@ -184,7 +201,7 @@ class TestBoTorchGPModelTraining:
 
     def test_train_with_valid_data_torch(self, simple_2d_training_data):
         """Test training with valid data using torch optimizer."""
-        model = BoTorchGPModel(num_iterations=20, optimizer="torch", learning_rate=0.1)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=20, optimizer="torch", learning_rate=0.1))
 
         # Training should complete without error
         model.train(simple_2d_training_data)
@@ -196,7 +213,7 @@ class TestBoTorchGPModelTraining:
 
     def test_train_with_validation_data(self, simple_2d_training_data):
         """Test training with validation data (for API compatibility)."""
-        model = BoTorchGPModel(num_iterations=20)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=20))
 
         # Create validation data
         X_val = np.random.rand(3, 2).astype(np.float32)
@@ -220,7 +237,7 @@ class TestBoTorchGPModelTraining:
 
     def test_train_updates_metrics(self, simple_2d_training_data):
         """Test that training updates metrics correctly."""
-        model = BoTorchGPModel(num_iterations=30)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=30))
 
         model.train(simple_2d_training_data)
 
@@ -232,7 +249,7 @@ class TestBoTorchGPModelTraining:
 
     def test_multiple_train_calls(self, simple_2d_training_data):
         """Test that model can be retrained."""
-        model = BoTorchGPModel(num_iterations=20)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=20))
 
         # First training
         model.train(simple_2d_training_data)
@@ -245,7 +262,7 @@ class TestBoTorchGPModelTraining:
 
     def test_train_with_1d_output(self):
         """Test training with 1D output (automatically reshaped to 2D)."""
-        model = BoTorchGPModel(num_iterations=20)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=20))
 
         # Create simple 1D data
         X = np.random.rand(10, 1).astype(np.float32)
@@ -266,7 +283,7 @@ class TestBoTorchGPModelPrediction:
 
     def test_predict_after_training(self, simple_2d_training_data, test_2d_candidates):
         """Test predictions after training."""
-        model = BoTorchGPModel(num_iterations=30)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=30))
         model.train(simple_2d_training_data)
 
         predictions = model.predict(test_2d_candidates)
@@ -293,7 +310,7 @@ class TestBoTorchGPModelPrediction:
 
     def test_predict_with_empty_candidates_raises_error(self, simple_2d_training_data):
         """Test that predicting with empty candidates raises ValueError."""
-        model = BoTorchGPModel(num_iterations=20)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=20))
         model.train(simple_2d_training_data)
 
         with pytest.raises(ValueError, match="Candidates list cannot be empty"):
@@ -301,7 +318,7 @@ class TestBoTorchGPModelPrediction:
 
     def test_predict_dimension_mismatch_raises_error(self, simple_2d_training_data):
         """Test that dimension mismatch raises ValueError."""
-        model = BoTorchGPModel(num_iterations=20)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=20))
         model.train(simple_2d_training_data)
 
         # Try to predict with 3D candidates (trained on 2D)
@@ -314,7 +331,7 @@ class TestBoTorchGPModelPrediction:
 
     def test_predict_single_point(self, simple_2d_training_data):
         """Test prediction on a single point."""
-        model = BoTorchGPModel(num_iterations=30)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=30))
         model.train(simple_2d_training_data)
 
         single_candidate = [
@@ -328,7 +345,7 @@ class TestBoTorchGPModelPrediction:
 
     def test_predictions_on_training_points(self, simple_2d_training_data):
         """Test that predictions on training points have low variance."""
-        model = BoTorchGPModel(num_iterations=50)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=50))
         model.train(simple_2d_training_data)
 
         # Predict on first training point
@@ -341,7 +358,7 @@ class TestBoTorchGPModelPrediction:
 
     def test_predict_returns_numpy_arrays(self, simple_2d_training_data, test_2d_candidates):
         """Test that predictions return numpy arrays, not tensors."""
-        model = BoTorchGPModel(num_iterations=20)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=20))
         model.train(simple_2d_training_data)
 
         predictions = model.predict(test_2d_candidates)
@@ -355,7 +372,7 @@ class TestBoTorchGPModelMetrics:
 
     def test_get_training_summary_metrics_after_training(self, simple_2d_training_data):
         """Test getting summary metrics after training."""
-        model = BoTorchGPModel(num_iterations=30)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=30))
         model.train(simple_2d_training_data)
 
         metrics = model.get_training_summary_metrics()
@@ -374,7 +391,7 @@ class TestBoTorchGPModelMetrics:
 
     def test_metrics_updated_after_multiple_trainings(self, simple_2d_training_data):
         """Test that metrics reset and reflect only the most recent training."""
-        model = BoTorchGPModel(num_iterations=20)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=20))
 
         # Train twice
         model.train(simple_2d_training_data)
@@ -411,7 +428,7 @@ class TestBoTorchGPModelEdgeCases:
 
     def test_train_with_single_sample(self):
         """Test training with just one sample (edge case)."""
-        model = BoTorchGPModel(num_iterations=10)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=10))
 
         # Single training point
         X = np.array([[0.5, 0.5]], dtype=np.float32)
@@ -427,7 +444,7 @@ class TestBoTorchGPModelEdgeCases:
 
     def test_train_with_constant_outputs(self):
         """Test training when all outputs are the same."""
-        model = BoTorchGPModel(num_iterations=20)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=20))
 
         # All outputs are 1.0
         X = np.random.rand(10, 2).astype(np.float32)
@@ -446,7 +463,7 @@ class TestBoTorchGPModelEdgeCases:
 
     def test_high_dimensional_input(self):
         """Test with high-dimensional input."""
-        model = BoTorchGPModel(num_iterations=20)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=20))
 
         # 10D input
         X = np.random.rand(20, 10).astype(np.float32)
@@ -464,7 +481,7 @@ class TestBoTorchGPModelEdgeCases:
 
     def test_negative_labels(self):
         """Test training with negative labels."""
-        model = BoTorchGPModel(num_iterations=20)
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=20))
 
         X = np.random.rand(10, 2).astype(np.float32)
         y = -np.ones(10) * 5.0  # All negative
@@ -497,7 +514,7 @@ class TestBoTorchGPModelReproducibility:
             candidates = [Candidate(data=x, modality=Modality.TABULAR) for x in X]
             train_data = LabelledCandidates(candidates=candidates, labels=y)
 
-            model = BoTorchGPModel(num_iterations=30)
+            model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=30))
             model.train(train_data)
 
             # Make predictions
@@ -527,9 +544,7 @@ class TestBoTorchGPModelIntegration:
 
         # Create model
         model = BoTorchGPModel(
-            num_iterations=40,
-            optimizer="scipy",
-            max_attempts=3,
+            train_config=BoTorchTrainConfig(num_iterations=40, optimizer="scipy", max_attempts=3),
         )
 
         # Create training data
@@ -567,10 +582,7 @@ class TestBoTorchGPModelIntegration:
 
         # Create model
         model = BoTorchGPModel(
-            num_iterations=30,
-            optimizer="torch",
-            learning_rate=0.1,
-            max_attempts=3,
+            train_config=BoTorchTrainConfig(num_iterations=30, optimizer="torch", learning_rate=0.1, max_attempts=3),
         )
 
         # Create training data
@@ -598,7 +610,7 @@ class TestBoTorchGPModelIntegration:
 
     def test_branin_function_optimization(self, branin_dataset):
         """Test on real Branin synthetic dataset."""
-        model = BoTorchGPModel(num_iterations=50, optimizer="scipy")
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=50, optimizer="scipy"))
 
         # Train on dataset
         model.train(branin_dataset.train_dataset)
@@ -624,7 +636,10 @@ class TestBoTorchGPModelKernelTypes:
 
     def test_matern_kernel_trains_without_error(self, simple_2d_training_data, test_2d_candidates):
         """Training with kernel_type='matern' completes without error."""
-        model = BoTorchGPModel(kernel_type="matern", num_iterations=20)
+        model = BoTorchGPModel(
+            model_config=GPModelConfig(kernel_type="matern"),
+            train_config=BoTorchTrainConfig(num_iterations=20),
+        )
         model.train(simple_2d_training_data)
         preds = model.predict(test_2d_candidates)
         assert preds.means.shape == (5,)
@@ -632,30 +647,39 @@ class TestBoTorchGPModelKernelTypes:
 
     def test_rbf_kernel_trains_without_error(self, simple_2d_training_data, test_2d_candidates):
         """Training with kernel_type='rbf' (explicit) completes without error."""
-        model = BoTorchGPModel(kernel_type="rbf", num_iterations=20)
+        model = BoTorchGPModel(
+            model_config=GPModelConfig(kernel_type="rbf"),
+            train_config=BoTorchTrainConfig(num_iterations=20),
+        )
         model.train(simple_2d_training_data)
         preds = model.predict(test_2d_candidates)
         assert preds.means.shape == (5,)
         assert np.all(np.isfinite(preds.means))
 
     def test_ard_kernel_trains_without_error(self, simple_2d_training_data, test_2d_candidates):
-        """Training with use_ard=True completes without error."""
-        model = BoTorchGPModel(use_ard=True, num_iterations=20)
+        """Training with ard=True completes without error."""
+        model = BoTorchGPModel(
+            model_config=GPModelConfig(ard=True),
+            train_config=BoTorchTrainConfig(num_iterations=20),
+        )
         model.train(simple_2d_training_data)
         preds = model.predict(test_2d_candidates)
         assert preds.means.shape == (5,)
         assert np.all(np.isfinite(preds.means))
 
     def test_invalid_kernel_type_raises_value_error(self, simple_2d_training_data):
-        """Invalid kernel_type raises ValueError on train(), not silent fallback."""
-        model = BoTorchGPModel(num_iterations=10)
-        model.kernel_type = "invalid_kernel"  # Override after init
-        with pytest.raises(ValueError, match="Invalid kernel_type"):
+        """Invalid kernel_type raises ValueError on train()."""
+        model = BoTorchGPModel(
+            model_config=GPModelConfig(kernel_type="rbf"),
+            train_config=BoTorchTrainConfig(num_iterations=10),
+        )
+        model.model_config.kernel_type = "invalid_kernel"  # Override after init
+        with pytest.raises(ValueError, match="BoTorchGPModel only supports"):
             model.train(simple_2d_training_data)
 
     def test_default_kernel_has_hvarfner_priors(self, simple_2d_training_data):
-        """Default kernel (kernel_type=None) registers Hvarfner lengthscale prior."""
-        model = BoTorchGPModel(kernel_type=None, num_iterations=20)
+        """Default kernel registers Hvarfner lengthscale prior."""
+        model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=20))
         model.train(simple_2d_training_data)
         # The covar_module's base kernel should have a lengthscale_prior registered
         base_kernel = model.model.covar_module.base_kernel
@@ -664,7 +688,10 @@ class TestBoTorchGPModelKernelTypes:
 
     def test_rbf_kernel_has_hvarfner_priors(self, simple_2d_training_data):
         """Explicit 'rbf' kernel also registers Hvarfner lengthscale prior."""
-        model = BoTorchGPModel(kernel_type="rbf", num_iterations=20)
+        model = BoTorchGPModel(
+            model_config=GPModelConfig(kernel_type="rbf"),
+            train_config=BoTorchTrainConfig(num_iterations=20),
+        )
         model.train(simple_2d_training_data)
         base_kernel = model.model.covar_module.base_kernel
         assert hasattr(base_kernel, "lengthscale_prior")
@@ -675,3 +702,54 @@ class TestBoTorchGPModelKernelTypes:
         model = BoTorchGPModel()
         with pytest.raises(RuntimeError, match="Model must be trained"):
             _ = model.botorch_model
+
+
+class TestBoTorchGPModelPriorWiring:
+    """Integration: confirm prior and constraint reach the kernel after training."""
+
+    def test_default_lognormal_prior_registered(self, simple_2d_training_data):
+        model = BoTorchGPModel(
+            train_config=BoTorchTrainConfig(num_iterations=5)
+        )
+        model.train(simple_2d_training_data)
+        base_kernel = model.model.covar_module.base_kernel
+        assert "lengthscale_prior" in {name for name, *_ in base_kernel.named_priors()}
+
+    def test_gamma_prior_registered(self, simple_2d_training_data):
+        model_cfg = GPModelConfig(
+            lengthscale_prior={
+                "_target_": "gpytorch.priors.GammaPrior",
+                "concentration": 3.0,
+                "rate": 6.0,
+            }
+        )
+        model = BoTorchGPModel(
+            model_config=model_cfg,
+            train_config=BoTorchTrainConfig(num_iterations=5),
+        )
+        model.train(simple_2d_training_data)
+        base_kernel = model.model.covar_module.base_kernel
+        named = {name: prior for name, _module, prior, *_ in base_kernel.named_priors()}
+        assert isinstance(named["lengthscale_prior"], gpytorch.priors.GammaPrior)
+
+    def test_no_prior_when_none(self, simple_2d_training_data):
+        model_cfg = GPModelConfig(lengthscale_prior=None)
+        model = BoTorchGPModel(
+            model_config=model_cfg,
+            train_config=BoTorchTrainConfig(num_iterations=5),
+        )
+        model.train(simple_2d_training_data)
+        base_kernel = model.model.covar_module.base_kernel
+        assert "lengthscale_prior" not in {name for name, *_ in base_kernel.named_priors()}
+
+    def test_ard_warning_with_default_prior(self, simple_2d_training_data, caplog):
+        import logging
+        model_cfg = GPModelConfig(ard=True)
+        model = BoTorchGPModel(
+            model_config=model_cfg,
+            train_config=BoTorchTrainConfig(num_iterations=5),
+        )
+        with caplog.at_level(logging.WARNING, logger="alf-tools"):
+            model.train(simple_2d_training_data)
+        assert "ARD is enabled" in caplog.text
+        assert "Hvarfner" in caplog.text
