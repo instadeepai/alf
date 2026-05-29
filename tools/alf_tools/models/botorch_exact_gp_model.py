@@ -186,6 +186,22 @@ class BoTorchGPModel(BaseModel):
         if tensor.ndim != 2:
             raise ValueError(f"Expected 2D input tensor, got shape {tensor.shape}")
 
+    def _make_kernel(self, ard_num_dims, ls_prior, ls_constraint):
+        if self.model_config.kernel_type == "matern":
+            base_kernel = MaternKernel(
+                nu=self.model_config.matern_nu,
+                ard_num_dims=ard_num_dims,
+                lengthscale_prior=ls_prior,
+                lengthscale_constraint=ls_constraint,
+            )
+        else:
+            base_kernel = RBFKernel(
+                ard_num_dims=ard_num_dims,
+                lengthscale_prior=ls_prior,
+                lengthscale_constraint=ls_constraint,
+            )
+        return base_kernel
+
     def train(
         self,
         train_data: LabelledCandidates,
@@ -259,20 +275,8 @@ class BoTorchGPModel(BaseModel):
                 self.train_X.shape[-1],
             )
 
-        if self.model_config.kernel_type == "matern":
-            base = MaternKernel(
-                nu=self.model_config.matern_nu,
-                ard_num_dims=ard_num_dims,
-                lengthscale_prior=ls_prior,
-                lengthscale_constraint=ls_constraint,
-            )
-        else:
-            base = RBFKernel(
-                ard_num_dims=ard_num_dims,
-                lengthscale_prior=ls_prior,
-                lengthscale_constraint=ls_constraint,
-            )
-        covar_module = ScaleKernel(base)
+        base_kernel = self._make_kernel(ard_num_dims, ls_prior, ls_constraint)
+        covar_module = ScaleKernel(base_kernel)
 
         outcome_transform = Standardize(m=1) if self.train_config.standardise_outputs else None
         self.model = SingleTaskGP(
