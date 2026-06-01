@@ -203,7 +203,12 @@ class TestWidth:
     def test_width_invalid_alpha_raises(self):
         """Alpha outside [0, 1] raises AssertionError."""
         with pytest.raises(AssertionError):
-            width(np.array([1.0, 2.0, 3.0]), np.array([0.5, 0.5, 0.5]), np.array([1.0, 2.0, 3.0]), alpha=1.5)
+            width(
+                np.array([1.0, 2.0, 3.0]),
+                np.array([0.5, 0.5, 0.5]),
+                np.array([1.0, 2.0, 3.0]),
+                alpha=1.5,
+            )
 
 
 class TestRegretUcbAlphaSweep:
