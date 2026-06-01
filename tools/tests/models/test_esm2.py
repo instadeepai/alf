@@ -40,9 +40,9 @@ def train_config():
     """Create a frozen ESM2TrainConfig for testing.
 
     Returns:
-        An ESM2TrainConfig with freeze_backbone=True.
+        An ESM2TrainConfig with freeze_backbone=True and linear_head=False for log-likelihood mode.
     """
-    return ESM2TrainConfig(freeze_backbone=True)
+    return ESM2TrainConfig(freeze_backbone=True, linear_head=False)
 
 
 @pytest.fixture(scope="session")
@@ -62,10 +62,10 @@ def esm2_small_batch_model():
     """Frozen ESM-2 with batch_size=2 to exercise multi-batch predict.
 
     Returns:
-        An ESM2Model with batch_size=2, frozen backbone, CPU.
+        An ESM2Model with batch_size=2, frozen backbone, linear_head=False, CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID)
-    train_cfg = ESM2TrainConfig(freeze_backbone=True, batch_size=2)
+    train_cfg = ESM2TrainConfig(freeze_backbone=True, batch_size=2, linear_head=False)
     return ESM2Model(
         name="test_esm2_small_batch", model_config=config, train_config=train_cfg, device="cpu"
     )
@@ -107,9 +107,10 @@ class TestConfigs:
         assert config.batch_size == 8
         assert config.num_epochs == 10
         assert config.log_frequency == 1
-        assert config.loss_fn == "log_likelihood"
+        assert config.linear_head is True
+        assert config.loss_fn == "mse"
         assert config.output_dim == 1
-        assert config.mlp_loss == "mse"
+        assert not hasattr(config, "mlp_loss")
         assert not hasattr(config, "loss_type")
         assert not hasattr(config, "mask_probability")
         assert not hasattr(config, "mask_splitting")
@@ -124,10 +125,10 @@ class TestConfigs:
         with pytest.raises(ValueError, match="loss_fn must be"):
             ESM2TrainConfig(loss_fn="mlm")
 
-    def test_invalid_mlp_loss_raises(self):
-        """Invalid mlp_loss raises ValueError."""
-        with pytest.raises(ValueError, match="mlp_loss"):
-            ESM2TrainConfig(loss_fn="mlp_head", mlp_loss="l1")
+    def test_old_loss_fn_values_raise(self):
+        """Old loss_fn values 'log_likelihood' and 'mlp_head' are no longer valid."""
+        with pytest.raises(ValueError, match="loss_fn must be"):
+            ESM2TrainConfig(loss_fn="mlp_head")
 
     def test_freeze_backbone_false_raises_not_implemented(self):
         """ESM2Model raises NotImplementedError when freeze_backbone=False."""
@@ -136,11 +137,11 @@ class TestConfigs:
         with pytest.raises(NotImplementedError):
             ESM2Model(name="unfrozen", model_config=config, train_config=train_cfg, device="cpu")
 
-    def test_last_hidden_state_with_mlp_head_raises(self):
-        """last_hidden_state pooling is not compatible with mlp_head mode — raises at init."""
+    def test_last_hidden_state_with_linear_head_raises(self):
+        """last_hidden_state pooling is not compatible with linear_head=True — raises at init."""
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
-        train_cfg = ESM2TrainConfig(loss_fn="mlp_head", batch_size=1)
-        with pytest.raises(ValueError, match="last_hidden_state.*mlp_head"):
+        train_cfg = ESM2TrainConfig(linear_head=True, batch_size=1)
+        with pytest.raises(ValueError, match="last_hidden_state.*linear_head"):
             ESM2Model(name="lhs_mlp", model_config=config, train_config=train_cfg, device="cpu")
 
     def test_invalid_pooling_raises(self):
@@ -284,7 +285,7 @@ class TestEmbed:
     def test_embed_last_hidden_state_shape(self, sample_data):
         """embed() with last_hidden_state pooling returns shape (n_seqs, seq_len, hidden_dim)."""
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
-        train_cfg = ESM2TrainConfig(freeze_backbone=True, batch_size=1)
+        train_cfg = ESM2TrainConfig(freeze_backbone=True, linear_head=False, batch_size=1)
         model = ESM2Model(
             name="lhs_model", model_config=config, train_config=train_cfg, device="cpu"
         )
@@ -420,53 +421,47 @@ class TestComputeLogLikelihoodLabels:
 
 @pytest.fixture
 def frozen_train_model():
-    """Function-scoped frozen ESM-2 model for TestTrainFrozen — avoids polluting session state.
+    """Function-scoped ESM-2 model with linear_head=False for TestTrainFrozen.
 
     Returns:
-        An ESM2Model with freeze_backbone=True on CPU.
+        An ESM2Model with freeze_backbone=True, linear_head=False on CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID)
-    train_cfg = ESM2TrainConfig(freeze_backbone=True)
+    train_cfg = ESM2TrainConfig(freeze_backbone=True, linear_head=False)
     return ESM2Model(
         name="test_esm2_frozen_train", model_config=config, train_config=train_cfg, device="cpu"
     )
 
 
 class TestTrainFrozen:
-    """Tests for ESM2Model.train() when freeze_backbone=True."""
+    """Tests for ESM2Model.train() when linear_head=False."""
 
-    def test_frozen_train_is_noop(self, frozen_train_model, sample_data):
-        """Test that train() does not update any weights when freeze_backbone=True."""
-        initial_params = {
-            name: param.clone() for name, param in frozen_train_model.esm_model.named_parameters()
-        }
-        frozen_train_model.train(sample_data)
-        for name, param in frozen_train_model.esm_model.named_parameters():
-            assert torch.equal(initial_params[name], param), f"Parameter {name} changed"
+    def test_train_without_linear_head_raises(self, frozen_train_model, sample_data):
+        """train() raises NotImplementedError when linear_head=False."""
+        with pytest.raises(NotImplementedError):
+            frozen_train_model.train(sample_data)
 
-    def test_frozen_epoch_metrics_empty(self, frozen_train_model, sample_data):
-        """Test that get_epoch_metrics returns an empty list after frozen train()."""
-        frozen_train_model.train(sample_data)
+    def test_epoch_metrics_empty_before_training(self, frozen_train_model):
+        """get_epoch_metrics() returns empty list before any training."""
         assert frozen_train_model.get_epoch_metrics() == []
 
-    def test_frozen_summary_metrics_empty(self, frozen_train_model, sample_data):
-        """Test that get_training_summary_metrics returns an empty dict after frozen train()."""
-        frozen_train_model.train(sample_data)
+    def test_summary_metrics_empty_before_training(self, frozen_train_model):
+        """get_training_summary_metrics() returns empty dict before any training."""
         assert frozen_train_model.get_training_summary_metrics() == {}
 
 
 @pytest.fixture(scope="module")
 def esm2_mlp_model():
-    """ESM-2 model with MLP regression head (output_dim=1, mse loss).
+    """ESM-2 model with linear regression head (output_dim=1, mse loss).
 
     Returns:
-        An ESM2Model with loss_fn='mlp_head', output_dim=1, CPU.
+        An ESM2Model with linear_head=True, loss_fn='mse', output_dim=1, CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID)
     train_cfg = ESM2TrainConfig(
-        loss_fn="mlp_head",
+        linear_head=True,
+        loss_fn="mse",
         output_dim=1,
-        mlp_loss="mse",
         num_epochs=2,
         batch_size=2,
         learning_rate=1e-3,
@@ -479,16 +474,16 @@ def esm2_mlp_model():
 
 @pytest.fixture(scope="module")
 def esm2_mlp_classification_model():
-    """ESM-2 model with MLP classification head (output_dim=2, cross_entropy loss).
+    """ESM-2 model with linear classification head (output_dim=2, cross_entropy loss).
 
     Returns:
-        An ESM2Model with loss_fn='mlp_head', output_dim=2, CPU.
+        An ESM2Model with linear_head=True, loss_fn='cross_entropy', output_dim=2, CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID)
     train_cfg = ESM2TrainConfig(
-        loss_fn="mlp_head",
+        linear_head=True,
+        loss_fn="cross_entropy",
         output_dim=2,
-        mlp_loss="cross_entropy",
         num_epochs=2,
         batch_size=2,
         learning_rate=1e-3,
@@ -524,8 +519,8 @@ class TestMLPHead:
         model_device = next(esm2_mlp_model.esm_model.parameters()).device
         assert head_device == model_device
 
-    def test_no_head_in_log_likelihood_mode(self, esm2_model):
-        """_head should be None when loss_fn is not 'mlp_head'."""
+    def test_no_head_when_linear_head_false(self, esm2_model):
+        """_head should be None when linear_head=False."""
         assert esm2_model._head is None
 
     def test_classification_head_output_dim(self, esm2_mlp_classification_model):
@@ -540,8 +535,8 @@ class TestMLPHead:
         _, _, targets = batch
         assert targets.dtype == torch.float32
 
-    def test_prepare_data_loader_no_labels_in_ll_mode(self, esm2_model, sample_data):
-        """DataLoader in log_likelihood mode yields (input_ids, attention_mask) pairs."""
+    def test_prepare_data_loader_no_labels_without_linear_head(self, esm2_model, sample_data):
+        """DataLoader without linear head yields (input_ids, attention_mask) pairs."""
         loader = esm2_model._prepare_data_loader(sample_data)
         batch = next(iter(loader))
         assert len(batch) == 2
@@ -646,7 +641,7 @@ class TestMLPHead:
         """train() with optimizer_type='adam' completes and updates head weights."""
         config = ESM2ModelConfig(model_id=MODEL_ID)
         train_cfg = ESM2TrainConfig(
-            loss_fn="mlp_head",
+            linear_head=True,
             optimizer_type="adam",
             num_epochs=1,
             batch_size=2,
@@ -662,7 +657,7 @@ class TestMLPHead:
         """train() with max_grad_norm set completes without error."""
         config = ESM2ModelConfig(model_id=MODEL_ID)
         train_cfg = ESM2TrainConfig(
-            loss_fn="mlp_head",
+            linear_head=True,
             num_epochs=1,
             batch_size=2,
             max_grad_norm=1.0,
@@ -677,7 +672,9 @@ class TestMLPHead:
     def test_batch_size_inference_different_from_batch_size(self, sample_data):
         """predict() with batch_size_inference != batch_size produces correct shape."""
         config = ESM2ModelConfig(model_id=MODEL_ID)
-        train_cfg = ESM2TrainConfig(freeze_backbone=True, batch_size=8, batch_size_inference=1)
+        train_cfg = ESM2TrainConfig(
+            freeze_backbone=True, linear_head=False, batch_size=8, batch_size_inference=1
+        )
         model = ESM2Model(
             name="bsi_test", model_config=config, train_config=train_cfg, device="cpu"
         )
@@ -689,7 +686,7 @@ class TestMLPHead:
         """log_frequency > 1 skips intermediate epochs but always records the final one."""
         config = ESM2ModelConfig(model_id=MODEL_ID)
         train_cfg = ESM2TrainConfig(
-            loss_fn="mlp_head",
+            linear_head=True,
             num_epochs=4,
             batch_size=2,
             log_frequency=3,

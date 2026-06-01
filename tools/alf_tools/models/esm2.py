@@ -79,16 +79,15 @@ class ESM2TrainConfig(BaseTrainConfig):
         num_epochs: Number of epochs to train for.
         log_frequency: Record epoch metrics every N epochs.
         max_grad_norm: Maximum norm for gradient clipping. None disables clipping.
-        loss_fn: Training scheme. 'log_likelihood' keeps the backbone frozen and makes train()
-            a no-op; predict() returns per-sequence pseudo-log-likelihood scores.
-            'mlp_head' trains a linear head on top of frozen sequence embeddings using
-            the labels provided to train().
-        output_dim: Output dimension of the MLP head. 1 for regression; N for N-class
-            classification. Only used when loss_fn='mlp_head'.
-        mlp_loss: Loss function for MLP head training. 'mse' for regression;
-            'cross_entropy' for classification. Cross-entropy expects integer class
-            labels in [0, output_dim); float labels are truncated with a warning.
-            Only used when loss_fn='mlp_head'.
+        linear_head: Whether to attach a trainable linear head on top of frozen ESM-2 embeddings.
+            True (default) enables training via loss_fn. False skips the head; predict() returns
+            per-sequence pseudo-log-likelihood scores and train() raises NotImplementedError.
+        loss_fn: Loss function for linear head training. 'mse' for regression;
+            'cross_entropy' for classification. Cross-entropy expects integer class labels in
+            [0, output_dim); float labels are truncated with a warning. Only used when
+            linear_head=True.
+        output_dim: Output dimension of the linear head. 1 for regression; N for N-class
+            classification. Only used when linear_head=True.
     """
 
     freeze_backbone: bool = True
@@ -99,9 +98,9 @@ class ESM2TrainConfig(BaseTrainConfig):
     num_epochs: int = 10
     log_frequency: int = 1
     max_grad_norm: float | None = None
-    loss_fn: Literal["log_likelihood", "mlp_head"] = "log_likelihood"
+    linear_head: bool = True
+    loss_fn: Literal["mse", "cross_entropy"] = "mse"
     output_dim: int = 1
-    mlp_loss: Literal["mse", "cross_entropy"] = "mse"
 
     def __post_init__(self) -> None:
         """Post-initialization checks for ESM2TrainConfig.
@@ -109,8 +108,7 @@ class ESM2TrainConfig(BaseTrainConfig):
         Raises:
             ValueError: If num_epochs < 1.
             ValueError: If optimizer_type is not 'adam' or 'adamw'.
-            ValueError: If loss_fn is not 'log_likelihood' or 'mlp_head'.
-            ValueError: If mlp_loss is not 'mse' or 'cross_entropy'.
+            ValueError: If loss_fn is not 'mse' or 'cross_entropy'.
         """
         if self.num_epochs < 1:
             raise ValueError(f"num_epochs must be >= 1, got {self.num_epochs}")
@@ -118,12 +116,8 @@ class ESM2TrainConfig(BaseTrainConfig):
             raise ValueError(
                 f"optimizer_type must be 'adam' or 'adamw', got {self.optimizer_type!r}"
             )
-        if self.loss_fn not in ("log_likelihood", "mlp_head"):
-            raise ValueError(
-                f"loss_fn must be 'log_likelihood' or 'mlp_head', got {self.loss_fn!r}"
-            )
-        if self.mlp_loss not in ("mse", "cross_entropy"):
-            raise ValueError(f"mlp_loss must be 'mse' or 'cross_entropy', got {self.mlp_loss!r}")
+        if self.loss_fn not in ("mse", "cross_entropy"):
+            raise ValueError(f"loss_fn must be 'mse' or 'cross_entropy', got {self.loss_fn!r}")
 
 
 class ESM2Model(BaseModel):
@@ -131,8 +125,8 @@ class ESM2Model(BaseModel):
 
     Loads a pre-trained ESM-2 checkpoint from HuggingFace and exposes it as a
     BaseModel. The backbone is always frozen. predict() returns per-sequence
-    pseudo-log-likelihood scores (loss_fn='log_likelihood') or passes embeddings
-    through a linear head (loss_fn='mlp_head'). embed() returns per-sequence embeddings.
+    pseudo-log-likelihood scores (linear_head=False) or passes embeddings through a
+    trainable linear head (linear_head=True). embed() returns per-sequence embeddings.
     """
 
     def __init__(
@@ -190,7 +184,7 @@ class ESM2Model(BaseModel):
         self._validate_esm_config()
 
         self._head: torch.nn.Linear | None = None
-        if self.train_config.loss_fn == "mlp_head":
+        if self.train_config.linear_head:
             hidden_dim = self.esm_model.config.hidden_size
             self._head = torch.nn.Linear(hidden_dim, self.train_config.output_dim)
             self._head.to(self.device)
@@ -225,13 +219,10 @@ class ESM2Model(BaseModel):
                 "concatenated across mini-batches. Set both to 1 or "
                 "use pooling='mean' or pooling='cls' instead."
             )
-        if (
-            self.model_config.pooling == "last_hidden_state"
-            and self.train_config.loss_fn == "mlp_head"
-        ):
+        if self.model_config.pooling == "last_hidden_state" and self.train_config.linear_head:
             raise ValueError(
-                "pooling='last_hidden_state' is not supported with loss_fn='mlp_head'. "
-                "The MLP head requires a fixed-size embedding. "
+                "pooling='last_hidden_state' is not supported with linear_head=True. "
+                "The linear head requires a fixed-size embedding. "
                 "Use pooling='mean' or pooling='cls' instead."
             )
 
@@ -291,9 +282,9 @@ class ESM2Model(BaseModel):
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Compute predictions for the given candidates.
 
-        In 'log_likelihood' mode: masks all non-special tokens and returns per-sequence
+        When linear_head=False: masks all non-special tokens and returns per-sequence
         pseudo-log-likelihood scores (higher = more probable to the model).
-        In 'mlp_head' mode: embeds sequences through the frozen backbone and passes
+        When linear_head=True: embeds sequences through the frozen backbone and passes
         them through the linear head. Returns regression values (output_dim=1) or
         argmax class indices (output_dim>1).
 
@@ -305,7 +296,7 @@ class ESM2Model(BaseModel):
 
         Raises:
             ValueError: If candidate_points is empty.
-            RuntimeError: If loss_fn='mlp_head' but the head is uninitialised
+            RuntimeError: If linear_head=True but the head is uninitialised
                 (should not happen if __init__ ran without error).
         """
         if not candidate_points:
@@ -318,11 +309,9 @@ class ESM2Model(BaseModel):
 
         self.esm_model.eval()
 
-        if self.train_config.loss_fn == "mlp_head":
+        if self.train_config.linear_head:
             if self._head is None:
-                raise RuntimeError(
-                    "_head is None; model was not configured with loss_fn='mlp_head'"
-                )
+                raise RuntimeError("_head is None; model was not configured with linear_head=True")
             self._head.eval()
             all_preds: list[torch.Tensor] = []
             with torch.no_grad():
@@ -420,23 +409,23 @@ class ESM2Model(BaseModel):
         """Create a DataLoader for training or validation.
 
         Args:
-            data: LabelledCandidates containing sequences and (for mlp_head mode) labels.
+            data: LabelledCandidates containing sequences and (for linear_head=True) labels.
             shuffle: Whether to shuffle the dataset.
 
         Returns:
-            DataLoader yielding (input_ids, attention_mask) pairs in log_likelihood mode,
-            or (input_ids, attention_mask, targets) triples in mlp_head mode.
+            DataLoader yielding (input_ids, attention_mask) pairs when linear_head=False,
+            or (input_ids, attention_mask, targets) triples when linear_head=True.
         """
         batch = self.featurise(data)
-        if self.train_config.loss_fn == "mlp_head":
+        if self.train_config.linear_head:
             targets = torch.tensor(data.labels, dtype=torch.float32)
-            if self.train_config.mlp_loss == "cross_entropy":
+            if self.train_config.loss_fn == "cross_entropy":
                 labels_arr = np.asarray(data.labels)
                 if not np.all(labels_arr == labels_arr.astype(int)):
                     logger.warning(
-                        "mlp_loss='cross_entropy' expects integer class labels. "
+                        "loss_fn='cross_entropy' expects integer class labels. "
                         "Non-integer values will be truncated (e.g., 2.7 → 2). "
-                        "Pass integer labels or switch to mlp_loss='mse' for regression."
+                        "Pass integer labels or switch to loss_fn='mse' for regression."
                     )
             dataset = TensorDataset(batch["input_ids"], batch["attention_mask"], targets)
         else:
@@ -531,7 +520,7 @@ class ESM2Model(BaseModel):
             ValueError: If the DataLoader produces no batches.
         """
         if self._head is None:
-            raise RuntimeError("_head is None; model was not configured with loss_fn='mlp_head'")
+            raise RuntimeError("_head is None; model was not configured with linear_head=True")
         self.esm_model.eval()
         self._head.train()
         epoch_losses: list[float] = []
@@ -553,7 +542,7 @@ class ESM2Model(BaseModel):
             optimizer.zero_grad()
             preds = self._head(embeddings)
 
-            if self.train_config.mlp_loss == "mse":
+            if self.train_config.loss_fn == "mse":
                 loss = torch.nn.functional.mse_loss(preds.squeeze(-1), batch_targets)
             else:  # cross_entropy
                 loss = torch.nn.functional.cross_entropy(preds, batch_targets.long())
@@ -588,11 +577,11 @@ class ESM2Model(BaseModel):
             Tuple of (average_loss, empty metrics_dict).
 
         Raises:
-            RuntimeError: If the model was not configured with loss_fn='mlp_head'.
+            RuntimeError: If the model was not configured with linear_head=True.
             ValueError: If the DataLoader produces no batches.
         """
         if self._head is None:
-            raise RuntimeError("_head is None; model was not configured with loss_fn='mlp_head'")
+            raise RuntimeError("_head is None; model was not configured with linear_head=True")
         self.esm_model.eval()
         self._head.eval()
         val_losses: list[float] = []
@@ -612,7 +601,7 @@ class ESM2Model(BaseModel):
                 embeddings = self._pool_hidden_state(hidden_state, batch_mask)
 
                 preds = self._head(embeddings)
-                if self.train_config.mlp_loss == "mse":
+                if self.train_config.loss_fn == "mse":
                     loss = torch.nn.functional.mse_loss(preds.squeeze(-1), batch_targets)
                 else:
                     loss = torch.nn.functional.cross_entropy(preds, batch_targets.long())
@@ -676,32 +665,37 @@ class ESM2Model(BaseModel):
     def train(
         self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None
     ) -> None:
-        """Fine-tune the MLP head using the configured training objective.
+        """Fine-tune the linear head using the configured loss function.
 
-        When loss_fn='log_likelihood', train() is a no-op (backbone is frozen and
-        scoring is done via pseudo-log-likelihood at predict time).
-        When loss_fn='mlp_head', trains the linear head on top of frozen embeddings.
+        When linear_head=False, train() raises NotImplementedError (predict uses
+        pseudo-log-likelihood scoring). When linear_head=True, trains the linear head
+        on top of frozen embeddings.
 
         Args:
             train_data: Training data containing sequences and labels.
             val_data: Optional validation data for monitoring training loss.
 
         Raises:
+            NotImplementedError: If linear_head=False.
             AssertionError: If optimizer_type is invalid (unreachable if __post_init__ ran).
-            RuntimeError: If configured with loss_fn='mlp_head' but head is uninitialised.
+            RuntimeError: If linear_head=True but head is uninitialised.
         """
+        if not self.train_config.linear_head:
+            raise NotImplementedError(
+                "train() requires linear_head=True. "
+                "Set linear_head=True in ESM2TrainConfig to enable training a linear head, "
+                "or use predict() for pseudo-log-likelihood scoring without training."
+            )
+
         self._epoch_metrics = []
         self.training_metrics = {}
-
-        if self.train_config.loss_fn == "log_likelihood":
-            return
 
         logger.info(
             f"Fine-tuning ESM-2 ({self.model_config.model_id}) with {len(train_data)} sequences"
         )
 
         if self._head is None:
-            raise RuntimeError("_head is None; model was not configured with loss_fn='mlp_head'")
+            raise RuntimeError("_head is None; model was not configured with linear_head=True")
 
         train_loader = self._prepare_data_loader(train_data, shuffle=True)
         val_loader = None
