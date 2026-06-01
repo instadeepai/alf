@@ -116,6 +116,7 @@ and provides:
 **Key Methods:**
 - `fit()`: Trains the surrogate on train/validation data
 - `predict()`: Generates predictions (means and uncertainties) for candidates
+- `featurise()`: Returns feature representations for candidates or `LabelledCandidates` by delegating to the underlying model — used by diversity-based acquisition functions such as `CoreSet`
 - `get_training_summary_metrics()`: Returns training metrics
 
 ### 4. Oracle (`Oracle`)
@@ -149,6 +150,7 @@ Acquisition functions determine which candidates are most promising to evaluate.
 score candidates based on:
 
 - Surrogate model predictions (means and uncertainties)
+- Model feature representations (for diversity-based selection)
 - Current task state (training data, round number, etc.)
 
 **Common Acquisition Functions:**
@@ -156,6 +158,7 @@ score candidates based on:
 - **UCB (Upper Confidence Bound)**: Balances exploitation and exploration
 - **Expected Improvement**: Selects candidates with highest expected improvement
 - **Thompson Sampling**: Uses Bayesian sampling for exploration
+- **CoreSet**: Greedy k-centres selection maximising input-space coverage — calls `state.surrogate.featurise()` rather than `predict()`, so it is independent of model uncertainty estimates
 
 ### 7. Search Strategy (`BaseSearch`)
 
@@ -338,9 +341,11 @@ The zero-shot task evaluates a pre-trained or untrained model without training:
 
 ## Evaluation Metrics
 
-ALF provides comprehensive utilities for evaluating surrogate model and campaign performance through
-the `utils/metrics/` package. Metrics are automatically registered at import time and categorised by
-domain.
+ALF provides utilities for evaluating model predictions through two metric registries
+(see `utils/metrics.py`). The active registry is selected automatically by `Results` based on
+the dataset's `problem_type`.
+
+### Regression Metrics (`ProblemType.REGRESSION`)
 
 **Regression — Accuracy Metrics** (no variance required, `utils/metrics/regression.py`):
 - **MSE**: Mean Squared Error between predictions and targets
@@ -372,8 +377,21 @@ domain.
 - **AUC-ROC**: Area under the ROC curve (binary or multiclass one-vs-rest)
 
 All classification metrics accept `(probs, targets)` where `probs` has shape `(n_samples, num_classes)`.
+Regression metrics accept predictions (means, variances, targets) and return a dictionary of
+computed values. Metrics requiring variance will validate that uncertainty estimates are provided.
 
 > **Normalisation and metrics:** When `standardise_outputs=True` in the model's train config,
 > predictions are inverse-transformed back to the original label scale before metrics are computed.
 > Metrics therefore always reflect performance in original label units, regardless of whether
 > output standardisation was used during training.
+
+### Classification Metrics (`ProblemType.BINARY` and `ProblemType.MULTICLASS`)
+
+- **Accuracy**: Classification accuracy (fraction of correct predictions)
+- **F1**: Macro-averaged F1 score
+- **Precision**: Macro-averaged precision
+- **Recall**: Macro-averaged recall
+- **AUC-ROC**: Area under the ROC curve (binary or one-vs-rest for multiclass)
+
+Classification metrics accept class probability arrays (shape `(n_samples, n_classes)`) and
+integer target labels.

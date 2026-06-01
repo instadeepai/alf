@@ -251,6 +251,12 @@ class TestCNNModelSurrogateEpochMetrics:
         for em in cnn_model.get_epoch_metrics():
             assert em.val_loss is None
 
+    def test_train_with_val_data_none(self, cnn_model, sample_data):
+        """Passing val_data=None must complete without error and produce no val_loss."""
+        cnn_model.train(sample_data, val_data=None)
+        for em in cnn_model.get_epoch_metrics():
+            assert em.val_loss is None
+
     def test_get_epoch_metrics_before_train_returns_empty(self, cnn_model):
         """get_epoch_metrics() before any training must return an empty list."""
         assert cnn_model.get_epoch_metrics() == []
