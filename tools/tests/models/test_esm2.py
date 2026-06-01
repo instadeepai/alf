@@ -57,7 +57,7 @@ def esm2_model(model_config, train_config):
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def esm2_finetune_model():
     """ESM-2 model with unfrozen backbone for log-likelihood fine-tuning tests.
 
@@ -76,7 +76,7 @@ def esm2_finetune_model():
     return ESM2Model(name="test_esm2_ft", model_config=config, train_config=train_cfg, device="cpu")
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def esm2_ll_model():
     """ESM-2 model configured for log-likelihood training.
 
@@ -179,6 +179,18 @@ class TestConfigs:
         with pytest.raises(ValueError, match="last_hidden_state.*mlp_head"):
             ESM2Model(name="lhs_mlp", model_config=config, train_config=train_cfg, device="cpu")
 
+    def test_invalid_pooling_raises(self):
+        """ESM2ModelConfig with an invalid pooling strategy raises ValueError."""
+        with pytest.raises(ValueError, match="pooling must be"):
+            ESM2ModelConfig(model_id=MODEL_ID, pooling="max")  # type: ignore[arg-type]
+
+    def test_repr_layer_out_of_range_raises(self):
+        """ESM2Model raises ValueError when repr_layer is out of range for the model."""
+        config = ESM2ModelConfig(model_id=MODEL_ID, repr_layer=999)
+        train_cfg = ESM2TrainConfig(freeze_backbone=True)
+        with pytest.raises(ValueError, match="repr_layer.*out of range"):
+            ESM2Model(name="bad_layer", model_config=config, train_config=train_cfg, device="cpu")
+
 
 class TestFeaturise:
     """Tests for ESM2Model.featurise()."""
@@ -211,6 +223,12 @@ class TestFeaturise:
         result = esm2_model.featurise(sample_data)
         assert result["input_ids"].device.type == "cpu"
         assert result["attention_mask"].device.type == "cpu"
+
+    def test_non_string_candidate_data_raises(self, esm2_model):
+        """featurise() raises ValueError when Candidate.data is not a string."""
+        bad_candidate = Candidate(data=123, modality="sequence")  # type: ignore[arg-type]
+        with pytest.raises(ValueError, match="Expected string sequences"):
+            esm2_model.featurise([bad_candidate])
 
 
 class TestPredict:
@@ -669,7 +687,7 @@ class TestTrainLogLikelihood:
             )
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def esm2_mlp_model():
     """ESM-2 model with MLP regression head (output_dim=1, mse loss).
 
@@ -691,7 +709,7 @@ def esm2_mlp_model():
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def esm2_mlp_unfrozen_model():
     """ESM-2 model with MLP regression head and unfrozen backbone.
 
@@ -714,7 +732,7 @@ def esm2_mlp_unfrozen_model():
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def esm2_mlp_classification_model():
     """ESM-2 model with MLP classification head (output_dim=2, cross_entropy loss).
 
@@ -838,13 +856,16 @@ class TestMLPHead:
         assert np.isfinite(summary["final_train_loss"])
 
     def test_mlp_val_loss_recorded_when_val_data_provided(self, esm2_mlp_model, sample_data):
-        """val_loss is recorded in epoch metrics when val_data is provided."""
+        """val_loss is recorded in epoch metrics and final summary when val_data is provided."""
         val_candidates = [Candidate(data="ACDEFGHIKL", modality="sequence")]
         val_data = LabelledCandidates(val_candidates, np.array([1.0]))
         esm2_mlp_model.train(sample_data, val_data=val_data)
         for m in esm2_mlp_model.get_epoch_metrics():
             assert m.val_loss is not None
             assert np.isfinite(m.val_loss)
+        summary = esm2_mlp_model.get_training_summary_metrics()
+        assert "final_val_loss" in summary
+        assert np.isfinite(summary["final_val_loss"])
 
     def test_mlp_cross_entropy_train_updates_head(self, esm2_mlp_classification_model):
         """train() with cross_entropy loss and integer labels updates the head."""
@@ -894,3 +915,64 @@ class TestMLPHead:
         assert preds.means.shape == (len(sample_data),)
         assert np.all(preds.means >= 0)
         assert np.all(preds.means < 2)  # output_dim=2
+
+    def test_mlp_adam_optimizer_trains(self, sample_data):
+        """train() with optimizer_type='adam' completes and updates head weights."""
+        config = ESM2ModelConfig(model_id=MODEL_ID)
+        train_cfg = ESM2TrainConfig(
+            loss_type="mlp_head",
+            optimizer_type="adam",
+            num_epochs=1,
+            batch_size=2,
+        )
+        model = ESM2Model(
+            name="adam_test", model_config=config, train_config=train_cfg, device="cpu"
+        )
+        initial_weight = model._head.weight.clone()
+        model.train(sample_data)
+        assert not torch.equal(initial_weight, model._head.weight)
+
+    def test_max_grad_norm_does_not_crash_training(self, sample_data):
+        """train() with max_grad_norm set completes without error."""
+        config = ESM2ModelConfig(model_id=MODEL_ID)
+        train_cfg = ESM2TrainConfig(
+            freeze_backbone=False,
+            loss_type="log_likelihood",
+            num_epochs=1,
+            batch_size=2,
+            max_grad_norm=1.0,
+        )
+        model = ESM2Model(
+            name="grad_clip_test", model_config=config, train_config=train_cfg, device="cpu"
+        )
+        model.train(sample_data)
+        summary = model.get_training_summary_metrics()
+        assert np.isfinite(summary["final_train_loss"])
+
+    def test_batch_size_inference_different_from_batch_size(self, sample_data):
+        """predict() with batch_size_inference != batch_size produces correct shape."""
+        config = ESM2ModelConfig(model_id=MODEL_ID)
+        train_cfg = ESM2TrainConfig(freeze_backbone=True, batch_size=8, batch_size_inference=1)
+        model = ESM2Model(
+            name="bsi_test", model_config=config, train_config=train_cfg, device="cpu"
+        )
+        predictions = model.predict(sample_data.candidates)
+        assert predictions.means.shape == (len(sample_data),)
+        assert np.all(np.isfinite(predictions.means))
+
+    def test_log_frequency_skips_intermediate_epochs(self, sample_data):
+        """log_frequency > 1 skips intermediate epochs but always records the final one."""
+        config = ESM2ModelConfig(model_id=MODEL_ID)
+        train_cfg = ESM2TrainConfig(
+            freeze_backbone=False,
+            loss_type="log_likelihood",
+            num_epochs=4,
+            batch_size=2,
+            log_frequency=3,
+        )
+        model = ESM2Model(
+            name="log_freq_test", model_config=config, train_config=train_cfg, device="cpu"
+        )
+        model.train(sample_data)
+        # Epochs logged: epoch 3 (index 2, (2+1)%3==0) and epoch 4 (index 3, last)
+        assert len(model.get_epoch_metrics()) == 2

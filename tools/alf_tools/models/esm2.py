@@ -52,6 +52,17 @@ class ESM2ModelConfig:
     repr_layer: int = -1
     max_length: int | None = None
 
+    def __post_init__(self) -> None:
+        """Validate ESM2ModelConfig fields.
+
+        Raises:
+            ValueError: If pooling is not a recognised strategy.
+        """
+        if self.pooling not in ("mean", "cls", "last_hidden_state"):
+            raise ValueError(
+                f"pooling must be 'mean', 'cls', or 'last_hidden_state', got {self.pooling!r}"
+            )
+
 
 @dataclass
 class ESM2TrainConfig(BaseTrainConfig):
@@ -151,8 +162,11 @@ class ESM2Model(BaseModel):
         self.name = name
         self.model_config = model_config
         self.train_config = train_config or ESM2TrainConfig()
-        if self.train_config.batch_size_inference is None:
-            self.train_config.batch_size_inference = self.train_config.batch_size
+        self._batch_size_inference = (
+            self.train_config.batch_size_inference
+            if self.train_config.batch_size_inference is not None
+            else self.train_config.batch_size
+        )
         self._validate_model_config()
         self.device = get_device(device)
 
@@ -196,7 +210,7 @@ class ESM2Model(BaseModel):
             )
 
     def _validate_model_config(self) -> None:
-        bsi = self.train_config.batch_size_inference or self.train_config.batch_size
+        bsi = self._batch_size_inference
         if self.model_config.pooling == "last_hidden_state" and (
             self.train_config.batch_size > 1 or bsi > 1
         ):
@@ -242,6 +256,15 @@ class ESM2Model(BaseModel):
                     f"Expected string sequences, got {type(seq).__name__!r}. "
                     "Ensure Candidate.data contains amino acid sequence strings."
                 )
+
+        effective_max = self.max_length - 2  # account for CLS and EOS tokens
+        if any(len(seq) > effective_max for seq in sequences):
+            logger.warning(
+                "One or more sequences exceed max_length=%d (after reserving 2 positions for "
+                "CLS/EOS tokens). They will be silently truncated, which may affect "
+                "log-likelihood scores. Increase ESM2ModelConfig.max_length to avoid this.",
+                self.max_length,
+            )
 
         encoding = self.tokeniser(
             sequences,
@@ -303,8 +326,7 @@ class ESM2Model(BaseModel):
         all_attention_mask = batch["attention_mask"]
 
         log_likelihoods: list[float] = []
-        batch_size = self.train_config.batch_size_inference
-        assert batch_size is not None
+        batch_size = self._batch_size_inference
 
         self.esm_model.eval()
         with torch.no_grad():
@@ -349,15 +371,18 @@ class ESM2Model(BaseModel):
         Returns:
             Predictions with regression values (output_dim=1) or argmax class indices
             (output_dim>1). variances is None.
+
+        Raises:
+            RuntimeError: If the model was not configured with loss_type='mlp_head'.
         """
-        assert self._head is not None
+        if self._head is None:
+            raise RuntimeError("_head is None; model was not configured with loss_type='mlp_head'")
         batch = self.featurise(candidate_points)
         all_input_ids = batch["input_ids"]
         all_attention_mask = batch["attention_mask"]
 
         all_preds: list[torch.Tensor] = []
-        batch_size = self.train_config.batch_size_inference
-        assert batch_size is not None
+        batch_size = self._batch_size_inference
 
         self.esm_model.eval()
         self._head.eval()
@@ -412,8 +437,7 @@ class ESM2Model(BaseModel):
         all_attention_mask = batch["attention_mask"]
 
         all_embeddings: list[torch.Tensor] = []
-        batch_size = self.train_config.batch_size_inference
-        assert batch_size is not None
+        batch_size = self._batch_size_inference
 
         self.esm_model.eval()
         with torch.no_grad():
@@ -461,6 +485,7 @@ class ESM2Model(BaseModel):
         return DataLoader(dataset, batch_size=self.train_config.batch_size, shuffle=shuffle)
 
     def _special_tokens_mask(self, input_ids: torch.Tensor) -> torch.Tensor:
+        """Return a boolean tensor True at positions occupied by CLS, EOS, PAD, or UNK tokens."""
         special_ids = {
             self.tokeniser.cls_token_id,
             self.tokeniser.eos_token_id,
@@ -530,9 +555,9 @@ class ESM2Model(BaseModel):
         correct_tokens = 0
         total_tokens = 0
 
-        for raw_ids, raw_mask in train_loader:
-            batch_ids = raw_ids.to(self.device)
-            batch_mask = raw_mask.to(self.device)
+        for input_ids, attention_mask in train_loader:
+            batch_ids = input_ids.to(self.device)
+            batch_mask = attention_mask.to(self.device)
 
             masked_ids, labels = self._compute_log_likelihood_labels(batch_ids)
 
@@ -585,6 +610,9 @@ class ESM2Model(BaseModel):
             Tuple of (average_loss, metrics_dict) where metrics_dict contains
             perplexity and token_accuracy over all labeled positions.
             When loss_type='log_likelihood', also includes log_likelihood = -avg_loss.
+
+        Raises:
+            ValueError: If the DataLoader produces no batches.
         """
         self.esm_model.eval()
         val_losses: list[float] = []
@@ -592,9 +620,9 @@ class ESM2Model(BaseModel):
         total_tokens = 0
 
         with torch.no_grad():
-            for raw_ids, raw_mask in val_loader:
-                batch_ids = raw_ids.to(self.device)
-                batch_mask = raw_mask.to(self.device)
+            for input_ids, attention_mask in val_loader:
+                batch_ids = input_ids.to(self.device)
+                batch_mask = attention_mask.to(self.device)
 
                 masked_ids, labels = self._compute_log_likelihood_labels(batch_ids)
 
@@ -610,6 +638,11 @@ class ESM2Model(BaseModel):
                 correct_tokens += (preds == labels[labeled_positions]).sum().item()
                 total_tokens += labeled_positions.sum().item()
 
+        if not val_losses:
+            raise ValueError(
+                "Validation DataLoader produced no batches. Ensure val_data is non-empty "
+                "and batch_size does not exceed the number of validation sequences."
+            )
         avg_val_loss = float(np.mean(val_losses))
         token_accuracy = correct_tokens / total_tokens if total_tokens > 0 else 0.0
         val_metrics: dict[str, float] = {
@@ -642,7 +675,8 @@ class ESM2Model(BaseModel):
             RuntimeError: If the loss becomes NaN or infinite.
             ValueError: If the DataLoader produces no batches.
         """
-        assert self._head is not None
+        if self._head is None:
+            raise RuntimeError("_head is None; model was not configured with loss_type='mlp_head'")
         if self.train_config.freeze_backbone:
             self.esm_model.eval()
         else:
@@ -650,9 +684,9 @@ class ESM2Model(BaseModel):
         self._head.train()
         epoch_losses: list[float] = []
 
-        for raw_ids, raw_mask, targets in train_loader:
-            batch_ids = raw_ids.to(self.device)
-            batch_mask = raw_mask.to(self.device)
+        for input_ids, attention_mask, targets in train_loader:
+            batch_ids = input_ids.to(self.device)
+            batch_mask = attention_mask.to(self.device)
             batch_targets = targets.to(self.device)
 
             ctx = torch.no_grad() if self.train_config.freeze_backbone else contextlib.nullcontext()
@@ -708,16 +742,21 @@ class ESM2Model(BaseModel):
 
         Returns:
             Tuple of (average_loss, empty metrics_dict).
+
+        Raises:
+            RuntimeError: If the model was not configured with loss_type='mlp_head'.
+            ValueError: If the DataLoader produces no batches.
         """
-        assert self._head is not None
+        if self._head is None:
+            raise RuntimeError("_head is None; model was not configured with loss_type='mlp_head'")
         self.esm_model.eval()  # always eval during validation regardless of freeze_backbone
         self._head.eval()
         val_losses: list[float] = []
 
         with torch.no_grad():
-            for raw_ids, raw_mask, targets in val_loader:
-                batch_ids = raw_ids.to(self.device)
-                batch_mask = raw_mask.to(self.device)
+            for input_ids, attention_mask, targets in val_loader:
+                batch_ids = input_ids.to(self.device)
+                batch_mask = attention_mask.to(self.device)
                 batch_targets = targets.to(self.device)
 
                 outputs = self.esm_model(
@@ -739,6 +778,10 @@ class ESM2Model(BaseModel):
                     loss = torch.nn.functional.cross_entropy(preds, batch_targets.long())
                 val_losses.append(loss.item())
 
+        if not val_losses:
+            raise ValueError(
+                "MLP validation DataLoader produced no batches. Ensure val_data is non-empty."
+            )
         avg_loss = float(np.mean(val_losses))
         return avg_loss, {}
 
@@ -796,12 +839,13 @@ class ESM2Model(BaseModel):
     ) -> None:
         """Fine-tune the ESM-2 backbone using the configured training objective.
 
-        Raises:
-            AssertionError: Unreachable — if optimizer_type bypasses __post_init__ validation.
-
         Args:
             train_data: Training data containing sequences.
             val_data: Optional validation data for monitoring training loss.
+
+        Raises:
+            AssertionError: If optimizer_type is invalid (unreachable if __post_init__ ran).
+            RuntimeError: If configured with loss_type='mlp_head' but head is uninitialised.
         """
         self._epoch_metrics = []
         self.training_metrics = {}
@@ -821,7 +865,10 @@ class ESM2Model(BaseModel):
 
         # Setup training
         if self.train_config.loss_type == "mlp_head":
-            assert self._head is not None
+            if self._head is None:
+                raise RuntimeError(
+                    "_head is None; model was not configured with loss_type='mlp_head'"
+                )
             if self.train_config.freeze_backbone:
                 params_to_optimize = self._head.parameters()
             else:
