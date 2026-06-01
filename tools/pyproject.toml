@@ -11,7 +11,7 @@ requires-python = ">=3.12"
 dependencies = [
     "alf_core",
     "requests>=2.25.0",
-    "huggingface_hub==0.27.0",
+    "huggingface_hub>=1.5.0",
     "jaxtyping>=0.3.5",
     "torch>=2.10.0",
     "gpytorch>=1.9.0",
@@ -19,6 +19,11 @@ dependencies = [
     "transformers>=4.36.0",
     "accelerate>=0.26.0",
     "botorch>=0.17.0",
+]
+
+[project.optional-dependencies]
+chemprop = [
+    "chemprop>=2.0.0,<3.0.0",
 ]
 
 [tool.setuptools.packages.find]
