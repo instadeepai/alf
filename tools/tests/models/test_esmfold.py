@@ -18,13 +18,18 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 import torch
-from alf_core import Candidate, Predictions
-from alf_core.dataclasses import LabelledCandidates, State
-from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
-from alf_core.model.base_model import BaseModel
-from alf_core.oracle.oracle import Oracle
-from alf_core.surrogate.surrogate import Surrogate
-from alf_core.utils.enums import ProblemType
+from alf_core import (
+    BaseDataset,
+    BaseDatasetConfig,
+    BaseModel,
+    Candidate,
+    LabelledCandidates,
+    Oracle,
+    Predictions,
+    ProblemType,
+    State,
+    Surrogate,
+)
 from alf_tools.models.esmfold import ESMFoldModel, ESMFoldModelConfig
 
 MOCK_PTM = 0.7
@@ -685,7 +690,7 @@ class TestESMFoldPLDDTResidueWeighting:
                 plddt = torch.zeros(1, 2, 37, dtype=torch.float32)
                 plddt[0, 0, 0] = 1.0
                 atom_exists = torch.zeros(1, 2, 37, dtype=torch.bool)
-                atom_exists[0, 0, 0] = True   # residue 0: 1 atom
+                atom_exists[0, 0, 0] = True  # residue 0: 1 atom
                 atom_exists[0, 1, 1:] = True  # residue 1: 36 atoms
                 out.plddt = plddt
                 out.atom37_atom_exists = atom_exists

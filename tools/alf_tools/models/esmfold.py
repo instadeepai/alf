@@ -221,8 +221,8 @@ class ESMFoldModel(BaseModel):
                             "attention mask after tokenization."
                         )
                     plddt_scores[dest] = (
-                        (residue_plddt * seq_mask).sum(dim=1) / residue_count
-                    ).cpu().numpy()
+                        ((residue_plddt * seq_mask).sum(dim=1) / residue_count).cpu().numpy()
+                    )
 
         if metric == "ptm":
             means = ptm_scores
