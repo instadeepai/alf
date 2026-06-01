@@ -904,6 +904,32 @@ def _label_smiles(
     return LabelledCandidates(candidates=candidates, labels=np.array(labels, dtype=float))
 
 
+def _label_smiles_benchmark(
+    smiles_list: list[str],
+    scorer: Callable[[str], float],
+    modality: "Modality | str",
+) -> LabelledCandidates:
+    """Score SMILES using a benchmark task scorer, skipping invalid SMILES.
+
+    Args:
+        smiles_list: Raw SMILES strings to process.
+        scorer: Benchmark task scoring function; returns a float in [0, 1].
+        modality: Modality to assign to each Candidate.
+
+    Returns:
+        LabelledCandidates with 1D labels of shape (N,). Candidates have empty features.
+    """
+    candidates = []
+    labels = []
+    for smiles in smiles_list:
+        if _mol_from_smiles(smiles) is None:
+            logger.warning("Skipping invalid SMILES: %r", smiles)
+            continue
+        candidates.append(Candidate(data=smiles, modality=modality, features={}))
+        labels.append(scorer(smiles))
+    return LabelledCandidates(candidates=candidates, labels=np.array(labels, dtype=float))
+
+
 class GuacaMol(BaseDataset):
     """GuacaMol dataset for physicochemical property prediction on drug-like molecules.
 
@@ -954,20 +980,16 @@ class GuacaMol(BaseDataset):
         )
 
     def load_dataset(self) -> LabelledCandidates:
-        """Load GuacaMol SMILES and compute physicochemical property labels via RDKit.
+        """Load GuacaMol SMILES and compute labels via RDKit.
 
         Returns:
-            LabelledCandidates with SMILES candidates and 1D property labels.
+            LabelledCandidates with SMILES candidates and 1D labels.
 
         Raises:
-            NotImplementedError: If target_property is a benchmark task.
             FileNotFoundError: If the corpus cannot be downloaded.
         """
         if self.config.task_type == "benchmark_task":
-            raise NotImplementedError(
-                f"GuacaMol goal-directed task '{self.config.target_property}' is not yet "
-                "implemented. Only physicochemical properties are currently supported."
-            )
+            return self._load_benchmark_task()
         if self.config.split_mode == "paper":
             return self._load_paper_splits()
         return self._load_single_file()
@@ -1027,6 +1049,59 @@ class GuacaMol(BaseDataset):
                 len(smiles_list),
                 len(split_lc.candidates),
             )
+            self._paper_splits[tag_to_key[tag]] = split_lc
+            all_candidates.extend(split_lc.candidates)
+            all_labels.extend(split_lc.labels.tolist())
+        return LabelledCandidates(
+            candidates=all_candidates, labels=np.array(all_labels, dtype=float)
+        )
+
+    def _load_benchmark_task(self) -> LabelledCandidates:
+        """Load corpus and score each valid SMILES using the benchmark task scorer."""
+        scorer = get_task_scorer(cast(GuacaMolTaskName, self.config.target_property))
+        if self.config.split_mode == "paper":
+            return self._load_paper_splits_benchmark(scorer)
+        return self._load_single_file_benchmark(scorer)
+
+    def _load_single_file_benchmark(
+        self, scorer: Callable[[str], float]
+    ) -> LabelledCandidates:
+        """Download (if absent) and score the combined corpus file."""
+        entry_info_all = GUACAMOL_FILES["ALL"]
+        filepath = _download_file(
+            entry_info_all["url"],
+            self.config.data_dir / entry_info_all["name"],
+            self.config.max_molecules,
+            sha256=entry_info_all.get("sha256"),
+        )
+        smiles_list = _load_smiles_file(filepath)
+        if self.config.max_molecules is not None:
+            smiles_list = smiles_list[: self.config.max_molecules]
+        return _label_smiles_benchmark(smiles_list, scorer, self.modality)
+
+    def _load_paper_splits_benchmark(
+        self, scorer: Callable[[str], float]
+    ) -> LabelledCandidates:
+        """Download (if absent) train/valid/test files and score all candidates.
+
+        Stores the three splits in ``self._paper_splits``.
+        """
+        split_files = {k: v for k, v in GUACAMOL_FILES.items() if k != "ALL"}
+        tag_to_key = {"TRAIN": "train", "VALID": "validation", "TEST": "test"}
+        self._paper_splits = {}
+        all_candidates: list[Candidate] = []
+        all_labels: list[float] = []
+        for tag, entry_info in split_files.items():
+            filepath = _download_file(
+                entry_info["url"],
+                self.config.data_dir / entry_info["name"],
+                self.config.max_molecules,
+                sha256=entry_info.get("sha256"),
+            )
+            smiles_list = _load_smiles_file(filepath)
+            if self.config.max_molecules is not None:
+                smiles_list = smiles_list[: self.config.max_molecules]
+            split_lc = _label_smiles_benchmark(smiles_list, scorer, self.modality)
             self._paper_splits[tag_to_key[tag]] = split_lc
             all_candidates.extend(split_lc.candidates)
             all_labels.extend(split_lc.labels.tolist())

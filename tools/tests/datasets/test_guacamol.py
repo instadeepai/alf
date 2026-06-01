@@ -376,12 +376,6 @@ class TestGuacaMolSingleFileLoad:
         assert dataset._raw_dataset is not None
         assert len(dataset._raw_dataset) <= 3
 
-    def test_benchmark_task_target_raises_not_implemented(self, tmp_path):
-        """NotImplementedError is raised when target_property is a benchmark task."""
-        config = _base_config(data_dir=tmp_path, target_property="celecoxib_rediscovery")
-        with pytest.raises(NotImplementedError):
-            GuacaMol(config)
-
     def test_no_download_if_file_already_cached(self, tmp_path):
         """requests.get is not called when the corpus file already exists on disk."""
         (tmp_path / FILENAME_ALL).write_text("\n".join(VALID_SMILES_LINES))
@@ -1408,3 +1402,64 @@ class TestGetTaskScorer:
             scorer = get_task_scorer(name)
             result = scorer("NOTSMILES!!!!")
             assert result == pytest.approx(0.0), f"{name} returned {result} for invalid SMILES"
+
+
+class TestGuacaMolBenchmarkTaskLoad:
+    """Tests for GuacaMol loading with a benchmark task target."""
+
+    def test_benchmark_task_loads_without_error(self, tmp_path):
+        (tmp_path / FILENAME_ALL).write_text(
+            "CC1=CC=C(C=C1)C1=CC(=NN1C1=CC=C(C=C1)S(N)(=O)=O)C(F)(F)F\nc1ccccc1\n"
+        )
+        config = _base_config(data_dir=tmp_path, target_property="celecoxib_rediscovery")
+        dataset = GuacaMol(config)
+        assert dataset._raw_dataset is not None
+        assert len(dataset._raw_dataset) == 2
+
+    def test_benchmark_task_labels_in_zero_one(self, tmp_path):
+        (tmp_path / FILENAME_ALL).write_text(
+            "CC1=CC=C(C=C1)C1=CC(=NN1C1=CC=C(C=C1)S(N)(=O)=O)C(F)(F)F\nc1ccccc1\n"
+        )
+        config = _base_config(data_dir=tmp_path, target_property="celecoxib_rediscovery")
+        dataset = GuacaMol(config)
+        assert dataset._raw_dataset is not None
+        for label in dataset._raw_dataset.labels:
+            assert 0.0 <= float(label) <= 1.0
+
+    def test_benchmark_task_candidates_have_empty_features(self, tmp_path):
+        (tmp_path / FILENAME_ALL).write_text("c1ccccc1\nCCO\n")
+        config = _base_config(data_dir=tmp_path, target_property="celecoxib_rediscovery")
+        dataset = GuacaMol(config)
+        assert dataset._raw_dataset is not None
+        for cand in dataset._raw_dataset.candidates:
+            assert cand.features == {}
+
+    def test_query_scores_celecoxib_near_one(self, tmp_path):
+        (tmp_path / FILENAME_ALL).write_text(
+            "CC1=CC=C(C=C1)C1=CC(=NN1C1=CC=C(C=C1)S(N)(=O)=O)C(F)(F)F\nc1ccccc1\n"
+        )
+        config = _base_config(data_dir=tmp_path, target_property="celecoxib_rediscovery")
+        dataset = GuacaMol(config)
+        celecoxib = Candidate(
+            data="CC1=CC=C(C=C1)C1=CC(=NN1C1=CC=C(C=C1)S(N)(=O)=O)C(F)(F)F",
+            modality=Modality.SEQUENCE,
+        )
+        result = dataset.query([celecoxib])
+        assert len(result) == 1
+        assert result.labels[0] == pytest.approx(1.0, abs=0.01)
+
+    def test_query_returns_caller_candidate(self, tmp_path):
+        (tmp_path / FILENAME_ALL).write_text("c1ccccc1\nCCO\n")
+        config = _base_config(data_dir=tmp_path, target_property="celecoxib_rediscovery")
+        dataset = GuacaMol(config)
+        cand = Candidate(data="c1ccccc1", modality=Modality.SEQUENCE, features={"custom": 42.0})
+        result = dataset.query([cand])
+        assert result.candidates[0] is cand
+
+    def test_query_invalid_smiles_raises_value_error(self, tmp_path):
+        (tmp_path / FILENAME_ALL).write_text("c1ccccc1\n")
+        config = _base_config(data_dir=tmp_path, target_property="celecoxib_rediscovery")
+        dataset = GuacaMol(config)
+        bad = Candidate(data="NOTSMILES!!!", modality=Modality.SEQUENCE)
+        with pytest.raises(ValueError, match="invalid SMILES"):
+            dataset.query([bad])
