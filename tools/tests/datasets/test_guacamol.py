@@ -79,6 +79,8 @@ from alf_tools.datasets.guacamol import (
 )
 from pydantic import ValidationError
 from rdkit import Chem as _Chem
+from rdkit import DataStructs as _DataStructs
+from rdkit.Chem import rdMolDescriptors as _rdMD
 
 pytestmark = [pytest.mark.guacamol, pytest.mark.rdkit]
 
@@ -1154,10 +1156,9 @@ class TestApFingerprintMaxLength:
     """Tests that _ap() uses maxLength=10 matching the original GuacaMol implementation."""
 
     def test_ap_uses_maxlength_10_not_default_30(self):
-        """_ap() matches rdMolDescriptors.GetAtomPairFingerprint(mol, maxLength=10) for long chains."""
-        from rdkit.Chem import rdMolDescriptors as _rdMD
-        from rdkit import DataStructs as _DataStructs
-
+        """_ap() matches rdMolDescriptors.GetAtomPairFingerprint(mol, maxLength=10) for long
+        chains.
+        """
         # C22 chain: atoms 0..21 span distances up to 21 bonds — well beyond maxLength=10
         mol = _mol_from_smiles("CCCCCCCCCCCCCCCCCCCCCC")
         fp_ours = _ap(mol)
