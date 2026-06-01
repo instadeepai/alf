@@ -16,6 +16,7 @@
 
 import numpy as np
 import pytest
+import alf_core.utils.metrics  # ensures registry is populated before assertions below
 from alf_core.utils.metrics.base import (
     ClassificationMetricRegistry,
     RegressionMetricRegistry,

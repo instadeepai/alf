@@ -153,6 +153,16 @@ class TestRegretUcbAlpha:
         assert key in result
         assert result[key] >= 0.0
 
+    def test_regret_ucb_alpha_zero_acquisitions_raises(self):
+        """num_acquisitions=0 raises AssertionError."""
+        with pytest.raises(AssertionError):
+            regret_ucb_alpha(
+                np.array([1.0, 2.0, 3.0, 4.0, 5.0]),
+                np.ones(5),
+                np.array([5.0, 4.0, 3.0, 2.0, 1.0]),
+                num_acquisitions=0,
+            )
+
 
 class TestRegressionRegistryIntegration:
     """Confirm regression metrics auto-register on module import."""
@@ -189,6 +199,11 @@ class TestWidth:
         assert len(result) > 0
         for v in result.values():
             assert v >= 0.0
+
+    def test_width_invalid_alpha_raises(self):
+        """Alpha outside [0, 1] raises AssertionError."""
+        with pytest.raises(AssertionError):
+            width(np.array([1.0, 2.0, 3.0]), np.array([0.5, 0.5, 0.5]), np.array([1.0, 2.0, 3.0]), alpha=1.5)
 
 
 class TestRegretUcbAlphaSweep:
