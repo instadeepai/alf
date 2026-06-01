@@ -786,3 +786,17 @@ class TestBoTorchGPModelPriorWiring:
             model.train(simple_2d_training_data)
         assert "ARD is enabled" in caplog.text
         assert "Hvarfner" in caplog.text
+
+
+class TestBoTorchGPModelViaSurrogate:
+    """Test BoTorchGPModel accessed through the Surrogate wrapper."""
+
+    def test_surrogate_predict_returns_finite_results(self, trained_surrogate, branin_dataset):
+        """Predictions from a trained Surrogate have finite means and non-negative variances."""
+        predictions = trained_surrogate.predict(branin_dataset.test_dataset.candidates)
+
+        assert predictions.means is not None
+        assert predictions.variances is not None
+        assert predictions.means.shape == (len(branin_dataset.test_dataset.candidates),)
+        assert np.all(np.isfinite(predictions.means))
+        assert np.all(predictions.variances >= 0)

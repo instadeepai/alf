@@ -41,24 +41,14 @@ if TYPE_CHECKING:
 class BoTorchModelAdapter(Model):
     """Universal adapter for BoTorch acquisition functions compatibility.
 
-    This adapter provides a unified interface for both:
-    1. **Native BoTorch models** (e.g., SingleTaskGP, FixedNoiseGP)
-       - Direct pass-through to the underlying model's posterior method
-    2. **ALF BaseModel instances** (e.g., BoTorchGPModel wrapping
-       SingleTaskGP)
-       - Adapts predict() method to BoTorch's posterior() interface
+    Accepts either a native BoTorch ``Model`` (direct pass-through to
+    ``posterior()``) or an ALF ``BaseModel`` (adapts ``predict()`` to BoTorch's
+    ``posterior()`` interface). The adapter detects the model type automatically.
 
-    The adapter automatically detects the model type and handles the
-    appropriate conversion between ALF's Predictions format and BoTorch's
-    Posterior format.
-
-    **Important Limitation - Models without uncertainty:**
-    Models that don't provide prediction variances (e.g., CNNModel,
-    deterministic models) cannot be used with BoTorch acquisition functions.
-    BoTorch acquisition functions like Expected Improvement and Upper
-    Confidence Bound require both mean and variance estimates to compute
-    acquisition values. Attempting to use such models will raise a
-    ValueError.
+    Models that don't provide prediction variances (e.g., CNNModel, deterministic
+    models) cannot be used with BoTorch acquisition functions. Expected Improvement
+    and Upper Confidence Bound require uncertainty estimates; attempting to use such
+    models raises a ``ValueError``.
 
     Example with BoTorch GP Model:
         >>> from botorch.models import SingleTaskGP

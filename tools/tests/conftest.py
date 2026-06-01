@@ -35,7 +35,7 @@ from alf_core import (
     Surrogate,
 )
 from alf_core.model.base_model import BaseModel
-from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
+from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel, BoTorchTrainConfig
 from botorch.models import SingleTaskGP
 
 
@@ -350,7 +350,7 @@ def trained_surrogate(branin_dataset):
     Returns:
         Surrogate with trained BoTorchGPModel.
     """
-    gp_model = BoTorchGPModel(num_iterations=50, learning_rate=0.1)
+    gp_model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=50, learning_rate=0.1))
     surrogate = Surrogate(model=gp_model)
     surrogate.fit(branin_dataset.train_dataset, branin_dataset.test_dataset)
     return surrogate
