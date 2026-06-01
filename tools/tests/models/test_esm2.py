@@ -762,8 +762,7 @@ class TestMLPHead:
     def test_mlp_train_does_not_update_backbone(self, esm2_mlp_model, sample_data):
         """train() in mlp_head mode must not change any ESM-2 backbone parameters."""
         initial_params = {
-            name: param.clone()
-            for name, param in esm2_mlp_model.esm_model.named_parameters()
+            name: param.clone() for name, param in esm2_mlp_model.esm_model.named_parameters()
         }
         esm2_mlp_model.train(sample_data)
         for name, param in esm2_mlp_model.esm_model.named_parameters():

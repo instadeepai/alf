@@ -287,6 +287,9 @@ class ESM2Model(BaseModel):
 
         Returns:
             Predictions with per-sequence log-likelihood scores. variances is None.
+
+        Raises:
+            ValueError: If any sequence has no scoreable positions after masking.
         """
         batch = self.featurise(candidate_points)
         all_input_ids = batch["input_ids"]
@@ -636,7 +639,7 @@ class ESM2Model(BaseModel):
         for raw_ids, raw_mask, targets in train_loader:
             batch_ids = raw_ids.to(self.device)
             batch_mask = raw_mask.to(self.device)
-            targets = targets.to(self.device)
+            batch_targets = targets.to(self.device)
 
             with torch.no_grad():
                 outputs = self.esm_model(
@@ -655,9 +658,9 @@ class ESM2Model(BaseModel):
             preds = self._head(embeddings)
 
             if self.train_config.mlp_loss == "mse":
-                loss = torch.nn.functional.mse_loss(preds.squeeze(-1), targets)
+                loss = torch.nn.functional.mse_loss(preds.squeeze(-1), batch_targets)
             else:  # cross_entropy
-                loss = torch.nn.functional.cross_entropy(preds, targets.long())
+                loss = torch.nn.functional.cross_entropy(preds, batch_targets.long())
 
             if not torch.isfinite(loss):
                 raise RuntimeError(
@@ -697,7 +700,7 @@ class ESM2Model(BaseModel):
             for raw_ids, raw_mask, targets in val_loader:
                 batch_ids = raw_ids.to(self.device)
                 batch_mask = raw_mask.to(self.device)
-                targets = targets.to(self.device)
+                batch_targets = targets.to(self.device)
 
                 outputs = self.esm_model(
                     input_ids=batch_ids,
@@ -713,9 +716,9 @@ class ESM2Model(BaseModel):
 
                 preds = self._head(embeddings)
                 if self.train_config.mlp_loss == "mse":
-                    loss = torch.nn.functional.mse_loss(preds.squeeze(-1), targets)
+                    loss = torch.nn.functional.mse_loss(preds.squeeze(-1), batch_targets)
                 else:
-                    loss = torch.nn.functional.cross_entropy(preds, targets.long())
+                    loss = torch.nn.functional.cross_entropy(preds, batch_targets.long())
                 val_losses.append(loss.item())
 
         avg_loss = float(np.mean(val_losses))
@@ -810,9 +813,7 @@ class ESM2Model(BaseModel):
                 params_to_optimize, lr=self.train_config.learning_rate
             )
         elif self.train_config.optimizer_type == "adam":
-            optimizer = torch.optim.Adam(
-                params_to_optimize, lr=self.train_config.learning_rate
-            )
+            optimizer = torch.optim.Adam(params_to_optimize, lr=self.train_config.learning_rate)
         else:
             raise AssertionError(
                 f"Unreachable: optimizer_type={self.train_config.optimizer_type!r} "
