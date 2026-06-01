@@ -59,7 +59,8 @@ class ESM2TrainConfig(BaseTrainConfig):
     Args:
         freeze_backbone: When True and loss_type='log_likelihood', train() is a no-op.
             When True and loss_type='mlp_head', only the linear head is trained.
-            When False and loss_type='mlp_head', the full ESM-2 backbone and head are trained jointly.
+            When False and loss_type='mlp_head', the full ESM-2 backbone and head
+            are trained jointly.
         learning_rate: Learning rate for the optimizer.
         optimizer_type: Which optimizer to use ('adam' or 'adamw').
         batch_size: Batch size for training.
@@ -68,9 +69,9 @@ class ESM2TrainConfig(BaseTrainConfig):
         log_frequency: Record epoch metrics every N epochs.
         max_grad_norm: Maximum norm for gradient clipping. None disables clipping.
         loss_type: Training scheme. 'log_likelihood' masks ALL non-special tokens and
-            computes cross-entropy over all of them (self-supervised). 'mlp_head' freezes
-            the ESM-2 backbone and trains a linear head on top of sequence embeddings
-            using the labels provided to train().
+            computes cross-entropy over all of them (self-supervised). 'mlp_head' trains
+            a linear head on top of sequence embeddings using the labels provided to
+            train(). The backbone is frozen only when freeze_backbone=True.
         output_dim: Output dimension of the MLP head. 1 for regression; N for N-class
             classification. Only used when loss_type='mlp_head'.
         mlp_loss: Loss function for MLP head training. 'mse' for regression;
@@ -173,8 +174,9 @@ class ESM2Model(BaseModel):
             hidden_dim = self.esm_model.config.hidden_size
             self._head = torch.nn.Linear(hidden_dim, self.train_config.output_dim)
             self._head.to(self.device)
-            for param in self.esm_model.parameters():
-                param.requires_grad = False
+            if self.train_config.freeze_backbone:
+                for param in self.esm_model.parameters():
+                    param.requires_grad = False
 
         total_params = sum(p.numel() for p in self.esm_model.parameters())
         logger.info(f"ESM-2 loaded: {self.model_config.model_id} ({total_params:,} parameters)")

@@ -692,6 +692,29 @@ def esm2_mlp_model():
 
 
 @pytest.fixture
+def esm2_mlp_unfrozen_model():
+    """ESM-2 model with MLP regression head and unfrozen backbone.
+
+    Returns:
+        An ESM2Model with loss_type='mlp_head', freeze_backbone=False, CPU.
+    """
+    config = ESM2ModelConfig(model_id=MODEL_ID)
+    train_cfg = ESM2TrainConfig(
+        loss_type="mlp_head",
+        freeze_backbone=False,
+        output_dim=1,
+        mlp_loss="mse",
+        num_epochs=1,
+        batch_size=2,
+        learning_rate=1e-5,
+        log_frequency=1,
+    )
+    return ESM2Model(
+        name="test_esm2_mlp_unfrozen", model_config=config, train_config=train_cfg, device="cpu"
+    )
+
+
+@pytest.fixture
 def esm2_mlp_classification_model():
     """ESM-2 model with MLP classification head (output_dim=2, cross_entropy loss).
 
@@ -727,10 +750,15 @@ class TestMLPHead:
         assert esm2_mlp_model._head.in_features == hidden_dim
         assert esm2_mlp_model._head.out_features == 1
 
-    def test_backbone_frozen_in_mlp_mode(self, esm2_mlp_model):
+    def test_backbone_frozen_in_mlp_mode_when_freeze_true(self, esm2_mlp_model):
         """All ESM-2 backbone parameters should have requires_grad=False."""
         for param in esm2_mlp_model.esm_model.parameters():
             assert not param.requires_grad
+
+    def test_backbone_trainable_in_mlp_mode_when_freeze_false(self, esm2_mlp_unfrozen_model):
+        """All backbone parameters should have requires_grad=True when freeze_backbone=False."""
+        for param in esm2_mlp_unfrozen_model.esm_model.parameters():
+            assert param.requires_grad
 
     def test_head_on_correct_device(self, esm2_mlp_model):
         """Linear head should be on the same device as the ESM-2 model."""
