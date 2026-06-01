@@ -172,6 +172,13 @@ class TestConfigs:
         with pytest.raises(ValueError, match="mlp_loss"):
             ESM2TrainConfig(loss_type="mlp_head", mlp_loss="l1")
 
+    def test_last_hidden_state_with_mlp_head_raises(self):
+        """last_hidden_state pooling is not compatible with mlp_head mode — raises at init."""
+        config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
+        train_cfg = ESM2TrainConfig(loss_type="mlp_head", batch_size=1)
+        with pytest.raises(ValueError, match="last_hidden_state.*mlp_head"):
+            ESM2Model(name="lhs_mlp", model_config=config, train_config=train_cfg, device="cpu")
+
 
 class TestFeaturise:
     """Tests for ESM2Model.featurise()."""
@@ -470,7 +477,7 @@ class TestTrainFinetune:
     """Tests for ESM2Model.train() when freeze_backbone=False."""
 
     def test_finetune_updates_weights(self, esm2_finetune_model, sample_data):
-        """Test that MLM fine-tuning updates at least one model parameter."""
+        """Test that log-likelihood fine-tuning updates at least one model parameter."""
         initial_params = {
             name: param.clone() for name, param in esm2_finetune_model.esm_model.named_parameters()
         }

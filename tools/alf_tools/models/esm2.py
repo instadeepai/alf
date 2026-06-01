@@ -209,6 +209,12 @@ class ESM2Model(BaseModel):
                 "concatenated across mini-batches. Set both to 1 or "
                 "use pooling='mean' or pooling='cls' instead."
             )
+        if self.model_config.pooling == "last_hidden_state" and self.train_config.loss_type == "mlp_head":
+            raise ValueError(
+                "pooling='last_hidden_state' is not supported with loss_type='mlp_head'. "
+                "The MLP head requires a fixed-size embedding. "
+                "Use pooling='mean' or pooling='cls' instead."
+            )
 
     def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> dict[str, torch.Tensor]:
         """Tokenize sequences into input tensors for the ESM-2 model.
