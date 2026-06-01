@@ -650,6 +650,60 @@ class TestESMFoldPLDDTMasking:
         np.testing.assert_almost_equal(result.means[0], 0.6, decimal=5)
 
 
+class TestESMFoldPLDDTResidueWeighting:
+    """Tests that pLDDT is averaged per-residue before averaging across residues."""
+
+    def test_each_residue_weighted_equally_regardless_of_atom_count(self):
+        """Each residue contributes equally to the sequence mean, independent of atom count.
+
+        Residue 0: 1 valid atom, pLDDT=1.0  → per-residue mean = 1.0
+        Residue 1: 36 valid atoms, pLDDT=0.0 → per-residue mean = 0.0
+        Expected sequence mean = (1.0 + 0.0) / 2 = 0.5.
+        An atom-flat average would give (1*1.0 + 36*0.0) / 37 ≈ 0.027.
+        """
+
+        def _tok_call(seqs, return_tensors="pt", padding=True, add_special_tokens=False):
+            n, seq_len = len(seqs), max(len(s) for s in seqs)
+            return {
+                "input_ids": torch.ones(n, seq_len, dtype=torch.long),
+                "attention_mask": torch.ones(n, seq_len, dtype=torch.long),
+            }
+
+        with (
+            patch("alf_tools.models.esmfold.EsmForProteinFolding") as mock_cls,
+            patch("alf_tools.models.esmfold.AutoTokenizer") as mock_tok_cls,
+        ):
+            mock_tok = MagicMock()
+            mock_tok.side_effect = _tok_call
+            mock_tok_cls.from_pretrained.return_value = mock_tok
+
+            def _model_call(**tokens):
+                out = MagicMock()
+                out.ptm = torch.tensor(0.5, dtype=torch.float32)
+                # Residue 0: atom slot 0 only (1 atom), pLDDT=1.0
+                # Residue 1: atom slots 1–36 (36 atoms), pLDDT=0.0
+                plddt = torch.zeros(1, 2, 37, dtype=torch.float32)
+                plddt[0, 0, 0] = 1.0
+                atom_exists = torch.zeros(1, 2, 37, dtype=torch.bool)
+                atom_exists[0, 0, 0] = True   # residue 0: 1 atom
+                atom_exists[0, 1, 1:] = True  # residue 1: 36 atoms
+                out.plddt = plddt
+                out.atom37_atom_exists = atom_exists
+                return out
+
+            mock_mdl = MagicMock()
+            mock_mdl.to.return_value = mock_mdl
+            mock_mdl.esm = MagicMock()
+            mock_mdl.side_effect = _model_call
+            mock_cls.from_pretrained.return_value = mock_mdl
+
+            model = ESMFoldModel(ESMFoldModelConfig(scoring_metric="mean_plddt"))
+            cand = Candidate(data="AC", modality="sequence")
+            result = model.predict([cand])
+
+        np.testing.assert_almost_equal(result.means[0], 0.5, decimal=5)
+
+
 class TestESMFoldDuplicates:
     """Duplicate sequences are each processed independently."""
 
