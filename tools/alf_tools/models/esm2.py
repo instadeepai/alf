@@ -126,7 +126,7 @@ class ESM2Model(BaseModel):
     Loads a pre-trained ESM-2 checkpoint from HuggingFace and exposes it as a
     BaseModel. predict() returns per-sequence pseudo-log-likelihood scores;
     embed() returns per-sequence embeddings. Optionally fine-tunes the backbone
-    with masked language modelling (MLM) or full log-likelihood masking.
+    with log-likelihood masking, or trains a frozen-backbone linear head for regression or classification.
     """
 
     def __init__(

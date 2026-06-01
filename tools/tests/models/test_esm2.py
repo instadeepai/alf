@@ -163,7 +163,7 @@ class TestConfigs:
 
     def test_invalid_loss_type_raises(self):
         """Invalid loss_type raises ValueError."""
-        with pytest.raises(ValueError, match="loss_type"):
+        with pytest.raises(ValueError, match="loss_type must be"):
             ESM2TrainConfig(loss_type="mlm")
 
     def test_invalid_mlp_loss_raises(self):
