@@ -23,6 +23,8 @@ import numpy as np
 import pytest
 import requests
 from alf_core import Candidate, Modality
+from typing import get_args as _get_args
+
 from alf_tools.datasets.guacamol import (
     ALL_PROPERTIES,
     DATAPATH,
@@ -32,6 +34,7 @@ from alf_tools.datasets.guacamol import (
     FILENAME_VALID,
     GuacaMol,
     GuacaMolConfig,
+    GuacaMolTaskName,
     _ap,  # noqa: PLC2701
     _cache_path,  # noqa: PLC2701
     _canonical_smiles,  # noqa: PLC2701
@@ -48,7 +51,11 @@ from alf_tools.datasets.guacamol import (
     albuterol_similarity,  # noqa: PLC2701
     amlodipine_mpo,  # noqa: PLC2701
     arithmetic_mean,  # noqa: PLC2701
+    aripiprazole_decorator_hop,  # noqa: PLC2701
+    aripiprazole_scaffold_hop,  # noqa: PLC2701
     aripiprazole_similarity,  # noqa: PLC2701
+    c7h8n2o2_isomer,  # noqa: PLC2701
+    c9h10n2o2pf2cl_isomer,  # noqa: PLC2701
     camphor_menthol_median,  # noqa: PLC2701
     celecoxib_rediscovery,  # noqa: PLC2701
     clipped_score,  # noqa: PLC2701
@@ -56,6 +63,7 @@ from alf_tools.datasets.guacamol import (
     fexofenadine_mpo,  # noqa: PLC2701
     gaussian_score,  # noqa: PLC2701
     geometric_mean,  # noqa: PLC2701
+    get_task_scorer,  # noqa: PLC2701
     isomer_score,  # noqa: PLC2701
     max_gaussian_score,  # noqa: PLC2701
     mestranol_similarity,  # noqa: PLC2701
@@ -1329,3 +1337,66 @@ class TestMPOPart2:
 
     def test_zaleplon_invalid_smiles_returns_zero(self):
         assert zaleplon_mpo("NOTSMILES") == pytest.approx(0.0)
+
+
+class TestIsomerTaskScorers:
+    def test_c7h8n2o2_invalid_returns_zero(self):
+        assert c7h8n2o2_isomer("NOTSMILES") == pytest.approx(0.0)
+
+    def test_c7h8n2o2_score_in_range(self):
+        assert 0.0 <= c7h8n2o2_isomer("CC(=O)O") <= 1.0
+
+    def test_c7h8n2o2_caffeine_low(self):
+        # Caffeine is C8H10N4O2 — wrong formula on multiple elements.
+        assert c7h8n2o2_isomer("CN1C=NC2=C1C(=O)N(C(=O)N2C)C") < 0.5
+
+    def test_c9h10n2o2pf2cl_invalid_returns_zero(self):
+        assert c9h10n2o2pf2cl_isomer("NOTSMILES") == pytest.approx(0.0)
+
+    def test_c9h10n2o2pf2cl_score_in_range(self):
+        assert 0.0 <= c9h10n2o2pf2cl_isomer("CC(=O)O") <= 1.0
+
+
+_HOP_REF_SMILES = "CCCOc1cc2ncnc(Nc3ccc4ncsc4c3)c2cc1S(=O)(=O)C(C)(C)C"
+
+
+class TestHopScorers:
+    def test_scaffold_hop_ref_mol_between_zero_and_one(self):
+        assert 0.0 <= aripiprazole_scaffold_hop(_HOP_REF_SMILES) <= 1.0
+
+    def test_decorator_hop_ref_mol_between_zero_and_one(self):
+        assert 0.0 <= aripiprazole_decorator_hop(_HOP_REF_SMILES) <= 1.0
+
+    def test_scaffold_hop_invalid_smiles_returns_zero(self):
+        assert aripiprazole_scaffold_hop("NOTSMILES") == pytest.approx(0.0)
+
+    def test_decorator_hop_invalid_smiles_returns_zero(self):
+        assert aripiprazole_decorator_hop("NOTSMILES") == pytest.approx(0.0)
+
+    def test_scaffold_hop_benzene_in_range(self):
+        assert 0.0 <= aripiprazole_scaffold_hop("c1ccccc1") <= 1.0
+
+    def test_decorator_hop_caffeine_in_range(self):
+        assert 0.0 <= aripiprazole_decorator_hop("CN1C=NC2=C1C(=O)N(C(=O)N2C)C") <= 1.0
+
+
+class TestGetTaskScorer:
+    def test_returns_callable_for_all_task_names(self):
+        for name in _get_args(GuacaMolTaskName):
+            scorer = get_task_scorer(name)
+            assert callable(scorer), f"get_task_scorer({name!r}) did not return a callable"
+
+    def test_scorer_returns_float(self):
+        scorer = get_task_scorer("celecoxib_rediscovery")
+        result = scorer("c1ccccc1")
+        assert isinstance(result, float)
+
+    def test_unknown_task_name_raises_key_error(self):
+        with pytest.raises(KeyError):
+            get_task_scorer("this_does_not_exist")
+
+    def test_each_scorer_returns_zero_for_invalid_smiles(self):
+        for name in _get_args(GuacaMolTaskName):
+            scorer = get_task_scorer(name)
+            result = scorer("NOTSMILES!!!!")
+            assert result == pytest.approx(0.0), f"{name} returned {result} for invalid SMILES"

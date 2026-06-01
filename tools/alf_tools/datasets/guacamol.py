@@ -778,6 +778,98 @@ def zaleplon_mpo(smiles: str) -> float:
     return geometric_mean([tanimoto_score, isomer_s])
 
 
+_C7H8N2O2_FORMULA = _parse_formula("C7H8N2O2")
+_C9H10N2O2PF2CL_FORMULA = _parse_formula("C9H10N2O2PF2Cl")
+
+
+def c7h8n2o2_isomer(smiles: str) -> float:
+    """Geometric mean of per-element Gaussian scores targeting formula C7H8N2O2."""
+    return isomer_score(smiles, _C7H8N2O2_FORMULA)
+
+
+def c9h10n2o2pf2cl_isomer(smiles: str) -> float:
+    """Geometric mean of per-element Gaussian scores targeting formula C9H10N2O2PF2Cl."""
+    return isomer_score(smiles, _C9H10N2O2PF2CL_FORMULA)
+
+
+_HOP_REF = Chem.MolFromSmiles("CCCOc1cc2ncnc(Nc3ccc4ncsc4c3)c2cc1S(=O)(=O)C(C)(C)C")
+_HOP_REF_PHCO = _phco(_HOP_REF)
+
+_SCAFFOLD_HOP_SMARTS_KEEP = (
+    "[#6]-[#6]-[#6]-[#8]-[#6]~[#6]~[#6]~[#6]~[#6]-[#7]-c1ccc2ncsc2c1"
+)
+_SCAFFOLD_HOP_SMARTS_REMOVE = "[#7]-c1n[c;h1]nc2[c;h1]c(-[#8])[c;h0][c;h1]c12"
+
+_DECORATOR_HOP_SMARTS_REMOVE_SULFONYL = "CS([#6])(=O)=O"
+_DECORATOR_HOP_SMARTS_REMOVE_THIENOPYRIDINE = "[#7]-c1ccc2ncsc2c1"
+_DECORATOR_HOP_SMARTS_KEEP_PURINONE = "[#7]-c1n[c;h1]nc2[c;h1]c(-[#8])[c;h0][c;h1]c12"
+
+
+def aripiprazole_scaffold_hop(smiles: str) -> float:
+    """Arithmetic mean: PHCO Tanimoto (≤0.75) + keep propoxy-thienopyridine + remove aminopyrimidine scaffold."""
+    mol = _mol_from_smiles(smiles)
+    if mol is None:
+        return 0.0
+    phco_score = clipped_score(_tanimoto(smiles, _HOP_REF_PHCO, _phco), upper=0.75)
+    keep_score = smarts_score(smiles, _SCAFFOLD_HOP_SMARTS_KEEP, inverse=False)
+    remove_score = smarts_score(smiles, _SCAFFOLD_HOP_SMARTS_REMOVE, inverse=True)
+    return arithmetic_mean([phco_score, keep_score, remove_score])
+
+
+def aripiprazole_decorator_hop(smiles: str) -> float:
+    """Arithmetic mean: PHCO Tanimoto (≤0.85) + remove sulfonyl + remove thienopyridine + keep purinone."""
+    mol = _mol_from_smiles(smiles)
+    if mol is None:
+        return 0.0
+    phco_score = clipped_score(_tanimoto(smiles, _HOP_REF_PHCO, _phco), upper=0.85)
+    rm_sulfonyl = smarts_score(smiles, _DECORATOR_HOP_SMARTS_REMOVE_SULFONYL, inverse=True)
+    rm_thienopyridine = smarts_score(smiles, _DECORATOR_HOP_SMARTS_REMOVE_THIENOPYRIDINE, inverse=True)
+    keep_purinone = smarts_score(smiles, _DECORATOR_HOP_SMARTS_KEEP_PURINONE, inverse=False)
+    return arithmetic_mean([phco_score, rm_sulfonyl, rm_thienopyridine, keep_purinone])
+
+
+# ---------------------------------------------------------------------------
+# Task scorer dispatch
+# ---------------------------------------------------------------------------
+
+_TASK_SCORERS: dict[str, Callable[[str], float]] = {
+    "celecoxib_rediscovery": celecoxib_rediscovery,
+    "troglitazone_rediscovery": troglitazone_rediscovery,
+    "thiothixene_rediscovery": thiothixene_rediscovery,
+    "aripiprazole_similarity": aripiprazole_similarity,
+    "albuterol_similarity": albuterol_similarity,
+    "mestranol_similarity": mestranol_similarity,
+    "camphor_menthol_median": camphor_menthol_median,
+    "tadalafil_sildenafil_median": tadalafil_sildenafil_median,
+    "fexofenadine_mpo": fexofenadine_mpo,
+    "osimertinib_mpo": osimertinib_mpo,
+    "ranolazine_mpo": ranolazine_mpo,
+    "perindopril_mpo": perindopril_mpo,
+    "amlodipine_mpo": amlodipine_mpo,
+    "sitagliptin_mpo": sitagliptin_mpo,
+    "zaleplon_mpo": zaleplon_mpo,
+    "c7h8n2o2_isomer": c7h8n2o2_isomer,
+    "c9h10n2o2pf2cl_isomer": c9h10n2o2pf2cl_isomer,
+    "aripiprazole_scaffold_hop": aripiprazole_scaffold_hop,
+    "aripiprazole_decorator_hop": aripiprazole_decorator_hop,
+}
+
+
+def get_task_scorer(task_name: str) -> Callable[[str], float]:
+    """Return the scoring function for the given GuacaMol benchmark task name.
+
+    Args:
+        task_name: One of the GuacaMolTaskName literal values.
+
+    Returns:
+        A callable ``(smiles: str) -> float`` in [0, 1].
+
+    Raises:
+        KeyError: If task_name is not a recognised benchmark task.
+    """
+    return _TASK_SCORERS[task_name]
+
+
 def _label_smiles(
     smiles_list: list[str],
     properties: list[GuacaMolPropertyName],
