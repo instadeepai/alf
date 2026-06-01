@@ -30,6 +30,9 @@ from alf_core import (
     State,
     Surrogate,
 )
+
+pytest.importorskip("transformers", reason="transformers not installed; install alf_tools[esmfold]")
+
 from alf_tools.models.esmfold import ESMFoldModel, ESMFoldModelConfig
 
 MOCK_PTM = 0.7
