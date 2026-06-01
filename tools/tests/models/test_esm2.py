@@ -18,7 +18,7 @@ import torch
 from alf_core import Candidate, LabelledCandidates
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 
-pytest.importorskip("transformers")
+pytest.importorskip("transformers", reason="esm2 not installed; install alf_tools[esm2]")
 
 from alf_tools.models.esm2 import ESM2Model, ESM2ModelConfig, ESM2TrainConfig
 
@@ -55,44 +55,6 @@ def esm2_model(model_config, train_config):
     return ESM2Model(
         name="test_esm2", model_config=model_config, train_config=train_config, device="cpu"
     )
-
-
-@pytest.fixture(scope="module")
-def esm2_finetune_model():
-    """ESM-2 model with unfrozen backbone for log-likelihood fine-tuning tests.
-
-    Returns:
-        An ESM2Model with trainable backbone, loss_type='log_likelihood', 2 epochs.
-    """
-    config = ESM2ModelConfig(model_id=MODEL_ID)
-    train_cfg = ESM2TrainConfig(
-        freeze_backbone=False,
-        loss_type="log_likelihood",
-        num_epochs=2,
-        batch_size=2,
-        learning_rate=1e-4,
-        log_frequency=1,
-    )
-    return ESM2Model(name="test_esm2_ft", model_config=config, train_config=train_cfg, device="cpu")
-
-
-@pytest.fixture(scope="module")
-def esm2_ll_model():
-    """ESM-2 model configured for log-likelihood training.
-
-    Returns:
-        An ESM2Model with loss_type='log_likelihood', trainable backbone, 2 epochs.
-    """
-    config = ESM2ModelConfig(model_id=MODEL_ID)
-    train_cfg = ESM2TrainConfig(
-        freeze_backbone=False,
-        loss_type="log_likelihood",
-        num_epochs=2,
-        batch_size=2,
-        learning_rate=1e-4,
-        log_frequency=1,
-    )
-    return ESM2Model(name="test_esm2_ll", model_config=config, train_config=train_cfg, device="cpu")
 
 
 @pytest.fixture(scope="session")
@@ -145,10 +107,10 @@ class TestConfigs:
         assert config.batch_size == 8
         assert config.num_epochs == 10
         assert config.log_frequency == 1
-        assert config.loss_type == "log_likelihood"
+        assert config.loss_fn == "log_likelihood"
         assert config.output_dim == 1
         assert config.mlp_loss == "mse"
-        # mask_probability and mask_splitting should not exist
+        assert not hasattr(config, "loss_type")
         assert not hasattr(config, "mask_probability")
         assert not hasattr(config, "mask_splitting")
 
@@ -157,25 +119,27 @@ class TestConfigs:
         with pytest.raises(ValueError, match="num_epochs must be >= 1"):
             ESM2TrainConfig(num_epochs=0)
 
-    def test_mlp_head_with_unfrozen_backbone_is_valid(self):
-        """loss_type='mlp_head' with freeze_backbone=False must not raise."""
-        cfg = ESM2TrainConfig(loss_type="mlp_head", freeze_backbone=False)
-        assert cfg.freeze_backbone is False
-
-    def test_invalid_loss_type_raises(self):
-        """Invalid loss_type raises ValueError."""
-        with pytest.raises(ValueError, match="loss_type must be"):
-            ESM2TrainConfig(loss_type="mlm")
+    def test_invalid_loss_fn_raises(self):
+        """Invalid loss_fn raises ValueError."""
+        with pytest.raises(ValueError, match="loss_fn must be"):
+            ESM2TrainConfig(loss_fn="mlm")
 
     def test_invalid_mlp_loss_raises(self):
         """Invalid mlp_loss raises ValueError."""
         with pytest.raises(ValueError, match="mlp_loss"):
-            ESM2TrainConfig(loss_type="mlp_head", mlp_loss="l1")
+            ESM2TrainConfig(loss_fn="mlp_head", mlp_loss="l1")
+
+    def test_freeze_backbone_false_raises_not_implemented(self):
+        """ESM2Model raises NotImplementedError when freeze_backbone=False."""
+        config = ESM2ModelConfig(model_id=MODEL_ID)
+        train_cfg = ESM2TrainConfig(freeze_backbone=False)
+        with pytest.raises(NotImplementedError):
+            ESM2Model(name="unfrozen", model_config=config, train_config=train_cfg, device="cpu")
 
     def test_last_hidden_state_with_mlp_head_raises(self):
         """last_hidden_state pooling is not compatible with mlp_head mode — raises at init."""
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
-        train_cfg = ESM2TrainConfig(loss_type="mlp_head", batch_size=1)
+        train_cfg = ESM2TrainConfig(loss_fn="mlp_head", batch_size=1)
         with pytest.raises(ValueError, match="last_hidden_state.*mlp_head"):
             ESM2Model(name="lhs_mlp", model_config=config, train_config=train_cfg, device="cpu")
 
@@ -491,212 +455,16 @@ class TestTrainFrozen:
         assert frozen_train_model.get_training_summary_metrics() == {}
 
 
-class TestTrainFinetune:
-    """Tests for ESM2Model.train() when freeze_backbone=False."""
-
-    def test_finetune_updates_weights(self, esm2_finetune_model, sample_data):
-        """Test that log-likelihood fine-tuning updates at least one model parameter."""
-        initial_params = {
-            name: param.clone() for name, param in esm2_finetune_model.esm_model.named_parameters()
-        }
-        esm2_finetune_model.train(sample_data)
-        params_changed = any(
-            not torch.equal(initial_params[name], param)
-            for name, param in esm2_finetune_model.esm_model.named_parameters()
-        )
-        assert params_changed, "Fine-tuning should update model parameters"
-
-    def test_epoch_metrics_recorded(self, esm2_finetune_model, sample_data):
-        """Test that one SurrogateEpochMetrics is recorded per training epoch."""
-        esm2_finetune_model.train(sample_data)
-        metrics = esm2_finetune_model.get_epoch_metrics()
-        assert len(metrics) == esm2_finetune_model.train_config.num_epochs
-        assert all(isinstance(m, SurrogateEpochMetrics) for m in metrics)
-
-    def test_epoch_metrics_train_loss_finite(self, esm2_finetune_model, sample_data):
-        """Test that train_loss in each epoch metric is a finite number."""
-        esm2_finetune_model.train(sample_data)
-        for m in esm2_finetune_model.get_epoch_metrics():
-            assert np.isfinite(m.train_loss)
-
-    def test_epoch_metrics_reset_on_retrain(self, esm2_finetune_model, sample_data):
-        """Test that epoch metrics are cleared at the start of each train() call."""
-        esm2_finetune_model.train(sample_data)
-        esm2_finetune_model.train(sample_data)
-        assert (
-            len(esm2_finetune_model.get_epoch_metrics())
-            == esm2_finetune_model.train_config.num_epochs
-        )
-
-    def test_summary_metrics_has_final_train_loss(self, esm2_finetune_model, sample_data):
-        """Test that get_training_summary_metrics includes a finite final_train_loss."""
-        esm2_finetune_model.train(sample_data)
-        summary = esm2_finetune_model.get_training_summary_metrics()
-        assert "final_train_loss" in summary
-        assert np.isfinite(summary["final_train_loss"])
-
-    def test_val_loss_recorded_when_val_data_provided(self, esm2_finetune_model, sample_data):
-        """Test that val_loss is recorded in epoch metrics when val_data is provided."""
-        val_candidates = [Candidate(data="ACDEFGHIKL", modality="sequence")]
-        val_data = LabelledCandidates(val_candidates, np.array([1.0]))
-        esm2_finetune_model.train(sample_data, val_data=val_data)
-        for m in esm2_finetune_model.get_epoch_metrics():
-            assert m.val_loss is not None
-            assert np.isfinite(m.val_loss)
-        assert "final_val_loss" in esm2_finetune_model.get_training_summary_metrics()
-
-    def test_val_loss_none_without_val_data(self, esm2_finetune_model, sample_data):
-        """Test that val_loss is None in epoch metrics when no val_data is provided."""
-        esm2_finetune_model.train(sample_data)
-        for m in esm2_finetune_model.get_epoch_metrics():
-            assert m.val_loss is None
-
-    def test_epoch_metrics_contain_train_perplexity_and_token_accuracy(
-        self, esm2_finetune_model, sample_data
-    ):
-        """Test that each epoch metric includes finite train_perplexity and train_token_accuracy."""
-        esm2_finetune_model.train(sample_data)
-        for m in esm2_finetune_model.get_epoch_metrics():
-            assert "train_perplexity" in m.additional_metrics
-            assert "train_token_accuracy" in m.additional_metrics
-            assert np.isfinite(m.additional_metrics["train_perplexity"])
-            assert 0.0 <= m.additional_metrics["train_token_accuracy"] <= 1.0
-
-    def test_epoch_metrics_contain_val_perplexity_and_token_accuracy(
-        self, esm2_finetune_model, sample_data
-    ):
-        """Test that epoch metrics include val_perplexity and val_token_accuracy."""
-        val_candidates = [Candidate(data="ACDEFGHIKL", modality="sequence")]
-        val_data = LabelledCandidates(val_candidates, np.array([1.0]))
-        esm2_finetune_model.train(sample_data, val_data=val_data)
-        for m in esm2_finetune_model.get_epoch_metrics():
-            assert "val_perplexity" in m.additional_metrics
-            assert "val_token_accuracy" in m.additional_metrics
-            assert np.isfinite(m.additional_metrics["val_perplexity"])
-            assert 0.0 <= m.additional_metrics["val_token_accuracy"] <= 1.0
-
-    def test_summary_metrics_contain_final_perplexity_and_token_accuracy(
-        self, esm2_finetune_model, sample_data
-    ):
-        """Test that summary metrics include final_train_perplexity and token_accuracy."""
-        esm2_finetune_model.train(sample_data)
-        summary = esm2_finetune_model.get_training_summary_metrics()
-        assert "final_train_perplexity" in summary
-        assert "final_train_token_accuracy" in summary
-        assert np.isfinite(summary["final_train_perplexity"])
-        assert 0.0 <= summary["final_train_token_accuracy"] <= 1.0
-
-    def test_summary_metrics_contain_val_perplexity_and_token_accuracy_with_val_data(
-        self, esm2_finetune_model, sample_data
-    ):
-        """Test that summary metrics include final_val_perplexity and token_accuracy."""
-        val_candidates = [Candidate(data="ACDEFGHIKL", modality="sequence")]
-        val_data = LabelledCandidates(val_candidates, np.array([1.0]))
-        esm2_finetune_model.train(sample_data, val_data=val_data)
-        summary = esm2_finetune_model.get_training_summary_metrics()
-        assert "final_val_perplexity" in summary
-        assert "final_val_token_accuracy" in summary
-        assert np.isfinite(summary["final_val_perplexity"])
-        assert 0.0 <= summary["final_val_token_accuracy"] <= 1.0
-
-
-class TestTrainLogLikelihood:
-    """Tests for ESM2Model.train() when loss_type='log_likelihood'."""
-
-    def test_ll_finetune_updates_weights(self, esm2_ll_model, sample_data):
-        """Test that log-likelihood fine-tuning updates at least one model parameter."""
-        initial_params = {
-            name: param.clone() for name, param in esm2_ll_model.esm_model.named_parameters()
-        }
-        esm2_ll_model.train(sample_data)
-        params_changed = any(
-            not torch.equal(initial_params[name], param)
-            for name, param in esm2_ll_model.esm_model.named_parameters()
-        )
-        assert params_changed, "Log-likelihood fine-tuning should update model parameters"
-
-    def test_ll_epoch_metrics_recorded(self, esm2_ll_model, sample_data):
-        """Test that one SurrogateEpochMetrics is recorded per training epoch."""
-        esm2_ll_model.train(sample_data)
-        metrics = esm2_ll_model.get_epoch_metrics()
-        assert len(metrics) == esm2_ll_model.train_config.num_epochs
-        assert all(isinstance(m, SurrogateEpochMetrics) for m in metrics)
-
-    def test_ll_epoch_metrics_train_loss_finite(self, esm2_ll_model, sample_data):
-        """Test that train_loss in each epoch metric is a finite number."""
-        esm2_ll_model.train(sample_data)
-        for m in esm2_ll_model.get_epoch_metrics():
-            assert np.isfinite(m.train_loss)
-
-    def test_ll_summary_metrics_has_final_train_loss(self, esm2_ll_model, sample_data):
-        """Test that get_training_summary_metrics includes a finite final_train_loss."""
-        esm2_ll_model.train(sample_data)
-        summary = esm2_ll_model.get_training_summary_metrics()
-        assert "final_train_loss" in summary
-        assert np.isfinite(summary["final_train_loss"])
-
-    def test_ll_epoch_metrics_contain_train_perplexity_token_accuracy_and_log_likelihood(
-        self, esm2_ll_model, sample_data
-    ):
-        """Test that each epoch metric has finite train_perplexity, train_token_accuracy,
-        and train_log_likelihood when loss_type='log_likelihood'.
-        """
-        esm2_ll_model.train(sample_data)
-        for m in esm2_ll_model.get_epoch_metrics():
-            assert "train_perplexity" in m.additional_metrics
-            assert "train_token_accuracy" in m.additional_metrics
-            assert "train_log_likelihood" in m.additional_metrics
-            assert np.isfinite(m.additional_metrics["train_perplexity"])
-            assert 0.0 <= m.additional_metrics["train_token_accuracy"] <= 1.0
-            assert np.isfinite(m.additional_metrics["train_log_likelihood"])
-
-    def test_ll_val_loss_recorded_when_val_data_provided(self, esm2_ll_model, sample_data):
-        """Test that val_loss is recorded when val_data is provided."""
-        val_candidates = [Candidate(data="ACDEFGHIKL", modality="sequence")]
-        val_data = LabelledCandidates(val_candidates, np.array([1.0]))
-        esm2_ll_model.train(sample_data, val_data=val_data)
-        for m in esm2_ll_model.get_epoch_metrics():
-            assert m.val_loss is not None
-            assert np.isfinite(m.val_loss)
-        assert "final_val_loss" in esm2_ll_model.get_training_summary_metrics()
-
-    def test_ll_epoch_metrics_contain_val_log_likelihood(self, esm2_ll_model, sample_data):
-        """Test that val_log_likelihood is recorded in epoch metrics when val_data provided."""
-        val_candidates = [Candidate(data="ACDEFGHIKL", modality="sequence")]
-        val_data = LabelledCandidates(val_candidates, np.array([1.0]))
-        esm2_ll_model.train(sample_data, val_data=val_data)
-        for m in esm2_ll_model.get_epoch_metrics():
-            assert "val_log_likelihood" in m.additional_metrics
-            assert np.isfinite(m.additional_metrics["val_log_likelihood"])
-
-    def test_ll_summary_metrics_contain_final_train_log_likelihood(
-        self, esm2_ll_model, sample_data
-    ):
-        """Test that summary metrics include finite final_train_log_likelihood."""
-        esm2_ll_model.train(sample_data)
-        summary = esm2_ll_model.get_training_summary_metrics()
-        assert "final_train_log_likelihood" in summary
-        assert np.isfinite(summary["final_train_log_likelihood"])
-
-    def test_ll_log_likelihood_is_negative_of_loss(self, esm2_ll_model, sample_data):
-        """Test that train_log_likelihood == -train_loss in each epoch metric."""
-        esm2_ll_model.train(sample_data)
-        for m in esm2_ll_model.get_epoch_metrics():
-            assert np.isclose(
-                m.additional_metrics["train_log_likelihood"], -m.train_loss, rtol=1e-5
-            )
-
-
 @pytest.fixture(scope="module")
 def esm2_mlp_model():
     """ESM-2 model with MLP regression head (output_dim=1, mse loss).
 
     Returns:
-        An ESM2Model with loss_type='mlp_head', output_dim=1, CPU.
+        An ESM2Model with loss_fn='mlp_head', output_dim=1, CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID)
     train_cfg = ESM2TrainConfig(
-        loss_type="mlp_head",
+        loss_fn="mlp_head",
         output_dim=1,
         mlp_loss="mse",
         num_epochs=2,
@@ -709,39 +477,16 @@ def esm2_mlp_model():
     )
 
 
-@pytest.fixture(scope="session")
-def esm2_mlp_unfrozen_model():
-    """ESM-2 model with MLP regression head and unfrozen backbone.
-
-    Returns:
-        An ESM2Model with loss_type='mlp_head', freeze_backbone=False, CPU.
-    """
-    config = ESM2ModelConfig(model_id=MODEL_ID)
-    train_cfg = ESM2TrainConfig(
-        loss_type="mlp_head",
-        freeze_backbone=False,
-        output_dim=1,
-        mlp_loss="mse",
-        num_epochs=1,
-        batch_size=2,
-        learning_rate=1e-5,
-        log_frequency=1,
-    )
-    return ESM2Model(
-        name="test_esm2_mlp_unfrozen", model_config=config, train_config=train_cfg, device="cpu"
-    )
-
-
 @pytest.fixture(scope="module")
 def esm2_mlp_classification_model():
     """ESM-2 model with MLP classification head (output_dim=2, cross_entropy loss).
 
     Returns:
-        An ESM2Model with loss_type='mlp_head', output_dim=2, CPU.
+        An ESM2Model with loss_fn='mlp_head', output_dim=2, CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID)
     train_cfg = ESM2TrainConfig(
-        loss_type="mlp_head",
+        loss_fn="mlp_head",
         output_dim=2,
         mlp_loss="cross_entropy",
         num_epochs=2,
@@ -755,7 +500,7 @@ def esm2_mlp_classification_model():
 
 
 class TestMLPHead:
-    """Tests for ESM2Model with loss_type='mlp_head'."""
+    """Tests for ESM2Model with loss_fn='mlp_head'."""
 
     def test_head_is_linear_layer(self, esm2_mlp_model):
         """MLP head should be a torch.nn.Linear module."""
@@ -768,15 +513,10 @@ class TestMLPHead:
         assert esm2_mlp_model._head.in_features == hidden_dim
         assert esm2_mlp_model._head.out_features == 1
 
-    def test_backbone_frozen_in_mlp_mode_when_freeze_true(self, esm2_mlp_model):
+    def test_backbone_frozen_in_mlp_mode(self, esm2_mlp_model):
         """All ESM-2 backbone parameters should have requires_grad=False."""
         for param in esm2_mlp_model.esm_model.parameters():
             assert not param.requires_grad
-
-    def test_backbone_trainable_in_mlp_mode_when_freeze_false(self, esm2_mlp_unfrozen_model):
-        """All backbone parameters should have requires_grad=True when freeze_backbone=False."""
-        for param in esm2_mlp_unfrozen_model.esm_model.parameters():
-            assert param.requires_grad
 
     def test_head_on_correct_device(self, esm2_mlp_model):
         """Linear head should be on the same device as the ESM-2 model."""
@@ -785,7 +525,7 @@ class TestMLPHead:
         assert head_device == model_device
 
     def test_no_head_in_log_likelihood_mode(self, esm2_model):
-        """_head should be None when loss_type is not 'mlp_head'."""
+        """_head should be None when loss_fn is not 'mlp_head'."""
         assert esm2_model._head is None
 
     def test_classification_head_output_dim(self, esm2_mlp_classification_model):
@@ -812,7 +552,7 @@ class TestMLPHead:
         esm2_mlp_model.train(sample_data)
         assert not torch.equal(initial_weight, esm2_mlp_model._head.weight)
 
-    def test_mlp_train_does_not_update_backbone_when_frozen(self, esm2_mlp_model, sample_data):
+    def test_mlp_train_does_not_update_backbone(self, esm2_mlp_model, sample_data):
         """train() in mlp_head mode must not change any ESM-2 backbone parameters."""
         initial_params = {
             name: param.clone() for name, param in esm2_mlp_model.esm_model.named_parameters()
@@ -820,20 +560,6 @@ class TestMLPHead:
         esm2_mlp_model.train(sample_data)
         for name, param in esm2_mlp_model.esm_model.named_parameters():
             assert torch.equal(initial_params[name], param), f"Backbone param {name} changed"
-
-    def test_mlp_train_updates_backbone_when_unfrozen(self, esm2_mlp_unfrozen_model, sample_data):
-        """train() in mlp_head mode with freeze_backbone=False must update backbone parameters."""
-        initial_params = {
-            name: param.clone()
-            for name, param in esm2_mlp_unfrozen_model.esm_model.named_parameters()
-        }
-        esm2_mlp_unfrozen_model.train(sample_data)
-        changed = [
-            name
-            for name, param in esm2_mlp_unfrozen_model.esm_model.named_parameters()
-            if not torch.equal(initial_params[name], param)
-        ]
-        assert len(changed) > 0, "Expected at least one backbone parameter to change"
 
     def test_mlp_train_records_epoch_metrics(self, esm2_mlp_model, sample_data):
         """train() in mlp_head mode records one SurrogateEpochMetrics per epoch."""
@@ -920,7 +646,7 @@ class TestMLPHead:
         """train() with optimizer_type='adam' completes and updates head weights."""
         config = ESM2ModelConfig(model_id=MODEL_ID)
         train_cfg = ESM2TrainConfig(
-            loss_type="mlp_head",
+            loss_fn="mlp_head",
             optimizer_type="adam",
             num_epochs=1,
             batch_size=2,
@@ -936,8 +662,7 @@ class TestMLPHead:
         """train() with max_grad_norm set completes without error."""
         config = ESM2ModelConfig(model_id=MODEL_ID)
         train_cfg = ESM2TrainConfig(
-            freeze_backbone=False,
-            loss_type="log_likelihood",
+            loss_fn="mlp_head",
             num_epochs=1,
             batch_size=2,
             max_grad_norm=1.0,
@@ -964,8 +689,7 @@ class TestMLPHead:
         """log_frequency > 1 skips intermediate epochs but always records the final one."""
         config = ESM2ModelConfig(model_id=MODEL_ID)
         train_cfg = ESM2TrainConfig(
-            freeze_backbone=False,
-            loss_type="log_likelihood",
+            loss_fn="mlp_head",
             num_epochs=4,
             batch_size=2,
             log_frequency=3,
