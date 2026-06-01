@@ -45,15 +45,23 @@ from alf_tools.datasets.guacamol import (
     _parse_formula,  # noqa: PLC2701
     _phco,  # noqa: PLC2701
     _tanimoto,  # noqa: PLC2701
+    albuterol_similarity,  # noqa: PLC2701
     arithmetic_mean,  # noqa: PLC2701
+    aripiprazole_similarity,  # noqa: PLC2701
+    camphor_menthol_median,  # noqa: PLC2701
+    celecoxib_rediscovery,  # noqa: PLC2701
     clipped_score,  # noqa: PLC2701
     download_guacamol,
     gaussian_score,  # noqa: PLC2701
     geometric_mean,  # noqa: PLC2701
     isomer_score,  # noqa: PLC2701
     max_gaussian_score,  # noqa: PLC2701
+    mestranol_similarity,  # noqa: PLC2701
     min_gaussian_score,  # noqa: PLC2701
     smarts_score,  # noqa: PLC2701
+    tadalafil_sildenafil_median,  # noqa: PLC2701
+    thiothixene_rediscovery,  # noqa: PLC2701
+    troglitazone_rediscovery,  # noqa: PLC2701
 )
 from pydantic import ValidationError
 from rdkit import Chem as _Chem
@@ -1088,49 +1096,165 @@ class TestTanimotoHelpers:
 
 
 class TestParseFormula:
+    """Tests for _parse_formula."""
+
     def test_simple_formula(self):
+        """Parse a simple formula into element counts."""
         assert _parse_formula("C7H8N2O2") == {"C": 7, "H": 8, "N": 2, "O": 2}
 
     def test_formula_with_two_letter_elements(self):
+        """Parse a formula containing two-letter element symbols."""
         result = _parse_formula("C9H10N2O2PF2Cl")
         assert result == {"C": 9, "H": 10, "N": 2, "O": 2, "P": 1, "F": 2, "Cl": 1}
 
     def test_single_element_no_count_defaults_to_one(self):
+        """An element with no explicit count defaults to 1."""
         assert _parse_formula("H2O") == {"H": 2, "O": 1}
 
 
 class TestIsomerScore:
+    """Tests for isomer_score."""
+
     def test_exact_formula_match_returns_one(self):
+        """A molecule whose formula matches exactly scores 1.0."""
         caffeine = "CN1C=NC2=C1C(=O)N(C(=O)N2C)C"
         target = _parse_formula("C8H10N4O2")
         assert isomer_score(caffeine, target) == pytest.approx(1.0, abs=0.01)
 
     def test_wrong_formula_scores_below_one(self):
+        """A molecule with a mismatched formula scores well below 1."""
         target = _parse_formula("C7H8N2O2")
         assert isomer_score("c1ccccc1", target) < 0.5
 
     def test_invalid_smiles_returns_zero(self):
+        """An invalid SMILES string returns 0.0."""
         target = _parse_formula("C7H8N2O2")
         assert isomer_score("NOTSMILES", target) == pytest.approx(0.0)
 
     def test_score_between_zero_and_one(self):
+        """Score is always in [0, 1]."""
         target = _parse_formula("C7H8N2O2")
         score = isomer_score("CC(=O)O", target)
         assert 0.0 <= score <= 1.0
 
 
 class TestSmartsScore:
+    """Tests for smarts_score."""
+
     def test_molecule_has_match_returns_one(self):
+        """A molecule matching the SMARTS pattern scores 1.0."""
         assert smarts_score("c1ccccc1", "c1ccccc1", inverse=False) == pytest.approx(1.0)
 
     def test_molecule_lacks_match_returns_zero(self):
+        """A molecule without the SMARTS match scores 0.0."""
         assert smarts_score("CC", "c1ccccc1", inverse=False) == pytest.approx(0.0)
 
     def test_inverse_true_rewards_absence(self):
+        """With inverse=True, absence of the pattern scores 1.0."""
         assert smarts_score("CC", "c1ccccc1", inverse=True) == pytest.approx(1.0)
 
     def test_inverse_true_penalizes_presence(self):
+        """With inverse=True, presence of the pattern scores 0.0."""
         assert smarts_score("c1ccccc1", "c1ccccc1", inverse=True) == pytest.approx(0.0)
 
     def test_invalid_smiles_returns_zero(self):
+        """An invalid SMILES string returns 0.0."""
         assert smarts_score("NOTSMILES", "c1ccccc1", inverse=False) == pytest.approx(0.0)
+
+
+_CELECOXIB_SMILES = "CC1=CC=C(C=C1)C1=CC(=NN1C1=CC=C(C=C1)S(N)(=O)=O)C(F)(F)F"
+_TROGLITAZONE_SMILES = "Cc1c(C)c2OC(C)(COc3ccc(CC4SC(=O)NC4=O)cc3)CCc2c(C)c1O"
+_THIOTHIXENE_SMILES = "CN(C)S(=O)(=O)c1ccc2Sc3ccccc3C(=CCCN4CCN(C)CC4)c2c1"
+
+
+class TestRediscoveryScorers:
+    """Tests for rediscovery task scorers."""
+
+    def test_celecoxib_self_score_is_one(self):
+        """Celecoxib against itself scores 1.0."""
+        assert celecoxib_rediscovery(_CELECOXIB_SMILES) == pytest.approx(1.0)
+
+    def test_celecoxib_benzene_scores_low(self):
+        """Benzene against celecoxib reference scores below 0.3."""
+        assert celecoxib_rediscovery("c1ccccc1") < 0.3
+
+    def test_troglitazone_self_score_is_one(self):
+        """Troglitazone against itself scores 1.0."""
+        assert troglitazone_rediscovery(_TROGLITAZONE_SMILES) == pytest.approx(1.0)
+
+    def test_thiothixene_self_score_is_one(self):
+        """Thiothixene against itself scores 1.0."""
+        assert thiothixene_rediscovery(_THIOTHIXENE_SMILES) == pytest.approx(1.0)
+
+    def test_invalid_smiles_returns_zero(self):
+        """Invalid SMILES in rediscovery scorers returns 0.0."""
+        assert celecoxib_rediscovery("NOTSMILES") == pytest.approx(0.0)
+
+    def test_scores_are_in_range(self):
+        """Rediscovery scores are always in [0, 1]."""
+        score = celecoxib_rediscovery("CC(=O)O")
+        assert 0.0 <= score <= 1.0
+
+
+_ARIPIPRAZOLE_SMILES = "Clc4cccc(N3CCN(CCCCOc2ccc1c(NC(=O)CC1)c2)CC3)c4Cl"
+_ALBUTEROL_SMILES = "CC(C)(C)NCC(O)c1ccc(O)c(CO)c1"
+_MESTRANOL_SMILES = "COc1ccc2[C@H]3CC[C@@]4(C)[C@@H](CC[C@@]4(O)C#C)[C@@H]3CCc2c1"
+
+
+class TestSimilarityScorers:
+    """Tests for similarity task scorers."""
+
+    def test_aripiprazole_self_score_is_one(self):
+        """Aripiprazole against itself scores 1.0."""
+        assert aripiprazole_similarity(_ARIPIPRAZOLE_SMILES) == pytest.approx(1.0)
+
+    def test_albuterol_self_score_is_one(self):
+        """Albuterol against itself scores 1.0."""
+        assert albuterol_similarity(_ALBUTEROL_SMILES) == pytest.approx(1.0)
+
+    def test_mestranol_self_score_is_one(self):
+        """Mestranol against itself scores 1.0."""
+        assert mestranol_similarity(_MESTRANOL_SMILES) == pytest.approx(1.0)
+
+    def test_aripiprazole_very_different_mol_scores_below_threshold(self):
+        """Benzene against aripiprazole scores below 1.0."""
+        assert aripiprazole_similarity("c1ccccc1") < 1.0
+
+    def test_invalid_smiles_returns_zero(self):
+        """Invalid SMILES in similarity scorers returns 0.0."""
+        assert aripiprazole_similarity("NOTSMILES") == pytest.approx(0.0)
+
+    def test_scores_in_range(self):
+        """Similarity scores are always in [0, 1]."""
+        score = mestranol_similarity("CC(=O)O")
+        assert 0.0 <= score <= 1.0
+
+
+_CAMPHOR_SMILES = "CC1(C)C2CCC1(C)C(=O)C2"
+_TADALAFIL_SMILES = "O=C1N(CC(N2C1CC3=C(C2C4=CC5=C(OCO5)C=C4)NC6=C3C=CC=C6)=O)C"
+
+
+class TestMedianScorers:
+    """Tests for median molecule task scorers."""
+
+    def test_camphor_scores_above_threshold(self):
+        """Camphor scores above 0.3."""
+        score = camphor_menthol_median(_CAMPHOR_SMILES)
+        assert score > 0.3
+
+    def test_tadalafil_scores_above_zero(self):
+        """Tadalafil scores above zero."""
+        score = tadalafil_sildenafil_median(_TADALAFIL_SMILES)
+        assert score > 0.0
+
+    def test_camphor_menthol_invalid_smiles_returns_zero(self):
+        """Invalid SMILES in camphor-menthol scorer returns 0.0."""
+        assert camphor_menthol_median("NOTSMILES") == pytest.approx(0.0)
+
+    def test_tadalafil_sildenafil_score_is_in_range(self):
+        """Tadalafil-sildenafil scores are in [0, 1]."""
+        assert 0.0 <= tadalafil_sildenafil_median("CC(=O)O") <= 1.0
+
+    def test_camphor_menthol_score_is_in_range(self):
+        """Camphor-menthol scores are in [0, 1]."""
+        assert 0.0 <= camphor_menthol_median("CC(=O)O") <= 1.0

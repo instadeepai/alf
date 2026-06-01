@@ -551,6 +551,114 @@ def smarts_score(smiles: str, smarts: str, inverse: bool = False) -> float:
     return 0.0 if (has_match == inverse) else 1.0
 
 
+# ---------------------------------------------------------------------------
+# Reference molecules — computed once at import
+# ---------------------------------------------------------------------------
+
+_CELECOXIB = Chem.MolFromSmiles(
+    "CC1=CC=C(C=C1)C1=CC(=NN1C1=CC=C(C=C1)S(N)(=O)=O)C(F)(F)F"
+)
+_TROGLITAZONE = Chem.MolFromSmiles(
+    "Cc1c(C)c2OC(C)(COc3ccc(CC4SC(=O)NC4=O)cc3)CCc2c(C)c1O"
+)
+_THIOTHIXENE = Chem.MolFromSmiles(
+    "CN(C)S(=O)(=O)c1ccc2Sc3ccccc3C(=CCCN4CCN(C)CC4)c2c1"
+)
+
+_CELECOXIB_FP4 = _ecfp4(_CELECOXIB)
+_TROGLITAZONE_FP4 = _ecfp4(_TROGLITAZONE)
+_THIOTHIXENE_FP4 = _ecfp4(_THIOTHIXENE)
+
+
+# ---------------------------------------------------------------------------
+# Rediscovery task scorers
+# ---------------------------------------------------------------------------
+
+
+def celecoxib_rediscovery(smiles: str) -> float:
+    """Tanimoto ECFP4 to celecoxib, clipped at 1.0. Score=1.0 for exact match."""
+    return clipped_score(_tanimoto(smiles, _CELECOXIB_FP4, _ecfp4), upper=1.0)
+
+
+def troglitazone_rediscovery(smiles: str) -> float:
+    """Tanimoto ECFP4 to troglitazone, clipped at 1.0."""
+    return clipped_score(_tanimoto(smiles, _TROGLITAZONE_FP4, _ecfp4), upper=1.0)
+
+
+def thiothixene_rediscovery(smiles: str) -> float:
+    """Tanimoto ECFP4 to thiothixene, clipped at 1.0."""
+    return clipped_score(_tanimoto(smiles, _THIOTHIXENE_FP4, _ecfp4), upper=1.0)
+
+
+_ARIPIPRAZOLE = Chem.MolFromSmiles("Clc4cccc(N3CCN(CCCCOc2ccc1c(NC(=O)CC1)c2)CC3)c4Cl")
+_ALBUTEROL = Chem.MolFromSmiles("CC(C)(C)NCC(O)c1ccc(O)c(CO)c1")
+_MESTRANOL = Chem.MolFromSmiles(
+    "COc1ccc2[C@H]3CC[C@@]4(C)[C@@H](CC[C@@]4(O)C#C)[C@@H]3CCc2c1"
+)
+
+_ARIPIPRAZOLE_FCFP4 = _fcfp4(_ARIPIPRAZOLE)
+_ALBUTEROL_FCFP4 = _fcfp4(_ALBUTEROL)
+_MESTRANOL_AP = _ap(_MESTRANOL)
+
+_SIMILARITY_THRESHOLD = 0.75
+
+
+# ---------------------------------------------------------------------------
+# Similarity task scorers
+# ---------------------------------------------------------------------------
+
+
+def aripiprazole_similarity(smiles: str) -> float:
+    """Tanimoto FCFP4 to aripiprazole, clipped at 0.75."""
+    return clipped_score(_tanimoto(smiles, _ARIPIPRAZOLE_FCFP4, _fcfp4), upper=_SIMILARITY_THRESHOLD)
+
+
+def albuterol_similarity(smiles: str) -> float:
+    """Tanimoto FCFP4 to albuterol, clipped at 0.75."""
+    return clipped_score(_tanimoto(smiles, _ALBUTEROL_FCFP4, _fcfp4), upper=_SIMILARITY_THRESHOLD)
+
+
+def mestranol_similarity(smiles: str) -> float:
+    """Tanimoto atom-pair to mestranol, clipped at 0.75."""
+    return clipped_score(_tanimoto(smiles, _MESTRANOL_AP, _ap), upper=_SIMILARITY_THRESHOLD)
+
+
+_CAMPHOR = Chem.MolFromSmiles("CC1(C)C2CCC1(C)C(=O)C2")
+_MENTHOL = Chem.MolFromSmiles("CC(C)C1CCC(C)CC1O")
+_TADALAFIL = Chem.MolFromSmiles(
+    "O=C1N(CC(N2C1CC3=C(C2C4=CC5=C(OCO5)C=C4)NC6=C3C=CC=C6)=O)C"
+)
+_SILDENAFIL = Chem.MolFromSmiles(
+    "CCCC1=NN(C2=C1N=C(NC2=O)C3=C(C=CC(=C3)S(=O)(=O)N4CCN(CC4)C)OCC)C"
+)
+
+_CAMPHOR_FP4 = _ecfp4(_CAMPHOR)
+_MENTHOL_FP4 = _ecfp4(_MENTHOL)
+_TADALAFIL_FP6 = _ecfp6(_TADALAFIL)
+_SILDENAFIL_FP6 = _ecfp6(_SILDENAFIL)
+
+
+# ---------------------------------------------------------------------------
+# Median molecule task scorers
+# ---------------------------------------------------------------------------
+
+
+def camphor_menthol_median(smiles: str) -> float:
+    """Geometric mean of Tanimoto ECFP4 to camphor and menthol."""
+    return geometric_mean([
+        _tanimoto(smiles, _CAMPHOR_FP4, _ecfp4),
+        _tanimoto(smiles, _MENTHOL_FP4, _ecfp4),
+    ])
+
+
+def tadalafil_sildenafil_median(smiles: str) -> float:
+    """Geometric mean of Tanimoto ECFP6 to tadalafil and sildenafil."""
+    return geometric_mean([
+        _tanimoto(smiles, _TADALAFIL_FP6, _ecfp6),
+        _tanimoto(smiles, _SILDENAFIL_FP6, _ecfp6),
+    ])
+
+
 def _label_smiles(
     smiles_list: list[str],
     properties: list[GuacaMolPropertyName],
