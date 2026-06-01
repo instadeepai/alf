@@ -11,6 +11,29 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 
 **Note:** Requires authentication via `.netrc` file (see main [README](../README.md#authentication))
 
+### Optional Extras
+
+Some models require additional dependencies. Append one or more extras to the package URL:
+
+```bash
+# ESM2 — protein language model (for ESM2Model)
+pip install "alf_tools[esm2] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+
+# Chemprop — small-molecule MPNN (for ChempropModel)
+pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+
+# Both extras together
+pip install "alf_tools[esm2,chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+```
+
+For development installs, pass `--extra` flags to `uv sync`:
+
+```bash
+uv sync --extra esm2
+uv sync --extra chemprop
+uv sync --extra esm2 --extra chemprop
+```
+
 ## What's Included
 
 ### Datasets

@@ -40,6 +40,19 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=core
 pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 ```
 
+**Optional extras** (required for ESM2Model and ChempropModel):
+
+```bash
+# ESM2 — protein language model
+pip install "alf_tools[esm2] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+
+# Chemprop — small-molecule MPNN
+pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+
+# Both extras together
+pip install "alf_tools[esm2,chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+```
+
 **Authentication:** Set up a `.netrc` file in your home directory with your GitHub personal access token:
 
 ```
