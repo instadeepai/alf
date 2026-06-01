@@ -255,30 +255,39 @@ class ESM2Model(BaseModel):
         }
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
-        """Compute pseudo-log-likelihood scores for the given candidates.
+        """Compute predictions for the given candidates.
 
-        Masks all non-special tokens, forward-passes through the model, and
-        averages the per-token log-probabilities at the true token identities.
-        Higher values indicate sequences the model considers more probable.
+        In 'log_likelihood' mode: masks all non-special tokens and returns per-sequence
+        pseudo-log-likelihood scores (higher = more probable to the model).
+        In 'mlp_head' mode: embeds sequences through the frozen backbone and passes
+        them through the linear head. Returns regression values (output_dim=1) or
+        argmax class indices (output_dim>1).
 
         Args:
             candidate_points: List of candidates to score. Must be non-empty.
 
         Returns:
-            Predictions whose means are per-sequence pseudo-log-likelihoods,
-            shape (n_candidates,). variances is always None.
+            Predictions whose means are shape (n_candidates,). variances is always None.
 
         Raises:
             ValueError: If candidate_points is empty.
-
-        Note:
-            All sequences are tokenized in one pass before batching the forward pass.
-            ``batch_size_inference`` controls only the model forward pass. For very
-            large candidate lists, consider chunking externally.
         """
         if not candidate_points:
             raise ValueError("candidate_points must be non-empty")
 
+        if self.train_config.loss_type == "mlp_head":
+            return self._predict_mlp(candidate_points)
+        return self._predict_log_likelihood(candidate_points)
+
+    def _predict_log_likelihood(self, candidate_points: list[Candidate]) -> Predictions:
+        """Compute pseudo-log-likelihood scores by masking all non-special tokens.
+
+        Args:
+            candidate_points: Non-empty list of candidates to score.
+
+        Returns:
+            Predictions with per-sequence log-likelihood scores. variances is None.
+        """
         batch = self.featurise(candidate_points)
         all_input_ids = batch["input_ids"]
         all_attention_mask = batch["attention_mask"]
@@ -320,6 +329,54 @@ class ESM2Model(BaseModel):
                 log_likelihoods.extend(seq_lls.cpu().tolist())
 
         return Predictions(means=np.array(log_likelihoods, dtype=np.float32))
+
+    def _predict_mlp(self, candidate_points: list[Candidate]) -> Predictions:
+        """Compute predictions using the frozen backbone and MLP head.
+
+        Args:
+            candidate_points: Non-empty list of candidates.
+
+        Returns:
+            Predictions with regression values (output_dim=1) or argmax class indices
+            (output_dim>1). variances is None.
+        """
+        assert self._head is not None
+        batch = self.featurise(candidate_points)
+        all_input_ids = batch["input_ids"]
+        all_attention_mask = batch["attention_mask"]
+
+        all_preds: list[torch.Tensor] = []
+        batch_size = self.train_config.batch_size_inference
+        assert batch_size is not None
+
+        self.esm_model.eval()
+        self._head.eval()
+        with torch.no_grad():
+            for start in range(0, len(candidate_points), batch_size):
+                input_ids = all_input_ids[start : start + batch_size].to(self.device)
+                attention_mask = all_attention_mask[start : start + batch_size].to(self.device)
+
+                outputs = self.esm_model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    output_hidden_states=True,
+                )
+                hidden_state = outputs.hidden_states[self.model_config.repr_layer]
+
+                if self.model_config.pooling == "mean":
+                    mask = attention_mask.unsqueeze(-1).float()
+                    embeddings = (hidden_state * mask).sum(1) / mask.sum(1)
+                else:  # cls
+                    embeddings = hidden_state[:, 0, :]
+
+                head_out = self._head(embeddings)
+                if self.train_config.output_dim == 1:
+                    preds = head_out.squeeze(-1)
+                else:
+                    preds = head_out.argmax(dim=-1).float()
+                all_preds.append(preds.cpu())
+
+        return Predictions(means=torch.cat(all_preds, dim=0).numpy().astype(np.float32))
 
     def embed(self, candidate_points: list[Candidate]) -> np.ndarray:
         """Compute sequence embeddings using the configured pooling strategy.

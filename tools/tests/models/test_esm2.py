@@ -816,3 +816,33 @@ class TestMLPHead:
         esm2_mlp_model.train(sample_data)
         for m in esm2_mlp_model.get_epoch_metrics():
             assert "train_log_likelihood" not in m.additional_metrics
+
+    def test_mlp_predict_shape(self, esm2_mlp_model, sample_data):
+        """predict() in mlp_head mode returns means of shape (n_candidates,)."""
+        predictions = esm2_mlp_model.predict(sample_data.candidates)
+        assert predictions.means.ndim == 1
+        assert predictions.means.shape == (len(sample_data),)
+
+    def test_mlp_predict_variances_none(self, esm2_mlp_model, sample_data):
+        """predict() in mlp_head mode returns Predictions with variances=None."""
+        predictions = esm2_mlp_model.predict(sample_data.candidates)
+        assert predictions.variances is None
+
+    def test_mlp_predict_finite(self, esm2_mlp_model, sample_data):
+        """predict() in mlp_head mode returns finite values."""
+        predictions = esm2_mlp_model.predict(sample_data.candidates)
+        assert np.all(np.isfinite(predictions.means))
+
+    def test_mlp_predict_empty_raises(self, esm2_mlp_model):
+        """predict() with an empty list raises ValueError."""
+        with pytest.raises(ValueError, match="non-empty"):
+            esm2_mlp_model.predict([])
+
+    def test_mlp_classification_predict_returns_class_indices(
+        self, esm2_mlp_classification_model, sample_data
+    ):
+        """predict() with output_dim=2 returns argmax class indices in [0, output_dim)."""
+        preds = esm2_mlp_classification_model.predict(sample_data.candidates)
+        assert preds.means.shape == (len(sample_data),)
+        assert np.all(preds.means >= 0)
+        assert np.all(preds.means < 2)  # output_dim=2
