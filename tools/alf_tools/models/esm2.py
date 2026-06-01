@@ -58,7 +58,8 @@ class ESM2TrainConfig(BaseTrainConfig):
 
     Args:
         freeze_backbone: When True and loss_type='log_likelihood', train() is a no-op.
-            Must be True when loss_type='mlp_head' (backbone is always frozen in that mode).
+            When True and loss_type='mlp_head', only the linear head is trained.
+            When False and loss_type='mlp_head', the full ESM-2 backbone and head are trained jointly.
         learning_rate: Learning rate for the optimizer.
         optimizer_type: Which optimizer to use ('adam' or 'adamw').
         batch_size: Batch size for training.
@@ -96,7 +97,6 @@ class ESM2TrainConfig(BaseTrainConfig):
             ValueError: If num_epochs < 1.
             ValueError: If optimizer_type is not 'adam' or 'adamw'.
             ValueError: If loss_type is not 'log_likelihood' or 'mlp_head'.
-            ValueError: If loss_type='mlp_head' and freeze_backbone=False.
             ValueError: If mlp_loss is not 'mse' or 'cross_entropy'.
         """
         if self.num_epochs < 1:
@@ -108,11 +108,6 @@ class ESM2TrainConfig(BaseTrainConfig):
         if self.loss_type not in ("log_likelihood", "mlp_head"):
             raise ValueError(
                 f"loss_type must be 'log_likelihood' or 'mlp_head', got {self.loss_type!r}"
-            )
-        if self.loss_type == "mlp_head" and not self.freeze_backbone:
-            raise ValueError(
-                "mlp_head mode requires freeze_backbone=True. "
-                "The ESM-2 backbone is always frozen when training an MLP head."
             )
         if self.mlp_loss not in ("mse", "cross_entropy"):
             raise ValueError(f"mlp_loss must be 'mse' or 'cross_entropy', got {self.mlp_loss!r}")

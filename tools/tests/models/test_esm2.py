@@ -157,10 +157,10 @@ class TestConfigs:
         with pytest.raises(ValueError, match="num_epochs must be >= 1"):
             ESM2TrainConfig(num_epochs=0)
 
-    def test_mlp_head_with_unfrozen_backbone_raises(self):
-        """mlp_head mode requires freeze_backbone=True — raises ValueError otherwise."""
-        with pytest.raises(ValueError, match="mlp_head.*freeze_backbone"):
-            ESM2TrainConfig(loss_type="mlp_head", freeze_backbone=False)
+    def test_mlp_head_with_unfrozen_backbone_is_valid(self):
+        """loss_type='mlp_head' with freeze_backbone=False must not raise."""
+        cfg = ESM2TrainConfig(loss_type="mlp_head", freeze_backbone=False)
+        assert cfg.freeze_backbone is False
 
     def test_invalid_loss_type_raises(self):
         """Invalid loss_type raises ValueError."""
