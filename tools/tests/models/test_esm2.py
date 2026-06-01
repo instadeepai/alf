@@ -752,4 +752,3 @@ class TestMLPHead:
         loader = esm2_model._prepare_data_loader(sample_data)
         batch = next(iter(loader))
         assert len(batch) == 2
-

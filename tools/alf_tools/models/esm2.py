@@ -115,9 +115,7 @@ class ESM2TrainConfig(BaseTrainConfig):
                 "The ESM-2 backbone is always frozen when training an MLP head."
             )
         if self.mlp_loss not in ("mse", "cross_entropy"):
-            raise ValueError(
-                f"mlp_loss must be 'mse' or 'cross_entropy', got {self.mlp_loss!r}"
-            )
+            raise ValueError(f"mlp_loss must be 'mse' or 'cross_entropy', got {self.mlp_loss!r}")
 
 
 class ESM2Model(BaseModel):
@@ -126,7 +124,8 @@ class ESM2Model(BaseModel):
     Loads a pre-trained ESM-2 checkpoint from HuggingFace and exposes it as a
     BaseModel. predict() returns per-sequence pseudo-log-likelihood scores;
     embed() returns per-sequence embeddings. Optionally fine-tunes the backbone
-    with log-likelihood masking, or trains a frozen-backbone linear head for regression or classification.
+    with log-likelihood masking, or trains a frozen-backbone linear head for
+    regression or classification.
     """
 
     def __init__(
