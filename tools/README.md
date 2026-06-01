@@ -47,7 +47,7 @@ uv sync --extra esm2 --extra chemprop
   selection, input normalisation, and output standardisation enabled by default
 - **ESM2Model** - Protein language model surrogate backed by
   [ESM-2](https://huggingface.co/docs/transformers/model_doc/esm). Accepts amino acid sequences
-  directly; embeddings can also be extracted via `featurise()`. Requires the `[esm2]` optional
+  directly; embeddings can also be extracted via `embed()`. Requires the `[esm2]` optional
   extra: `pip install "alf-tools[esm2]"`
 - **ChempropModel** - Message Passing Neural Network (MPNN) for small-molecule fitness prediction,
   backed by [Chemprop v2.x](https://chemprop.readthedocs.io/). Accepts SMILES strings directly;
