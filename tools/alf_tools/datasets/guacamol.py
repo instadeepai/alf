@@ -17,6 +17,7 @@ import hashlib
 import logging
 import math
 import os
+import re
 import time
 from functools import lru_cache
 from pathlib import Path
@@ -499,6 +500,55 @@ def _tanimoto(smiles: str, ref_fp, fp_fn: Callable) -> float:
     return DataStructs.TanimotoSimilarity(fp_fn(mol), ref_fp)
 
 
+# ---------------------------------------------------------------------------
+# Isomer and SMARTS scoring helpers
+# ---------------------------------------------------------------------------
+
+
+def _parse_formula(formula: str) -> dict[str, int]:
+    """Parse a molecular formula string into {element: count}.
+
+    Example: 'C7H8N2O2' → {'C': 7, 'H': 8, 'N': 2, 'O': 2}
+
+    Returns:
+        Mapping of element symbol to atom count.
+    """
+    return {el: int(cnt or 1) for el, cnt in re.findall(r"([A-Z][a-z]?)(\d*)", formula) if el}
+
+
+def isomer_score(smiles: str, target_formula: dict[str, int]) -> float:
+    """Geometric mean of per-element Gaussian scores (mu=target count, sigma=1).
+
+    Scores 1.0 when the molecule's formula matches target_formula exactly.
+    Returns 0.0 for invalid SMILES.
+    """
+    mol = _mol_from_smiles(smiles)
+    if mol is None:
+        return 0.0
+    mol_formula = rdMolDescriptors.CalcMolFormula(mol)
+    mol_counts = _parse_formula(mol_formula)
+    scores = [
+        gaussian_score(float(mol_counts.get(el, 0)), mu=float(target_count), sigma=1.0)
+        for el, target_count in target_formula.items()
+    ]
+    return geometric_mean(scores)
+
+
+def smarts_score(smiles: str, smarts: str, inverse: bool = False) -> float:
+    """Returns 1.0 if molecule has (inverse=False) or lacks (inverse=True) the SMARTS match.
+
+    Returns 0.0 for invalid SMILES or unparseable SMARTS.
+    """
+    mol = _mol_from_smiles(smiles)
+    if mol is None:
+        return 0.0
+    pattern = Chem.MolFromSmarts(smarts)
+    if pattern is None:
+        return 0.0
+    has_match = mol.HasSubstructMatch(pattern)
+    return 0.0 if (has_match == inverse) else 1.0
+
+
 def _label_smiles(
     smiles_list: list[str],
     properties: list[GuacaMolPropertyName],
@@ -697,19 +747,19 @@ class GuacaMol(BaseDataset):
                 if mol is None:
                     raise ValueError(f"Cannot compute label for invalid SMILES: {candidate.data!r}")
                 label_val = PROPERTY_FNS[self.config.target_property](mol)
-                # Populate features if not already set
+                out_candidate = candidate
                 if not candidate.features:
                     props_to_compute: list[GuacaMolPropertyName] = list(
                         self.config.computed_properties
                         or [cast(GuacaMolPropertyName, self.config.target_property)]
                     )
-                    candidate = Candidate(
+                    out_candidate = Candidate(
                         data=candidate.data,
                         modality=candidate.modality,
                         features=dict(_compute_properties(candidate.data, props_to_compute) or {}),
                     )
                 result_labels.append(label_val)
-                result_candidates.append(candidate)
+                result_candidates.append(out_candidate)
 
         return LabelledCandidates(
             candidates=result_candidates,

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
 import inspect
 import os
 import shutil
@@ -31,15 +32,31 @@ from alf_tools.datasets.guacamol import (
     FILENAME_VALID,
     GuacaMol,
     GuacaMolConfig,
+    _ap,  # noqa: PLC2701
     _cache_path,  # noqa: PLC2701
     _canonical_smiles,  # noqa: PLC2701
     _compute_properties,  # noqa: PLC2701
     _download_file,  # noqa: PLC2701
+    _ecfp4,  # noqa: PLC2701
+    _ecfp6,  # noqa: PLC2701
+    _fcfp4,  # noqa: PLC2701
     _load_smiles_file,  # noqa: PLC2701
     _mol_from_smiles,  # noqa: PLC2701
+    _parse_formula,  # noqa: PLC2701
+    _phco,  # noqa: PLC2701
+    _tanimoto,  # noqa: PLC2701
+    arithmetic_mean,  # noqa: PLC2701
+    clipped_score,  # noqa: PLC2701
     download_guacamol,
+    gaussian_score,  # noqa: PLC2701
+    geometric_mean,  # noqa: PLC2701
+    isomer_score,  # noqa: PLC2701
+    max_gaussian_score,  # noqa: PLC2701
+    min_gaussian_score,  # noqa: PLC2701
+    smarts_score,  # noqa: PLC2701
 )
 from pydantic import ValidationError
+from rdkit import Chem as _Chem
 
 pytestmark = [pytest.mark.guacamol, pytest.mark.rdkit]
 
@@ -373,7 +390,7 @@ class TestGuacaMolPaperSplits:
     """Tests for GuacaMol paper-split mode using original figshare file boundaries."""
 
     def test_train_split_contains_train_file_smiles(self, tmp_path):
-        """train_dataset candidates exactly match the canonical form of the train split file contents."""
+        """train_dataset candidates match the canonical SMILES of the train split file."""
         _write_paper_files(tmp_path)
         dataset = GuacaMol(_paper_config(data_dir=tmp_path))
         assert {c.data for c in dataset.train_dataset.candidates} == {
@@ -381,7 +398,7 @@ class TestGuacaMolPaperSplits:
         }
 
     def test_validation_split_contains_valid_file_smiles(self, tmp_path):
-        """validation_dataset candidates exactly match the canonical form of the valid split file contents."""
+        """validation_dataset candidates match the canonical SMILES of the valid split file."""
         _write_paper_files(tmp_path)
         dataset = GuacaMol(_paper_config(data_dir=tmp_path))
         assert {c.data for c in dataset.validation_dataset.candidates} == {
@@ -389,7 +406,7 @@ class TestGuacaMolPaperSplits:
         }
 
     def test_test_split_contains_test_file_smiles(self, tmp_path):
-        """test_dataset candidates exactly match the canonical form of the test split file contents."""
+        """test_dataset candidates match the canonical SMILES of the test split file."""
         _write_paper_files(tmp_path)
         dataset = GuacaMol(_paper_config(data_dir=tmp_path))
         assert {c.data for c in dataset.test_dataset.candidates} == {
@@ -429,7 +446,7 @@ class TestGuacaMolPaperSplits:
         assert len(dataset._raw_dataset) == expected
 
     def test_paper_split_all_invalid_in_valid_file(self, tmp_path, monkeypatch):
-        """Silent data-loss: a split file with only invalid SMILES produces empty validation split."""
+        """A split file with only invalid SMILES produces an empty validation split."""
         config = _paper_config(data_dir=tmp_path)
         # Write valid SMILES to train and test, but only invalid to valid
         (tmp_path / FILENAME_TRAIN).write_text("CCO\nCC\nCCCO\n")
@@ -664,8 +681,6 @@ class TestDownloadFile:
 
     def test_download_verifies_sha256_match(self, tmp_path, monkeypatch):
         """_download_file does not raise when sha256 matches the downloaded content."""
-        import hashlib
-
         content = b"CC\nCCO\n"
         mock_resp = _make_mock_response(["CC", "CCO"])
         monkeypatch.setattr("requests.get", lambda *a, **kw: mock_resp)
@@ -917,16 +932,6 @@ class TestDownloadGuacaMol:
         assert (new_dir / FILENAME_ALL).exists()
 
 
-from alf_tools.datasets.guacamol import (
-    arithmetic_mean,  # noqa: PLC2701
-    clipped_score,  # noqa: PLC2701
-    gaussian_score,  # noqa: PLC2701
-    geometric_mean,  # noqa: PLC2701
-    max_gaussian_score,  # noqa: PLC2701
-    min_gaussian_score,  # noqa: PLC2701
-)
-
-
 class TestClippedScore:
     """Tests for clipped_score score modifier."""
 
@@ -1029,17 +1034,6 @@ class TestArithmeticMean:
         assert arithmetic_mean([]) == pytest.approx(0.0)
 
 
-from alf_tools.datasets.guacamol import (
-    _ap,  # noqa: PLC2701
-    _ecfp4,  # noqa: PLC2701
-    _ecfp6,  # noqa: PLC2701
-    _fcfp4,  # noqa: PLC2701
-    _phco,  # noqa: PLC2701
-    _tanimoto,  # noqa: PLC2701
-)
-from rdkit import Chem as _Chem
-
-
 class TestTanimotoHelpers:
     """Tests for fingerprint helper functions and _tanimoto similarity scorer."""
 
@@ -1091,3 +1085,52 @@ class TestTanimotoHelpers:
         ref_fp = _ecfp4(mol1)
         score = _tanimoto("CC(C)Cc1ccc(CC(C)C(=O)O)cc1", ref_fp, _ecfp4)
         assert 0.0 <= score <= 1.0
+
+
+class TestParseFormula:
+    def test_simple_formula(self):
+        assert _parse_formula("C7H8N2O2") == {"C": 7, "H": 8, "N": 2, "O": 2}
+
+    def test_formula_with_two_letter_elements(self):
+        result = _parse_formula("C9H10N2O2PF2Cl")
+        assert result == {"C": 9, "H": 10, "N": 2, "O": 2, "P": 1, "F": 2, "Cl": 1}
+
+    def test_single_element_no_count_defaults_to_one(self):
+        assert _parse_formula("H2O") == {"H": 2, "O": 1}
+
+
+class TestIsomerScore:
+    def test_exact_formula_match_returns_one(self):
+        caffeine = "CN1C=NC2=C1C(=O)N(C(=O)N2C)C"
+        target = _parse_formula("C8H10N4O2")
+        assert isomer_score(caffeine, target) == pytest.approx(1.0, abs=0.01)
+
+    def test_wrong_formula_scores_below_one(self):
+        target = _parse_formula("C7H8N2O2")
+        assert isomer_score("c1ccccc1", target) < 0.5
+
+    def test_invalid_smiles_returns_zero(self):
+        target = _parse_formula("C7H8N2O2")
+        assert isomer_score("NOTSMILES", target) == pytest.approx(0.0)
+
+    def test_score_between_zero_and_one(self):
+        target = _parse_formula("C7H8N2O2")
+        score = isomer_score("CC(=O)O", target)
+        assert 0.0 <= score <= 1.0
+
+
+class TestSmartsScore:
+    def test_molecule_has_match_returns_one(self):
+        assert smarts_score("c1ccccc1", "c1ccccc1", inverse=False) == pytest.approx(1.0)
+
+    def test_molecule_lacks_match_returns_zero(self):
+        assert smarts_score("CC", "c1ccccc1", inverse=False) == pytest.approx(0.0)
+
+    def test_inverse_true_rewards_absence(self):
+        assert smarts_score("CC", "c1ccccc1", inverse=True) == pytest.approx(1.0)
+
+    def test_inverse_true_penalizes_presence(self):
+        assert smarts_score("c1ccccc1", "c1ccccc1", inverse=True) == pytest.approx(0.0)
+
+    def test_invalid_smiles_returns_zero(self):
+        assert smarts_score("NOTSMILES", "c1ccccc1", inverse=False) == pytest.approx(0.0)
