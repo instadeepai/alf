@@ -28,11 +28,6 @@ from alf_core.utils.metrics.base import (
     regression_metric_registry,
     require_min_samples,
 )
-from alf_core.utils.metrics.benchmarking import (
-    BenchmarkingMetricRegistry,
-    benchmarking_metric_registry,
-    register_benchmarking_metric,
-)
 from alf_core.utils.metrics.classification import (
     accuracy,
     auc_roc,
