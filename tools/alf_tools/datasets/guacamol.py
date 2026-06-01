@@ -15,7 +15,9 @@
 import copy
 import hashlib
 import logging
+import math
 import os
+import re
 import time
 from functools import lru_cache
 from pathlib import Path
@@ -28,11 +30,51 @@ from alf_core.dataclasses.candidate import Modality
 from alf_core.dataset.base_dataset import BaseDatasetConfig
 from alf_core.utils.enums import ProblemType
 from pydantic import Field, computed_field, model_validator
-from rdkit import Chem
+from rdkit import Chem, DataStructs
+from rdkit.Chem import AllChem
 from rdkit.Chem import QED as RDKitQED
 from rdkit.Chem import Descriptors, GraphDescriptors, rdMolDescriptors
 
 logger = logging.getLogger("alf-tools")
+
+# ---------------------------------------------------------------------------
+# Score modifiers for benchmark task scoring
+# ---------------------------------------------------------------------------
+
+
+def clipped_score(x: float, upper: float = 1.0) -> float:
+    """Linear ramp [0, upper] → [0, 1], clipped to 1.0 above upper."""
+    return min(1.0, x / upper)
+
+
+def gaussian_score(x: float, mu: float, sigma: float) -> float:
+    """Gaussian bell: 1.0 at x==mu, decaying symmetrically with sigma."""
+    return math.exp(-0.5 * ((x - mu) / sigma) ** 2)
+
+
+def max_gaussian_score(x: float, mu: float, sigma: float) -> float:
+    """Half-Gaussian: 1.0 for x >= mu, Gaussian fall-off below mu."""
+    return 1.0 if x >= mu else gaussian_score(x, mu, sigma)
+
+
+def min_gaussian_score(x: float, mu: float, sigma: float) -> float:
+    """Half-Gaussian: 1.0 for x <= mu, Gaussian fall-off above mu."""
+    return 1.0 if x <= mu else gaussian_score(x, mu, sigma)
+
+
+def geometric_mean(scores: list[float]) -> float:
+    """Geometric mean of scores; returns 0.0 for empty list."""
+    if not scores:
+        return 0.0
+    return math.prod(scores) ** (1.0 / len(scores))
+
+
+def arithmetic_mean(scores: list[float]) -> float:
+    """Arithmetic mean of scores; returns 0.0 for empty list."""
+    if not scores:
+        return 0.0
+    return sum(scores) / len(scores)
+
 
 DATAPATH = Path.home() / ".cache" / "alf"
 

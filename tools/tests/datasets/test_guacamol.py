@@ -911,3 +911,84 @@ class TestDownloadGuacaMol:
             download_guacamol(data_dir=new_dir)
         assert new_dir.exists()
         assert (new_dir / FILENAME_ALL).exists()
+
+
+from alf_tools.datasets.guacamol import (
+    clipped_score,       # noqa: PLC2701
+    gaussian_score,      # noqa: PLC2701
+    max_gaussian_score,  # noqa: PLC2701
+    min_gaussian_score,  # noqa: PLC2701
+    geometric_mean,      # noqa: PLC2701
+    arithmetic_mean,     # noqa: PLC2701
+)
+
+
+class TestClippedScore:
+    def test_at_threshold_returns_one(self):
+        assert clipped_score(0.75, upper=0.75) == pytest.approx(1.0)
+
+    def test_above_threshold_is_clipped_to_one(self):
+        assert clipped_score(0.9, upper=0.75) == pytest.approx(1.0)
+
+    def test_below_threshold_is_linear(self):
+        assert clipped_score(0.5, upper=1.0) == pytest.approx(0.5)
+
+    def test_zero_input_returns_zero(self):
+        assert clipped_score(0.0, upper=1.0) == pytest.approx(0.0)
+
+
+class TestGaussianScore:
+    def test_at_mu_returns_one(self):
+        assert gaussian_score(5.0, mu=5.0, sigma=1.0) == pytest.approx(1.0)
+
+    def test_far_from_mu_near_zero(self):
+        assert gaussian_score(100.0, mu=0.0, sigma=1.0) < 1e-10
+
+    def test_symmetric_around_mu(self):
+        assert gaussian_score(4.0, mu=5.0, sigma=1.0) == pytest.approx(
+            gaussian_score(6.0, mu=5.0, sigma=1.0)
+        )
+
+
+class TestMaxGaussianScore:
+    def test_above_mu_returns_one(self):
+        assert max_gaussian_score(10.0, mu=5.0, sigma=1.0) == pytest.approx(1.0)
+
+    def test_at_mu_returns_one(self):
+        assert max_gaussian_score(5.0, mu=5.0, sigma=1.0) == pytest.approx(1.0)
+
+    def test_below_mu_falls_off(self):
+        assert max_gaussian_score(3.0, mu=5.0, sigma=1.0) < 1.0
+
+
+class TestMinGaussianScore:
+    def test_below_mu_returns_one(self):
+        assert min_gaussian_score(0.0, mu=5.0, sigma=1.0) == pytest.approx(1.0)
+
+    def test_at_mu_returns_one(self):
+        assert min_gaussian_score(5.0, mu=5.0, sigma=1.0) == pytest.approx(1.0)
+
+    def test_above_mu_falls_off(self):
+        assert min_gaussian_score(8.0, mu=5.0, sigma=1.0) < 1.0
+
+
+class TestGeometricMean:
+    def test_single_value(self):
+        assert geometric_mean([0.5]) == pytest.approx(0.5)
+
+    def test_equal_values(self):
+        assert geometric_mean([0.5, 0.5]) == pytest.approx(0.5)
+
+    def test_zero_collapses_result(self):
+        assert geometric_mean([1.0, 0.0, 1.0]) == pytest.approx(0.0)
+
+    def test_empty_returns_zero(self):
+        assert geometric_mean([]) == pytest.approx(0.0)
+
+
+class TestArithmeticMean:
+    def test_equal_values(self):
+        assert arithmetic_mean([0.4, 0.6]) == pytest.approx(0.5)
+
+    def test_empty_returns_zero(self):
+        assert arithmetic_mean([]) == pytest.approx(0.0)
