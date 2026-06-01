@@ -235,7 +235,8 @@ class GuacaMolConfig(BaseDatasetConfig):
     @model_validator(mode="after")
     def _validate_and_sync(self) -> "GuacaMolConfig":
         if (
-            self.computed_properties is not None
+            self.target_property in ALL_PROPERTIES
+            and self.computed_properties is not None
             and self.target_property not in self.computed_properties
         ):
             raise ValueError(

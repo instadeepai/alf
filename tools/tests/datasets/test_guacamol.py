@@ -174,6 +174,14 @@ class TestGuacaMolConfig:
         config = _base_config(data_dir=tmp_path)
         assert config.data_dir == tmp_path
 
+    def test_benchmark_task_with_computed_properties_does_not_raise(self):
+        """computed_properties is ignored for benchmark tasks — no ValueError."""
+        config = _base_config(
+            target_property="celecoxib_rediscovery",
+            computed_properties=["TPSA", "MolWt"],
+        )
+        assert config.task_type == "benchmark_task"
+
 
 class TestComputeProperties:
     """Unit tests for the _compute_properties RDKit descriptor helper."""
