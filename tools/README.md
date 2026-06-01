@@ -22,7 +22,7 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 - **CNNModel** - Convolutional neural network for sequence modeling. Supports `ProblemType.REGRESSION`, `ProblemType.BINARY`, and `ProblemType.MULTICLASS`; output shape and activation are determined automatically from the dataset's `problem_type`
 - **GPModel** - Gaussian Process model for sequence fitness prediction with flexible kernel
   selection, input normalisation, and output standardisation enabled by default
-- **ESMFoldModel** - ESMFold protein structure prediction oracle; returns pTM and/or mean pLDDT scores for amino acid sequence candidates. Use as `Oracle(scorer=ESMFoldModel(ESMFoldConfig(...)))`. Requires `transformers>=4.36.0` and `accelerate>=0.26.0`.
+- **ESMFoldModel** - ESMFold protein structure prediction oracle; returns pTM and/or mean pLDDT scores for amino acid sequence candidates. Use as `Oracle(scorer=ESMFoldModel(ESMFoldModelConfig(...)))`. Requires `transformers>=4.36.0` and `accelerate>=0.26.0`.
 - **ChempropModel** - Message Passing Neural Network (MPNN) for small-molecule fitness prediction,
   backed by [Chemprop v2.x](https://chemprop.readthedocs.io/). Accepts SMILES strings directly;
   no hand-crafted features required. Requires the `[chemprop]` optional extra:

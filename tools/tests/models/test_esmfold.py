@@ -25,67 +25,67 @@ from alf_core.model.base_model import BaseModel
 from alf_core.oracle.oracle import Oracle
 from alf_core.surrogate.surrogate import Surrogate
 from alf_core.utils.enums import ProblemType
-from alf_tools.models.esmfold import ESMFoldConfig, ESMFoldModel
+from alf_tools.models.esmfold import ESMFoldModel, ESMFoldModelConfig
 
 MOCK_PTM = 0.7
 MOCK_PLDDT = 0.6  # EsmForProteinFolding returns plddt already in [0, 1]
 
 
-class TestESMFoldConfig:
-    """Tests for ESMFoldConfig defaults and field acceptance."""
+class TestESMFoldModelConfig:
+    """Tests for ESMFoldModelConfig defaults and field acceptance."""
 
     def test_default_model_name(self):
         """Default model_name is facebook/esmfold_v1."""
-        assert ESMFoldConfig().model_name == "facebook/esmfold_v1"
+        assert ESMFoldModelConfig().model_name == "facebook/esmfold_v1"
 
     def test_default_device(self):
         """Default device is cpu."""
-        assert ESMFoldConfig().device == "cpu"
+        assert ESMFoldModelConfig().device == "cpu"
 
     def test_default_scoring_metric(self):
         """Default scoring_metric is ptm."""
-        assert ESMFoldConfig().scoring_metric == "ptm"
+        assert ESMFoldModelConfig().scoring_metric == "ptm"
 
     def test_default_combined_ptm_weight(self):
         """Default combined_ptm_weight is 0.5."""
-        assert ESMFoldConfig().combined_ptm_weight == 0.5
+        assert ESMFoldModelConfig().combined_ptm_weight == 0.5
 
     def test_default_batch_size(self):
         """Default batch_size is 1."""
-        assert ESMFoldConfig().batch_size == 1
+        assert ESMFoldModelConfig().batch_size == 1
 
     def test_default_chunk_size_is_none(self):
         """Default chunk_size is None."""
-        assert ESMFoldConfig().chunk_size is None
+        assert ESMFoldModelConfig().chunk_size is None
 
     def test_default_low_memory_is_false(self):
         """Default low_memory is False."""
-        assert ESMFoldConfig().low_memory is False
+        assert ESMFoldModelConfig().low_memory is False
 
     def test_each_valid_scoring_metric_accepted(self):
         """Each of ptm, mean_plddt, combined is accepted."""
         for metric in ("ptm", "mean_plddt", "combined"):
-            assert ESMFoldConfig(scoring_metric=metric).scoring_metric == metric
+            assert ESMFoldModelConfig(scoring_metric=metric).scoring_metric == metric
 
     def test_combined_ptm_weight_boundary_zero(self):
         """combined_ptm_weight=0.0 is accepted."""
-        assert ESMFoldConfig(combined_ptm_weight=0.0).combined_ptm_weight == 0.0
+        assert ESMFoldModelConfig(combined_ptm_weight=0.0).combined_ptm_weight == 0.0
 
     def test_combined_ptm_weight_boundary_one(self):
         """combined_ptm_weight=1.0 is accepted."""
-        assert ESMFoldConfig(combined_ptm_weight=1.0).combined_ptm_weight == 1.0
+        assert ESMFoldModelConfig(combined_ptm_weight=1.0).combined_ptm_weight == 1.0
 
     def test_chunk_size_positive_accepted(self):
         """chunk_size=64 is accepted."""
-        assert ESMFoldConfig(chunk_size=64).chunk_size == 64
+        assert ESMFoldModelConfig(chunk_size=64).chunk_size == 64
 
     def test_batch_size_greater_than_one_accepted(self):
         """batch_size=4 is accepted."""
-        assert ESMFoldConfig(batch_size=4).batch_size == 4
+        assert ESMFoldModelConfig(batch_size=4).batch_size == 4
 
     def test_local_path_accepted_as_model_name(self):
         """model_name can be a local filesystem path."""
-        cfg = ESMFoldConfig(model_name="/models/esmfold_v1")
+        cfg = ESMFoldModelConfig(model_name="/models/esmfold_v1")
         assert cfg.model_name == "/models/esmfold_v1"
 
 
@@ -140,12 +140,12 @@ def mock_components():
 
 @pytest.fixture
 def default_model(mock_components):
-    """ESMFoldModel with default ESMFoldConfig and mocked HuggingFace components.
+    """ESMFoldModel with default ESMFoldModelConfig and mocked HuggingFace components.
 
     Returns:
         ESMFoldModel: model instance with mocked HuggingFace components.
     """
-    return ESMFoldModel(ESMFoldConfig())
+    return ESMFoldModel(ESMFoldModelConfig())
 
 
 @pytest.fixture
@@ -173,13 +173,13 @@ class TestESMFoldModelInit:
     def test_tokenizer_loaded_from_model_name(self, mock_components):
         """Tokenizer is loaded using the configured model_name."""
         _, _, _, mock_tok_cls = mock_components
-        ESMFoldModel(ESMFoldConfig(model_name="facebook/esmfold_v1"))
+        ESMFoldModel(ESMFoldModelConfig(model_name="facebook/esmfold_v1"))
         mock_tok_cls.from_pretrained.assert_called_once_with("facebook/esmfold_v1")
 
     def test_model_loaded_from_model_name(self, mock_components):
         """EsmForProteinFolding is loaded using the configured model_name."""
         _, _, mock_cls, _ = mock_components
-        ESMFoldModel(ESMFoldConfig(model_name="facebook/esmfold_v1"))
+        ESMFoldModel(ESMFoldModelConfig(model_name="facebook/esmfold_v1"))
         mock_cls.from_pretrained.assert_called_once_with(
             "facebook/esmfold_v1", low_cpu_mem_usage=False
         )
@@ -187,31 +187,31 @@ class TestESMFoldModelInit:
     def test_model_moved_to_configured_device(self, mock_components):
         """Model tensor is moved to the configured device."""
         mock_mdl, _, _, _ = mock_components
-        ESMFoldModel(ESMFoldConfig(device="cpu"))
+        ESMFoldModel(ESMFoldModelConfig(device="cpu"))
         mock_mdl.to.assert_called_once_with(torch.device("cpu"))
 
     def test_model_set_to_eval_mode(self, mock_components):
         """Model is placed in eval() mode after loading."""
         mock_mdl, _, _, _ = mock_components
-        ESMFoldModel(ESMFoldConfig())
+        ESMFoldModel(ESMFoldModelConfig())
         mock_mdl.eval.assert_called_once()
 
     def test_chunk_size_applied_to_encoder(self, mock_components):
         """set_chunk_size() is called on the encoder when chunk_size is configured."""
         mock_mdl, _, _, _ = mock_components
-        ESMFoldModel(ESMFoldConfig(chunk_size=64))
+        ESMFoldModel(ESMFoldModelConfig(chunk_size=64))
         mock_mdl.esm.encoder.set_chunk_size.assert_called_once_with(64)
 
     def test_chunk_size_not_applied_when_none(self, mock_components):
         """set_chunk_size() is not called when chunk_size is None."""
         mock_mdl, _, _, _ = mock_components
-        ESMFoldModel(ESMFoldConfig(chunk_size=None))
+        ESMFoldModel(ESMFoldModelConfig(chunk_size=None))
         mock_mdl.esm.encoder.set_chunk_size.assert_not_called()
 
     def test_low_memory_passed_as_low_cpu_mem_usage(self, mock_components):
         """low_memory=True sets low_cpu_mem_usage=True in from_pretrained."""
         _, _, mock_cls, _ = mock_components
-        ESMFoldModel(ESMFoldConfig(low_memory=True))
+        ESMFoldModel(ESMFoldModelConfig(low_memory=True))
         mock_cls.from_pretrained.assert_called_once_with(
             "facebook/esmfold_v1", low_cpu_mem_usage=True
         )
@@ -219,48 +219,48 @@ class TestESMFoldModelInit:
     def test_invalid_combined_ptm_weight_raises(self, mock_components):
         """combined_ptm_weight > 1 raises ValueError before model loading."""
         with pytest.raises(ValueError, match="combined_ptm_weight"):
-            ESMFoldModel(ESMFoldConfig(combined_ptm_weight=1.5))
+            ESMFoldModel(ESMFoldModelConfig(combined_ptm_weight=1.5))
 
     def test_negative_combined_ptm_weight_raises(self, mock_components):
         """combined_ptm_weight < 0 raises ValueError."""
         with pytest.raises(ValueError, match="combined_ptm_weight"):
-            ESMFoldModel(ESMFoldConfig(combined_ptm_weight=-0.1))
+            ESMFoldModel(ESMFoldModelConfig(combined_ptm_weight=-0.1))
 
     def test_zero_chunk_size_raises(self, mock_components):
         """chunk_size=0 raises ValueError."""
         with pytest.raises(ValueError, match="chunk_size"):
-            ESMFoldModel(ESMFoldConfig(chunk_size=0))
+            ESMFoldModel(ESMFoldModelConfig(chunk_size=0))
 
     def test_negative_chunk_size_raises(self, mock_components):
         """chunk_size=-1 raises ValueError."""
         with pytest.raises(ValueError, match="chunk_size"):
-            ESMFoldModel(ESMFoldConfig(chunk_size=-1))
+            ESMFoldModel(ESMFoldModelConfig(chunk_size=-1))
 
     def test_zero_batch_size_raises(self, mock_components):
         """batch_size=0 raises ValueError."""
         with pytest.raises(ValueError, match="batch_size"):
-            ESMFoldModel(ESMFoldConfig(batch_size=0))
+            ESMFoldModel(ESMFoldModelConfig(batch_size=0))
 
     def test_batch_size_gt_1_with_ptm_raises(self, mock_components):
         """batch_size > 1 with scoring_metric='ptm' raises ValueError."""
         with pytest.raises(ValueError, match="batch_size > 1 is not supported"):
-            ESMFoldModel(ESMFoldConfig(batch_size=2, scoring_metric="ptm"))
+            ESMFoldModel(ESMFoldModelConfig(batch_size=2, scoring_metric="ptm"))
 
     def test_batch_size_gt_1_with_combined_raises(self, mock_components):
         """batch_size > 1 with scoring_metric='combined' raises ValueError."""
         with pytest.raises(ValueError, match="batch_size > 1 is not supported"):
-            ESMFoldModel(ESMFoldConfig(batch_size=2, scoring_metric="combined"))
+            ESMFoldModel(ESMFoldModelConfig(batch_size=2, scoring_metric="combined"))
 
     def test_esm_backbone_converted_to_float32_on_cpu(self, mock_components):
         """On CPU, model.esm.float() is called to fix fp16 emulation artifacts."""
         mock_mdl, _, _, _ = mock_components
-        ESMFoldModel(ESMFoldConfig(device="cpu"))
+        ESMFoldModel(ESMFoldModelConfig(device="cpu"))
         mock_mdl.esm.float.assert_called_once()
 
     def test_esm_backbone_not_converted_on_cuda(self, mock_components):
         """On non-CPU devices, model.esm.float() is not called."""
         mock_mdl, _, _, _ = mock_components
-        ESMFoldModel(ESMFoldConfig(device="cuda"))
+        ESMFoldModel(ESMFoldModelConfig(device="cuda"))
         mock_mdl.esm.float.assert_not_called()
 
     def test_featurise_raises_not_implemented(self, default_model, protein_candidates):
@@ -320,7 +320,7 @@ class TestESMFoldModelPredict:
     @pytest.mark.parametrize("metric", ["ptm", "mean_plddt", "combined"])
     def test_metric_values_in_range(self, mock_components, protein_candidates, metric):
         """All scoring metrics produce values in [0, 1]."""
-        config = ESMFoldConfig(scoring_metric=metric)
+        config = ESMFoldModelConfig(scoring_metric=metric)
         model = ESMFoldModel(config)
         result = model.predict(protein_candidates)
         assert np.all(result.means >= 0.0)
@@ -328,11 +328,11 @@ class TestESMFoldModelPredict:
 
     def test_combined_weight_0_equals_mean_plddt(self, mock_components, protein_candidates):
         """combined_ptm_weight=0.0 -> means equal to mean_plddt."""
-        config_combined = ESMFoldConfig(scoring_metric="combined", combined_ptm_weight=0.0)
+        config_combined = ESMFoldModelConfig(scoring_metric="combined", combined_ptm_weight=0.0)
         model_combined = ESMFoldModel(config_combined)
         result_combined = model_combined.predict(protein_candidates)
 
-        config_plddt = ESMFoldConfig(scoring_metric="mean_plddt")
+        config_plddt = ESMFoldModelConfig(scoring_metric="mean_plddt")
         model_plddt = ESMFoldModel(config_plddt)
         result_plddt = model_plddt.predict(protein_candidates)
 
@@ -340,11 +340,11 @@ class TestESMFoldModelPredict:
 
     def test_combined_weight_1_equals_ptm(self, mock_components, protein_candidates):
         """combined_ptm_weight=1.0 -> means equal to ptm."""
-        config_combined = ESMFoldConfig(scoring_metric="combined", combined_ptm_weight=1.0)
+        config_combined = ESMFoldModelConfig(scoring_metric="combined", combined_ptm_weight=1.0)
         model_combined = ESMFoldModel(config_combined)
         result_combined = model_combined.predict(protein_candidates)
 
-        config_ptm = ESMFoldConfig(scoring_metric="ptm")
+        config_ptm = ESMFoldModelConfig(scoring_metric="ptm")
         model_ptm = ESMFoldModel(config_ptm)
         result_ptm = model_ptm.predict(protein_candidates)
 
@@ -353,7 +353,7 @@ class TestESMFoldModelPredict:
     def test_combined_weight_intermediate_interpolates(self, mock_components):
         """combined_ptm_weight=0.3 -> means = 0.3*ptm + 0.7*plddt."""
         w = 0.3
-        config = ESMFoldConfig(scoring_metric="combined", combined_ptm_weight=w)
+        config = ESMFoldModelConfig(scoring_metric="combined", combined_ptm_weight=w)
         model = ESMFoldModel(config)
         cand = Candidate(data="ACDE", modality="sequence")
         result = model.predict([cand])
@@ -368,7 +368,7 @@ class TestESMFoldModelPredict:
 
     def test_mean_plddt_output_matches_mock_value(self, mock_components, protein_candidates):
         """mean_plddt scores match the mocked value (0.6)."""
-        config = ESMFoldConfig(scoring_metric="mean_plddt")
+        config = ESMFoldModelConfig(scoring_metric="mean_plddt")
         model = ESMFoldModel(config)
         result = model.predict(protein_candidates)
         expected = MOCK_PLDDT
@@ -437,7 +437,7 @@ class TestESMFoldBatching:
     def test_7_seqs_batch3_calls_3_times(self, mock_components):
         """7 sequences with batch_size=3 -> exactly 3 forward-pass calls (ceil(7/3)=3)."""
         mock_mdl, _, _, _ = mock_components
-        config = ESMFoldConfig(batch_size=3, scoring_metric="mean_plddt")
+        config = ESMFoldModelConfig(batch_size=3, scoring_metric="mean_plddt")
         model = ESMFoldModel(config)
         seqs = [Candidate(data="ACDE", modality="sequence")] * 7
         model.predict(seqs)
@@ -445,7 +445,7 @@ class TestESMFoldBatching:
 
     def test_7_seqs_batch3_returns_7_results(self, mock_components):
         """7 sequences with batch_size=3 -> output has 7 elements."""
-        config = ESMFoldConfig(batch_size=3, scoring_metric="mean_plddt")
+        config = ESMFoldModelConfig(batch_size=3, scoring_metric="mean_plddt")
         model = ESMFoldModel(config)
         seqs = [Candidate(data="ACDE", modality="sequence")] * 7
         result = model.predict(seqs)
@@ -453,7 +453,7 @@ class TestESMFoldBatching:
 
     def test_partial_last_batch_handled(self, mock_components):
         """The final batch of 1 (in 7 seqs with batch_size=3) is handled correctly."""
-        config = ESMFoldConfig(batch_size=3, scoring_metric="mean_plddt")
+        config = ESMFoldModelConfig(batch_size=3, scoring_metric="mean_plddt")
         model = ESMFoldModel(config)
         seqs = [Candidate(data="ACDE", modality="sequence")] * 7
         result = model.predict(seqs)
@@ -463,7 +463,7 @@ class TestESMFoldBatching:
     def test_batch_size_1_calls_n_times(self, mock_components):
         """batch_size=1 -> N forward calls for N sequences."""
         mock_mdl, _, _, _ = mock_components
-        config = ESMFoldConfig(batch_size=1)
+        config = ESMFoldModelConfig(batch_size=1)
         model = ESMFoldModel(config)
         seqs = [Candidate(data="ACDE", modality="sequence")] * 5
         model.predict(seqs)
@@ -472,7 +472,7 @@ class TestESMFoldBatching:
     def test_batch_size_n_calls_1_time(self, mock_components):
         """batch_size >= N -> 1 forward call for N sequences."""
         mock_mdl, _, _, _ = mock_components
-        config = ESMFoldConfig(batch_size=10, scoring_metric="mean_plddt")
+        config = ESMFoldModelConfig(batch_size=10, scoring_metric="mean_plddt")
         model = ESMFoldModel(config)
         seqs = [Candidate(data="ACDE", modality="sequence")] * 5
         model.predict(seqs)
@@ -484,7 +484,7 @@ class TestESMFoldSequenceLengths:
 
     def test_single_residue_sequence(self, mock_components):
         """Single 'A' residue -> valid Predictions with shape (1,)."""
-        config = ESMFoldConfig()
+        config = ESMFoldModelConfig()
         model = ESMFoldModel(config)
         cand = Candidate(data="A", modality="sequence")
         result = model.predict([cand])
@@ -494,7 +494,7 @@ class TestESMFoldSequenceLengths:
     def test_long_sequence_with_chunk_size(self, mock_components):
         """1024-AA sequence with chunk_size=64 -> set_chunk_size called, prediction completes."""
         mock_mdl, _, _, _ = mock_components
-        config = ESMFoldConfig(chunk_size=64)
+        config = ESMFoldModelConfig(chunk_size=64)
         model = ESMFoldModel(config)
         mock_mdl.esm.encoder.set_chunk_size.assert_called_once_with(64)
         cand = Candidate(data="A" * 1024, modality="sequence")
@@ -504,7 +504,7 @@ class TestESMFoldSequenceLengths:
 
     def test_mixed_length_batch(self, mock_components):
         """Batch with 5-AA and 50-AA sequences -> both results valid and independent."""
-        config = ESMFoldConfig()
+        config = ESMFoldModelConfig()
         model = ESMFoldModel(config)
         cands = [
             Candidate(data="ACDEF", modality="sequence"),
@@ -551,7 +551,7 @@ class TestESMFoldSequenceLengths:
             mock_mdl.side_effect = _model_call
             mock_cls.from_pretrained.return_value = mock_mdl
 
-            config = ESMFoldConfig(scoring_metric="mean_plddt")
+            config = ESMFoldModelConfig(scoring_metric="mean_plddt")
             model = ESMFoldModel(config)
             cand = Candidate(data="ACG", modality="sequence")  # 3 residues
             result = model.predict([cand])
@@ -596,7 +596,7 @@ class TestESMFoldPLDDTMasking:
             mock_cls.from_pretrained.return_value = mock_mdl
 
             # batch_size=2 so both sequences are processed in one forward pass
-            model = ESMFoldModel(ESMFoldConfig(scoring_metric="mean_plddt", batch_size=2))
+            model = ESMFoldModel(ESMFoldModelConfig(scoring_metric="mean_plddt", batch_size=2))
             cands = [
                 Candidate(data="AC", modality="sequence"),
                 Candidate(data="ACG", modality="sequence"),
@@ -642,7 +642,7 @@ class TestESMFoldPLDDTMasking:
             mock_mdl.esm = MagicMock()
             mock_cls.from_pretrained.return_value = mock_mdl
 
-            model = ESMFoldModel(ESMFoldConfig(scoring_metric="mean_plddt"))
+            model = ESMFoldModel(ESMFoldModelConfig(scoring_metric="mean_plddt"))
             cand = Candidate(data="AC", modality="sequence")
             result = model.predict([cand])
 
@@ -655,7 +655,7 @@ class TestESMFoldDuplicates:
 
     def test_two_identical_sequences(self, mock_components):
         """Two identical sequences -> each gets its own output at separate indices."""
-        config = ESMFoldConfig()
+        config = ESMFoldModelConfig()
         model = ESMFoldModel(config)
         cands = [
             Candidate(data="ACDE", modality="sequence"),
@@ -668,7 +668,7 @@ class TestESMFoldDuplicates:
 
     def test_5_sequences_with_3_duplicates(self, mock_components):
         """5-sequence batch with 3 duplicates -> all 5 results returned."""
-        config = ESMFoldConfig()
+        config = ESMFoldModelConfig()
         model = ESMFoldModel(config)
         cands = [
             Candidate(data="ACDE", modality="sequence"),
@@ -688,14 +688,14 @@ class TestESMFoldCleanup:
     def test_cleanup_moves_model_to_cpu(self, mock_components):
         """After cleanup(), model.to('cpu') was called."""
         mock_mdl, _, _, _ = mock_components
-        model = ESMFoldModel(ESMFoldConfig())
+        model = ESMFoldModel(ESMFoldModelConfig())
         mock_mdl.to.reset_mock()
         model.cleanup()
         mock_mdl.to.assert_called_once_with("cpu")
 
     def test_cleanup_calls_cuda_empty_cache_when_cuda_available(self, mock_components):
         """torch.cuda.empty_cache() called once when CUDA is available."""
-        model = ESMFoldModel(ESMFoldConfig())
+        model = ESMFoldModel(ESMFoldModelConfig())
         with (
             patch("alf_tools.models.esmfold.torch.cuda.is_available", return_value=True),
             patch("alf_tools.models.esmfold.torch.cuda.empty_cache") as mock_cache,
@@ -705,7 +705,7 @@ class TestESMFoldCleanup:
 
     def test_cleanup_does_not_call_empty_cache_when_cuda_unavailable(self, mock_components):
         """torch.cuda.empty_cache() is not called when CUDA is unavailable."""
-        model = ESMFoldModel(ESMFoldConfig())
+        model = ESMFoldModel(ESMFoldModelConfig())
         with (
             patch("alf_tools.models.esmfold.torch.cuda.is_available", return_value=False),
             patch("alf_tools.models.esmfold.torch.cuda.empty_cache") as mock_cache,
@@ -715,7 +715,7 @@ class TestESMFoldCleanup:
 
     def test_cleanup_updates_device_to_cpu(self, mock_components):
         """After cleanup(), self.device is torch.device('cpu')."""
-        model = ESMFoldModel(ESMFoldConfig())
+        model = ESMFoldModel(ESMFoldModelConfig())
         with patch("alf_tools.models.esmfold.torch.cuda.is_available", return_value=False):
             model.cleanup()
         assert model.device == torch.device("cpu")
@@ -723,7 +723,7 @@ class TestESMFoldCleanup:
     def test_cleanup_converts_full_model_to_float32(self, mock_components):
         """After cleanup(), model.float() is called to restore fp32 for all submodules."""
         mock_mdl, _, _, _ = mock_components
-        model = ESMFoldModel(ESMFoldConfig())
+        model = ESMFoldModel(ESMFoldModelConfig())
         mock_mdl.float.reset_mock()  # clear any prior calls
         with patch("alf_tools.models.esmfold.torch.cuda.is_available", return_value=False):
             model.cleanup()
@@ -731,7 +731,7 @@ class TestESMFoldCleanup:
 
     def test_predict_after_cleanup_raises_runtime_error(self, mock_components):
         """predict() called after cleanup() raises RuntimeError."""
-        model = ESMFoldModel(ESMFoldConfig())
+        model = ESMFoldModel(ESMFoldModelConfig())
         with patch("alf_tools.models.esmfold.torch.cuda.is_available", return_value=False):
             model.cleanup()
         with pytest.raises(RuntimeError, match="cleanup"):
@@ -775,7 +775,7 @@ class TestESMFoldAllZeroAttentionMask:
             mock_mdl.esm = MagicMock()
             mock_cls.from_pretrained.return_value = mock_mdl
 
-            model = ESMFoldModel(ESMFoldConfig(scoring_metric="mean_plddt"))
+            model = ESMFoldModel(ESMFoldModelConfig(scoring_metric="mean_plddt"))
             with pytest.raises(RuntimeError, match="all-padding"):
                 model.predict([Candidate(data="ACDE", modality="sequence")])
 
@@ -838,7 +838,7 @@ class TestESMFoldOracle:
         self, mock_components, protein_candidates, esmfold_state
     ):
         """Oracle.evaluate() returns LabelledCandidates with correct length."""
-        model = ESMFoldModel(ESMFoldConfig())
+        model = ESMFoldModel(ESMFoldModelConfig())
         oracle = Oracle(scorer=model)
         result, _ = oracle.evaluate(protein_candidates, esmfold_state)
         assert isinstance(result, LabelledCandidates)
@@ -848,7 +848,7 @@ class TestESMFoldOracle:
         self, mock_components, protein_candidates, esmfold_state
     ):
         """oracle_time is recorded in state.round_metrics after evaluate()."""
-        model = ESMFoldModel(ESMFoldConfig())
+        model = ESMFoldModel(ESMFoldModelConfig())
         oracle = Oracle(scorer=model)
         _, new_state = oracle.evaluate(protein_candidates, esmfold_state)
         assert "oracle_time" in new_state.round_metrics.metrics
@@ -867,7 +867,7 @@ def _golden_esmfold():
         ESMFoldModel: loaded model instance shared across the session.
     """
     torch.set_num_threads(os.cpu_count() or 1)
-    model = ESMFoldModel(ESMFoldConfig(device="cpu", scoring_metric="ptm"))
+    model = ESMFoldModel(ESMFoldModelConfig(device="cpu", scoring_metric="ptm"))
     yield model
     model.cleanup()
 

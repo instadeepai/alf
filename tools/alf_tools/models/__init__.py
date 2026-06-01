@@ -47,14 +47,14 @@ __all__ = [
 
 
 try:
-    from alf_tools.models.esmfold import ESMFoldConfig, ESMFoldModel
+    from alf_tools.models.esmfold import ESMFoldModel, ESMFoldModelConfig
 
     _ESMFOLD_AVAILABLE = True
 except ImportError:
     _ESMFOLD_AVAILABLE = False
 
 if _ESMFOLD_AVAILABLE:
-    __all__ += ["ESMFoldConfig", "ESMFoldModel"]
+    __all__ += ["ESMFoldModelConfig", "ESMFoldModel"]
 
 _chemprop_available = False
 try:

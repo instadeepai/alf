@@ -18,8 +18,7 @@ from typing import Any, Literal, NoReturn
 
 import numpy as np
 import torch
-from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
-from alf_core.dataclasses.candidate import Modality
+from alf_core import BaseModel, Candidate, LabelledCandidates, Modality, Predictions
 
 try:
     from transformers import AutoTokenizer, EsmForProteinFolding
@@ -38,7 +37,7 @@ _VALID_AA: frozenset[str] = frozenset(PROTEIN_ALPHABET) | frozenset("XBZUO")
 
 
 @dataclass
-class ESMFoldConfig:
+class ESMFoldModelConfig:
     """Configuration for ESMFold protein structure prediction model.
 
     Args:
@@ -68,10 +67,10 @@ class ESMFoldModel(BaseModel):
 
     Predicts pTM and/or mean pLDDT for amino acid sequence candidates using
     HuggingFace EsmForProteinFolding. Plugs into Oracle via:
-        Oracle(scorer=ESMFoldModel(ESMFoldConfig(...)))
+        Oracle(scorer=ESMFoldModel(ESMFoldModelConfig(...)))
     """
 
-    def __init__(self, config: ESMFoldConfig) -> None:
+    def __init__(self, config: ESMFoldModelConfig) -> None:
         """Load ESMFold tokenizer and model from HuggingFace or a local path.
 
         Args:
@@ -100,7 +99,9 @@ class ESMFoldModel(BaseModel):
         try:
             self.device = torch.device(config.device)
         except (RuntimeError, ValueError) as exc:
-            raise ValueError(f"Invalid device string in ESMFoldConfig: {config.device!r}") from exc
+            raise ValueError(
+                f"Invalid device string in ESMFoldModelConfig: {config.device!r}"
+            ) from exc
 
         self.tokenizer = AutoTokenizer.from_pretrained(config.model_name)
         self.model = EsmForProteinFolding.from_pretrained(
@@ -171,7 +172,7 @@ class ESMFoldModel(BaseModel):
             ValueError: If any candidate fails validation.
             RuntimeError: If the forward pass fails. GPU OOM propagates as
                 torch.cuda.OutOfMemoryError; reduce batch_size or enable chunk_size
-                in ESMFoldConfig to lower peak memory.
+                in ESMFoldModelConfig to lower peak memory.
         """
         if self._cleaned_up:
             raise RuntimeError(
@@ -206,21 +207,22 @@ class ESMFoldModel(BaseModel):
                     ptm_scores[dest] = output.ptm.item()
 
                 if plddt_scores is not None:
-                    mask = tokens["attention_mask"]  # (B, L)
-                    # atom37_atom_exists: (B, L, 37) — which atom slots exist per residue.
-                    # Combine with the sequence mask so phantom atoms and padding are excluded.
+                    seq_mask = tokens["attention_mask"].float()  # (B, L)
                     atom_exists = output.atom37_atom_exists.float()  # (B, L, 37)
-                    seq_mask = mask.float().unsqueeze(-1)  # (B, L, 1)
-                    valid = atom_exists * seq_mask  # (B, L, 37)
-                    atom_count = valid.sum(dim=(1, 2))  # (B,)
-                    if (atom_count == 0).any():
+                    # Step 1: average pLDDT over atoms within each residue.
+                    atoms_per_residue = atom_exists.sum(dim=2)  # (B, L)
+                    atom_sum = (output.plddt.float() * atom_exists).sum(dim=2)  # (B, L)
+                    residue_plddt = atom_sum / atoms_per_residue.clamp(min=1)  # (B, L)
+                    # Step 2: average per-residue pLDDT over valid (non-padding) residues.
+                    residue_count = seq_mask.sum(dim=1)  # (B,)
+                    if (residue_count == 0).any():
                         raise RuntimeError(
                             f"Batch at offset {i} contains sequences with all-padding "
                             "attention mask after tokenization."
                         )
-                    # Cast to float32: avoids fp16 overflow.
-                    masked_sum = (output.plddt.float() * valid).sum(dim=(1, 2))  # (B,)
-                    plddt_scores[dest] = (masked_sum / atom_count).cpu().numpy()
+                    plddt_scores[dest] = (
+                        (residue_plddt * seq_mask).sum(dim=1) / residue_count
+                    ).cpu().numpy()
 
         if metric == "ptm":
             means = ptm_scores
