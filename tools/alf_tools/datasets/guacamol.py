@@ -1207,7 +1207,6 @@ class GuacaMol(BaseDataset):
             always the caller's input objects — corpus lookup provides the label only.
 
         Raises:
-            NotImplementedError: If task_type is "benchmark_task".
             ValueError: If a novel candidate's SMILES string is invalid.
             RuntimeError: If the dataset is not loaded before querying.
         """
