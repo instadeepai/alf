@@ -1109,6 +1109,31 @@ class GuacaMol(BaseDataset):
             candidates=all_candidates, labels=np.array(all_labels, dtype=float)
         )
 
+    def _query_benchmark(self, candidates: list[Candidate]) -> LabelledCandidates:
+        """Score candidates using the benchmark task scorer.
+
+        Args:
+            candidates: Candidates to score. Each must have a parseable SMILES in `.data`.
+
+        Returns:
+            LabelledCandidates with scores in [0, 1].
+
+        Raises:
+            ValueError: If a candidate's SMILES string is invalid.
+        """
+        scorer = get_task_scorer(cast(GuacaMolTaskName, self.config.target_property))
+        result_labels: list[float] = []
+        for candidate in candidates:
+            if _mol_from_smiles(candidate.data) is None:
+                raise ValueError(
+                    f"Cannot compute label for invalid SMILES: {candidate.data!r}"
+                )
+            result_labels.append(scorer(candidate.data))
+        return LabelledCandidates(
+            candidates=candidates,
+            labels=np.array(result_labels, dtype=float),
+        )
+
     def query(self, candidates: list[Candidate]) -> LabelledCandidates:
         """Return labels for candidates, computing via RDKit for SMILES not in the corpus.
 
@@ -1125,9 +1150,7 @@ class GuacaMol(BaseDataset):
             RuntimeError: If the dataset is not loaded before querying.
         """
         if self.config.task_type == "benchmark_task":
-            raise NotImplementedError(
-                f"Online query for task '{self.config.target_property}' is not yet implemented."
-            )
+            return self._query_benchmark(candidates)
         if self._raw_dataset is None:
             raise RuntimeError("Dataset must be loaded before querying")  # pragma: no cover
 

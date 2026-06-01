@@ -801,22 +801,6 @@ class TestGuacaMolWithFixtures:
         assert dataset._raw_dataset is not None
         assert len(dataset._raw_dataset) > 0
 
-    def test_query_benchmark_task_raises_not_implemented(self, tmp_path):
-        """query() raises NotImplementedError when task_type is 'benchmark_task'."""
-        shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
-        config = _base_config(data_dir=tmp_path)
-        dataset = GuacaMol(config)
-        assert dataset._raw_dataset is not None
-        cand = dataset._raw_dataset.candidates[0]
-        # task_type is a @computed_field derived from target_property; set target_property
-        # to a benchmark task name to make task_type == "benchmark_task" without triggering
-        # load_dataset() again.
-        dataset.config = dataset.config.model_copy(
-            update={"target_property": "celecoxib_rediscovery"}
-        )
-        with pytest.raises(NotImplementedError):
-            dataset.query([cand])
-
     def test_paper_splits_cache_miss_triggers_download(self, tmp_path):
         """When paper split files are absent, requests.get is called once per split file."""
         smiles = ["c1ccccc1", "CCO", "CC(=O)O"]
