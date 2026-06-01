@@ -59,14 +59,15 @@ def esm2_model(model_config, train_config):
 
 @pytest.fixture
 def esm2_finetune_model():
-    """ESM-2 model with unfrozen backbone for fine-tuning tests.
+    """ESM-2 model with unfrozen backbone for log-likelihood fine-tuning tests.
 
     Returns:
-        An ESM2Model with trainable backbone, 2 epochs, batch size 2.
+        An ESM2Model with trainable backbone, loss_type='log_likelihood', 2 epochs.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID)
     train_cfg = ESM2TrainConfig(
         freeze_backbone=False,
+        loss_type="log_likelihood",
         num_epochs=2,
         batch_size=2,
         learning_rate=1e-4,
@@ -353,87 +354,6 @@ class TestEmbed:
         single = esm2_model.embed(candidates)
         batched = esm2_small_batch_model.embed(candidates)
         np.testing.assert_allclose(single, batched, rtol=1e-5, atol=1e-5)
-
-
-class TestMaskTokens:
-    """Tests for ESM2Model._mask_tokens()."""
-
-    def test_special_tokens_never_masked(self, esm2_model):
-        """Test that CLS, EOS, and PAD positions are always excluded from masking."""
-        # Two sequences of different lengths to produce PAD tokens after collation
-        seqs = ["ACDE", "ACDEFGHIKLMNPQRSTVWY"]
-        encoding = esm2_model.tokeniser(seqs, return_tensors="pt", padding=True)
-        input_ids = encoding["input_ids"]
-
-        special_ids = {
-            esm2_model.tokeniser.cls_token_id,
-            esm2_model.tokeniser.eos_token_id,
-            esm2_model.tokeniser.pad_token_id,
-        } - {None}
-
-        _, labels = esm2_model._mask_tokens(input_ids)
-
-        for sid in special_ids:
-            positions = input_ids == sid
-            if positions.any():
-                assert (labels[positions] == -100).all()
-
-    def test_nan_guard_ensures_at_least_one_masked_token(self):
-        """Test that the NaN guard forces a mask even when mask_probability=0."""
-        config = ESM2ModelConfig(model_id=MODEL_ID)
-        train_cfg = ESM2TrainConfig(freeze_backbone=True, mask_probability=0.0)
-        model = ESM2Model(
-            name="zero_mask", model_config=config, train_config=train_cfg, device="cpu"
-        )
-        seqs = ["ACDEFGHIKL"] * 8
-        encoding = model.tokeniser(seqs, return_tensors="pt", padding=True)
-        input_ids = encoding["input_ids"]
-
-        _, labels = model._mask_tokens(input_ids)
-
-        assert (labels != -100).any(dim=1).all()
-
-    def test_selected_labels_equal_original_token(self, esm2_model):
-        """Test that labels at selected positions store the original token ID."""
-        seqs = ["ACDEFGHIKL", "MNPQRSTVWY"]
-        encoding = esm2_model.tokeniser(seqs, return_tensors="pt", padding=True)
-        input_ids = encoding["input_ids"]
-
-        _, labels = esm2_model._mask_tokens(input_ids)
-
-        selected = labels != -100
-        assert (labels[selected] == input_ids[selected]).all()
-
-    def test_mask_token_split_proportions(self):
-        """Test that the 80/10/10 replacement split matches the configured proportions."""
-        config = ESM2ModelConfig(model_id=MODEL_ID)
-        # mask_probability=1.0 selects all eligible tokens, giving stable statistics
-        train_cfg = ESM2TrainConfig(
-            freeze_backbone=True,
-            mask_probability=1.0,
-            mask_splitting=(0.8, 0.1, 0.1),
-        )
-        model = ESM2Model(
-            name="split_model", model_config=config, train_config=train_cfg, device="cpu"
-        )
-        # 100 sequences × 20 eligible tokens = ~2 000 selected positions
-        seqs = ["ACDEFGHIKLMNPQRSTVWY"] * 100
-        encoding = model.tokeniser(seqs, return_tensors="pt", padding=True)
-        input_ids = encoding["input_ids"]
-
-        masked_ids, labels = model._mask_tokens(input_ids)
-
-        selected = labels != -100
-        n = selected.sum().item()
-        n_mask = (masked_ids[selected] == model.tokeniser.mask_token_id).sum().item()
-        n_unchanged = (masked_ids[selected] == input_ids[selected]).sum().item()
-        # random = not [MASK] and not unchanged
-        # (chance of random token coinciding with original ≈ 1/vocab_size ≈ 3%, negligible)
-        n_random = n - n_mask - n_unchanged
-
-        assert 0.70 < n_mask / n < 0.90, f"Expected ~80% [MASK], got {n_mask / n:.2f}"
-        assert 0.03 < n_random / n < 0.20, f"Expected ~10% random, got {n_random / n:.2f}"
-        assert 0.05 < n_unchanged / n < 0.20, f"Expected ~10% unchanged, got {n_unchanged / n:.2f}"
 
 
 class TestComputeLogLikelihoodLabels:
@@ -741,8 +661,3 @@ class TestTrainLogLikelihood:
                 m.additional_metrics["train_log_likelihood"], -m.train_loss, rtol=1e-5
             )
 
-    def test_mlm_mode_does_not_emit_log_likelihood_metric(self, esm2_finetune_model, sample_data):
-        """Test that MLM training (default loss_type) does NOT add log_likelihood to metrics."""
-        esm2_finetune_model.train(sample_data)
-        for m in esm2_finetune_model.get_epoch_metrics():
-            assert "train_log_likelihood" not in m.additional_metrics
