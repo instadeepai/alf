@@ -46,22 +46,29 @@ from alf_tools.datasets.guacamol import (
     _phco,  # noqa: PLC2701
     _tanimoto,  # noqa: PLC2701
     albuterol_similarity,  # noqa: PLC2701
+    amlodipine_mpo,  # noqa: PLC2701
     arithmetic_mean,  # noqa: PLC2701
     aripiprazole_similarity,  # noqa: PLC2701
     camphor_menthol_median,  # noqa: PLC2701
     celecoxib_rediscovery,  # noqa: PLC2701
     clipped_score,  # noqa: PLC2701
     download_guacamol,
+    fexofenadine_mpo,  # noqa: PLC2701
     gaussian_score,  # noqa: PLC2701
     geometric_mean,  # noqa: PLC2701
     isomer_score,  # noqa: PLC2701
     max_gaussian_score,  # noqa: PLC2701
     mestranol_similarity,  # noqa: PLC2701
     min_gaussian_score,  # noqa: PLC2701
+    osimertinib_mpo,  # noqa: PLC2701
+    perindopril_mpo,  # noqa: PLC2701
+    ranolazine_mpo,  # noqa: PLC2701
+    sitagliptin_mpo,  # noqa: PLC2701
     smarts_score,  # noqa: PLC2701
     tadalafil_sildenafil_median,  # noqa: PLC2701
     thiothixene_rediscovery,  # noqa: PLC2701
     troglitazone_rediscovery,  # noqa: PLC2701
+    zaleplon_mpo,  # noqa: PLC2701
 )
 from pydantic import ValidationError
 from rdkit import Chem as _Chem
@@ -1258,3 +1265,67 @@ class TestMedianScorers:
     def test_camphor_menthol_score_is_in_range(self):
         """Camphor-menthol scores are in [0, 1]."""
         assert 0.0 <= camphor_menthol_median("CC(=O)O") <= 1.0
+
+
+_FEXOFENADINE_SMILES = "CC(C)(C(=O)O)c1ccc(cc1)C(O)CCCN2CCC(CC2)C(O)(c3ccccc3)c4ccccc4"
+_OSIMERTINIB_SMILES = "COc1cc(N(C)CCN(C)C)c(NC(=O)C=C)cc1Nc2nccc(n2)c3cn(C)c4ccccc34"
+_RANOLAZINE_SMILES = "COc1ccccc1OCC(O)CN2CCN(CC(=O)Nc3c(C)cccc3C)CC2"
+
+
+class TestMPOPart1:
+    def test_fexofenadine_scores_above_zero(self):
+        assert fexofenadine_mpo(_FEXOFENADINE_SMILES) > 0.1
+
+    def test_fexofenadine_invalid_smiles_zero(self):
+        assert fexofenadine_mpo("NOTSMILES") == pytest.approx(0.0)
+
+    def test_fexofenadine_score_in_range(self):
+        assert 0.0 <= fexofenadine_mpo("CC(=O)O") <= 1.0
+
+    def test_osimertinib_scores_above_zero(self):
+        assert osimertinib_mpo(_OSIMERTINIB_SMILES) > 0.1
+
+    def test_osimertinib_score_in_range(self):
+        assert 0.0 <= osimertinib_mpo("CC(=O)O") <= 1.0
+
+    def test_ranolazine_scores_above_zero(self):
+        assert ranolazine_mpo(_RANOLAZINE_SMILES) > 0.0
+
+    def test_ranolazine_invalid_smiles_zero(self):
+        assert ranolazine_mpo("NOTSMILES") == pytest.approx(0.0)
+
+
+_PERINDOPRIL_SMILES = "O=C(OCC)C(NC(C(=O)N1C(C(=O)O)CC2CCCCC12)C)CCC"
+_AMLODIPINE_SMILES = r"Clc1ccccc1C2C(=C(/N/C(=C2/C(=O)OCC)COCCN)C)\C(=O)OC"
+_SITAGLIPTIN_SMILES = "Fc1cc(c(F)cc1F)CC(N)CC(=O)N3Cc2nnc(n2CC3)C(F)(F)F"
+_ZALEPLON_SMILES = "O=C(C)N(CC)C1=CC=CC(C2=CC=NC3=C(C=NN23)C#N)=C1"
+
+
+class TestMPOPart2:
+    def test_perindopril_scores_above_zero(self):
+        assert perindopril_mpo(_PERINDOPRIL_SMILES) > 0.0
+
+    def test_perindopril_invalid_smiles_returns_zero(self):
+        assert perindopril_mpo("NOTSMILES") == pytest.approx(0.0)
+
+    def test_perindopril_score_in_range(self):
+        assert 0.0 <= perindopril_mpo("c1ccccc1") <= 1.0
+
+    def test_amlodipine_scores_above_zero(self):
+        assert amlodipine_mpo(_AMLODIPINE_SMILES) > 0.0
+
+    def test_amlodipine_score_in_range(self):
+        assert 0.0 <= amlodipine_mpo("c1ccccc1") <= 1.0
+
+    def test_sitagliptin_dissimilar_scores_above_zero(self):
+        assert sitagliptin_mpo("c1ccccc1") > 0.0
+
+    def test_sitagliptin_self_scores_low(self):
+        # Tanimoto=1.0 → gaussian(1.0, mu=0, sigma=0.1) ≈ 0 → score ≈ 0.
+        assert sitagliptin_mpo(_SITAGLIPTIN_SMILES) < 0.01
+
+    def test_zaleplon_scores_above_zero(self):
+        assert zaleplon_mpo(_ZALEPLON_SMILES) > 0.0
+
+    def test_zaleplon_invalid_smiles_returns_zero(self):
+        assert zaleplon_mpo("NOTSMILES") == pytest.approx(0.0)

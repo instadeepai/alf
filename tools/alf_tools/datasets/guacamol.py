@@ -659,6 +659,125 @@ def tadalafil_sildenafil_median(smiles: str) -> float:
     ])
 
 
+_FEXOFENADINE = Chem.MolFromSmiles(
+    "CC(C)(C(=O)O)c1ccc(cc1)C(O)CCCN2CCC(CC2)C(O)(c3ccccc3)c4ccccc4"
+)
+_OSIMERTINIB = Chem.MolFromSmiles(
+    "COc1cc(N(C)CCN(C)C)c(NC(=O)C=C)cc1Nc2nccc(n2)c3cn(C)c4ccccc34"
+)
+_RANOLAZINE = Chem.MolFromSmiles("COc1ccccc1OCC(O)CN2CCN(CC(=O)Nc3c(C)cccc3C)CC2")
+
+_FEXOFENADINE_AP = _ap(_FEXOFENADINE)
+_OSIMERTINIB_FCFP4 = _fcfp4(_OSIMERTINIB)
+_OSIMERTINIB_FP6 = _ecfp6(_OSIMERTINIB)
+_RANOLAZINE_AP = _ap(_RANOLAZINE)
+
+
+def fexofenadine_mpo(smiles: str) -> float:
+    """Geometric mean: clipped AP Tanimoto (≤0.8) + high TPSA (μ=90) + low logP (μ=4)."""
+    mol = _mol_from_smiles(smiles)
+    if mol is None:
+        return 0.0
+    tanimoto_score = clipped_score(_tanimoto(smiles, _FEXOFENADINE_AP, _ap), upper=0.8)
+    tpsa_score = max_gaussian_score(float(Descriptors.TPSA(mol)), mu=90.0, sigma=10.0)
+    logp_score = min_gaussian_score(float(Descriptors.MolLogP(mol)), mu=4.0, sigma=1.0)
+    return geometric_mean([tanimoto_score, tpsa_score, logp_score])
+
+
+def osimertinib_mpo(smiles: str) -> float:
+    """Geometric mean: clipped FCFP4 Tanimoto (≤0.8) + penalise ECFP6 similarity (μ=0.85) + high TPSA (μ=100) + low logP (μ=1)."""
+    mol = _mol_from_smiles(smiles)
+    if mol is None:
+        return 0.0
+    tanimoto_fcfp4 = clipped_score(_tanimoto(smiles, _OSIMERTINIB_FCFP4, _fcfp4), upper=0.8)
+    tanimoto_fp6 = min_gaussian_score(
+        _tanimoto(smiles, _OSIMERTINIB_FP6, _ecfp6), mu=0.85, sigma=0.1
+    )
+    tpsa_score = max_gaussian_score(float(Descriptors.TPSA(mol)), mu=100.0, sigma=10.0)
+    logp_score = min_gaussian_score(float(Descriptors.MolLogP(mol)), mu=1.0, sigma=1.0)
+    return geometric_mean([tanimoto_fcfp4, tanimoto_fp6, tpsa_score, logp_score])
+
+
+def ranolazine_mpo(smiles: str) -> float:
+    """Geometric mean: clipped AP Tanimoto (≤0.7) + high logP (μ=7) + high TPSA (μ=95) + exactly 1 F atom."""
+    mol = _mol_from_smiles(smiles)
+    if mol is None:
+        return 0.0
+    tanimoto_score = clipped_score(_tanimoto(smiles, _RANOLAZINE_AP, _ap), upper=0.7)
+    logp_score = max_gaussian_score(float(Descriptors.MolLogP(mol)), mu=7.0, sigma=1.0)
+    tpsa_score = max_gaussian_score(float(Descriptors.TPSA(mol)), mu=95.0, sigma=20.0)
+    f_count = float(sum(1 for a in mol.GetAtoms() if a.GetSymbol() == "F"))
+    f_score = gaussian_score(f_count, mu=1.0, sigma=1.0)
+    return geometric_mean([tanimoto_score, logp_score, tpsa_score, f_score])
+
+
+_PERINDOPRIL = Chem.MolFromSmiles("O=C(OCC)C(NC(C(=O)N1C(C(=O)O)CC2CCCCC12)C)CCC")
+_AMLODIPINE = Chem.MolFromSmiles(
+    r"Clc1ccccc1C2C(=C(/N/C(=C2/C(=O)OCC)COCCN)C)\C(=O)OC"
+)
+_SITAGLIPTIN = Chem.MolFromSmiles("Fc1cc(c(F)cc1F)CC(N)CC(=O)N3Cc2nnc(n2CC3)C(F)(F)F")
+_ZALEPLON = Chem.MolFromSmiles("O=C(C)N(CC)C1=CC=CC(C2=CC=NC3=C(C=NN23)C#N)=C1")
+
+_PERINDOPRIL_FP4 = _ecfp4(_PERINDOPRIL)
+_AMLODIPINE_FP4 = _ecfp4(_AMLODIPINE)
+_SITAGLIPTIN_FP4 = _ecfp4(_SITAGLIPTIN)
+_ZALEPLON_FP4 = _ecfp4(_ZALEPLON)
+
+_SITAGLIPTIN_LOGP = float(Descriptors.MolLogP(_SITAGLIPTIN))
+_SITAGLIPTIN_TPSA = float(Descriptors.TPSA(_SITAGLIPTIN))
+_SITAGLIPTIN_FORMULA = _parse_formula(rdMolDescriptors.CalcMolFormula(_SITAGLIPTIN))
+
+_ZALEPLON_FORMULA = _parse_formula("C19H17N3O2")
+
+
+def perindopril_mpo(smiles: str) -> float:
+    """Geometric mean: ECFP4 Tanimoto to perindopril + exactly 2 aromatic rings (μ=2, σ=0.5)."""
+    mol = _mol_from_smiles(smiles)
+    if mol is None:
+        return 0.0
+    tanimoto_score = _tanimoto(smiles, _PERINDOPRIL_FP4, _ecfp4)
+    ring_score = gaussian_score(
+        float(rdMolDescriptors.CalcNumAromaticRings(mol)), mu=2.0, sigma=0.5
+    )
+    return geometric_mean([tanimoto_score, ring_score])
+
+
+def amlodipine_mpo(smiles: str) -> float:
+    """Geometric mean: ECFP4 Tanimoto to amlodipine + exactly 3 rings total (μ=3, σ=0.5)."""
+    mol = _mol_from_smiles(smiles)
+    if mol is None:
+        return 0.0
+    tanimoto_score = _tanimoto(smiles, _AMLODIPINE_FP4, _ecfp4)
+    ring_score = gaussian_score(
+        float(rdMolDescriptors.CalcNumRings(mol)), mu=3.0, sigma=0.5
+    )
+    return geometric_mean([tanimoto_score, ring_score])
+
+
+def sitagliptin_mpo(smiles: str) -> float:
+    """Geometric mean: dissimilarity to sitagliptin + logP/TPSA match + formula match."""
+    mol = _mol_from_smiles(smiles)
+    if mol is None:
+        return 0.0
+    dissim_score = gaussian_score(
+        _tanimoto(smiles, _SITAGLIPTIN_FP4, _ecfp4), mu=0.0, sigma=0.1
+    )
+    logp_score = gaussian_score(float(Descriptors.MolLogP(mol)), mu=_SITAGLIPTIN_LOGP, sigma=0.2)
+    tpsa_score = gaussian_score(float(Descriptors.TPSA(mol)), mu=_SITAGLIPTIN_TPSA, sigma=5.0)
+    isomer_s = isomer_score(smiles, _SITAGLIPTIN_FORMULA)
+    return geometric_mean([dissim_score, logp_score, tpsa_score, isomer_s])
+
+
+def zaleplon_mpo(smiles: str) -> float:
+    """Geometric mean: ECFP4 Tanimoto to zaleplon + formula C19H17N3O2."""
+    mol = _mol_from_smiles(smiles)
+    if mol is None:
+        return 0.0
+    tanimoto_score = _tanimoto(smiles, _ZALEPLON_FP4, _ecfp4)
+    isomer_s = isomer_score(smiles, _ZALEPLON_FORMULA)
+    return geometric_mean([tanimoto_score, isomer_s])
+
+
 def _label_smiles(
     smiles_list: list[str],
     properties: list[GuacaMolPropertyName],
