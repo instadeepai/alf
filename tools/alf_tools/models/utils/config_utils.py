@@ -12,9 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Config instantiation utilities for GPyTorch objects."""
+"""Config instantiation utilities for configurations with _target_ keys."""
 
 import importlib
+
+_ALLOWED_MODULES = frozenset({"gpytorch.priors", "gpytorch.constraints"})
 
 
 def build_from_target(cfg: dict | None) -> object | None:
@@ -27,6 +29,9 @@ def build_from_target(cfg: dict | None) -> object | None:
     Args:
         cfg: Dict with ``_target_`` (e.g. ``"gpytorch.priors.LogNormalPrior"``)
             and any constructor kwargs. ``None`` returns ``None``.
+
+    Raises:
+        ValueError: If ``_target_`` is not in the allowed module list.
 
     Returns:
         Instantiated object, or ``None`` if ``cfg`` is ``None``.
@@ -43,6 +48,12 @@ def build_from_target(cfg: dict | None) -> object | None:
         return None
     cfg = dict(cfg)  # don't mutate the caller's dict
     target = cfg.pop("_target_")
+
+    if not any(target.startswith(prefix) for prefix in _ALLOWED_MODULES):
+        raise ValueError(
+            f"build_from_target: _target_ '{target}' is not in the allowed module list. "
+            f"Only gpytorch.priors.* and gpytorch.constraints.* are permitted."
+        )
     module_path, cls_name = target.rsplit(".", 1)
     cls = getattr(importlib.import_module(module_path), cls_name)
     return cls(**cfg)
