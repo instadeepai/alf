@@ -373,15 +373,6 @@ domain.
 
 All classification metrics accept `(probs, targets)` where `probs` has shape `(n_samples, num_classes)`.
 
-**Benchmarking Metrics** (`utils/metrics/benchmarking.py`):
-
-A separate `BenchmarkingMetricRegistry` holds campaign-level metrics that assess end-to-end
-optimisation quality. Register new functions with `@register_benchmarking_metric`. This domain is
-intentionally kept distinct from surrogate-quality metrics.
-
-All regression metrics accept predictions `(means, variances, targets)` and return a dictionary of
-computed values. Metrics requiring variance will validate that uncertainty estimates are provided.
-
 > **Normalisation and metrics:** When `standardise_outputs=True` in the model's train config,
 > predictions are inverse-transformed back to the original label scale before metrics are computed.
 > Metrics therefore always reflect performance in original label units, regardless of whether
