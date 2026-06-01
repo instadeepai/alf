@@ -17,14 +17,13 @@ import inspect
 import os
 import shutil
 from pathlib import Path
+from typing import get_args as _get_args
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 import requests
 from alf_core import Candidate, Modality
-from typing import get_args as _get_args
-
 from alf_tools.datasets.guacamol import (
     ALL_PROPERTIES,
     DATAPATH,
@@ -50,10 +49,10 @@ from alf_tools.datasets.guacamol import (
     _tanimoto,  # noqa: PLC2701
     albuterol_similarity,  # noqa: PLC2701
     amlodipine_mpo,  # noqa: PLC2701
-    arithmetic_mean,  # noqa: PLC2701
     aripiprazole_decorator_hop,  # noqa: PLC2701
     aripiprazole_scaffold_hop,  # noqa: PLC2701
     aripiprazole_similarity,  # noqa: PLC2701
+    arithmetic_mean,  # noqa: PLC2701
     c7h8n2o2_isomer,  # noqa: PLC2701
     c9h10n2o2pf2cl_isomer,  # noqa: PLC2701
     camphor_menthol_median,  # noqa: PLC2701
@@ -1267,25 +1266,34 @@ _RANOLAZINE_SMILES = "COc1ccccc1OCC(O)CN2CCN(CC(=O)Nc3c(C)cccc3C)CC2"
 
 
 class TestMPOPart1:
+    """Tests for fexofenadine, osimertinib, and ranolazine MPO scorers."""
+
     def test_fexofenadine_scores_above_zero(self):
+        """Fexofenadine self-score should be well above zero."""
         assert fexofenadine_mpo(_FEXOFENADINE_SMILES) > 0.1
 
     def test_fexofenadine_invalid_smiles_zero(self):
+        """Invalid SMILES should return 0.0."""
         assert fexofenadine_mpo("NOTSMILES") == pytest.approx(0.0)
 
     def test_fexofenadine_score_in_range(self):
+        """Score for any valid SMILES should be in [0, 1]."""
         assert 0.0 <= fexofenadine_mpo("CC(=O)O") <= 1.0
 
     def test_osimertinib_scores_above_zero(self):
+        """Osimertinib self-score should be well above zero."""
         assert osimertinib_mpo(_OSIMERTINIB_SMILES) > 0.1
 
     def test_osimertinib_score_in_range(self):
+        """Score for any valid SMILES should be in [0, 1]."""
         assert 0.0 <= osimertinib_mpo("CC(=O)O") <= 1.0
 
     def test_ranolazine_scores_above_zero(self):
+        """Ranolazine self-score should be above zero."""
         assert ranolazine_mpo(_RANOLAZINE_SMILES) > 0.0
 
     def test_ranolazine_invalid_smiles_zero(self):
+        """Invalid SMILES should return 0.0."""
         assert ranolazine_mpo("NOTSMILES") == pytest.approx(0.0)
 
 
@@ -1296,50 +1304,68 @@ _ZALEPLON_SMILES = "O=C(C)N(CC)C1=CC=CC(C2=CC=NC3=C(C=NN23)C#N)=C1"
 
 
 class TestMPOPart2:
+    """Tests for perindopril, amlodipine, sitagliptin, and zaleplon MPO scorers."""
+
     def test_perindopril_scores_above_zero(self):
+        """Perindopril self-score should be above zero."""
         assert perindopril_mpo(_PERINDOPRIL_SMILES) > 0.0
 
     def test_perindopril_invalid_smiles_returns_zero(self):
+        """Invalid SMILES should return 0.0."""
         assert perindopril_mpo("NOTSMILES") == pytest.approx(0.0)
 
     def test_perindopril_score_in_range(self):
+        """Score for any valid SMILES should be in [0, 1]."""
         assert 0.0 <= perindopril_mpo("c1ccccc1") <= 1.0
 
     def test_amlodipine_scores_above_zero(self):
+        """Amlodipine self-score should be above zero."""
         assert amlodipine_mpo(_AMLODIPINE_SMILES) > 0.0
 
     def test_amlodipine_score_in_range(self):
+        """Score for any valid SMILES should be in [0, 1]."""
         assert 0.0 <= amlodipine_mpo("c1ccccc1") <= 1.0
 
     def test_sitagliptin_dissimilar_scores_above_zero(self):
+        """Dissimilar molecules should score above zero."""
         assert sitagliptin_mpo("c1ccccc1") > 0.0
 
     def test_sitagliptin_self_scores_low(self):
+        """Sitagliptin scores near-zero for itself (Tanimoto=1.0 → dissim ≈ 0)."""
         # Tanimoto=1.0 → gaussian(1.0, mu=0, sigma=0.1) ≈ 0 → score ≈ 0.
         assert sitagliptin_mpo(_SITAGLIPTIN_SMILES) < 0.01
 
     def test_zaleplon_scores_above_zero(self):
+        """Zaleplon self-score should be above zero."""
         assert zaleplon_mpo(_ZALEPLON_SMILES) > 0.0
 
     def test_zaleplon_invalid_smiles_returns_zero(self):
+        """Invalid SMILES should return 0.0."""
         assert zaleplon_mpo("NOTSMILES") == pytest.approx(0.0)
 
 
 class TestIsomerTaskScorers:
+    """Tests for the C7H8N2O2 and C9H10N2O2PF2Cl isomer task scorers."""
+
     def test_c7h8n2o2_invalid_returns_zero(self):
+        """Invalid SMILES should return 0.0."""
         assert c7h8n2o2_isomer("NOTSMILES") == pytest.approx(0.0)
 
     def test_c7h8n2o2_score_in_range(self):
+        """Score for any valid SMILES should be in [0, 1]."""
         assert 0.0 <= c7h8n2o2_isomer("CC(=O)O") <= 1.0
 
     def test_c7h8n2o2_caffeine_low(self):
+        """Caffeine (C8H10N4O2) has wrong formula — score should be below 0.5."""
         # Caffeine is C8H10N4O2 — wrong formula on multiple elements.
         assert c7h8n2o2_isomer("CN1C=NC2=C1C(=O)N(C(=O)N2C)C") < 0.5
 
     def test_c9h10n2o2pf2cl_invalid_returns_zero(self):
+        """Invalid SMILES should return 0.0."""
         assert c9h10n2o2pf2cl_isomer("NOTSMILES") == pytest.approx(0.0)
 
     def test_c9h10n2o2pf2cl_score_in_range(self):
+        """Score for any valid SMILES should be in [0, 1]."""
         assert 0.0 <= c9h10n2o2pf2cl_isomer("CC(=O)O") <= 1.0
 
 
@@ -1347,41 +1373,55 @@ _HOP_REF_SMILES = "CCCOc1cc2ncnc(Nc3ccc4ncsc4c3)c2cc1S(=O)(=O)C(C)(C)C"
 
 
 class TestHopScorers:
+    """Tests for aripiprazole scaffold hop and decorator hop scorers."""
+
     def test_scaffold_hop_ref_mol_between_zero_and_one(self):
+        """Reference molecule score should be in [0, 1]."""
         assert 0.0 <= aripiprazole_scaffold_hop(_HOP_REF_SMILES) <= 1.0
 
     def test_decorator_hop_ref_mol_between_zero_and_one(self):
+        """Reference molecule score should be in [0, 1]."""
         assert 0.0 <= aripiprazole_decorator_hop(_HOP_REF_SMILES) <= 1.0
 
     def test_scaffold_hop_invalid_smiles_returns_zero(self):
+        """Invalid SMILES should return 0.0."""
         assert aripiprazole_scaffold_hop("NOTSMILES") == pytest.approx(0.0)
 
     def test_decorator_hop_invalid_smiles_returns_zero(self):
+        """Invalid SMILES should return 0.0."""
         assert aripiprazole_decorator_hop("NOTSMILES") == pytest.approx(0.0)
 
     def test_scaffold_hop_benzene_in_range(self):
+        """Score for benzene should be in [0, 1]."""
         assert 0.0 <= aripiprazole_scaffold_hop("c1ccccc1") <= 1.0
 
     def test_decorator_hop_caffeine_in_range(self):
+        """Score for caffeine should be in [0, 1]."""
         assert 0.0 <= aripiprazole_decorator_hop("CN1C=NC2=C1C(=O)N(C(=O)N2C)C") <= 1.0
 
 
 class TestGetTaskScorer:
+    """Tests for the get_task_scorer dispatch function."""
+
     def test_returns_callable_for_all_task_names(self):
+        """get_task_scorer should return a callable for every registered task name."""
         for name in _get_args(GuacaMolTaskName):
             scorer = get_task_scorer(name)
             assert callable(scorer), f"get_task_scorer({name!r}) did not return a callable"
 
     def test_scorer_returns_float(self):
+        """The returned scorer callable should return a float."""
         scorer = get_task_scorer("celecoxib_rediscovery")
         result = scorer("c1ccccc1")
         assert isinstance(result, float)
 
     def test_unknown_task_name_raises_key_error(self):
+        """Unknown task names should raise KeyError."""
         with pytest.raises(KeyError):
             get_task_scorer("this_does_not_exist")
 
     def test_each_scorer_returns_zero_for_invalid_smiles(self):
+        """Every scorer should return 0.0 for invalid SMILES."""
         for name in _get_args(GuacaMolTaskName):
             scorer = get_task_scorer(name)
             result = scorer("NOTSMILES!!!!")
@@ -1392,6 +1432,7 @@ class TestGuacaMolBenchmarkTaskLoad:
     """Tests for GuacaMol loading with a benchmark task target."""
 
     def test_benchmark_task_loads_without_error(self, tmp_path):
+        """Dataset should load with a benchmark task target without raising."""
         (tmp_path / FILENAME_ALL).write_text(
             "CC1=CC=C(C=C1)C1=CC(=NN1C1=CC=C(C=C1)S(N)(=O)=O)C(F)(F)F\nc1ccccc1\n"
         )
@@ -1401,6 +1442,7 @@ class TestGuacaMolBenchmarkTaskLoad:
         assert len(dataset._raw_dataset) == 2
 
     def test_benchmark_task_labels_in_zero_one(self, tmp_path):
+        """All labels from a benchmark task load should be in [0, 1]."""
         (tmp_path / FILENAME_ALL).write_text(
             "CC1=CC=C(C=C1)C1=CC(=NN1C1=CC=C(C=C1)S(N)(=O)=O)C(F)(F)F\nc1ccccc1\n"
         )
@@ -1411,6 +1453,7 @@ class TestGuacaMolBenchmarkTaskLoad:
             assert 0.0 <= float(label) <= 1.0
 
     def test_benchmark_task_candidates_have_empty_features(self, tmp_path):
+        """Candidates loaded via benchmark task should have empty features dicts."""
         (tmp_path / FILENAME_ALL).write_text("c1ccccc1\nCCO\n")
         config = _base_config(data_dir=tmp_path, target_property="celecoxib_rediscovery")
         dataset = GuacaMol(config)
@@ -1419,6 +1462,7 @@ class TestGuacaMolBenchmarkTaskLoad:
             assert cand.features == {}
 
     def test_query_scores_celecoxib_near_one(self, tmp_path):
+        """Querying celecoxib against celecoxib_rediscovery should score near 1.0."""
         (tmp_path / FILENAME_ALL).write_text(
             "CC1=CC=C(C=C1)C1=CC(=NN1C1=CC=C(C=C1)S(N)(=O)=O)C(F)(F)F\nc1ccccc1\n"
         )
@@ -1433,6 +1477,7 @@ class TestGuacaMolBenchmarkTaskLoad:
         assert result.labels[0] == pytest.approx(1.0, abs=0.01)
 
     def test_query_returns_caller_candidate(self, tmp_path):
+        """query() should return the exact same Candidate objects that were passed in."""
         (tmp_path / FILENAME_ALL).write_text("c1ccccc1\nCCO\n")
         config = _base_config(data_dir=tmp_path, target_property="celecoxib_rediscovery")
         dataset = GuacaMol(config)
@@ -1441,6 +1486,7 @@ class TestGuacaMolBenchmarkTaskLoad:
         assert result.candidates[0] is cand
 
     def test_query_invalid_smiles_raises_value_error(self, tmp_path):
+        """query() should raise ValueError when given an invalid SMILES string."""
         (tmp_path / FILENAME_ALL).write_text("c1ccccc1\n")
         config = _base_config(data_dir=tmp_path, target_property="celecoxib_rediscovery")
         dataset = GuacaMol(config)

@@ -556,15 +556,9 @@ def smarts_score(smiles: str, smarts: str, inverse: bool = False) -> float:
 # Reference molecules — computed once at import
 # ---------------------------------------------------------------------------
 
-_CELECOXIB = Chem.MolFromSmiles(
-    "CC1=CC=C(C=C1)C1=CC(=NN1C1=CC=C(C=C1)S(N)(=O)=O)C(F)(F)F"
-)
-_TROGLITAZONE = Chem.MolFromSmiles(
-    "Cc1c(C)c2OC(C)(COc3ccc(CC4SC(=O)NC4=O)cc3)CCc2c(C)c1O"
-)
-_THIOTHIXENE = Chem.MolFromSmiles(
-    "CN(C)S(=O)(=O)c1ccc2Sc3ccccc3C(=CCCN4CCN(C)CC4)c2c1"
-)
+_CELECOXIB = Chem.MolFromSmiles("CC1=CC=C(C=C1)C1=CC(=NN1C1=CC=C(C=C1)S(N)(=O)=O)C(F)(F)F")
+_TROGLITAZONE = Chem.MolFromSmiles("Cc1c(C)c2OC(C)(COc3ccc(CC4SC(=O)NC4=O)cc3)CCc2c(C)c1O")
+_THIOTHIXENE = Chem.MolFromSmiles("CN(C)S(=O)(=O)c1ccc2Sc3ccccc3C(=CCCN4CCN(C)CC4)c2c1")
 
 _CELECOXIB_FP4 = _ecfp4(_CELECOXIB)
 _TROGLITAZONE_FP4 = _ecfp4(_TROGLITAZONE)
@@ -577,25 +571,35 @@ _THIOTHIXENE_FP4 = _ecfp4(_THIOTHIXENE)
 
 
 def celecoxib_rediscovery(smiles: str) -> float:
-    """Tanimoto ECFP4 to celecoxib, clipped at 1.0. Score=1.0 for exact match."""
+    """Tanimoto ECFP4 to celecoxib, clipped at 1.0. Score=1.0 for exact match.
+
+    Returns:
+        float: Score in [0, 1].
+    """
     return clipped_score(_tanimoto(smiles, _CELECOXIB_FP4, _ecfp4), upper=1.0)
 
 
 def troglitazone_rediscovery(smiles: str) -> float:
-    """Tanimoto ECFP4 to troglitazone, clipped at 1.0."""
+    """Tanimoto ECFP4 to troglitazone, clipped at 1.0.
+
+    Returns:
+        float: Score in [0, 1].
+    """
     return clipped_score(_tanimoto(smiles, _TROGLITAZONE_FP4, _ecfp4), upper=1.0)
 
 
 def thiothixene_rediscovery(smiles: str) -> float:
-    """Tanimoto ECFP4 to thiothixene, clipped at 1.0."""
+    """Tanimoto ECFP4 to thiothixene, clipped at 1.0.
+
+    Returns:
+        float: Score in [0, 1].
+    """
     return clipped_score(_tanimoto(smiles, _THIOTHIXENE_FP4, _ecfp4), upper=1.0)
 
 
 _ARIPIPRAZOLE = Chem.MolFromSmiles("Clc4cccc(N3CCN(CCCCOc2ccc1c(NC(=O)CC1)c2)CC3)c4Cl")
 _ALBUTEROL = Chem.MolFromSmiles("CC(C)(C)NCC(O)c1ccc(O)c(CO)c1")
-_MESTRANOL = Chem.MolFromSmiles(
-    "COc1ccc2[C@H]3CC[C@@]4(C)[C@@H](CC[C@@]4(O)C#C)[C@@H]3CCc2c1"
-)
+_MESTRANOL = Chem.MolFromSmiles("COc1ccc2[C@H]3CC[C@@]4(C)[C@@H](CC[C@@]4(O)C#C)[C@@H]3CCc2c1")
 
 _ARIPIPRAZOLE_FCFP4 = _fcfp4(_ARIPIPRAZOLE)
 _ALBUTEROL_FCFP4 = _fcfp4(_ALBUTEROL)
@@ -610,28 +614,38 @@ _SIMILARITY_THRESHOLD = 0.75
 
 
 def aripiprazole_similarity(smiles: str) -> float:
-    """Tanimoto FCFP4 to aripiprazole, clipped at 0.75."""
-    return clipped_score(_tanimoto(smiles, _ARIPIPRAZOLE_FCFP4, _fcfp4), upper=_SIMILARITY_THRESHOLD)
+    """Tanimoto FCFP4 to aripiprazole, clipped at 0.75.
+
+    Returns:
+        float: Score in [0, 1].
+    """
+    return clipped_score(
+        _tanimoto(smiles, _ARIPIPRAZOLE_FCFP4, _fcfp4), upper=_SIMILARITY_THRESHOLD
+    )
 
 
 def albuterol_similarity(smiles: str) -> float:
-    """Tanimoto FCFP4 to albuterol, clipped at 0.75."""
+    """Tanimoto FCFP4 to albuterol, clipped at 0.75.
+
+    Returns:
+        float: Score in [0, 1].
+    """
     return clipped_score(_tanimoto(smiles, _ALBUTEROL_FCFP4, _fcfp4), upper=_SIMILARITY_THRESHOLD)
 
 
 def mestranol_similarity(smiles: str) -> float:
-    """Tanimoto atom-pair to mestranol, clipped at 0.75."""
+    """Tanimoto atom-pair to mestranol, clipped at 0.75.
+
+    Returns:
+        float: Score in [0, 1].
+    """
     return clipped_score(_tanimoto(smiles, _MESTRANOL_AP, _ap), upper=_SIMILARITY_THRESHOLD)
 
 
 _CAMPHOR = Chem.MolFromSmiles("CC1(C)C2CCC1(C)C(=O)C2")
 _MENTHOL = Chem.MolFromSmiles("CC(C)C1CCC(C)CC1O")
-_TADALAFIL = Chem.MolFromSmiles(
-    "O=C1N(CC(N2C1CC3=C(C2C4=CC5=C(OCO5)C=C4)NC6=C3C=CC=C6)=O)C"
-)
-_SILDENAFIL = Chem.MolFromSmiles(
-    "CCCC1=NN(C2=C1N=C(NC2=O)C3=C(C=CC(=C3)S(=O)(=O)N4CCN(CC4)C)OCC)C"
-)
+_TADALAFIL = Chem.MolFromSmiles("O=C1N(CC(N2C1CC3=C(C2C4=CC5=C(OCO5)C=C4)NC6=C3C=CC=C6)=O)C")
+_SILDENAFIL = Chem.MolFromSmiles("CCCC1=NN(C2=C1N=C(NC2=O)C3=C(C=CC(=C3)S(=O)(=O)N4CCN(CC4)C)OCC)C")
 
 _CAMPHOR_FP4 = _ecfp4(_CAMPHOR)
 _MENTHOL_FP4 = _ecfp4(_MENTHOL)
@@ -645,7 +659,11 @@ _SILDENAFIL_FP6 = _ecfp6(_SILDENAFIL)
 
 
 def camphor_menthol_median(smiles: str) -> float:
-    """Geometric mean of Tanimoto ECFP4 to camphor and menthol."""
+    """Geometric mean of Tanimoto ECFP4 to camphor and menthol.
+
+    Returns:
+        float: Score in [0, 1].
+    """
     return geometric_mean([
         _tanimoto(smiles, _CAMPHOR_FP4, _ecfp4),
         _tanimoto(smiles, _MENTHOL_FP4, _ecfp4),
@@ -653,19 +671,19 @@ def camphor_menthol_median(smiles: str) -> float:
 
 
 def tadalafil_sildenafil_median(smiles: str) -> float:
-    """Geometric mean of Tanimoto ECFP6 to tadalafil and sildenafil."""
+    """Geometric mean of Tanimoto ECFP6 to tadalafil and sildenafil.
+
+    Returns:
+        float: Score in [0, 1].
+    """
     return geometric_mean([
         _tanimoto(smiles, _TADALAFIL_FP6, _ecfp6),
         _tanimoto(smiles, _SILDENAFIL_FP6, _ecfp6),
     ])
 
 
-_FEXOFENADINE = Chem.MolFromSmiles(
-    "CC(C)(C(=O)O)c1ccc(cc1)C(O)CCCN2CCC(CC2)C(O)(c3ccccc3)c4ccccc4"
-)
-_OSIMERTINIB = Chem.MolFromSmiles(
-    "COc1cc(N(C)CCN(C)C)c(NC(=O)C=C)cc1Nc2nccc(n2)c3cn(C)c4ccccc34"
-)
+_FEXOFENADINE = Chem.MolFromSmiles("CC(C)(C(=O)O)c1ccc(cc1)C(O)CCCN2CCC(CC2)C(O)(c3ccccc3)c4ccccc4")
+_OSIMERTINIB = Chem.MolFromSmiles("COc1cc(N(C)CCN(C)C)c(NC(=O)C=C)cc1Nc2nccc(n2)c3cn(C)c4ccccc34")
 _RANOLAZINE = Chem.MolFromSmiles("COc1ccccc1OCC(O)CN2CCN(CC(=O)Nc3c(C)cccc3C)CC2")
 
 _FEXOFENADINE_AP = _ap(_FEXOFENADINE)
@@ -675,7 +693,11 @@ _RANOLAZINE_AP = _ap(_RANOLAZINE)
 
 
 def fexofenadine_mpo(smiles: str) -> float:
-    """Geometric mean: clipped AP Tanimoto (≤0.8) + high TPSA (μ=90) + low logP (μ=4)."""
+    """Geometric mean: clipped AP Tanimoto (≤0.8) + high TPSA (μ=90) + low logP (μ=4).
+
+    Returns:
+        float: Score in [0, 1].
+    """
     mol = _mol_from_smiles(smiles)
     if mol is None:
         return 0.0
@@ -686,7 +708,11 @@ def fexofenadine_mpo(smiles: str) -> float:
 
 
 def osimertinib_mpo(smiles: str) -> float:
-    """Geometric mean: clipped FCFP4 Tanimoto (≤0.8) + penalise ECFP6 similarity (μ=0.85) + high TPSA (μ=100) + low logP (μ=1)."""
+    """Geometric mean: clipped FCFP4 (≤0.8) + penalised ECFP6 (μ=0.85) + TPSA (μ=100) + logP (μ=1).
+
+    Returns:
+        float: Score in [0, 1].
+    """
     mol = _mol_from_smiles(smiles)
     if mol is None:
         return 0.0
@@ -700,7 +726,11 @@ def osimertinib_mpo(smiles: str) -> float:
 
 
 def ranolazine_mpo(smiles: str) -> float:
-    """Geometric mean: clipped AP Tanimoto (≤0.7) + high logP (μ=7) + high TPSA (μ=95) + exactly 1 F atom."""
+    """Geometric mean: clipped AP Tanimoto (≤0.7) + high logP (μ=7) + high TPSA (μ=95) + 1 F atom.
+
+    Returns:
+        float: Score in [0, 1].
+    """
     mol = _mol_from_smiles(smiles)
     if mol is None:
         return 0.0
@@ -713,9 +743,7 @@ def ranolazine_mpo(smiles: str) -> float:
 
 
 _PERINDOPRIL = Chem.MolFromSmiles("O=C(OCC)C(NC(C(=O)N1C(C(=O)O)CC2CCCCC12)C)CCC")
-_AMLODIPINE = Chem.MolFromSmiles(
-    r"Clc1ccccc1C2C(=C(/N/C(=C2/C(=O)OCC)COCCN)C)\C(=O)OC"
-)
+_AMLODIPINE = Chem.MolFromSmiles(r"Clc1ccccc1C2C(=C(/N/C(=C2/C(=O)OCC)COCCN)C)\C(=O)OC")
 _SITAGLIPTIN = Chem.MolFromSmiles("Fc1cc(c(F)cc1F)CC(N)CC(=O)N3Cc2nnc(n2CC3)C(F)(F)F")
 _ZALEPLON = Chem.MolFromSmiles("O=C(C)N(CC)C1=CC=CC(C2=CC=NC3=C(C=NN23)C#N)=C1")
 
@@ -732,7 +760,11 @@ _ZALEPLON_FORMULA = _parse_formula("C19H17N3O2")
 
 
 def perindopril_mpo(smiles: str) -> float:
-    """Geometric mean: ECFP4 Tanimoto to perindopril + exactly 2 aromatic rings (μ=2, σ=0.5)."""
+    """Geometric mean: ECFP4 Tanimoto to perindopril + exactly 2 aromatic rings (μ=2, σ=0.5).
+
+    Returns:
+        float: Score in [0, 1].
+    """
     mol = _mol_from_smiles(smiles)
     if mol is None:
         return 0.0
@@ -744,25 +776,29 @@ def perindopril_mpo(smiles: str) -> float:
 
 
 def amlodipine_mpo(smiles: str) -> float:
-    """Geometric mean: ECFP4 Tanimoto to amlodipine + exactly 3 rings total (μ=3, σ=0.5)."""
+    """Geometric mean: ECFP4 Tanimoto to amlodipine + exactly 3 rings total (μ=3, σ=0.5).
+
+    Returns:
+        float: Score in [0, 1].
+    """
     mol = _mol_from_smiles(smiles)
     if mol is None:
         return 0.0
     tanimoto_score = _tanimoto(smiles, _AMLODIPINE_FP4, _ecfp4)
-    ring_score = gaussian_score(
-        float(rdMolDescriptors.CalcNumRings(mol)), mu=3.0, sigma=0.5
-    )
+    ring_score = gaussian_score(float(rdMolDescriptors.CalcNumRings(mol)), mu=3.0, sigma=0.5)
     return geometric_mean([tanimoto_score, ring_score])
 
 
 def sitagliptin_mpo(smiles: str) -> float:
-    """Geometric mean: dissimilarity to sitagliptin + logP/TPSA match + formula match."""
+    """Geometric mean: dissimilarity to sitagliptin + logP/TPSA match + formula match.
+
+    Returns:
+        float: Score in [0, 1].
+    """
     mol = _mol_from_smiles(smiles)
     if mol is None:
         return 0.0
-    dissim_score = gaussian_score(
-        _tanimoto(smiles, _SITAGLIPTIN_FP4, _ecfp4), mu=0.0, sigma=0.1
-    )
+    dissim_score = gaussian_score(_tanimoto(smiles, _SITAGLIPTIN_FP4, _ecfp4), mu=0.0, sigma=0.1)
     logp_score = gaussian_score(float(Descriptors.MolLogP(mol)), mu=_SITAGLIPTIN_LOGP, sigma=0.2)
     tpsa_score = gaussian_score(float(Descriptors.TPSA(mol)), mu=_SITAGLIPTIN_TPSA, sigma=5.0)
     isomer_s = isomer_score(smiles, _SITAGLIPTIN_FORMULA)
@@ -770,7 +806,11 @@ def sitagliptin_mpo(smiles: str) -> float:
 
 
 def zaleplon_mpo(smiles: str) -> float:
-    """Geometric mean: ECFP4 Tanimoto to zaleplon + formula C19H17N3O2."""
+    """Geometric mean: ECFP4 Tanimoto to zaleplon + formula C19H17N3O2.
+
+    Returns:
+        float: Score in [0, 1].
+    """
     mol = _mol_from_smiles(smiles)
     if mol is None:
         return 0.0
@@ -784,21 +824,27 @@ _C9H10N2O2PF2CL_FORMULA = _parse_formula("C9H10N2O2PF2Cl")
 
 
 def c7h8n2o2_isomer(smiles: str) -> float:
-    """Geometric mean of per-element Gaussian scores targeting formula C7H8N2O2."""
+    """Geometric mean of per-element Gaussian scores targeting formula C7H8N2O2.
+
+    Returns:
+        float: Score in [0, 1].
+    """
     return isomer_score(smiles, _C7H8N2O2_FORMULA)
 
 
 def c9h10n2o2pf2cl_isomer(smiles: str) -> float:
-    """Geometric mean of per-element Gaussian scores targeting formula C9H10N2O2PF2Cl."""
+    """Geometric mean of per-element Gaussian scores targeting formula C9H10N2O2PF2Cl.
+
+    Returns:
+        float: Score in [0, 1].
+    """
     return isomer_score(smiles, _C9H10N2O2PF2CL_FORMULA)
 
 
 _HOP_REF = Chem.MolFromSmiles("CCCOc1cc2ncnc(Nc3ccc4ncsc4c3)c2cc1S(=O)(=O)C(C)(C)C")
 _HOP_REF_PHCO = _phco(_HOP_REF)
 
-_SCAFFOLD_HOP_SMARTS_KEEP = (
-    "[#6]-[#6]-[#6]-[#8]-[#6]~[#6]~[#6]~[#6]~[#6]-[#7]-c1ccc2ncsc2c1"
-)
+_SCAFFOLD_HOP_SMARTS_KEEP = "[#6]-[#6]-[#6]-[#8]-[#6]~[#6]~[#6]~[#6]~[#6]-[#7]-c1ccc2ncsc2c1"
 _SCAFFOLD_HOP_SMARTS_REMOVE = "[#7]-c1n[c;h1]nc2[c;h1]c(-[#8])[c;h0][c;h1]c12"
 
 _DECORATOR_HOP_SMARTS_REMOVE_SULFONYL = "CS([#6])(=O)=O"
@@ -807,7 +853,12 @@ _DECORATOR_HOP_SMARTS_KEEP_PURINONE = "[#7]-c1n[c;h1]nc2[c;h1]c(-[#8])[c;h0][c;h
 
 
 def aripiprazole_scaffold_hop(smiles: str) -> float:
-    """Arithmetic mean: PHCO Tanimoto (≤0.75) + keep propoxy-thienopyridine + remove aminopyrimidine scaffold."""
+    """Arithmetic mean: PHCO Tanimoto (<=0.75) + keep propoxy-thienopyridine + remove
+    aminopyrimidine scaffold.
+
+    Returns:
+        float: Score in [0, 1].
+    """
     mol = _mol_from_smiles(smiles)
     if mol is None:
         return 0.0
@@ -818,13 +869,19 @@ def aripiprazole_scaffold_hop(smiles: str) -> float:
 
 
 def aripiprazole_decorator_hop(smiles: str) -> float:
-    """Arithmetic mean: PHCO Tanimoto (≤0.85) + remove sulfonyl + remove thienopyridine + keep purinone."""
+    """Arithmetic mean: PHCO (<=0.85) + remove sulfonyl + remove thienopyridine + keep purinone.
+
+    Returns:
+        float: Score in [0, 1].
+    """
     mol = _mol_from_smiles(smiles)
     if mol is None:
         return 0.0
     phco_score = clipped_score(_tanimoto(smiles, _HOP_REF_PHCO, _phco), upper=0.85)
     rm_sulfonyl = smarts_score(smiles, _DECORATOR_HOP_SMARTS_REMOVE_SULFONYL, inverse=True)
-    rm_thienopyridine = smarts_score(smiles, _DECORATOR_HOP_SMARTS_REMOVE_THIENOPYRIDINE, inverse=True)
+    rm_thienopyridine = smarts_score(
+        smiles, _DECORATOR_HOP_SMARTS_REMOVE_THIENOPYRIDINE, inverse=True
+    )
     keep_purinone = smarts_score(smiles, _DECORATOR_HOP_SMARTS_KEEP_PURINONE, inverse=False)
     return arithmetic_mean([phco_score, rm_sulfonyl, rm_thienopyridine, keep_purinone])
 
@@ -1057,16 +1114,22 @@ class GuacaMol(BaseDataset):
         )
 
     def _load_benchmark_task(self) -> LabelledCandidates:
-        """Load corpus and score each valid SMILES using the benchmark task scorer."""
+        """Load corpus and score each valid SMILES using the benchmark task scorer.
+
+        Returns:
+            LabelledCandidates: Scored candidates from the corpus.
+        """
         scorer = get_task_scorer(cast(GuacaMolTaskName, self.config.target_property))
         if self.config.split_mode == "paper":
             return self._load_paper_splits_benchmark(scorer)
         return self._load_single_file_benchmark(scorer)
 
-    def _load_single_file_benchmark(
-        self, scorer: Callable[[str], float]
-    ) -> LabelledCandidates:
-        """Download (if absent) and score the combined corpus file."""
+    def _load_single_file_benchmark(self, scorer: Callable[[str], float]) -> LabelledCandidates:
+        """Download (if absent) and score the combined corpus file.
+
+        Returns:
+            LabelledCandidates: Scored candidates from the corpus.
+        """
         entry_info_all = GUACAMOL_FILES["ALL"]
         filepath = _download_file(
             entry_info_all["url"],
@@ -1079,12 +1142,13 @@ class GuacaMol(BaseDataset):
             smiles_list = smiles_list[: self.config.max_molecules]
         return _label_smiles_benchmark(smiles_list, scorer, self.modality)
 
-    def _load_paper_splits_benchmark(
-        self, scorer: Callable[[str], float]
-    ) -> LabelledCandidates:
+    def _load_paper_splits_benchmark(self, scorer: Callable[[str], float]) -> LabelledCandidates:
         """Download (if absent) train/valid/test files and score all candidates.
 
         Stores the three splits in ``self._paper_splits``.
+
+        Returns:
+            LabelledCandidates: All scored candidates across train/valid/test splits.
         """
         split_files = {k: v for k, v in GUACAMOL_FILES.items() if k != "ALL"}
         tag_to_key = {"TRAIN": "train", "VALID": "validation", "TEST": "test"}
@@ -1125,9 +1189,7 @@ class GuacaMol(BaseDataset):
         result_labels: list[float] = []
         for candidate in candidates:
             if _mol_from_smiles(candidate.data) is None:
-                raise ValueError(
-                    f"Cannot compute label for invalid SMILES: {candidate.data!r}"
-                )
+                raise ValueError(f"Cannot compute label for invalid SMILES: {candidate.data!r}")
             result_labels.append(scorer(candidate.data))
         return LabelledCandidates(
             candidates=candidates,
