@@ -143,15 +143,33 @@ class TestConfigs:
         assert config.optimizer_type == "adamw"
         assert config.batch_size == 8
         assert config.num_epochs == 10
-        assert config.mask_probability == 0.15
-        assert config.mask_splitting == (0.8, 0.1, 0.1)
         assert config.log_frequency == 1
-        assert config.loss_type == "mlm"
+        assert config.loss_type == "log_likelihood"
+        assert config.output_dim == 1
+        assert config.mlp_loss == "mse"
+        # mask_probability and mask_splitting should not exist
+        assert not hasattr(config, "mask_probability")
+        assert not hasattr(config, "mask_splitting")
 
     def test_train_config_num_epochs_zero_raises(self):
         """ESM2TrainConfig with num_epochs=0 must raise ValueError."""
         with pytest.raises(ValueError, match="num_epochs must be >= 1"):
             ESM2TrainConfig(num_epochs=0)
+
+    def test_mlp_head_with_unfrozen_backbone_raises(self):
+        """mlp_head mode requires freeze_backbone=True — raises ValueError otherwise."""
+        with pytest.raises(ValueError, match="mlp_head.*freeze_backbone"):
+            ESM2TrainConfig(loss_type="mlp_head", freeze_backbone=False)
+
+    def test_invalid_loss_type_raises(self):
+        """Invalid loss_type raises ValueError."""
+        with pytest.raises(ValueError, match="loss_type"):
+            ESM2TrainConfig(loss_type="mlm")
+
+    def test_invalid_mlp_loss_raises(self):
+        """Invalid mlp_loss raises ValueError."""
+        with pytest.raises(ValueError, match="mlp_loss"):
+            ESM2TrainConfig(loss_type="mlp_head", mlp_loss="l1")
 
 
 class TestFeaturise:

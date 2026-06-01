@@ -57,22 +57,24 @@ class ESM2TrainConfig(BaseTrainConfig):
     """Configuration for ESM-2 training.
 
     Args:
-        freeze_backbone: When True, train() is a no-op (pure embedding extractor).
+        freeze_backbone: When True and loss_type='log_likelihood', train() is a no-op.
+            Must be True when loss_type='mlp_head' (backbone is always frozen in that mode).
         learning_rate: Learning rate for the optimizer.
         optimizer_type: Which optimizer to use ('adam' or 'adamw').
         batch_size: Batch size for training.
         batch_size_inference: Batch size for predict() and embed(). None defaults to batch_size.
         num_epochs: Number of epochs to train for.
-        mask_probability: Fraction of non-special tokens to randomly mask (MLM).
-        mask_splitting: Tuple of (p_mask, p_random, p_unchanged) probabilities
-            for masked token replacement.
         log_frequency: Record epoch metrics every N epochs.
         max_grad_norm: Maximum norm for gradient clipping. None disables clipping.
-        loss_type: Training objective. 'mlm' masks a random fraction of tokens
-            (controlled by mask_probability and mask_splitting) and computes
-            cross-entropy over those positions. 'log_likelihood' masks ALL
-            non-special tokens with [MASK] and computes cross-entropy over
-            all of them, approximating the pseudo-log-likelihood of the sequence.
+        loss_type: Training scheme. 'log_likelihood' masks ALL non-special tokens and
+            computes cross-entropy over all of them (self-supervised). 'mlp_head' freezes
+            the ESM-2 backbone and trains a linear head on top of sequence embeddings
+            using the labels provided to train().
+        output_dim: Output dimension of the MLP head. 1 for regression; N for N-class
+            classification. Only used when loss_type='mlp_head'.
+        mlp_loss: Loss function for MLP head training. 'mse' for regression;
+            'cross_entropy' for classification (expects integer class labels).
+            Only used when loss_type='mlp_head'.
     """
 
     freeze_backbone: bool = True
@@ -81,33 +83,41 @@ class ESM2TrainConfig(BaseTrainConfig):
     batch_size: int = 8
     batch_size_inference: int | None = None
     num_epochs: int = 10
-    mask_probability: float = 0.15
-    mask_splitting: tuple[float, float, float] = (0.8, 0.1, 0.1)  # mask / random / unchanged
     log_frequency: int = 1
     max_grad_norm: float | None = None
-    loss_type: Literal["mlm", "log_likelihood"] = "mlm"
+    loss_type: Literal["log_likelihood", "mlp_head"] = "log_likelihood"
+    output_dim: int = 1
+    mlp_loss: Literal["mse", "cross_entropy"] = "mse"
 
     def __post_init__(self) -> None:
         """Post-initialization checks for ESM2TrainConfig.
 
         Raises:
             ValueError: If num_epochs < 1.
-            ValueError: mask splitting probabilities must sum to 1.
-            ValueError: optimizer_type must be 'adam' or 'adamw'.
-            ValueError: loss_type must be 'mlm' or 'log_likelihood'.
+            ValueError: If optimizer_type is not 'adam' or 'adamw'.
+            ValueError: If loss_type is not 'log_likelihood' or 'mlp_head'.
+            ValueError: If loss_type='mlp_head' and freeze_backbone=False.
+            ValueError: If mlp_loss is not 'mse' or 'cross_entropy'.
         """
         if self.num_epochs < 1:
             raise ValueError(f"num_epochs must be >= 1, got {self.num_epochs}")
-        if not np.isclose(sum(self.mask_splitting), 1.0):
-            raise ValueError(
-                f"mask_splitting probabilities must sum to 1, got {self.mask_splitting}"
-            )
         if self.optimizer_type not in ("adam", "adamw"):
             raise ValueError(
                 f"optimizer_type must be 'adam' or 'adamw', got {self.optimizer_type!r}"
             )
-        if self.loss_type not in ("mlm", "log_likelihood"):
-            raise ValueError(f"loss_type must be 'mlm' or 'log_likelihood', got {self.loss_type!r}")
+        if self.loss_type not in ("log_likelihood", "mlp_head"):
+            raise ValueError(
+                f"loss_type must be 'log_likelihood' or 'mlp_head', got {self.loss_type!r}"
+            )
+        if self.loss_type == "mlp_head" and not self.freeze_backbone:
+            raise ValueError(
+                "mlp_head mode requires freeze_backbone=True. "
+                "The ESM-2 backbone is always frozen when training an MLP head."
+            )
+        if self.mlp_loss not in ("mse", "cross_entropy"):
+            raise ValueError(
+                f"mlp_loss must be 'mse' or 'cross_entropy', got {self.mlp_loss!r}"
+            )
 
 
 class ESM2Model(BaseModel):
@@ -379,103 +389,6 @@ class ESM2Model(BaseModel):
         for sid in special_ids:
             mask |= input_ids.eq(sid)
         return mask
-
-    def _mask_tokens(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """Apply random token masking for MLM.
-
-        Non-masked positions in labels are set to -100 so CrossEntropyLoss ignores them.
-        Special tokens (cls, eos, pad) are never masked.
-
-        Args:
-            input_ids: Token IDs of shape (batch, seq_len).
-
-        Raises:
-            ValueError: If the tokeniser does not have a mask token.
-
-        Returns:
-            Tuple of (masked_input_ids, labels), both of shape (batch, seq_len).
-        """
-        labels = input_ids.clone()
-
-        special_tokens_mask = self._special_tokens_mask(input_ids)
-
-        # eligible[i, j] is True when position (i, j) may be masked
-        eligible = ~special_tokens_mask  # (batch, seq_len)
-
-        # Sample masked positions
-        prob_matrix = torch.full(
-            input_ids.shape, self.train_config.mask_probability, device=input_ids.device
-        )
-        prob_matrix.masked_fill_(special_tokens_mask, 0.0)
-        masked = torch.bernoulli(prob_matrix).bool()
-
-        # Guarantee at least one token is masked per row so CrossEntropyLoss is never NaN.
-        # Pick a random eligible position to avoid systematic positional bias.
-        rows_with_no_mask = ~masked.any(dim=1)
-        if rows_with_no_mask.any():
-            # eligible_float: ineligible positions get 0 weight so they are never picked
-            eligible_float = eligible[rows_with_no_mask].float()  # (n_empty, seq_len)
-
-            if eligible_float.sum(dim=1).eq(0).any():
-                # Every token in this row is a special token — cannot mask anything.
-                # Log a warning; the row's labels will be all -100 (loss contribution = 0).
-                logger.warning(
-                    "One or more sequences consist entirely of special tokens. "
-                    "These rows will contribute zero loss. Check your data pipeline."
-                )
-                # Zero-weight rows would cause multinomial to raise; fall back to no-op.
-                eligible_float = eligible_float.clamp(min=0)  # already 0, kept for clarity
-                has_eligible = eligible_float.sum(dim=1) > 0  # (n_empty,)
-                if has_eligible.any():
-                    picks = torch.multinomial(eligible_float[has_eligible], num_samples=1).squeeze(
-                        1
-                    )  # (n_has_eligible,)
-                    target_rows = rows_with_no_mask.nonzero(as_tuple=True)[0][has_eligible]
-                    masked[target_rows, picks] = True
-            else:
-                picks = torch.multinomial(eligible_float, num_samples=1).squeeze(1)
-                target_rows = rows_with_no_mask.nonzero(as_tuple=True)[0]
-                masked[target_rows, picks] = True
-
-        labels[~masked] = -100
-
-        masked_input_ids = input_ids.clone()
-        if self.tokeniser.mask_token_id is None:
-            raise ValueError(
-                "Tokeniser has no mask token. Cannot perform MLM masking. "
-                "Ensure the tokeniser is initialised with a [MASK] token."
-            )
-
-        # Apply 80 / 10 / 10 (or specified) replacement split
-        masked_indices = masked.nonzero(as_tuple=False)  # (n_masked, 2)
-
-        n_masked = masked_indices.shape[0]
-        p_mask, p_random, p_unchanged = self.train_config.mask_splitting
-        if n_masked > 0:
-            split = torch.rand(n_masked, device=input_ids.device)
-
-            # X %: replace with [MASK]
-            replace_with_mask = split < p_mask
-            if replace_with_mask.any():
-                idx = masked_indices[replace_with_mask]
-                masked_input_ids[idx[:, 0], idx[:, 1]] = self.tokeniser.mask_token_id
-
-            # Y %: replace with a uniformly random vocabulary token
-            replace_with_random = (split >= p_mask) & (split < (p_mask + p_random))
-            if replace_with_random.any():
-                idx = masked_indices[replace_with_random]
-                random_ids = torch.randint(
-                    low=0,
-                    high=self.tokeniser.vocab_size,
-                    size=(idx.shape[0],),
-                    device=input_ids.device,
-                )
-                masked_input_ids[idx[:, 0], idx[:, 1]] = random_ids
-
-            # Z %: leave unchanged — no write needed, masked_input_ids is already a
-            # copy of input_ids. Documented explicitly to make the split complete.
-
-        return masked_input_ids, labels
 
     def _compute_log_likelihood_labels(
         self, input_ids: torch.Tensor
