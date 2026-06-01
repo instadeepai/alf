@@ -1137,6 +1137,40 @@ class TestIsomerScore:
         score = isomer_score("CC(=O)O", target)
         assert 0.0 <= score <= 1.0
 
+    def test_includes_total_atom_count_gaussian_term(self):
+        """isomer_score includes a total-atom-count Gaussian (sigma=2) per original GuacaMol.
+
+        Propane (C3H8, 11 atoms with H) scored against target C2H6 (8 atoms total).
+        Expected score = geometric_mean([C_score, H_score, total_score])
+        = geometric_mean([exp(-0.5), exp(-2), exp(-1.125)]) ≈ 0.2987
+        Without the total-atom-count term the score is ≈ 0.2864.
+        """
+        target = _parse_formula("C2H6")
+        score = isomer_score("CCC", target)  # propane vs ethane target
+        assert score == pytest.approx(0.2987, rel=0.01)
+
+
+class TestApFingerprintMaxLength:
+    """Tests that _ap() uses maxLength=10 matching the original GuacaMol implementation."""
+
+    def test_ap_uses_maxlength_10_not_default_30(self):
+        """_ap() matches rdMolDescriptors.GetAtomPairFingerprint(mol, maxLength=10) for long chains."""
+        from rdkit.Chem import rdMolDescriptors as _rdMD
+        from rdkit import DataStructs as _DataStructs
+
+        # C22 chain: atoms 0..21 span distances up to 21 bonds — well beyond maxLength=10
+        mol = _mol_from_smiles("CCCCCCCCCCCCCCCCCCCCCC")
+        fp_ours = _ap(mol)
+        fp_max10 = _rdMD.GetAtomPairFingerprint(mol, maxLength=10)
+        fp_max30 = _rdMD.GetAtomPairFingerprint(mol, maxLength=30)
+
+        # Precondition: maxLength=10 and maxLength=30 differ for this molecule
+        assert _DataStructs.TanimotoSimilarity(fp_max10, fp_max30) < 1.0, (
+            "Test precondition: maxLength=10 vs maxLength=30 should differ on C22 chain"
+        )
+        # Our _ap must match maxLength=10
+        assert _DataStructs.TanimotoSimilarity(fp_ours, fp_max10) == pytest.approx(1.0)
+
 
 class TestSmartsScore:
     """Tests for smarts_score."""

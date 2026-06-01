@@ -21,7 +21,7 @@ import re
 import time
 from functools import lru_cache
 from pathlib import Path
-from typing import Callable, Final, Literal, NotRequired, TypedDict, cast, get_args
+from typing import Any, Callable, Final, Literal, NotRequired, TypedDict, cast, get_args
 
 import numpy as np
 import requests
@@ -244,14 +244,14 @@ class GuacaMolConfig(BaseDatasetConfig):
                 "computed_properties when computed_properties is explicitly set."
             )
         if self.split_mode != "paper":
-            # split_mode values "random" and "low_vs_high" are valid SplitType values;
-            # cast is safe here since BaseDatasetConfig.split_type accepts them.
+            # split_mode values "random", "low_vs_high", "stratified" map 1-to-1 to SplitType.
             from alf_core.dataset.splitting_utils import SplitType  # noqa: PLC0415
 
-            assert self.split_mode in get_args(SplitType), (
-                f"split_mode {self.split_mode!r} is not a valid SplitType value. "
-                f"Valid values: {get_args(SplitType)}"
-            )
+            if self.split_mode not in get_args(SplitType):
+                raise ValueError(
+                    f"split_mode {self.split_mode!r} is not a valid SplitType value. "
+                    f"Valid values: {get_args(SplitType)}"
+                )
             self.split_type = cast(SplitType, self.split_mode)
         return self
 
@@ -368,7 +368,7 @@ def _download_file(
         raise
 
     if sha256 is None:
-        logger.warning(
+        logger.info(
             "No SHA-256 checksum configured for %s — integrity not verified.", filepath.name
         )
     else:
@@ -439,7 +439,7 @@ def _canonical_smiles(smiles: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _ecfp4(mol: "Chem.Mol"):
+def _ecfp4(mol: "Chem.Mol") -> Any:
     """Morgan fingerprint radius=2 (ECFP4).
 
     Returns:
@@ -448,7 +448,7 @@ def _ecfp4(mol: "Chem.Mol"):
     return AllChem.GetMorganFingerprint(mol, 2)
 
 
-def _ecfp6(mol: "Chem.Mol"):
+def _ecfp6(mol: "Chem.Mol") -> Any:
     """Morgan fingerprint radius=3 (ECFP6).
 
     Returns:
@@ -457,7 +457,7 @@ def _ecfp6(mol: "Chem.Mol"):
     return AllChem.GetMorganFingerprint(mol, 3)
 
 
-def _fcfp4(mol: "Chem.Mol"):
+def _fcfp4(mol: "Chem.Mol") -> Any:
     """Feature-based Morgan fingerprint radius=2 (FCFP4).
 
     Returns:
@@ -466,16 +466,16 @@ def _fcfp4(mol: "Chem.Mol"):
     return AllChem.GetMorganFingerprint(mol, 2, useFeatures=True)
 
 
-def _ap(mol: "Chem.Mol"):
-    """Atom-pair fingerprint.
+def _ap(mol: "Chem.Mol") -> Any:
+    """Atom-pair fingerprint with maxLength=10, matching the original GuacaMol implementation.
 
     Returns:
         RDKit atom-pair fingerprint object.
     """
-    return rdMolDescriptors.GetAtomPairFingerprint(mol)
+    return rdMolDescriptors.GetAtomPairFingerprint(mol, maxLength=10)
 
 
-def _phco(mol: "Chem.Mol"):
+def _phco(mol: "Chem.Mol") -> Any:
     """2D pharmacophore fingerprint (Gobbi).
 
     Returns:
@@ -489,7 +489,7 @@ def _phco(mol: "Chem.Mol"):
     return Generate.Gen2DFingerprint(mol, Gobbi_Pharm2D.factory)
 
 
-def _tanimoto(smiles: str, ref_fp, fp_fn: Callable) -> float:
+def _tanimoto(smiles: str, ref_fp: Any, fp_fn: Callable[["Chem.Mol"], Any]) -> float:
     """Tanimoto similarity of smiles to ref_fp using the given fingerprint function.
 
     Returns:
@@ -534,6 +534,10 @@ def isomer_score(smiles: str, target_formula: dict[str, int]) -> float:
         gaussian_score(float(mol_counts.get(el, 0)), mu=float(target_count), sigma=1.0)
         for el, target_count in target_formula.items()
     ]
+    # Total-atom-count term (H included) with sigma=2, per original IsomerScoringFunction.
+    total_mol_atoms = float(Chem.AddHs(mol).GetNumAtoms())
+    total_target = float(sum(target_formula.values()))
+    scores.append(gaussian_score(total_mol_atoms, mu=total_target, sigma=2.0))
     return geometric_mean(scores)
 
 
@@ -979,10 +983,12 @@ def _label_smiles_benchmark(
     candidates = []
     labels = []
     for smiles in smiles_list:
-        if _mol_from_smiles(smiles) is None:
+        mol = _mol_from_smiles(smiles)
+        if mol is None:
             logger.warning("Skipping invalid SMILES: %r", smiles)
             continue
-        candidates.append(Candidate(data=smiles, modality=modality, features={}))
+        canonical = Chem.MolToSmiles(mol)
+        candidates.append(Candidate(data=canonical, modality=modality, features={}))
         labels.append(scorer(smiles))
     return LabelledCandidates(candidates=candidates, labels=np.array(labels, dtype=float))
 
@@ -1086,6 +1092,13 @@ class GuacaMol(BaseDataset):
         tag_to_key = {"TRAIN": "train", "VALID": "validation", "TEST": "test"}
         target = cast(GuacaMolPropertyName, self.config.target_property)
         properties = list(self.config.computed_properties or [target])
+        if self.config.max_molecules is not None:
+            logger.warning(
+                "max_molecules=%d is applied per split file in paper mode — "
+                "total molecules may reach %d × 3.",
+                self.config.max_molecules,
+                self.config.max_molecules,
+            )
         self._paper_splits = {}
         all_candidates: list[Candidate] = []
         all_labels: list[float] = []
@@ -1152,6 +1165,13 @@ class GuacaMol(BaseDataset):
         """
         split_files = {k: v for k, v in GUACAMOL_FILES.items() if k != "ALL"}
         tag_to_key = {"TRAIN": "train", "VALID": "validation", "TEST": "test"}
+        if self.config.max_molecules is not None:
+            logger.warning(
+                "max_molecules=%d is applied per split file in paper mode — "
+                "total molecules may reach %d × 3.",
+                self.config.max_molecules,
+                self.config.max_molecules,
+            )
         self._paper_splits = {}
         all_candidates: list[Candidate] = []
         all_labels: list[float] = []
