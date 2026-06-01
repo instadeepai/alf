@@ -752,3 +752,67 @@ class TestMLPHead:
         loader = esm2_model._prepare_data_loader(sample_data)
         batch = next(iter(loader))
         assert len(batch) == 2
+
+    def test_mlp_train_updates_head_weights(self, esm2_mlp_model, sample_data):
+        """train() in mlp_head mode updates the linear head parameters."""
+        initial_weight = esm2_mlp_model._head.weight.clone()
+        esm2_mlp_model.train(sample_data)
+        assert not torch.equal(initial_weight, esm2_mlp_model._head.weight)
+
+    def test_mlp_train_does_not_update_backbone(self, esm2_mlp_model, sample_data):
+        """train() in mlp_head mode must not change any ESM-2 backbone parameters."""
+        initial_params = {
+            name: param.clone()
+            for name, param in esm2_mlp_model.esm_model.named_parameters()
+        }
+        esm2_mlp_model.train(sample_data)
+        for name, param in esm2_mlp_model.esm_model.named_parameters():
+            assert torch.equal(initial_params[name], param), f"Backbone param {name} changed"
+
+    def test_mlp_train_records_epoch_metrics(self, esm2_mlp_model, sample_data):
+        """train() in mlp_head mode records one SurrogateEpochMetrics per epoch."""
+        esm2_mlp_model.train(sample_data)
+        metrics = esm2_mlp_model.get_epoch_metrics()
+        assert len(metrics) == esm2_mlp_model.train_config.num_epochs
+        assert all(isinstance(m, SurrogateEpochMetrics) for m in metrics)
+
+    def test_mlp_train_loss_is_finite(self, esm2_mlp_model, sample_data):
+        """Each epoch metric train_loss must be finite."""
+        esm2_mlp_model.train(sample_data)
+        for m in esm2_mlp_model.get_epoch_metrics():
+            assert np.isfinite(m.train_loss)
+
+    def test_mlp_train_summary_has_final_train_loss(self, esm2_mlp_model, sample_data):
+        """Summary metrics include a finite final_train_loss."""
+        esm2_mlp_model.train(sample_data)
+        summary = esm2_mlp_model.get_training_summary_metrics()
+        assert "final_train_loss" in summary
+        assert np.isfinite(summary["final_train_loss"])
+
+    def test_mlp_val_loss_recorded_when_val_data_provided(self, esm2_mlp_model, sample_data):
+        """val_loss is recorded in epoch metrics when val_data is provided."""
+        val_candidates = [Candidate(data="ACDEFGHIKL", modality="sequence")]
+        val_data = LabelledCandidates(val_candidates, np.array([1.0]))
+        esm2_mlp_model.train(sample_data, val_data=val_data)
+        for m in esm2_mlp_model.get_epoch_metrics():
+            assert m.val_loss is not None
+            assert np.isfinite(m.val_loss)
+
+    def test_mlp_cross_entropy_train_updates_head(self, esm2_mlp_classification_model):
+        """train() with cross_entropy loss and integer labels updates the head."""
+        candidates = [
+            Candidate(data="ACDEFGHIKL", modality="sequence"),
+            Candidate(data="MNPQRSTVWY", modality="sequence"),
+            Candidate(data="ACMNPQRST", modality="sequence"),
+        ]
+        labels = np.array([0.0, 1.0, 0.0])  # class indices as floats (cast to long internally)
+        sample = LabelledCandidates(candidates, labels)
+        initial_weight = esm2_mlp_classification_model._head.weight.clone()
+        esm2_mlp_classification_model.train(sample)
+        assert not torch.equal(initial_weight, esm2_mlp_classification_model._head.weight)
+
+    def test_mlp_mode_does_not_emit_log_likelihood_metric(self, esm2_mlp_model, sample_data):
+        """MLP head mode must NOT include train_log_likelihood in epoch metrics."""
+        esm2_mlp_model.train(sample_data)
+        for m in esm2_mlp_model.get_epoch_metrics():
+            assert "train_log_likelihood" not in m.additional_metrics

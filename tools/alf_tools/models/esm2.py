@@ -553,6 +553,117 @@ class ESM2Model(BaseModel):
             val_metrics["log_likelihood"] = -avg_val_loss
         return avg_val_loss, val_metrics
 
+    def _train_epoch_mlp(
+        self,
+        train_loader: DataLoader,
+        optimizer: optim.Optimizer,
+    ) -> tuple[float, dict[str, float]]:
+        """Train the MLP head for one epoch with the backbone frozen.
+
+        Args:
+            train_loader: DataLoader yielding (input_ids, attention_mask, targets).
+            optimizer: Optimizer for the head parameters only.
+
+        Returns:
+            Tuple of (average_loss, empty metrics_dict).
+
+        Raises:
+            RuntimeError: If the loss becomes NaN or infinite.
+            ValueError: If the DataLoader produces no batches.
+        """
+        assert self._head is not None
+        self.esm_model.eval()
+        self._head.train()
+        epoch_losses: list[float] = []
+
+        for raw_ids, raw_mask, targets in train_loader:
+            batch_ids = raw_ids.to(self.device)
+            batch_mask = raw_mask.to(self.device)
+            targets = targets.to(self.device)
+
+            with torch.no_grad():
+                outputs = self.esm_model(
+                    input_ids=batch_ids,
+                    attention_mask=batch_mask,
+                    output_hidden_states=True,
+                )
+                hidden_state = outputs.hidden_states[self.model_config.repr_layer]
+                if self.model_config.pooling == "mean":
+                    mask = batch_mask.unsqueeze(-1).float()
+                    embeddings = (hidden_state * mask).sum(1) / mask.sum(1)
+                else:  # cls
+                    embeddings = hidden_state[:, 0, :]
+
+            optimizer.zero_grad()
+            preds = self._head(embeddings)
+
+            if self.train_config.mlp_loss == "mse":
+                loss = torch.nn.functional.mse_loss(preds.squeeze(-1), targets)
+            else:  # cross_entropy
+                loss = torch.nn.functional.cross_entropy(preds, targets.long())
+
+            if not torch.isfinite(loss):
+                raise RuntimeError(
+                    f"MLP head training loss is {loss.item():.6g}. "
+                    "Check labels, reduce learning rate, or inspect embeddings."
+                )
+            loss.backward()
+            if self.train_config.max_grad_norm is not None:
+                torch.nn.utils.clip_grad_norm_(
+                    self._head.parameters(), self.train_config.max_grad_norm
+                )
+            optimizer.step()
+            epoch_losses.append(loss.item())
+
+        if not epoch_losses:
+            raise ValueError(
+                "MLP training DataLoader produced no batches. Ensure train_data is non-empty."
+            )
+        avg_loss = float(np.mean(epoch_losses))
+        return avg_loss, {}
+
+    def _validate_epoch_mlp(self, val_loader: DataLoader) -> tuple[float, dict[str, float]]:
+        """Validate the MLP head for one epoch.
+
+        Args:
+            val_loader: DataLoader yielding (input_ids, attention_mask, targets).
+
+        Returns:
+            Tuple of (average_loss, empty metrics_dict).
+        """
+        assert self._head is not None
+        self.esm_model.eval()
+        self._head.eval()
+        val_losses: list[float] = []
+
+        with torch.no_grad():
+            for raw_ids, raw_mask, targets in val_loader:
+                batch_ids = raw_ids.to(self.device)
+                batch_mask = raw_mask.to(self.device)
+                targets = targets.to(self.device)
+
+                outputs = self.esm_model(
+                    input_ids=batch_ids,
+                    attention_mask=batch_mask,
+                    output_hidden_states=True,
+                )
+                hidden_state = outputs.hidden_states[self.model_config.repr_layer]
+                if self.model_config.pooling == "mean":
+                    mask = batch_mask.unsqueeze(-1).float()
+                    embeddings = (hidden_state * mask).sum(1) / mask.sum(1)
+                else:  # cls
+                    embeddings = hidden_state[:, 0, :]
+
+                preds = self._head(embeddings)
+                if self.train_config.mlp_loss == "mse":
+                    loss = torch.nn.functional.mse_loss(preds.squeeze(-1), targets)
+                else:
+                    loss = torch.nn.functional.cross_entropy(preds, targets.long())
+                val_losses.append(loss.item())
+
+        avg_loss = float(np.mean(val_losses))
+        return avg_loss, {}
+
     def _record_epoch_metrics(
         self,
         epoch: int,
@@ -617,7 +728,7 @@ class ESM2Model(BaseModel):
         self._epoch_metrics = []
         self.training_metrics = {}
 
-        if self.train_config.freeze_backbone:
+        if self.train_config.freeze_backbone and self.train_config.loss_type == "log_likelihood":
             return
 
         logger.info(
@@ -631,13 +742,19 @@ class ESM2Model(BaseModel):
             val_loader = self._prepare_data_loader(val_data, shuffle=False)
 
         # Setup training
+        if self.train_config.loss_type == "mlp_head":
+            assert self._head is not None
+            params_to_optimize = self._head.parameters()
+        else:
+            params_to_optimize = self.esm_model.parameters()
+
         if self.train_config.optimizer_type == "adamw":
             optimizer: torch.optim.Optimizer = torch.optim.AdamW(
-                self.esm_model.parameters(), lr=self.train_config.learning_rate
+                params_to_optimize, lr=self.train_config.learning_rate
             )
         elif self.train_config.optimizer_type == "adam":
             optimizer = torch.optim.Adam(
-                self.esm_model.parameters(), lr=self.train_config.learning_rate
+                params_to_optimize, lr=self.train_config.learning_rate
             )
         else:
             raise AssertionError(
@@ -651,25 +768,24 @@ class ESM2Model(BaseModel):
         val_metrics: dict[str, float] = {}
 
         for epoch in range(self.train_config.num_epochs):
-            # Train
-            avg_train_loss, train_metrics = self._train_epoch(train_loader, optimizer)
-
-            # Validate
-            if val_loader is not None:
-                avg_val_loss, val_metrics = self._validate_epoch(val_loader)
-                self._record_epoch_metrics(
-                    epoch,
-                    avg_train_loss,
-                    train_metrics,
-                    avg_val_loss,
-                    val_metrics,
-                )
+            if self.train_config.loss_type == "mlp_head":
+                avg_train_loss, train_metrics = self._train_epoch_mlp(train_loader, optimizer)
+                if val_loader is not None:
+                    avg_val_loss, val_metrics = self._validate_epoch_mlp(val_loader)
+                    self._record_epoch_metrics(
+                        epoch, avg_train_loss, train_metrics, avg_val_loss, val_metrics
+                    )
+                else:
+                    self._record_epoch_metrics(epoch, avg_train_loss, train_metrics)
             else:
-                self._record_epoch_metrics(
-                    epoch,
-                    avg_train_loss,
-                    train_metrics,
-                )
+                avg_train_loss, train_metrics = self._train_epoch(train_loader, optimizer)
+                if val_loader is not None:
+                    avg_val_loss, val_metrics = self._validate_epoch(val_loader)
+                    self._record_epoch_metrics(
+                        epoch, avg_train_loss, train_metrics, avg_val_loss, val_metrics
+                    )
+                else:
+                    self._record_epoch_metrics(epoch, avg_train_loss, train_metrics)
 
         self.training_metrics = {"final_train_loss": avg_train_loss}
         self.training_metrics.update({f"final_train_{k}": v for k, v in train_metrics.items()})
