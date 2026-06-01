@@ -520,7 +520,9 @@ def isomer_score(smiles: str, target_formula: dict[str, int]) -> float:
     """Geometric mean of per-element Gaussian scores (mu=target count, sigma=1).
 
     Scores 1.0 when the molecule's formula matches target_formula exactly.
-    Returns 0.0 for invalid SMILES.
+
+    Returns:
+        Score in [0, 1]; 0.0 for invalid SMILES.
     """
     mol = _mol_from_smiles(smiles)
     if mol is None:
