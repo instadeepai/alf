@@ -174,11 +174,13 @@ class ESM2Model(BaseModel):
         self.max_length = _raw_max
         self._validate_esm_config()
 
-        self._prepare_labels = (
-            self._mask_tokens
-            if self.train_config.loss_type == "mlm"
-            else self._compute_log_likelihood_labels
-        )
+        self._head: torch.nn.Linear | None = None
+        if self.train_config.loss_type == "mlp_head":
+            hidden_dim = self.esm_model.config.hidden_size
+            self._head = torch.nn.Linear(hidden_dim, self.train_config.output_dim)
+            self._head.to(self.device)
+            for param in self.esm_model.parameters():
+                param.requires_grad = False
 
         total_params = sum(p.numel() for p in self.esm_model.parameters())
         logger.info(f"ESM-2 loaded: {self.model_config.model_id} ({total_params:,} parameters)")
@@ -452,7 +454,7 @@ class ESM2Model(BaseModel):
             batch_ids = raw_ids.to(self.device)
             batch_mask = raw_mask.to(self.device)
 
-            masked_ids, labels = self._prepare_labels(batch_ids)
+            masked_ids, labels = self._compute_log_likelihood_labels(batch_ids)
 
             optimizer.zero_grad()
             outputs = self.esm_model(
@@ -514,7 +516,7 @@ class ESM2Model(BaseModel):
                 batch_ids = raw_ids.to(self.device)
                 batch_mask = raw_mask.to(self.device)
 
-                masked_ids, labels = self._prepare_labels(batch_ids)
+                masked_ids, labels = self._compute_log_likelihood_labels(batch_ids)
 
                 outputs = self.esm_model(
                     input_ids=masked_ids,

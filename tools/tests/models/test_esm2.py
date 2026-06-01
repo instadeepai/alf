@@ -661,3 +661,81 @@ class TestTrainLogLikelihood:
                 m.additional_metrics["train_log_likelihood"], -m.train_loss, rtol=1e-5
             )
 
+
+@pytest.fixture
+def esm2_mlp_model():
+    """ESM-2 model with MLP regression head (output_dim=1, mse loss).
+
+    Returns:
+        An ESM2Model with loss_type='mlp_head', output_dim=1, CPU.
+    """
+    config = ESM2ModelConfig(model_id=MODEL_ID)
+    train_cfg = ESM2TrainConfig(
+        loss_type="mlp_head",
+        output_dim=1,
+        mlp_loss="mse",
+        num_epochs=2,
+        batch_size=2,
+        learning_rate=1e-3,
+        log_frequency=1,
+    )
+    return ESM2Model(
+        name="test_esm2_mlp", model_config=config, train_config=train_cfg, device="cpu"
+    )
+
+
+@pytest.fixture
+def esm2_mlp_classification_model():
+    """ESM-2 model with MLP classification head (output_dim=2, cross_entropy loss).
+
+    Returns:
+        An ESM2Model with loss_type='mlp_head', output_dim=2, CPU.
+    """
+    config = ESM2ModelConfig(model_id=MODEL_ID)
+    train_cfg = ESM2TrainConfig(
+        loss_type="mlp_head",
+        output_dim=2,
+        mlp_loss="cross_entropy",
+        num_epochs=2,
+        batch_size=2,
+        learning_rate=1e-3,
+        log_frequency=1,
+    )
+    return ESM2Model(
+        name="test_esm2_mlp_cls", model_config=config, train_config=train_cfg, device="cpu"
+    )
+
+
+class TestMLPHead:
+    """Tests for ESM2Model with loss_type='mlp_head'."""
+
+    def test_head_is_linear_layer(self, esm2_mlp_model):
+        """MLP head should be a torch.nn.Linear module."""
+        assert esm2_mlp_model._head is not None
+        assert isinstance(esm2_mlp_model._head, torch.nn.Linear)
+
+    def test_head_output_dim(self, esm2_mlp_model):
+        """Linear head output features should equal output_dim."""
+        hidden_dim = esm2_mlp_model.esm_model.config.hidden_size
+        assert esm2_mlp_model._head.in_features == hidden_dim
+        assert esm2_mlp_model._head.out_features == 1
+
+    def test_backbone_frozen_in_mlp_mode(self, esm2_mlp_model):
+        """All ESM-2 backbone parameters should have requires_grad=False."""
+        for param in esm2_mlp_model.esm_model.parameters():
+            assert not param.requires_grad
+
+    def test_head_on_correct_device(self, esm2_mlp_model):
+        """Linear head should be on the same device as the ESM-2 model."""
+        head_device = next(esm2_mlp_model._head.parameters()).device
+        model_device = next(esm2_mlp_model.esm_model.parameters()).device
+        assert head_device == model_device
+
+    def test_no_head_in_log_likelihood_mode(self, esm2_model):
+        """_head should be None when loss_type is not 'mlp_head'."""
+        assert esm2_model._head is None
+
+    def test_classification_head_output_dim(self, esm2_mlp_classification_model):
+        """Classification head should have out_features equal to output_dim."""
+        assert esm2_mlp_classification_model._head.out_features == 2
+
