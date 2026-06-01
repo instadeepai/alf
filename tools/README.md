@@ -47,10 +47,11 @@ uv sync --extra esm2 --extra chemprop
   selection, input normalisation, and output standardisation enabled by default
 - **ESM2Model** - Protein language model surrogate backed by
   [ESM-2](https://huggingface.co/docs/transformers/model_doc/esm). Accepts amino acid sequences
-  directly. Operates in two modes: `log_likelihood` (zero-shot pseudo-log-likelihood scoring,
-  optional backbone fine-tuning) and `mlp_head` (frozen backbone with a trainable linear head
-  for regression or classification). Embeddings can be extracted via `embed()`. Requires the
-  `[esm2]` optional extra: `pip install "alf-tools[esm2]"`
+  directly. Two modes via `ESM2TrainConfig.linear_head`: `linear_head=True` (default) freezes the
+  backbone and trains a linear head for regression (`loss_fn='mse'`) or classification
+  (`loss_fn='cross_entropy'`); `linear_head=False` performs zero-shot pseudo-log-likelihood scoring
+  with no training. Embeddings can be extracted via `embed()`. Requires the `[esm2]` optional extra:
+  `pip install "alf-tools[esm2]"`
 - **ChempropModel** - Message Passing Neural Network (MPNN) for small-molecule fitness prediction,
   backed by [Chemprop v2.x](https://chemprop.readthedocs.io/). Accepts SMILES strings directly;
   no hand-crafted features required. Requires the `[chemprop]` optional extra:
