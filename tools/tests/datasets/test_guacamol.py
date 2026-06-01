@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import inspect
+import os
 import shutil
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -41,6 +42,15 @@ from alf_tools.datasets.guacamol import (
 from pydantic import ValidationError
 
 pytestmark = [pytest.mark.guacamol, pytest.mark.rdkit]
+
+
+@pytest.fixture(autouse=True)
+def _clear_mol_cache():
+    """Clear the module-level lru_cache before each test to prevent cross-test pollution."""
+    _mol_from_smiles.cache_clear()
+    yield
+    _mol_from_smiles.cache_clear()
+
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "guacamol"
 VALID_FIXTURE = FIXTURES / "valid.smiles"
@@ -363,22 +373,28 @@ class TestGuacaMolPaperSplits:
     """Tests for GuacaMol paper-split mode using original figshare file boundaries."""
 
     def test_train_split_contains_train_file_smiles(self, tmp_path):
-        """train_dataset candidates exactly match the train split file contents."""
+        """train_dataset candidates exactly match the canonical form of the train split file contents."""
         _write_paper_files(tmp_path)
         dataset = GuacaMol(_paper_config(data_dir=tmp_path))
-        assert {c.data for c in dataset.train_dataset.candidates} == set(TRAIN_SMILES)
+        assert {c.data for c in dataset.train_dataset.candidates} == {
+            _canonical_smiles(s) for s in TRAIN_SMILES
+        }
 
     def test_validation_split_contains_valid_file_smiles(self, tmp_path):
-        """validation_dataset candidates exactly match the valid split file contents."""
+        """validation_dataset candidates exactly match the canonical form of the valid split file contents."""
         _write_paper_files(tmp_path)
         dataset = GuacaMol(_paper_config(data_dir=tmp_path))
-        assert {c.data for c in dataset.validation_dataset.candidates} == set(PAPER_VALID_SMILES)
+        assert {c.data for c in dataset.validation_dataset.candidates} == {
+            _canonical_smiles(s) for s in PAPER_VALID_SMILES
+        }
 
     def test_test_split_contains_test_file_smiles(self, tmp_path):
-        """test_dataset candidates exactly match the test split file contents."""
+        """test_dataset candidates exactly match the canonical form of the test split file contents."""
         _write_paper_files(tmp_path)
         dataset = GuacaMol(_paper_config(data_dir=tmp_path))
-        assert {c.data for c in dataset.test_dataset.candidates} == set(PAPER_TEST_SMILES)
+        assert {c.data for c in dataset.test_dataset.candidates} == {
+            _canonical_smiles(s) for s in PAPER_TEST_SMILES
+        }
 
     def test_candidate_pool_is_empty_for_paper_splits(self, tmp_path):
         """candidate_pool is empty when using paper splits (no residual pool)."""
@@ -411,6 +427,20 @@ class TestGuacaMolPaperSplits:
         dataset = GuacaMol(_paper_config(data_dir=tmp_path))
         expected = len(TRAIN_SMILES) + len(PAPER_VALID_SMILES) + len(PAPER_TEST_SMILES)
         assert len(dataset._raw_dataset) == expected
+
+    def test_paper_split_all_invalid_in_valid_file(self, tmp_path, monkeypatch):
+        """Silent data-loss: a split file with only invalid SMILES produces empty validation split."""
+        config = _paper_config(data_dir=tmp_path)
+        # Write valid SMILES to train and test, but only invalid to valid
+        (tmp_path / FILENAME_TRAIN).write_text("CCO\nCC\nCCCO\n")
+        (tmp_path / FILENAME_VALID).write_text("INVALIDSMILES1\nINVALIDSMILES2\n")
+        (tmp_path / FILENAME_TEST).write_text("CCCO\nCCCC\n")
+
+        dataset = GuacaMol(config)
+
+        assert len(dataset.validation_dataset) == 0, "Expected empty validation split for all-invalid SMILES"
+        assert len(dataset.train_dataset) > 0
+        assert len(dataset.test_dataset) > 0
 
 
 class TestGuacaMolQuery:
@@ -621,12 +651,40 @@ class TestDownloadFile:
             with pytest.raises(OSError):
                 _download_file("https://example.com/fake.smiles", out)
         assert not out.exists()
+        tmp_file = out.with_name(f"{out.stem}.{os.getpid()}.tmp")
+        assert not tmp_file.exists(), "Partial download left a stale .tmp file"
 
     def test_connection_error_raises_os_error(self, tmp_path):
         """OSError is raised when requests.get() raises a network connection error."""
         with patch("requests.get", side_effect=requests.ConnectionError("connection refused")):
             with pytest.raises(OSError, match="Network error"):
                 _download_file("https://example.com/fake.smiles", tmp_path / "out.smiles", None)
+
+    def test_download_verifies_sha256_match(self, tmp_path, monkeypatch):
+        """_download_file does not raise when sha256 matches the downloaded content."""
+        import hashlib
+
+        content = b"CC\nCCO\n"
+        mock_resp = _make_mock_response(["CC", "CCO"])
+        monkeypatch.setattr("requests.get", lambda *a, **kw: mock_resp)
+
+        dest = tmp_path / "out.smiles"
+        digest = hashlib.sha256(content).hexdigest()
+        result = _download_file("http://example.com/f", dest, sha256=digest)
+
+        assert result == dest
+        assert dest.exists()
+
+    def test_download_raises_and_deletes_on_sha256_mismatch(self, tmp_path, monkeypatch):
+        """_download_file raises ValueError and deletes the file on sha256 mismatch."""
+        mock_resp = _make_mock_response(["CC", "CCO"])
+        monkeypatch.setattr("requests.get", lambda *a, **kw: mock_resp)
+
+        dest = tmp_path / "out.smiles"
+        with pytest.raises(ValueError, match="SHA-256 mismatch"):
+            _download_file("http://example.com/f", dest, sha256="deadbeef" * 8)
+
+        assert not dest.exists()
 
 
 class TestCanonicalSmiles:
@@ -708,9 +766,10 @@ class TestGuacaMolWithFixtures:
         dataset = GuacaMol(config)
         assert dataset._raw_dataset is not None
         cand = dataset._raw_dataset.candidates[0]
-        # Benchmark tasks also raise in load_dataset(), preventing normal construction.
-        # Use model_copy to reach the guard in query() independently.
-        dataset.config = dataset.config.model_copy(update={"task_type": "benchmark_task"})
+        # task_type is a @computed_field derived from target_property; set target_property
+        # to a benchmark task name to make task_type == "benchmark_task" without triggering
+        # load_dataset() again.
+        dataset.config = dataset.config.model_copy(update={"target_property": "celecoxib_rediscovery"})
         with pytest.raises(NotImplementedError):
             dataset.query([cand])
 

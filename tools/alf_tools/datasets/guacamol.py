@@ -16,6 +16,7 @@ import copy
 import hashlib
 import logging
 import os
+import time
 from functools import lru_cache
 from pathlib import Path
 from typing import Callable, Final, Literal, NotRequired, TypedDict, cast, get_args
@@ -26,7 +27,7 @@ from alf_core import BaseDataset, Candidate, LabelledCandidates
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataset.base_dataset import BaseDatasetConfig
 from alf_core.utils.enums import ProblemType
-from pydantic import Field, model_validator
+from pydantic import Field, computed_field, model_validator
 from rdkit import Chem
 from rdkit.Chem import QED as RDKitQED
 from rdkit.Chem import Descriptors, GraphDescriptors, rdMolDescriptors
@@ -75,18 +76,22 @@ GUACAMOL_FILES: Final[dict[Literal["TRAIN", "VALID", "TEST", "ALL"], GuacaMolFil
     "TRAIN": {
         "name": FILENAME_TRAIN,
         "url": "https://ndownloader.figshare.com/files/13612760",
+        "sha256": None,  # SHA-256 not published by Figshare; Figshare MD5: 05ad85d871958a05c02ab51a4fde8530
     },
     "VALID": {
         "name": FILENAME_VALID,
         "url": "https://ndownloader.figshare.com/files/13612766",
+        "sha256": None,  # SHA-256 not published by Figshare; Figshare MD5: e53db4bff7dc4784123ae6df72e3b1f0
     },
     "TEST": {
         "name": FILENAME_TEST,
         "url": "https://ndownloader.figshare.com/files/13612757",
+        "sha256": None,  # SHA-256 not published by Figshare; Figshare MD5: 677b757ccec4809febd83850b43e1616
     },
     "ALL": {
         "name": FILENAME_ALL,
         "url": "https://ndownloader.figshare.com/files/13612745",
+        "sha256": None,  # SHA-256 not published by Figshare; Figshare MD5: 7d45bc95c33c10cb96ef5e78c38ac0b6
     },
 }
 
@@ -151,15 +156,19 @@ class GuacaMolConfig(BaseDatasetConfig):
 
     problem_type: ProblemType = ProblemType.REGRESSION
     target_property: GuacaMolPropertyName | GuacaMolTaskName
-    task_type: Literal["property", "benchmark_task"] = "property"
     computed_properties: list[GuacaMolPropertyName] | None = None
     max_molecules: int | None = Field(default=None, ge=1)
-    split_mode: Literal["random", "low_vs_high", "paper"] = "random"
+    split_mode: Literal["random", "low_vs_high", "stratified", "paper"] = "random"
     data_dir: Path = DATAPATH
+
+    @computed_field
+    @property
+    def task_type(self) -> Literal["property", "benchmark_task"]:
+        """Derived from target_property; 'property' for RDKit properties, 'benchmark_task' for goal-directed tasks."""
+        return "property" if self.target_property in ALL_PROPERTIES else "benchmark_task"
 
     @model_validator(mode="after")
     def _validate_and_sync(self) -> "GuacaMolConfig":
-        self.task_type = "property" if self.target_property in ALL_PROPERTIES else "benchmark_task"
         if (
             self.computed_properties is not None
             and self.target_property not in self.computed_properties
@@ -173,6 +182,10 @@ class GuacaMolConfig(BaseDatasetConfig):
             # cast is safe here since BaseDatasetConfig.split_type accepts them.
             from alf_core.dataset.splitting_utils import SplitType  # noqa: PLC0415
 
+            assert self.split_mode in get_args(SplitType), (
+                f"split_mode {self.split_mode!r} is not a valid SplitType value. "
+                f"Valid values: {get_args(SplitType)}"
+            )
             self.split_type = cast(SplitType, self.split_mode)
         return self
 
@@ -255,14 +268,24 @@ def _download_file(
         f" (first {max_lines} lines)" if max_lines is not None else "",
     )
     filepath.parent.mkdir(parents=True, exist_ok=True)
+    # Clean up stale .tmp files from previously killed processes (SIGKILL cannot run except blocks)
+    _stale_threshold = 3600  # 1 hour
+    for _stale in filepath.parent.glob(f"{filepath.stem}.*.tmp"):
+        try:
+            if time.time() - _stale.stat().st_mtime > _stale_threshold:
+                _stale.unlink(missing_ok=True)
+        except OSError:
+            pass
     tmp_path = filepath.with_name(f"{filepath.stem}.{os.getpid()}.tmp")
     # allow_redirects=True is the default — requests follows the 302 → S3 automatically
     try:
-        resp = requests.get(url, stream=True, timeout=60)
+        resp = requests.get(url, stream=True, timeout=(10, 120))
     except requests.RequestException as exc:
         raise OSError(f"Network error downloading {filepath.name} from {url}") from exc
+    if resp.status_code == 404:
+        raise FileNotFoundError(f"File not found at {url}. Status code: 404")
     if resp.status_code != 200:
-        raise FileNotFoundError(f"Failed to download from {url}. Status code: {resp.status_code}")
+        raise OSError(f"Failed to download from {url}. Status code: {resp.status_code}")
 
     try:
         with open(tmp_path, "wb") as f:
@@ -315,10 +338,10 @@ def download_guacamol(data_dir: Path = DATAPATH, max_lines: int | None = None) -
     """
     data_dir.mkdir(parents=True, exist_ok=True)
     for file_info in GUACAMOL_FILES.values():
-        _download_file(file_info["url"], data_dir / file_info["name"], max_lines)
+        _download_file(file_info["url"], data_dir / file_info["name"], max_lines, sha256=file_info.get("sha256"))
 
 
-@lru_cache(maxsize=None)
+@lru_cache(maxsize=65536)
 def _mol_from_smiles(smiles: str) -> "Chem.Mol | None":
     """Return the RDKit Mol for smiles, or None if invalid. Result is cached per unique string."""
     return Chem.MolFromSmiles(smiles)
@@ -343,7 +366,7 @@ def _canonical_smiles(smiles: str) -> str:
 def _label_smiles(
     smiles_list: list[str],
     properties: list[GuacaMolPropertyName],
-    target_property: str,
+    target_property: GuacaMolPropertyName,
     modality: Modality | str,
 ) -> LabelledCandidates:
     """Parse SMILES, compute properties, build LabelledCandidates.
@@ -362,11 +385,13 @@ def _label_smiles(
     candidates = []
     labels = []
     for smiles in smiles_list:
+        mol = _mol_from_smiles(smiles)
         props = _compute_properties(smiles, properties)
-        if props is None:
+        if mol is None or props is None:
             logger.warning("Skipping invalid SMILES: %r", smiles)
             continue
-        candidates.append(Candidate(data=smiles, modality=modality, features=dict(props)))
+        canonical = Chem.MolToSmiles(mol)
+        candidates.append(Candidate(data=canonical, modality=modality, features=dict(props)))
         labels.append(props[target_property])
     return LabelledCandidates(candidates=candidates, labels=np.array(labels, dtype=float))
 
@@ -395,7 +420,7 @@ class GuacaMol(BaseDataset):
             config: Configuration for the GuacaMol dataset.
         """
         self._paper_splits: dict[str, LabelledCandidates] | None = None
-        self._smiles_index: dict[str, int] = {}
+        self._smiles_index: dict[str, float] = {}
         super().__init__(config)
         self.setup()
 
@@ -403,7 +428,10 @@ class GuacaMol(BaseDataset):
         """Set up the dataset and rebuild the SMILES lookup index."""
         super().setup()
         self._smiles_index = (
-            {_canonical_smiles(c.data): i for i, c in enumerate(self._raw_dataset.candidates)}
+            {
+                c.data: float(label)
+                for c, label in zip(self._raw_dataset.candidates, self._raw_dataset.labels)
+            }
             if self._raw_dataset is not None
             else {}
         )
@@ -447,6 +475,7 @@ class GuacaMol(BaseDataset):
             entry_info_all["url"],
             self.config.data_dir / entry_info_all["name"],
             self.config.max_molecules,
+            sha256=entry_info_all.get("sha256"),
         )
         smiles_list = _load_smiles_file(filepath)
         if self.config.max_molecules is not None:
@@ -478,6 +507,7 @@ class GuacaMol(BaseDataset):
                 entry_info["url"],
                 self.config.data_dir / entry_info["name"],
                 self.config.max_molecules,
+                sha256=entry_info.get("sha256"),
             )
             smiles_list = _load_smiles_file(filepath)
             if self.config.max_molecules is not None:
@@ -527,13 +557,24 @@ class GuacaMol(BaseDataset):
             mol = _mol_from_smiles(candidate.data)
             key = Chem.MolToSmiles(mol) if mol is not None else candidate.data
             if key in self._smiles_index:
-                idx = self._smiles_index[key]
-                result_labels.append(float(self._raw_dataset.labels[idx]))
+                result_labels.append(self._smiles_index[key])
                 result_candidates.append(candidate)
             else:
                 if mol is None:
                     raise ValueError(f"Cannot compute label for invalid SMILES: {candidate.data!r}")
-                result_labels.append(PROPERTY_FNS[self.config.target_property](mol))
+                label_val = PROPERTY_FNS[self.config.target_property](mol)
+                # Populate features if not already set
+                if not candidate.features:
+                    props_to_compute: list[GuacaMolPropertyName] = list(
+                        self.config.computed_properties
+                        or [cast(GuacaMolPropertyName, self.config.target_property)]
+                    )
+                    candidate = Candidate(
+                        data=candidate.data,
+                        modality=candidate.modality,
+                        features=dict(_compute_properties(candidate.data, props_to_compute) or {}),
+                    )
+                result_labels.append(label_val)
                 result_candidates.append(candidate)
 
         return LabelledCandidates(

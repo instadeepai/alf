@@ -333,7 +333,11 @@ class BaseDataset(abc.ABC):
             )
         if problem_type == ProblemType.BINARY:
             return 2
-        return len(unique_labels)
+        if problem_type == ProblemType.MULTICLASS:
+            return len(unique_labels)
+        raise NotImplementedError(
+            f"determine_num_classes not implemented for ProblemType {problem_type!r}"
+        )
 
     def get_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Get summary metrics for all dataset splits.
