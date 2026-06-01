@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
 import logging
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -654,7 +655,8 @@ class ESM2Model(BaseModel):
             batch_mask = raw_mask.to(self.device)
             batch_targets = targets.to(self.device)
 
-            def _forward_backbone() -> torch.Tensor:
+            ctx = torch.no_grad() if self.train_config.freeze_backbone else contextlib.nullcontext()
+            with ctx:
                 outputs = self.esm_model(
                     input_ids=batch_ids,
                     attention_mask=batch_mask,
@@ -663,15 +665,9 @@ class ESM2Model(BaseModel):
                 hidden_state = outputs.hidden_states[self.model_config.repr_layer]
                 if self.model_config.pooling == "mean":
                     mask = batch_mask.unsqueeze(-1).float()
-                    return (hidden_state * mask).sum(1) / mask.sum(1)
+                    embeddings = (hidden_state * mask).sum(1) / mask.sum(1)
                 else:  # cls
-                    return hidden_state[:, 0, :]
-
-            if self.train_config.freeze_backbone:
-                with torch.no_grad():
-                    embeddings = _forward_backbone()
-            else:
-                embeddings = _forward_backbone()
+                    embeddings = hidden_state[:, 0, :]
 
             optimizer.zero_grad()
             preds = self._head(embeddings)
@@ -714,7 +710,7 @@ class ESM2Model(BaseModel):
             Tuple of (average_loss, empty metrics_dict).
         """
         assert self._head is not None
-        self.esm_model.eval()
+        self.esm_model.eval()  # always eval during validation regardless of freeze_backbone
         self._head.eval()
         val_losses: list[float] = []
 
