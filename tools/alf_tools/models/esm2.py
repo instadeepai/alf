@@ -120,8 +120,8 @@ class ESM2Model(BaseModel):
     Loads a pre-trained ESM-2 checkpoint from HuggingFace and exposes it as a
     BaseModel. predict() returns per-sequence pseudo-log-likelihood scores;
     embed() returns per-sequence embeddings. Optionally fine-tunes the backbone
-    with log-likelihood masking, or trains a frozen-backbone linear head for
-    regression or classification.
+    with log-likelihood masking, or trains a linear head for regression or
+    classification (backbone frozen or jointly trained depending on freeze_backbone).
     """
 
     def __init__(
@@ -624,7 +624,11 @@ class ESM2Model(BaseModel):
         train_loader: DataLoader,
         optimizer: optim.Optimizer,
     ) -> tuple[float, dict[str, float]]:
-        """Train the MLP head for one epoch with the backbone frozen.
+        """Train the MLP head for one epoch.
+
+        When freeze_backbone=True the ESM-2 backbone runs under torch.no_grad() in eval mode
+        and only head parameters receive gradients. When freeze_backbone=False both backbone
+        and head are trained jointly.
 
         Args:
             train_loader: DataLoader yielding (input_ids, attention_mask, targets).
@@ -638,7 +642,10 @@ class ESM2Model(BaseModel):
             ValueError: If the DataLoader produces no batches.
         """
         assert self._head is not None
-        self.esm_model.eval()
+        if self.train_config.freeze_backbone:
+            self.esm_model.eval()
+        else:
+            self.esm_model.train()
         self._head.train()
         epoch_losses: list[float] = []
 
@@ -647,7 +654,7 @@ class ESM2Model(BaseModel):
             batch_mask = raw_mask.to(self.device)
             batch_targets = targets.to(self.device)
 
-            with torch.no_grad():
+            def _forward_backbone() -> torch.Tensor:
                 outputs = self.esm_model(
                     input_ids=batch_ids,
                     attention_mask=batch_mask,
@@ -656,9 +663,15 @@ class ESM2Model(BaseModel):
                 hidden_state = outputs.hidden_states[self.model_config.repr_layer]
                 if self.model_config.pooling == "mean":
                     mask = batch_mask.unsqueeze(-1).float()
-                    embeddings = (hidden_state * mask).sum(1) / mask.sum(1)
+                    return (hidden_state * mask).sum(1) / mask.sum(1)
                 else:  # cls
-                    embeddings = hidden_state[:, 0, :]
+                    return hidden_state[:, 0, :]
+
+            if self.train_config.freeze_backbone:
+                with torch.no_grad():
+                    embeddings = _forward_backbone()
+            else:
+                embeddings = _forward_backbone()
 
             optimizer.zero_grad()
             preds = self._head(embeddings)
@@ -675,9 +688,12 @@ class ESM2Model(BaseModel):
                 )
             loss.backward()
             if self.train_config.max_grad_norm is not None:
-                torch.nn.utils.clip_grad_norm_(
-                    self._head.parameters(), self.train_config.max_grad_norm
+                params_to_clip = (
+                    self._head.parameters()
+                    if self.train_config.freeze_backbone
+                    else list(self.esm_model.parameters()) + list(self._head.parameters())
                 )
+                torch.nn.utils.clip_grad_norm_(params_to_clip, self.train_config.max_grad_norm)
             optimizer.step()
             epoch_losses.append(loss.item())
 
@@ -810,7 +826,12 @@ class ESM2Model(BaseModel):
         # Setup training
         if self.train_config.loss_type == "mlp_head":
             assert self._head is not None
-            params_to_optimize = self._head.parameters()
+            if self.train_config.freeze_backbone:
+                params_to_optimize = self._head.parameters()
+            else:
+                params_to_optimize = list(self.esm_model.parameters()) + list(
+                    self._head.parameters()
+                )
         else:
             params_to_optimize = self.esm_model.parameters()
 

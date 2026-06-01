@@ -794,7 +794,7 @@ class TestMLPHead:
         esm2_mlp_model.train(sample_data)
         assert not torch.equal(initial_weight, esm2_mlp_model._head.weight)
 
-    def test_mlp_train_does_not_update_backbone(self, esm2_mlp_model, sample_data):
+    def test_mlp_train_does_not_update_backbone_when_frozen(self, esm2_mlp_model, sample_data):
         """train() in mlp_head mode must not change any ESM-2 backbone parameters."""
         initial_params = {
             name: param.clone() for name, param in esm2_mlp_model.esm_model.named_parameters()
@@ -802,6 +802,20 @@ class TestMLPHead:
         esm2_mlp_model.train(sample_data)
         for name, param in esm2_mlp_model.esm_model.named_parameters():
             assert torch.equal(initial_params[name], param), f"Backbone param {name} changed"
+
+    def test_mlp_train_updates_backbone_when_unfrozen(self, esm2_mlp_unfrozen_model, sample_data):
+        """train() in mlp_head mode with freeze_backbone=False must update backbone parameters."""
+        initial_params = {
+            name: param.clone()
+            for name, param in esm2_mlp_unfrozen_model.esm_model.named_parameters()
+        }
+        esm2_mlp_unfrozen_model.train(sample_data)
+        changed = [
+            name
+            for name, param in esm2_mlp_unfrozen_model.esm_model.named_parameters()
+            if not torch.equal(initial_params[name], param)
+        ]
+        assert len(changed) > 0, "Expected at least one backbone parameter to change"
 
     def test_mlp_train_records_epoch_metrics(self, esm2_mlp_model, sample_data):
         """train() in mlp_head mode records one SurrogateEpochMetrics per epoch."""
