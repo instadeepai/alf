@@ -199,9 +199,7 @@ class ESM2Model(BaseModel):
                 "use pooling='mean' or pooling='cls' instead."
             )
 
-    def featurise(
-        self, inputs: LabelledCandidates | list[Candidate]
-    ) -> dict[str, torch.Tensor]:
+    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> dict[str, torch.Tensor]:
         """Tokenize sequences into input tensors for the ESM-2 model.
 
         Args:
@@ -276,6 +274,7 @@ class ESM2Model(BaseModel):
 
         log_likelihoods: list[float] = []
         batch_size = self.train_config.batch_size_inference
+        assert batch_size is not None
 
         self.esm_model.eval()
         with torch.no_grad():
@@ -336,6 +335,7 @@ class ESM2Model(BaseModel):
 
         all_embeddings: list[torch.Tensor] = []
         batch_size = self.train_config.batch_size_inference
+        assert batch_size is not None
 
         self.esm_model.eval()
         with torch.no_grad():
@@ -525,6 +525,10 @@ class ESM2Model(BaseModel):
             Tuple of (average_loss, metrics_dict) where metrics_dict contains
             perplexity and token_accuracy over all labeled positions in the epoch.
             When loss_type='log_likelihood', also includes log_likelihood = -avg_loss.
+
+        Raises:
+            RuntimeError: If training loss becomes NaN or infinite.
+            ValueError: If the DataLoader produces no batches.
         """
         self.esm_model.train()
         epoch_losses: list[float] = []

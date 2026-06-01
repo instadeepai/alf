@@ -500,7 +500,9 @@ def frozen_train_model():
     """
     config = ESM2ModelConfig(model_id=MODEL_ID)
     train_cfg = ESM2TrainConfig(freeze_backbone=True)
-    return ESM2Model(name="test_esm2_frozen_train", model_config=config, train_config=train_cfg, device="cpu")
+    return ESM2Model(
+        name="test_esm2_frozen_train", model_config=config, train_config=train_cfg, device="cpu"
+    )
 
 
 class TestTrainFrozen:
