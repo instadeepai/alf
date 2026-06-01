@@ -376,8 +376,22 @@ class ESM2Model(BaseModel):
         return torch.cat(all_embeddings, dim=0).numpy()
 
     def _prepare_data_loader(self, data: LabelledCandidates, shuffle: bool = False) -> DataLoader:
+        """Create a DataLoader for training or validation.
+
+        Args:
+            data: LabelledCandidates containing sequences and (for mlp_head mode) labels.
+            shuffle: Whether to shuffle the dataset.
+
+        Returns:
+            DataLoader yielding (input_ids, attention_mask) pairs in log_likelihood mode,
+            or (input_ids, attention_mask, targets) triples in mlp_head mode.
+        """
         batch = self.featurise(data)
-        dataset = TensorDataset(batch["input_ids"], batch["attention_mask"])
+        if self.train_config.loss_type == "mlp_head":
+            targets = torch.tensor(data.labels, dtype=torch.float32)
+            dataset = TensorDataset(batch["input_ids"], batch["attention_mask"], targets)
+        else:
+            dataset = TensorDataset(batch["input_ids"], batch["attention_mask"])
         return DataLoader(dataset, batch_size=self.train_config.batch_size, shuffle=shuffle)
 
     def _special_tokens_mask(self, input_ids: torch.Tensor) -> torch.Tensor:

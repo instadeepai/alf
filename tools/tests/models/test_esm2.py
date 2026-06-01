@@ -739,3 +739,17 @@ class TestMLPHead:
         """Classification head should have out_features equal to output_dim."""
         assert esm2_mlp_classification_model._head.out_features == 2
 
+    def test_prepare_data_loader_yields_labels_in_mlp_mode(self, esm2_mlp_model, sample_data):
+        """DataLoader in mlp_head mode yields (input_ids, attention_mask, targets) triples."""
+        loader = esm2_mlp_model._prepare_data_loader(sample_data)
+        batch = next(iter(loader))
+        assert len(batch) == 3  # input_ids, attention_mask, targets
+        _, _, targets = batch
+        assert targets.dtype == torch.float32
+
+    def test_prepare_data_loader_no_labels_in_ll_mode(self, esm2_model, sample_data):
+        """DataLoader in log_likelihood mode yields (input_ids, attention_mask) pairs."""
+        loader = esm2_model._prepare_data_loader(sample_data)
+        batch = next(iter(loader))
+        assert len(batch) == 2
+
