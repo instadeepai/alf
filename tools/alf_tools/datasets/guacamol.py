@@ -17,7 +17,6 @@ import hashlib
 import logging
 import math
 import os
-import re
 import time
 from functools import lru_cache
 from pathlib import Path
@@ -31,9 +30,8 @@ from alf_core.dataset.base_dataset import BaseDatasetConfig
 from alf_core.utils.enums import ProblemType
 from pydantic import Field, computed_field, model_validator
 from rdkit import Chem, DataStructs
-from rdkit.Chem import AllChem
 from rdkit.Chem import QED as RDKitQED
-from rdkit.Chem import Descriptors, GraphDescriptors, rdMolDescriptors
+from rdkit.Chem import AllChem, Descriptors, GraphDescriptors, rdMolDescriptors
 
 logger = logging.getLogger("alf-tools")
 
@@ -43,34 +41,58 @@ logger = logging.getLogger("alf-tools")
 
 
 def clipped_score(x: float, upper: float = 1.0) -> float:
-    """Linear ramp [0, upper] → [0, 1], clipped to 1.0 above upper."""
+    """Linear ramp [0, upper] → [0, 1], clipped to 1.0 above upper.
+
+    Returns:
+        Score in [0, 1].
+    """
     return min(1.0, x / upper)
 
 
 def gaussian_score(x: float, mu: float, sigma: float) -> float:
-    """Gaussian bell: 1.0 at x==mu, decaying symmetrically with sigma."""
+    """Gaussian bell: 1.0 at x==mu, decaying symmetrically with sigma.
+
+    Returns:
+        Score in (0, 1].
+    """
     return math.exp(-0.5 * ((x - mu) / sigma) ** 2)
 
 
 def max_gaussian_score(x: float, mu: float, sigma: float) -> float:
-    """Half-Gaussian: 1.0 for x >= mu, Gaussian fall-off below mu."""
+    """Half-Gaussian: 1.0 for x >= mu, Gaussian fall-off below mu.
+
+    Returns:
+        Score in (0, 1].
+    """
     return 1.0 if x >= mu else gaussian_score(x, mu, sigma)
 
 
 def min_gaussian_score(x: float, mu: float, sigma: float) -> float:
-    """Half-Gaussian: 1.0 for x <= mu, Gaussian fall-off above mu."""
+    """Half-Gaussian: 1.0 for x <= mu, Gaussian fall-off above mu.
+
+    Returns:
+        Score in (0, 1].
+    """
     return 1.0 if x <= mu else gaussian_score(x, mu, sigma)
 
 
 def geometric_mean(scores: list[float]) -> float:
-    """Geometric mean of scores; returns 0.0 for empty list."""
+    """Geometric mean of scores; returns 0.0 for empty list.
+
+    Returns:
+        Geometric mean in [0, 1] for scores in [0, 1].
+    """
     if not scores:
         return 0.0
     return math.prod(scores) ** (1.0 / len(scores))
 
 
 def arithmetic_mean(scores: list[float]) -> float:
-    """Arithmetic mean of scores; returns 0.0 for empty list."""
+    """Arithmetic mean of scores; returns 0.0 for empty list.
+
+    Returns:
+        Arithmetic mean of the input scores.
+    """
     if not scores:
         return 0.0
     return sum(scores) / len(scores)
@@ -118,22 +140,22 @@ GUACAMOL_FILES: Final[dict[Literal["TRAIN", "VALID", "TEST", "ALL"], GuacaMolFil
     "TRAIN": {
         "name": FILENAME_TRAIN,
         "url": "https://ndownloader.figshare.com/files/13612760",
-        "sha256": None,  # SHA-256 not published by Figshare; Figshare MD5: 05ad85d871958a05c02ab51a4fde8530
+        "sha256": None,  # no SHA-256 from Figshare; MD5: 05ad85d871958a05c02ab51a4fde8530
     },
     "VALID": {
         "name": FILENAME_VALID,
         "url": "https://ndownloader.figshare.com/files/13612766",
-        "sha256": None,  # SHA-256 not published by Figshare; Figshare MD5: e53db4bff7dc4784123ae6df72e3b1f0
+        "sha256": None,  # no SHA-256 from Figshare; MD5: e53db4bff7dc4784123ae6df72e3b1f0
     },
     "TEST": {
         "name": FILENAME_TEST,
         "url": "https://ndownloader.figshare.com/files/13612757",
-        "sha256": None,  # SHA-256 not published by Figshare; Figshare MD5: 677b757ccec4809febd83850b43e1616
+        "sha256": None,  # no SHA-256 from Figshare; MD5: 677b757ccec4809febd83850b43e1616
     },
     "ALL": {
         "name": FILENAME_ALL,
         "url": "https://ndownloader.figshare.com/files/13612745",
-        "sha256": None,  # SHA-256 not published by Figshare; Figshare MD5: 7d45bc95c33c10cb96ef5e78c38ac0b6
+        "sha256": None,  # no SHA-256 from Figshare; MD5: 7d45bc95c33c10cb96ef5e78c38ac0b6
     },
 }
 
@@ -203,10 +225,10 @@ class GuacaMolConfig(BaseDatasetConfig):
     split_mode: Literal["random", "low_vs_high", "stratified", "paper"] = "random"
     data_dir: Path = DATAPATH
 
-    @computed_field
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def task_type(self) -> Literal["property", "benchmark_task"]:
-        """Derived from target_property; 'property' for RDKit properties, 'benchmark_task' for goal-directed tasks."""
+        """'property' for RDKit properties, 'benchmark_task' for goal-directed tasks."""
         return "property" if self.target_property in ALL_PROPERTIES else "benchmark_task"
 
     @model_validator(mode="after")
@@ -380,7 +402,12 @@ def download_guacamol(data_dir: Path = DATAPATH, max_lines: int | None = None) -
     """
     data_dir.mkdir(parents=True, exist_ok=True)
     for file_info in GUACAMOL_FILES.values():
-        _download_file(file_info["url"], data_dir / file_info["name"], max_lines, sha256=file_info.get("sha256"))
+        _download_file(
+            file_info["url"],
+            data_dir / file_info["name"],
+            max_lines,
+            sha256=file_info.get("sha256"),
+        )
 
 
 @lru_cache(maxsize=65536)
@@ -403,6 +430,73 @@ def _canonical_smiles(smiles: str) -> str:
     """
     mol = _mol_from_smiles(smiles)
     return Chem.MolToSmiles(mol) if mol is not None else smiles
+
+
+# ---------------------------------------------------------------------------
+# Fingerprint helpers for benchmark task scoring
+# ---------------------------------------------------------------------------
+
+
+def _ecfp4(mol: "Chem.Mol"):
+    """Morgan fingerprint radius=2 (ECFP4).
+
+    Returns:
+        RDKit Morgan fingerprint object.
+    """
+    return AllChem.GetMorganFingerprint(mol, 2)
+
+
+def _ecfp6(mol: "Chem.Mol"):
+    """Morgan fingerprint radius=3 (ECFP6).
+
+    Returns:
+        RDKit Morgan fingerprint object.
+    """
+    return AllChem.GetMorganFingerprint(mol, 3)
+
+
+def _fcfp4(mol: "Chem.Mol"):
+    """Feature-based Morgan fingerprint radius=2 (FCFP4).
+
+    Returns:
+        RDKit Morgan fingerprint object using pharmacophoric features.
+    """
+    return AllChem.GetMorganFingerprint(mol, 2, useFeatures=True)
+
+
+def _ap(mol: "Chem.Mol"):
+    """Atom-pair fingerprint.
+
+    Returns:
+        RDKit atom-pair fingerprint object.
+    """
+    return rdMolDescriptors.GetAtomPairFingerprint(mol)
+
+
+def _phco(mol: "Chem.Mol"):
+    """2D pharmacophore fingerprint (Gobbi).
+
+    Returns:
+        RDKit 2D pharmacophore fingerprint object.
+    """
+    from rdkit.Chem.Pharm2D import (  # noqa: PLC0415
+        Generate,
+        Gobbi_Pharm2D,
+    )
+
+    return Generate.Gen2DFingerprint(mol, Gobbi_Pharm2D.factory)
+
+
+def _tanimoto(smiles: str, ref_fp, fp_fn: Callable) -> float:
+    """Tanimoto similarity of smiles to ref_fp using the given fingerprint function.
+
+    Returns:
+        Tanimoto similarity in [0, 1], or 0.0 for unparseable SMILES.
+    """
+    mol = _mol_from_smiles(smiles)
+    if mol is None:
+        return 0.0
+    return DataStructs.TanimotoSimilarity(fp_fn(mol), ref_fp)
 
 
 def _label_smiles(
@@ -554,9 +648,7 @@ class GuacaMol(BaseDataset):
             smiles_list = _load_smiles_file(filepath)
             if self.config.max_molecules is not None:
                 smiles_list = smiles_list[: self.config.max_molecules]
-            split_lc = _label_smiles(
-                smiles_list, properties, self.config.target_property, self.modality
-            )
+            split_lc = _label_smiles(smiles_list, properties, target, self.modality)
             logger.debug(
                 "Paper split '%s': %d SMILES → %d valid candidates",
                 tag,

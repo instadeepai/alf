@@ -438,7 +438,9 @@ class TestGuacaMolPaperSplits:
 
         dataset = GuacaMol(config)
 
-        assert len(dataset.validation_dataset) == 0, "Expected empty validation split for all-invalid SMILES"
+        assert len(dataset.validation_dataset) == 0, (
+            "Expected empty validation split for all-invalid SMILES"
+        )
         assert len(dataset.train_dataset) > 0
         assert len(dataset.test_dataset) > 0
 
@@ -769,7 +771,9 @@ class TestGuacaMolWithFixtures:
         # task_type is a @computed_field derived from target_property; set target_property
         # to a benchmark task name to make task_type == "benchmark_task" without triggering
         # load_dataset() again.
-        dataset.config = dataset.config.model_copy(update={"target_property": "celecoxib_rediscovery"})
+        dataset.config = dataset.config.model_copy(
+            update={"target_property": "celecoxib_rediscovery"}
+        )
         with pytest.raises(NotImplementedError):
             dataset.query([cand])
 
@@ -914,81 +918,176 @@ class TestDownloadGuacaMol:
 
 
 from alf_tools.datasets.guacamol import (
-    clipped_score,       # noqa: PLC2701
-    gaussian_score,      # noqa: PLC2701
+    arithmetic_mean,  # noqa: PLC2701
+    clipped_score,  # noqa: PLC2701
+    gaussian_score,  # noqa: PLC2701
+    geometric_mean,  # noqa: PLC2701
     max_gaussian_score,  # noqa: PLC2701
     min_gaussian_score,  # noqa: PLC2701
-    geometric_mean,      # noqa: PLC2701
-    arithmetic_mean,     # noqa: PLC2701
 )
 
 
 class TestClippedScore:
+    """Tests for clipped_score score modifier."""
+
     def test_at_threshold_returns_one(self):
+        """Score equals 1.0 exactly at the upper threshold."""
         assert clipped_score(0.75, upper=0.75) == pytest.approx(1.0)
 
     def test_above_threshold_is_clipped_to_one(self):
+        """Score above the upper threshold is clipped to 1.0."""
         assert clipped_score(0.9, upper=0.75) == pytest.approx(1.0)
 
     def test_below_threshold_is_linear(self):
+        """Score below threshold scales linearly."""
         assert clipped_score(0.5, upper=1.0) == pytest.approx(0.5)
 
     def test_zero_input_returns_zero(self):
+        """Zero input maps to zero regardless of upper."""
         assert clipped_score(0.0, upper=1.0) == pytest.approx(0.0)
 
 
 class TestGaussianScore:
+    """Tests for gaussian_score score modifier."""
+
     def test_at_mu_returns_one(self):
+        """Score is exactly 1.0 at the mean."""
         assert gaussian_score(5.0, mu=5.0, sigma=1.0) == pytest.approx(1.0)
 
     def test_far_from_mu_near_zero(self):
+        """Score decays to near zero far from the mean."""
         assert gaussian_score(100.0, mu=0.0, sigma=1.0) < 1e-10
 
     def test_symmetric_around_mu(self):
+        """Score is symmetric around the mean."""
         assert gaussian_score(4.0, mu=5.0, sigma=1.0) == pytest.approx(
             gaussian_score(6.0, mu=5.0, sigma=1.0)
         )
 
 
 class TestMaxGaussianScore:
+    """Tests for max_gaussian_score (half-Gaussian, penalises below mu)."""
+
     def test_above_mu_returns_one(self):
+        """Score is 1.0 for values above mu."""
         assert max_gaussian_score(10.0, mu=5.0, sigma=1.0) == pytest.approx(1.0)
 
     def test_at_mu_returns_one(self):
+        """Score is 1.0 exactly at mu."""
         assert max_gaussian_score(5.0, mu=5.0, sigma=1.0) == pytest.approx(1.0)
 
     def test_below_mu_falls_off(self):
+        """Score falls below 1.0 for values less than mu."""
         assert max_gaussian_score(3.0, mu=5.0, sigma=1.0) < 1.0
 
 
 class TestMinGaussianScore:
+    """Tests for min_gaussian_score (half-Gaussian, penalises above mu)."""
+
     def test_below_mu_returns_one(self):
+        """Score is 1.0 for values below mu."""
         assert min_gaussian_score(0.0, mu=5.0, sigma=1.0) == pytest.approx(1.0)
 
     def test_at_mu_returns_one(self):
+        """Score is 1.0 exactly at mu."""
         assert min_gaussian_score(5.0, mu=5.0, sigma=1.0) == pytest.approx(1.0)
 
     def test_above_mu_falls_off(self):
+        """Score falls below 1.0 for values greater than mu."""
         assert min_gaussian_score(8.0, mu=5.0, sigma=1.0) < 1.0
 
 
 class TestGeometricMean:
+    """Tests for geometric_mean aggregation helper."""
+
     def test_single_value(self):
+        """Geometric mean of a single value equals that value."""
         assert geometric_mean([0.5]) == pytest.approx(0.5)
 
     def test_equal_values(self):
+        """Geometric mean of equal values equals that value."""
         assert geometric_mean([0.5, 0.5]) == pytest.approx(0.5)
 
     def test_zero_collapses_result(self):
+        """A single zero score collapses the geometric mean to zero."""
         assert geometric_mean([1.0, 0.0, 1.0]) == pytest.approx(0.0)
 
     def test_empty_returns_zero(self):
+        """Empty list returns 0.0."""
         assert geometric_mean([]) == pytest.approx(0.0)
 
 
 class TestArithmeticMean:
+    """Tests for arithmetic_mean aggregation helper."""
+
     def test_equal_values(self):
+        """Arithmetic mean of two symmetric values equals their midpoint."""
         assert arithmetic_mean([0.4, 0.6]) == pytest.approx(0.5)
 
     def test_empty_returns_zero(self):
+        """Empty list returns 0.0."""
         assert arithmetic_mean([]) == pytest.approx(0.0)
+
+
+from alf_tools.datasets.guacamol import (
+    _ap,  # noqa: PLC2701
+    _ecfp4,  # noqa: PLC2701
+    _ecfp6,  # noqa: PLC2701
+    _fcfp4,  # noqa: PLC2701
+    _phco,  # noqa: PLC2701
+    _tanimoto,  # noqa: PLC2701
+)
+from rdkit import Chem as _Chem
+
+
+class TestTanimotoHelpers:
+    """Tests for fingerprint helper functions and _tanimoto similarity scorer."""
+
+    def test_ecfp4_identical_molecule_is_one(self):
+        """ECFP4 Tanimoto of a molecule against itself is 1.0."""
+        benzene = _Chem.MolFromSmiles("c1ccccc1")
+        ref_fp = _ecfp4(benzene)
+        assert _tanimoto("c1ccccc1", ref_fp, _ecfp4) == pytest.approx(1.0)
+
+    def test_ecfp4_very_different_molecule_below_half(self):
+        """ECFP4 Tanimoto of a very different molecule is below 0.5."""
+        benzene = _Chem.MolFromSmiles("c1ccccc1")
+        ref_fp = _ecfp4(benzene)
+        assert _tanimoto("CC(C)(C)CCCCCC(=O)O", ref_fp, _ecfp4) < 0.5
+
+    def test_ecfp6_identical_molecule_is_one(self):
+        """ECFP6 Tanimoto of a molecule against itself is 1.0."""
+        mol = _Chem.MolFromSmiles("CCO")
+        ref_fp = _ecfp6(mol)
+        assert _tanimoto("CCO", ref_fp, _ecfp6) == pytest.approx(1.0)
+
+    def test_fcfp4_identical_molecule_is_one(self):
+        """FCFP4 Tanimoto of a molecule against itself is 1.0."""
+        mol = _Chem.MolFromSmiles("c1ccccc1")
+        ref_fp = _fcfp4(mol)
+        assert _tanimoto("c1ccccc1", ref_fp, _fcfp4) == pytest.approx(1.0)
+
+    def test_ap_identical_molecule_is_one(self):
+        """Atom-pair Tanimoto of a molecule against itself is 1.0."""
+        mol = _Chem.MolFromSmiles("CCO")
+        ref_fp = _ap(mol)
+        assert _tanimoto("CCO", ref_fp, _ap) == pytest.approx(1.0)
+
+    def test_phco_identical_molecule_is_one(self):
+        """PHCO Tanimoto of a molecule against itself is 1.0."""
+        mol = _Chem.MolFromSmiles("CC(=O)Oc1ccccc1C(=O)O")
+        ref_fp = _phco(mol)
+        assert _tanimoto("CC(=O)Oc1ccccc1C(=O)O", ref_fp, _phco) == pytest.approx(1.0)
+
+    def test_invalid_smiles_returns_zero(self):
+        """Invalid SMILES yields 0.0 without raising."""
+        benzene = _Chem.MolFromSmiles("c1ccccc1")
+        ref_fp = _ecfp4(benzene)
+        assert _tanimoto("NOTSMILES!!!", ref_fp, _ecfp4) == pytest.approx(0.0)
+
+    def test_tanimoto_is_between_zero_and_one(self):
+        """Tanimoto score is always in [0, 1]."""
+        mol1 = _Chem.MolFromSmiles("CC(=O)O")
+        ref_fp = _ecfp4(mol1)
+        score = _tanimoto("CC(C)Cc1ccc(CC(C)C(=O)O)cc1", ref_fp, _ecfp4)
+        assert 0.0 <= score <= 1.0
