@@ -565,6 +565,13 @@ class ESM2Model(BaseModel):
         else:  # last_hidden_state
             return hidden_state
 
+    def _compute_loss(self, preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """Compute loss between predictions and targets using the configured loss function."""
+        if self.train_config.loss_fn == "mse":
+            return torch.nn.functional.mse_loss(preds.squeeze(-1), targets)
+        else:
+            return torch.nn.functional.cross_entropy(preds, targets.long())
+
     def _train_epoch_linear_head(
         self,
         train_loader: DataLoader,
@@ -608,10 +615,7 @@ class ESM2Model(BaseModel):
             optimizer.zero_grad()
             preds = self._head(embeddings)
 
-            if self.train_config.loss_fn == "mse":
-                loss = torch.nn.functional.mse_loss(preds.squeeze(-1), batch_targets)
-            else:  # cross_entropy
-                loss = torch.nn.functional.cross_entropy(preds, batch_targets.long())
+            loss = self._compute_loss(preds, batch_targets)
 
             if not torch.isfinite(loss):
                 raise RuntimeError(
@@ -669,10 +673,7 @@ class ESM2Model(BaseModel):
                 embeddings = self._pool_hidden_state(hidden_state, batch_mask)
 
                 preds = self._head(embeddings)
-                if self.train_config.loss_fn == "mse":
-                    loss = torch.nn.functional.mse_loss(preds.squeeze(-1), batch_targets)
-                else:
-                    loss = torch.nn.functional.cross_entropy(preds, batch_targets.long())
+                loss = self._compute_loss(preds, batch_targets)
                 val_losses.append(loss.item())
 
         if not val_losses:
