@@ -191,7 +191,7 @@ uv sync
 ```
 
 For GPU support, see the [GPU Configuration](docs/INSTALLATION.md#gpu-support-optional) section in the installation guide.
-For including models like ESM2 or Chempropr, see the [Optional Extras](docs/INSTALLATION.md#optional-extras) section in the installation guide.
+For including models like ESM2 or Chemprop, see the [Optional Extras](docs/INSTALLATION.md#optional-extras) section in the installation guide.
 
 ### Run Tests
 
