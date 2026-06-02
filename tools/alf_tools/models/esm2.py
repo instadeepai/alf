@@ -505,12 +505,12 @@ class ESM2Model(BaseModel):
         else:  # last_hidden_state
             return hidden_state
 
-    def _train_epoch_mlp(
+    def _train_epoch_linear_head(
         self,
         train_loader: DataLoader,
         optimizer: optim.Optimizer,
     ) -> tuple[float, dict[str, float]]:
-        """Train the MLP head for one epoch with frozen backbone.
+        """Train the linear head for one epoch with frozen backbone.
 
         Args:
             train_loader: DataLoader yielding (input_ids, attention_mask, targets).
@@ -553,7 +553,7 @@ class ESM2Model(BaseModel):
 
             if not torch.isfinite(loss):
                 raise RuntimeError(
-                    f"MLP head training loss is {loss.item():.6g}. "
+                    f"Linear head training loss is {loss.item():.6g}. "
                     "Check labels, reduce learning rate, or inspect embeddings."
                 )
             loss.backward()
@@ -566,13 +566,13 @@ class ESM2Model(BaseModel):
 
         if not epoch_losses:
             raise ValueError(
-                "MLP training DataLoader produced no batches. Ensure train_data is non-empty."
+                "Linear training DataLoader produced no batches. Ensure train_data is non-empty."
             )
         avg_loss = float(np.mean(epoch_losses))
         return avg_loss, {}
 
-    def _validate_epoch_mlp(self, val_loader: DataLoader) -> tuple[float, dict[str, float]]:
-        """Validate the MLP head for one epoch.
+    def _validate_epoch_linear_head(self, val_loader: DataLoader) -> tuple[float, dict[str, float]]:
+        """Validate the linear head for one epoch.
 
         Args:
             val_loader: DataLoader yielding (input_ids, attention_mask, targets).
@@ -613,7 +613,7 @@ class ESM2Model(BaseModel):
 
         if not val_losses:
             raise ValueError(
-                "MLP validation DataLoader produced no batches. Ensure val_data is non-empty."
+                "Linear validation DataLoader produced no batches. Ensure val_data is non-empty."
             )
         avg_loss = float(np.mean(val_losses))
         return avg_loss, {}
@@ -639,7 +639,7 @@ class ESM2Model(BaseModel):
         if (epoch + 1) % self.train_config.log_frequency == 0 or is_last_epoch:
             additional: dict[str, float] = {}
             # These keys are reserved for future training modes (e.g. full MLM fine-tuning).
-            # In MLP head mode, train_metrics / val_metrics are always {}.
+            # In linear head mode, train_metrics / val_metrics are always {}.
             if (v := train_metrics.get("perplexity")) is not None:
                 additional["train_perplexity"] = float(v)
             if (v := train_metrics.get("token_accuracy")) is not None:
@@ -728,9 +728,9 @@ class ESM2Model(BaseModel):
         val_metrics: dict[str, float] = {}
 
         for epoch in range(self.train_config.num_epochs):
-            avg_train_loss, train_metrics = self._train_epoch_mlp(train_loader, optimizer)
+            avg_train_loss, train_metrics = self._train_epoch_linear_head(train_loader, optimizer)
             if val_loader is not None:
-                avg_val_loss, val_metrics = self._validate_epoch_mlp(val_loader)
+                avg_val_loss, val_metrics = self._validate_epoch_linear_head(val_loader)
                 self._record_epoch_metrics(
                     epoch, avg_train_loss, train_metrics, avg_val_loss, val_metrics
                 )
