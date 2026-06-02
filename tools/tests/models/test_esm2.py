@@ -346,82 +346,9 @@ class TestEmbed:
         np.testing.assert_allclose(single, batched, rtol=1e-5, atol=1e-5)
 
 
-class TestComputeLogLikelihoodLabels:
-    """Tests for ESM2Model._compute_log_likelihood_labels()."""
-
-    def test_all_non_special_positions_labeled(self, esm2_model):
-        """All non-special token positions should have labels != -100."""
-        seqs = ["ACDE", "ACDEFGHIKLMNPQRSTVWY"]
-        encoding = esm2_model.tokeniser(seqs, return_tensors="pt", padding=True)
-        input_ids = encoding["input_ids"]
-
-        special_ids = {
-            esm2_model.tokeniser.cls_token_id,
-            esm2_model.tokeniser.eos_token_id,
-            esm2_model.tokeniser.pad_token_id,
-        } - {None}
-        special_mask = torch.zeros_like(input_ids, dtype=torch.bool)
-        for sid in special_ids:
-            special_mask |= input_ids.eq(sid)
-
-        _, labels = esm2_model._compute_log_likelihood_labels(input_ids)
-
-        # Every non-special position must be labeled (not -100)
-        assert (labels[~special_mask] != -100).all()
-
-    def test_special_tokens_excluded_from_labels(self, esm2_model):
-        """CLS, EOS, and PAD positions must have label -100."""
-        seqs = ["ACDE", "ACDEFGHIKLMNPQRSTVWY"]
-        encoding = esm2_model.tokeniser(seqs, return_tensors="pt", padding=True)
-        input_ids = encoding["input_ids"]
-
-        special_ids = {
-            esm2_model.tokeniser.cls_token_id,
-            esm2_model.tokeniser.eos_token_id,
-            esm2_model.tokeniser.pad_token_id,
-        } - {None}
-
-        _, labels = esm2_model._compute_log_likelihood_labels(input_ids)
-
-        for sid in special_ids:
-            positions = input_ids == sid
-            if positions.any():
-                assert (labels[positions] == -100).all()
-
-    def test_all_non_special_tokens_replaced_with_mask(self, esm2_model):
-        """All non-special token positions in masked_ids should be mask_token_id."""
-        seqs = ["ACDE", "ACDEFGHIKLMNPQRSTVWY"]
-        encoding = esm2_model.tokeniser(seqs, return_tensors="pt", padding=True)
-        input_ids = encoding["input_ids"]
-
-        special_ids = {
-            esm2_model.tokeniser.cls_token_id,
-            esm2_model.tokeniser.eos_token_id,
-            esm2_model.tokeniser.pad_token_id,
-        } - {None}
-        special_mask = torch.zeros_like(input_ids, dtype=torch.bool)
-        for sid in special_ids:
-            special_mask |= input_ids.eq(sid)
-
-        masked_ids, _ = esm2_model._compute_log_likelihood_labels(input_ids)
-
-        assert (masked_ids[~special_mask] == esm2_model.tokeniser.mask_token_id).all()
-
-    def test_labels_equal_original_at_labeled_positions(self, esm2_model):
-        """Labels at non-special positions must equal the original token IDs."""
-        seqs = ["ACDEFGHIKL", "MNPQRSTVWY"]
-        encoding = esm2_model.tokeniser(seqs, return_tensors="pt", padding=True)
-        input_ids = encoding["input_ids"]
-
-        _, labels = esm2_model._compute_log_likelihood_labels(input_ids)
-
-        labeled = labels != -100
-        assert (labels[labeled] == input_ids[labeled]).all()
-
-
-@pytest.fixture
+@pytest.fixture(scope="module")
 def frozen_train_model():
-    """Function-scoped ESM-2 model with linear_head=False for TestTrainFrozen.
+    """Module-scoped ESM-2 model with linear_head=False for TestTrainFrozen.
 
     Returns:
         An ESM2Model with freeze_backbone=True, linear_head=False on CPU.
@@ -450,9 +377,12 @@ class TestTrainFrozen:
         assert frozen_train_model.get_training_summary_metrics() == {}
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def esm2_mlp_model():
-    """ESM-2 model with linear regression head (output_dim=1, mse loss).
+    """Function-scoped ESM-2 model with linear regression head (output_dim=1, mse loss).
+
+    Function-scoped so each test gets a fresh, untrained model — prevents
+    implicit ordering dependencies from mutation via train() calls.
 
     Returns:
         An ESM2Model with linear_head=True, loss_fn='mse', output_dim=1, CPU.
@@ -472,9 +402,12 @@ def esm2_mlp_model():
     )
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def esm2_mlp_classification_model():
-    """ESM-2 model with linear classification head (output_dim=2, cross_entropy loss).
+    """Function-scoped ESM-2 model with linear classification head (output_dim=2, cross_entropy).
+
+    Function-scoped so each test gets a fresh, untrained model — prevents
+    implicit ordering dependencies from mutation via train() calls.
 
     Returns:
         An ESM2Model with linear_head=True, loss_fn='cross_entropy', output_dim=2, CPU.
@@ -560,6 +493,7 @@ class TestMLPHead:
         """train() in mlp_head mode records one SurrogateEpochMetrics per epoch."""
         esm2_mlp_model.train(sample_data)
         metrics = esm2_mlp_model.get_epoch_metrics()
+        # Relies on log_frequency=1 in the fixture so every epoch is logged.
         assert len(metrics) == esm2_mlp_model.train_config.num_epochs
         assert all(isinstance(m, SurrogateEpochMetrics) for m in metrics)
 

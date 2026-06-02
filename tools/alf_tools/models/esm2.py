@@ -81,7 +81,7 @@ class ESM2TrainConfig(BaseTrainConfig):
         max_grad_norm: Maximum norm for gradient clipping. None disables clipping.
         linear_head: Whether to attach a trainable linear head on top of frozen ESM-2 embeddings.
             True (default) enables training via loss_fn. False skips the head; predict() returns
-            per-sequence pseudo-log-likelihood scores and train() raises NotImplementedError.
+            per-sequence masked-marginal scores and train() raises NotImplementedError.
         loss_fn: Loss function for linear head training. 'mse' for regression;
             'cross_entropy' for classification. Cross-entropy expects integer class labels in
             [0, output_dim); float labels are truncated with a warning. Only used when
@@ -124,9 +124,9 @@ class ESM2Model(BaseModel):
     """ESM-2 protein language model wrapper.
 
     Loads a pre-trained ESM-2 checkpoint from HuggingFace and exposes it as a
-    BaseModel. The backbone is always frozen. predict() returns per-sequence
-    pseudo-log-likelihood scores (linear_head=False) or passes embeddings through a
-    trainable linear head (linear_head=True). embed() returns per-sequence embeddings.
+    BaseModel. predict() returns per-sequence masked-marginal scores
+    (linear_head=False) or passes embeddings through a trainable linear head
+    (linear_head=True). embed() returns per-sequence embeddings.
     """
 
     def __init__(
@@ -147,6 +147,7 @@ class ESM2Model(BaseModel):
         Raises:
             ImportError: If transformers package is not available.
             NotImplementedError: If freeze_backbone=False.
+            ValueError: If the tokeniser has no mask token.
         """
         if not _TRANSFORMERS_AVAILABLE:
             raise ImportError(
@@ -170,6 +171,11 @@ class ESM2Model(BaseModel):
         self.device = get_device(device)
 
         self.tokeniser = AutoTokenizer.from_pretrained(self.model_config.model_id)
+        if self.tokeniser.mask_token_id is None:
+            raise ValueError(
+                "Tokeniser has no mask token. Cannot perform masked-marginal scoring. "
+                "Ensure the tokeniser is initialised with a [MASK] token."
+            )
         self.esm_model = AutoModelForMaskedLM.from_pretrained(self.model_config.model_id)
         self.esm_model.to(self.device)
         _raw_max = self.model_config.max_length or self.tokeniser.model_max_length
@@ -282,8 +288,11 @@ class ESM2Model(BaseModel):
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Compute predictions for the given candidates.
 
-        When linear_head=False: masks all non-special tokens and returns per-sequence
-        pseudo-log-likelihood scores (higher = more probable to the model).
+        When linear_head=False: computes pseudo-log-likelihood (PLL) by masking one
+        residue at a time and recording log P(token_i | all other tokens). Returns the
+        mean PLL over residue positions per sequence (higher = more probable). For short
+        sequences (≤512 residues), all masked copies are batched into a single forward
+        pass; longer sequences are scored position-by-position.
         When linear_head=True: embeds sequences through the frozen backbone and passes
         them through the linear head. Returns regression values (output_dim=1) or
         argmax class indices (output_dim>1).
@@ -296,6 +305,7 @@ class ESM2Model(BaseModel):
 
         Raises:
             ValueError: If candidate_points is empty.
+            ValueError: If any sequence has no scoreable residue positions.
             RuntimeError: If linear_head=True but the head is uninitialised
                 (should not happen if __init__ ran without error).
         """
@@ -305,7 +315,6 @@ class ESM2Model(BaseModel):
         batch = self.featurise(candidate_points)
         all_input_ids = batch["input_ids"]
         all_attention_mask = batch["attention_mask"]
-        batch_size = self._batch_size_inference
 
         self.esm_model.eval()
 
@@ -314,6 +323,7 @@ class ESM2Model(BaseModel):
                 raise RuntimeError("_head is None; model was not configured with linear_head=True")
             self._head.eval()
             all_preds: list[torch.Tensor] = []
+            batch_size = self._batch_size_inference
             with torch.no_grad():
                 for start in range(0, len(candidate_points), batch_size):
                     input_ids = all_input_ids[start : start + batch_size].to(self.device)
@@ -333,32 +343,54 @@ class ESM2Model(BaseModel):
                     all_preds.append(preds.cpu())
             return Predictions(means=torch.cat(all_preds, dim=0).numpy().astype(np.float32))
 
-        # log_likelihood scoring
+        # PLL: mask one residue at a time, scored per sequence
+        _PLL_BATCH_THRESHOLD = 512  # Use batching for shorter sequences
         log_likelihoods: list[float] = []
         with torch.no_grad():
-            for start in range(0, len(candidate_points), batch_size):
-                input_ids = all_input_ids[start : start + batch_size].to(self.device)
-                attention_mask = all_attention_mask[start : start + batch_size].to(self.device)
-                masked_ids, labels = self._compute_log_likelihood_labels(input_ids)
-                outputs = self.esm_model(
-                    input_ids=masked_ids,
-                    attention_mask=attention_mask,
-                )
-                log_probs = torch.nn.functional.log_softmax(outputs.logits, dim=-1)
-                labeled = labels != -100
-                safe_labels = labels.clone()
-                safe_labels[~labeled] = 0
-                token_log_probs = log_probs.gather(2, safe_labels.unsqueeze(2)).squeeze(2)
-                token_log_probs = token_log_probs * labeled.float()
-                labeled_counts = labeled.float().sum(dim=1)
-                if (labeled_counts == 0).any():
+            for i in range(len(candidate_points)):
+                input_ids_i = all_input_ids[i].unsqueeze(0).to(self.device)  # (1, L)
+                attention_mask_i = all_attention_mask[i].unsqueeze(0).to(self.device)
+
+                special_mask = self._special_tokens_mask(input_ids_i[0])
+                residue_positions = (~special_mask).nonzero(as_tuple=True)[0].tolist()
+
+                if not residue_positions:
                     raise ValueError(
-                        "One or more sequences have no scoreable positions (all special tokens "
-                        "after masking). Ensure each sequence contains at least one amino acid "
-                        "residue, or increase max_length to avoid full truncation."
+                        "One or more sequences have no scoreable positions (all special tokens). "
+                        "Ensure each sequence contains at least one amino acid residue, "
+                        "or increase max_length to avoid full truncation."
                     )
-                seq_lls = token_log_probs.sum(dim=1) / labeled_counts
-                log_likelihoods.extend(seq_lls.cpu().tolist())
+
+                if len(residue_positions) <= _PLL_BATCH_THRESHOLD:
+                    n = len(residue_positions)
+                    batch_input = input_ids_i.expand(n, -1).clone()  # (N, L)
+                    for row, pos in enumerate(residue_positions):
+                        batch_input[row, pos] = self.tokeniser.mask_token_id
+                    logits = self.esm_model(
+                        input_ids=batch_input,
+                        attention_mask=attention_mask_i.expand(n, -1),
+                    ).logits  # (N, L, vocab_size)
+                    ll = sum(
+                        torch.nn.functional.log_softmax(logits[row, pos], dim=-1)[
+                            input_ids_i[0, pos]
+                        ].item()
+                        for row, pos in enumerate(residue_positions)
+                    )
+                else:
+                    ll = 0.0
+                    for pos in residue_positions:
+                        masked_input = input_ids_i.clone()
+                        masked_input[0, pos] = self.tokeniser.mask_token_id
+                        logits = self.esm_model(
+                            input_ids=masked_input,
+                            attention_mask=attention_mask_i,
+                        ).logits  # (1, L, vocab_size)
+                        ll += torch.nn.functional.log_softmax(logits[0, pos], dim=-1)[
+                            input_ids_i[0, pos]
+                        ].item()
+
+                log_likelihoods.append(ll / len(residue_positions))
+
         return Predictions(means=np.array(log_likelihoods, dtype=np.float32))
 
     def embed(self, candidate_points: list[Candidate]) -> np.ndarray:
@@ -376,6 +408,11 @@ class ESM2Model(BaseModel):
             All sequences are tokenized in one pass before batching the forward pass.
             ``batch_size_inference`` controls only the model forward pass. For very
             large candidate lists, consider chunking externally.
+
+            For last_hidden_state pooling, the returned array has shape
+            (n_candidates, max_padded_seq_len, hidden_dim). Positions beyond each
+            sequence's EOS token are padding and have non-zero values. Use the
+            attention_mask from featurise() to identify valid positions.
         """
         if not candidate_points:
             return np.empty((0, self.esm_model.config.hidden_size), dtype=np.float32)
@@ -440,10 +477,10 @@ class ESM2Model(BaseModel):
             self.tokeniser.pad_token_id,
             self.tokeniser.unk_token_id,
         } - {None}
-        mask = torch.zeros_like(input_ids, dtype=torch.bool)
-        for sid in special_ids:
-            mask |= input_ids.eq(sid)
-        return mask
+        special_id_tensor = torch.tensor(
+            list(special_ids), dtype=input_ids.dtype, device=input_ids.device
+        )
+        return torch.isin(input_ids, special_id_tensor)
 
     def _pool_hidden_state(
         self, hidden_state: torch.Tensor, attention_mask: torch.Tensor
@@ -467,39 +504,6 @@ class ESM2Model(BaseModel):
             return hidden_state[:, 0, :]
         else:  # last_hidden_state
             return hidden_state
-
-    def _compute_log_likelihood_labels(
-        self, input_ids: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Prepare inputs for log-likelihood scoring.
-
-        All non-special positions are replaced with [MASK] in the input and
-        labeled with the original token ID. Special positions (CLS, EOS, PAD)
-        receive label -100 so the loss ignores them.
-
-        Args:
-            input_ids: Token IDs of shape (batch, seq_len).
-
-        Raises:
-            ValueError: If the tokeniser does not have a mask token.
-
-        Returns:
-            Tuple of (masked_input_ids, labels), both of shape (batch, seq_len).
-        """
-        special_tokens_mask = self._special_tokens_mask(input_ids)
-
-        labels = input_ids.clone()
-        labels[special_tokens_mask] = -100
-
-        if self.tokeniser.mask_token_id is None:
-            raise ValueError(
-                "Tokeniser has no mask token. Cannot perform log-likelihood masking. "
-                "Ensure the tokeniser is initialised with a [MASK] token."
-            )
-        masked_input_ids = input_ids.clone()
-        masked_input_ids[~special_tokens_mask] = self.tokeniser.mask_token_id
-
-        return masked_input_ids, labels
 
     def _train_epoch_mlp(
         self,
@@ -634,6 +638,8 @@ class ESM2Model(BaseModel):
         is_last_epoch = epoch == self.train_config.num_epochs - 1
         if (epoch + 1) % self.train_config.log_frequency == 0 or is_last_epoch:
             additional: dict[str, float] = {}
+            # These keys are reserved for future training modes (e.g. full MLM fine-tuning).
+            # In MLP head mode, train_metrics / val_metrics are always {}.
             if (v := train_metrics.get("perplexity")) is not None:
                 additional["train_perplexity"] = float(v)
             if (v := train_metrics.get("token_accuracy")) is not None:
@@ -668,7 +674,7 @@ class ESM2Model(BaseModel):
         """Fine-tune the linear head using the configured loss function.
 
         When linear_head=False, train() raises NotImplementedError (predict uses
-        pseudo-log-likelihood scoring). When linear_head=True, trains the linear head
+        masked-marginal scoring). When linear_head=True, trains the linear head
         on top of frozen embeddings.
 
         Args:
@@ -684,7 +690,7 @@ class ESM2Model(BaseModel):
             raise NotImplementedError(
                 "train() requires linear_head=True. "
                 "Set linear_head=True in ESM2TrainConfig to enable training a linear head, "
-                "or use predict() for pseudo-log-likelihood scoring without training."
+                "or use predict() for masked-marginal scoring without training."
             )
 
         self._epoch_metrics = []

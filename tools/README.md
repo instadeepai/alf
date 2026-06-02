@@ -126,6 +126,7 @@ configs (see `alf_core.model.base_model.BaseTrainConfig`).
 |-------|---------------------------|-------------------------------|
 | `CNNModel` | `False` | `False` |
 | `GPModel` | `True` | `True` |
+| `ESM2Model` | `False` | `False` |
 | `ChempropModel` | `False` | `False` |
 
 **`GPTrainConfig`** overrides both defaults to `True`:
