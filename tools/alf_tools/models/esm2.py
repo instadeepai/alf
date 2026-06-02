@@ -225,7 +225,10 @@ class ESM2Model(BaseModel):
                 "concatenated across mini-batches. Set both to 1 or "
                 "use pooling='mean' or pooling='cls' instead."
             )
-        if self.model_config.pooling == "last_hidden_state" and self.train_config.scoring_function == "linear_head":
+        if (
+            self.model_config.pooling == "last_hidden_state"
+            and self.train_config.scoring_function == "linear_head"
+        ):
             raise ValueError(
                 "pooling='last_hidden_state' is not supported with scoring_function='linear_head'. "
                 "The linear head requires a fixed-size embedding. "
@@ -320,7 +323,9 @@ class ESM2Model(BaseModel):
 
         if self.train_config.scoring_function == "linear_head":
             if self._head is None:
-                raise RuntimeError("_head is None; model was not configured with scoring_function='linear_head'")
+                raise RuntimeError(
+                    "_head is None; model was not configured with scoring_function='linear_head'"
+                )
             self._head.eval()
             all_preds: list[torch.Tensor] = []
             batch_size = self._batch_size_inference
@@ -561,7 +566,9 @@ class ESM2Model(BaseModel):
             ValueError: If the DataLoader produces no batches.
         """
         if self._head is None:
-            raise RuntimeError("_head is None; model was not configured with scoring_function='linear_head'")
+            raise RuntimeError(
+                "_head is None; model was not configured with scoring_function='linear_head'"
+            )
         self.esm_model.eval()
         self._head.train()
         epoch_losses: list[float] = []
@@ -622,7 +629,9 @@ class ESM2Model(BaseModel):
             ValueError: If the DataLoader produces no batches.
         """
         if self._head is None:
-            raise RuntimeError("_head is None; model was not configured with scoring_function='linear_head'")
+            raise RuntimeError(
+                "_head is None; model was not configured with scoring_function='linear_head'"
+            )
         self.esm_model.eval()
         self._head.eval()
         val_losses: list[float] = []
@@ -738,7 +747,9 @@ class ESM2Model(BaseModel):
         )
 
         if self._head is None:
-            raise RuntimeError("_head is None; model was not configured with scoring_function='linear_head'")
+            raise RuntimeError(
+                "_head is None; model was not configured with scoring_function='linear_head'"
+            )
 
         train_loader = self._prepare_data_loader(train_data, shuffle=True)
         val_loader = None
