@@ -80,9 +80,8 @@ class ESM2TrainConfig(BaseTrainConfig):
         log_frequency: Record epoch metrics every N epochs.
         max_grad_norm: Maximum norm for gradient clipping. None disables clipping.
         use_zeroshot: If True, predict() uses masked-marginal (PLL) zero-shot scoring via the
-            frozen backbone. Mutually exclusive with scoring_function='linear_head'. Cannot be
-            True when scoring_function=None (ambiguous — set scoring_function to a valid value
-            or disable use_zeroshot).
+            frozen backbone. Must be True when scoring_function=None. Mutually exclusive with
+            scoring_function='linear_head'.
         scoring_function: Scoring function to use. 'linear_head' (default) freezes the backbone
             and trains a linear head via loss_fn. None skips the head; predict() returns
             per-sequence masked-marginal scores and train() raises NotImplementedError.
@@ -115,7 +114,7 @@ class ESM2TrainConfig(BaseTrainConfig):
             ValueError: If optimizer_type is not 'adam' or 'adamw'.
             ValueError: If loss_fn is not 'mse' or 'cross_entropy'.
             ValueError: If use_zeroshot=True and scoring_function='linear_head'.
-            ValueError: If use_zeroshot=True and scoring_function=None.
+            ValueError: If use_zeroshot=False and scoring_function=None.
         """
         if self.num_epochs < 1:
             raise ValueError(f"num_epochs must be >= 1, got {self.num_epochs}")
