@@ -40,7 +40,8 @@ def train_config():
     """Create a frozen ESM2TrainConfig for testing.
 
     Returns:
-        An ESM2TrainConfig with freeze_backbone=True and scoring_function=None for log-likelihood mode.
+        An ESM2TrainConfig with freeze_backbone=True and scoring_function=None
+        for log-likelihood mode.
     """
     return ESM2TrainConfig(freeze_backbone=True, scoring_function=None)
 
@@ -107,6 +108,7 @@ class TestConfigs:
         assert config.batch_size == 8
         assert config.num_epochs == 10
         assert config.log_frequency == 1
+        assert config.use_zeroshot is False
         assert config.scoring_function == "linear_head"
         assert config.loss_fn == "mse"
         assert config.output_dim == 1
@@ -114,6 +116,16 @@ class TestConfigs:
         assert not hasattr(config, "loss_type")
         assert not hasattr(config, "mask_probability")
         assert not hasattr(config, "mask_splitting")
+
+    def test_use_zeroshot_with_linear_head_raises(self):
+        """use_zeroshot=True with scoring_function='linear_head' must raise ValueError."""
+        with pytest.raises(ValueError, match="use_zeroshot=True is incompatible"):
+            ESM2TrainConfig(use_zeroshot=True, scoring_function="linear_head")
+
+    def test_use_zeroshot_with_scoring_function_none_raises(self):
+        """use_zeroshot=True with scoring_function=None must raise ValueError."""
+        with pytest.raises(ValueError, match="use_zeroshot=True requires scoring_function"):
+            ESM2TrainConfig(use_zeroshot=True, scoring_function=None)
 
     def test_train_config_num_epochs_zero_raises(self):
         """ESM2TrainConfig with num_epochs=0 must raise ValueError."""
@@ -138,7 +150,9 @@ class TestConfigs:
             ESM2Model(name="unfrozen", model_config=config, train_config=train_cfg, device="cpu")
 
     def test_last_hidden_state_with_scoring_function_raises(self):
-        """last_hidden_state pooling is not compatible with scoring_function='linear_head' — raises at init."""
+        """last_hidden_state pooling is not compatible with scoring_function='linear_head'
+        — raises at init.
+        """
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
         train_cfg = ESM2TrainConfig(scoring_function="linear_head", batch_size=1)
         with pytest.raises(ValueError, match="last_hidden_state.*scoring_function"):
@@ -410,7 +424,8 @@ def esm2_mlp_classification_model():
     implicit ordering dependencies from mutation via train() calls.
 
     Returns:
-        An ESM2Model with scoring_function='linear_head', loss_fn='cross_entropy', output_dim=2, CPU.
+        An ESM2Model with scoring_function='linear_head', loss_fn='cross_entropy',
+        output_dim=2, CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID)
     train_cfg = ESM2TrainConfig(
@@ -461,7 +476,9 @@ class TestMLPHead:
         assert esm2_mlp_classification_model._head.out_features == 2
 
     def test_prepare_data_loader_yields_labels_in_mlp_mode(self, esm2_mlp_model, sample_data):
-        """DataLoader in scoring_function='linear_head' mode yields (input_ids, attention_mask, targets) triples."""
+        """DataLoader in scoring_function='linear_head' mode yields
+        (input_ids, attention_mask, targets) triples.
+        """
         loader = esm2_mlp_model._prepare_data_loader(sample_data)
         batch = next(iter(loader))
         assert len(batch) == 3  # input_ids, attention_mask, targets
@@ -481,7 +498,9 @@ class TestMLPHead:
         assert not torch.equal(initial_weight, esm2_mlp_model._head.weight)
 
     def test_mlp_train_does_not_update_backbone(self, esm2_mlp_model, sample_data):
-        """train() in scoring_function='linear_head' mode must not change any ESM-2 backbone parameters."""
+        """train() in scoring_function='linear_head' mode must not change
+        any ESM-2 backbone parameters.
+        """
         initial_params = {
             name: param.clone() for name, param in esm2_mlp_model.esm_model.named_parameters()
         }
@@ -490,7 +509,9 @@ class TestMLPHead:
             assert torch.equal(initial_params[name], param), f"Backbone param {name} changed"
 
     def test_mlp_train_records_epoch_metrics(self, esm2_mlp_model, sample_data):
-        """train() in scoring_function='linear_head' mode records one SurrogateEpochMetrics per epoch."""
+        """train() in scoring_function='linear_head' mode records one
+        SurrogateEpochMetrics per epoch.
+        """
         esm2_mlp_model.train(sample_data)
         metrics = esm2_mlp_model.get_epoch_metrics()
         # Relies on log_frequency=1 in the fixture so every epoch is logged.
@@ -542,13 +563,17 @@ class TestMLPHead:
             assert "train_log_likelihood" not in m.additional_metrics
 
     def test_mlp_predict_shape(self, esm2_mlp_model, sample_data):
-        """predict() in scoring_function='linear_head' mode returns means of shape (n_candidates,)."""
+        """predict() in scoring_function='linear_head' mode returns means
+        of shape (n_candidates,).
+        """
         predictions = esm2_mlp_model.predict(sample_data.candidates)
         assert predictions.means.ndim == 1
         assert predictions.means.shape == (len(sample_data),)
 
     def test_mlp_predict_variances_none(self, esm2_mlp_model, sample_data):
-        """predict() in scoring_function='linear_head' mode returns Predictions with variances=None."""
+        """predict() in scoring_function='linear_head' mode returns Predictions
+        with variances=None.
+        """
         predictions = esm2_mlp_model.predict(sample_data.candidates)
         assert predictions.variances is None
 
