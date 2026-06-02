@@ -350,13 +350,7 @@ class ESM2Model(BaseModel):
                 for start in range(0, len(candidate_points), batch_size):
                     input_ids = all_input_ids[start : start + batch_size].to(self.device)
                     attention_mask = all_attention_mask[start : start + batch_size].to(self.device)
-                    outputs = self.esm_model(
-                        input_ids=input_ids,
-                        attention_mask=attention_mask,
-                        output_hidden_states=True,
-                    )
-                    hidden_state = outputs.hidden_states[self.model_config.repr_layer]
-                    embeddings = self._pool_hidden_state(hidden_state, attention_mask)
+                    embeddings = self._embed_batch(input_ids, attention_mask)
                     head_out = self._head(embeddings)
                     if self.train_config.output_dim == 1:
                         preds = head_out.squeeze(-1)
@@ -489,15 +483,7 @@ class ESM2Model(BaseModel):
                 input_ids = all_input_ids[start : start + batch_size].to(self.device)
                 attention_mask = all_attention_mask[start : start + batch_size].to(self.device)
 
-                outputs = self.esm_model(
-                    input_ids=input_ids,
-                    attention_mask=attention_mask,
-                    output_hidden_states=True,
-                )
-
-                hidden_state = outputs.hidden_states[self.model_config.repr_layer]
-
-                all_embeddings.append(self._pool_hidden_state(hidden_state, attention_mask).cpu())
+                all_embeddings.append(self._embed_batch(input_ids, attention_mask).cpu())
 
         return torch.cat(all_embeddings, dim=0).numpy()
 
@@ -541,6 +527,25 @@ class ESM2Model(BaseModel):
             list(special_ids), dtype=input_ids.dtype, device=input_ids.device
         )
         return torch.isin(input_ids, special_id_tensor)
+
+    def _embed_batch(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+        """Run the frozen backbone and pool hidden states for one batch.
+
+        Args:
+            input_ids: Tensor of shape (batch, seq_len) on self.device.
+            attention_mask: Tensor of shape (batch, seq_len) on self.device.
+
+        Returns:
+            Embeddings of shape (batch, hidden_dim) for mean/cls pooling,
+            or (batch, seq_len, hidden_dim) for last_hidden_state.
+        """
+        outputs = self.esm_model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            output_hidden_states=True,
+        )
+        hidden_state = outputs.hidden_states[self.model_config.repr_layer]
+        return self._pool_hidden_state(hidden_state, attention_mask)
 
     def _pool_hidden_state(
         self, hidden_state: torch.Tensor, attention_mask: torch.Tensor
@@ -604,13 +609,7 @@ class ESM2Model(BaseModel):
             batch_targets = targets.to(self.device)
 
             with torch.no_grad():
-                outputs = self.esm_model(
-                    input_ids=batch_ids,
-                    attention_mask=batch_mask,
-                    output_hidden_states=True,
-                )
-                hidden_state = outputs.hidden_states[self.model_config.repr_layer]
-                embeddings = self._pool_hidden_state(hidden_state, batch_mask)
+                embeddings = self._embed_batch(batch_ids, batch_mask)
 
             optimizer.zero_grad()
             preds = self._head(embeddings)
@@ -664,14 +663,7 @@ class ESM2Model(BaseModel):
                 batch_mask = attention_mask.to(self.device)
                 batch_targets = targets.to(self.device)
 
-                outputs = self.esm_model(
-                    input_ids=batch_ids,
-                    attention_mask=batch_mask,
-                    output_hidden_states=True,
-                )
-                hidden_state = outputs.hidden_states[self.model_config.repr_layer]
-                embeddings = self._pool_hidden_state(hidden_state, batch_mask)
-
+                embeddings = self._embed_batch(batch_ids, batch_mask)
                 preds = self._head(embeddings)
                 loss = self._compute_loss(preds, batch_targets)
                 val_losses.append(loss.item())

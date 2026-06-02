@@ -672,3 +672,33 @@ class TestMLPHead:
         model.train(sample_data)
         # Epochs logged: epoch 3 (index 2, (2+1)%3==0) and epoch 4 (index 3, last)
         assert len(model.get_epoch_metrics()) == 2
+
+
+class TestEmbedBatch:
+    """Tests for ESM2Model._embed_batch()."""
+
+    def test_embed_batch_returns_correct_shape(self, esm2_mlp_model, sample_data):
+        """_embed_batch returns (batch_size, hidden_dim) tensor."""
+        batch = esm2_mlp_model.featurise(sample_data)
+        input_ids = batch["input_ids"].to(esm2_mlp_model.device)
+        attention_mask = batch["attention_mask"].to(esm2_mlp_model.device)
+        hidden_dim = esm2_mlp_model.esm_model.config.hidden_size
+        result = esm2_mlp_model._embed_batch(input_ids, attention_mask)
+        assert result.shape == (len(sample_data), hidden_dim)
+
+    def test_embed_batch_on_correct_device(self, esm2_mlp_model, sample_data):
+        """_embed_batch returns a tensor on the model's device."""
+        batch = esm2_mlp_model.featurise(sample_data)
+        input_ids = batch["input_ids"].to(esm2_mlp_model.device)
+        attention_mask = batch["attention_mask"].to(esm2_mlp_model.device)
+        result = esm2_mlp_model._embed_batch(input_ids, attention_mask)
+        assert result.device == esm2_mlp_model.device
+
+    def test_embed_batch_matches_embed_output(self, esm2_mlp_model, sample_data):
+        """_embed_batch output matches the result from the public embed() method."""
+        expected = esm2_mlp_model.embed(sample_data.candidates)
+        batch = esm2_mlp_model.featurise(sample_data)
+        input_ids = batch["input_ids"].to(esm2_mlp_model.device)
+        attention_mask = batch["attention_mask"].to(esm2_mlp_model.device)
+        result = esm2_mlp_model._embed_batch(input_ids, attention_mask)
+        np.testing.assert_allclose(result.cpu().numpy(), expected, rtol=1e-5, atol=1e-5)
