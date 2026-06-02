@@ -152,11 +152,9 @@ class TestConfigs:
             ESM2TrainConfig(loss_fn="linear_head")
 
     def test_freeze_backbone_false_raises_not_implemented(self):
-        """ESM2Model raises NotImplementedError when freeze_backbone=False."""
-        config = ESM2ModelConfig(model_id=MODEL_ID)
-        train_cfg = ESM2TrainConfig(freeze_backbone=False)
+        """ESM2TrainConfig raises NotImplementedError when freeze_backbone=False."""
         with pytest.raises(NotImplementedError):
-            ESM2Model(name="unfrozen", model_config=config, train_config=train_cfg, device="cpu")
+            ESM2TrainConfig(freeze_backbone=False)
 
     def test_last_hidden_state_with_scoring_function_raises(self):
         """last_hidden_state pooling is not compatible with scoring_function='linear_head'

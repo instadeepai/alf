@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Iterator, Literal
 
 import numpy as np
 import torch
@@ -75,7 +75,9 @@ class ESM2TrainConfig(BaseTrainConfig):
         learning_rate: Learning rate for the optimizer.
         optimizer_type: Which optimizer to use ('adam' or 'adamw').
         batch_size: Batch size for training.
-        batch_size_inference: Batch size for predict() and embed(). None defaults to batch_size.
+        batch_size_inference: Batch size for embed() and linear-head predict(). Has no effect on
+            zero-shot PLL scoring (scoring_function=None); use smaller call-site batches instead.
+            None defaults to batch_size.
         num_epochs: Number of epochs to train for.
         log_frequency: Record epoch metrics every N epochs.
         max_grad_norm: Maximum norm for gradient clipping. None disables clipping.
@@ -110,12 +112,17 @@ class ESM2TrainConfig(BaseTrainConfig):
         """Post-initialization checks for ESM2TrainConfig.
 
         Raises:
+            NotImplementedError: If freeze_backbone=False.
             ValueError: If num_epochs < 1.
             ValueError: If optimizer_type is not 'adam' or 'adamw'.
             ValueError: If loss_fn is not 'mse' or 'cross_entropy'.
             ValueError: If use_zeroshot=True and scoring_function='linear_head'.
             ValueError: If use_zeroshot=False and scoring_function=None.
         """
+        if not self.freeze_backbone:
+            raise NotImplementedError(
+                "freeze_backbone=False is not yet supported. Set freeze_backbone=True."
+            )
         if self.num_epochs < 1:
             raise ValueError(f"num_epochs must be >= 1, got {self.num_epochs}")
         if self.optimizer_type not in ("adam", "adamw"):
@@ -146,6 +153,8 @@ class ESM2Model(BaseModel):
     (scoring_function='linear_head'). embed() returns per-sequence embeddings.
     """
 
+    _PLL_BATCH_THRESHOLD = 128  # Use batching for shorter sequences
+
     def __init__(
         self,
         name: str,
@@ -163,7 +172,6 @@ class ESM2Model(BaseModel):
 
         Raises:
             ImportError: If transformers package is not available.
-            NotImplementedError: If freeze_backbone=False.
             ValueError: If the tokeniser has no mask token.
         """
         if not _TRANSFORMERS_AVAILABLE:
@@ -179,11 +187,6 @@ class ESM2Model(BaseModel):
             if self.train_config.batch_size_inference is not None
             else self.train_config.batch_size
         )
-        if not self.train_config.freeze_backbone:
-            raise NotImplementedError(
-                "Training with freeze_backbone=False is not yet supported. "
-                "Set freeze_backbone=True."
-            )
         self._validate_model_config()
         self.device = get_device(device)
 
@@ -231,9 +234,8 @@ class ESM2Model(BaseModel):
             )
 
     def _validate_model_config(self) -> None:
-        bsi = self._batch_size_inference
         if self.model_config.pooling == "last_hidden_state" and (
-            self.train_config.batch_size > 1 or bsi > 1
+            self.train_config.batch_size > 1 or self._batch_size_inference > 1
         ):
             raise ValueError(
                 "pooling='last_hidden_state' requires batch_size=1 and batch_size_inference=1. "
@@ -251,6 +253,18 @@ class ESM2Model(BaseModel):
                 "The linear head requires a fixed-size embedding. "
                 "Use pooling='mean' or pooling='cls' instead."
             )
+
+    def _require_head(self) -> torch.nn.Linear:
+        """Return the linear head.
+
+        Raises:
+            RuntimeError: If the head has not been initialised.
+        """
+        if self._head is None:
+            raise RuntimeError(
+                "_head is None; model was not configured with scoring_function='linear_head'"
+            )
+        return self._head
 
     def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> dict[str, torch.Tensor]:
         """Tokenize sequences into input tensors for the ESM-2 model.
@@ -310,9 +324,9 @@ class ESM2Model(BaseModel):
 
         When scoring_function=None: computes pseudo-log-likelihood (PLL) by masking one
         residue at a time and recording log P(token_i | all other tokens). Returns the
-        mean PLL over residue positions per sequence (higher = more probable). For short
-        sequences (≤512 residues), all masked copies are batched into a single forward
-        pass; longer sequences are scored position-by-position.
+        mean PLL over residue positions per sequence (higher = more probable). Sequences
+        with ≤_PLL_BATCH_THRESHOLD residues are scored in a single batched forward pass;
+        longer sequences are scored position-by-position to bound memory usage.
         When scoring_function='linear_head': embeds sequences through the frozen backbone and passes
         them through the linear head. Returns regression values (output_dim=1) or
         argmax class indices (output_dim>1).
@@ -339,19 +353,12 @@ class ESM2Model(BaseModel):
         self.esm_model.eval()
 
         if self.train_config.scoring_function == "linear_head":
-            if self._head is None:
-                raise RuntimeError(
-                    "_head is None; model was not configured with scoring_function='linear_head'"
-                )
-            self._head.eval()
+            head = self._require_head()
+            head.eval()
             all_preds: list[torch.Tensor] = []
-            batch_size = self._batch_size_inference
             with torch.no_grad():
-                for start in range(0, len(candidate_points), batch_size):
-                    input_ids = all_input_ids[start : start + batch_size].to(self.device)
-                    attention_mask = all_attention_mask[start : start + batch_size].to(self.device)
-                    embeddings = self._embed_batch(input_ids, attention_mask)
-                    head_out = self._head(embeddings)
+                for embeddings in self._iter_embedding_batches(all_input_ids, all_attention_mask):
+                    head_out = head(embeddings)
                     if self.train_config.output_dim == 1:
                         preds = head_out.squeeze(-1)
                     else:
@@ -373,10 +380,11 @@ class ESM2Model(BaseModel):
         positions. Two execution modes are used to trade off memory and
         speed:
 
-        - If the number of scoreable residues is below a batching threshold
-            (_PLL_BATCH_THRESHOLD), residues are masked in a single batched
-            forward pass (one masked position per batch row) to leverage GPU
-            parallelism.
+        - If the number of scoreable residues is ≤ _PLL_BATCH_THRESHOLD, residues
+            are masked in a single batched forward pass (one masked position per
+            batch row) to leverage GPU parallelism. This creates a forward pass of
+            shape (n_residues × padded_seq_len), which can spike GPU memory for
+            sequences near the threshold on large models.
         - For longer sequences, positions are masked and scored one-at-a-time
             to avoid excessive memory usage.
 
@@ -397,8 +405,8 @@ class ESM2Model(BaseModel):
         self.esm_model.eval()
 
         # PLL: mask one residue at a time, scored per sequence
-        _PLL_BATCH_THRESHOLD = 512  # Use batching for shorter sequences
         log_likelihoods: list[float] = []
+        _pll_oom_warned = False
         with torch.no_grad():
             for i in range(n_candidates):
                 input_ids_i = all_input_ids[i].unsqueeze(0).to(self.device)  # (1, L)
@@ -414,8 +422,20 @@ class ESM2Model(BaseModel):
                         "or increase max_length to avoid full truncation."
                     )
 
-                if len(residue_positions) <= _PLL_BATCH_THRESHOLD:
+                if len(residue_positions) <= self._PLL_BATCH_THRESHOLD:
                     n = len(residue_positions)
+                    seq_len = input_ids_i.shape[1]
+                    if not _pll_oom_warned and n * seq_len > 50_000:
+                        logger.warning(
+                            "Zero-shot PLL batched forward pass: %d residues × %d padded tokens "
+                            "= %d tokens. This may cause OOM on memory-constrained devices. "
+                            "Reduce ESM2ModelConfig.max_length or call predict() on "
+                            "smaller batches.",
+                            n,
+                            seq_len,
+                            n * seq_len,
+                        )
+                        _pll_oom_warned = True
                     batch_input = input_ids_i.expand(n, -1).clone()  # (N, L)
                     for row, pos in enumerate(residue_positions):
                         batch_input[row, pos] = self.tokeniser.mask_token_id
@@ -455,12 +475,14 @@ class ESM2Model(BaseModel):
         Returns:
             Numpy array of shape (n_candidates, hidden_dim) for mean or cls pooling,
             or (n_candidates, seq_len, hidden_dim) for last_hidden_state pooling.
-            Returns shape (0, hidden_dim) if candidate_points is empty.
+            Returns shape (0, hidden_dim) for mean/cls pooling, or (0, 0, hidden_dim) for
+            last_hidden_state pooling, if candidate_points is empty.
 
         Note:
             All sequences are tokenized in one pass before batching the forward pass.
-            ``batch_size_inference`` controls only the model forward pass. For very
-            large candidate lists, consider chunking externally.
+            ``batch_size_inference`` controls the embed() forward pass batch size but has
+            no effect on zero-shot PLL predict(). For very large candidate lists, consider
+            chunking externally.
 
             For last_hidden_state pooling, the returned array has shape
             (n_candidates, max_padded_seq_len, hidden_dim). Positions beyond each
@@ -468,24 +490,21 @@ class ESM2Model(BaseModel):
             attention_mask from featurise() to identify valid positions.
         """
         if not candidate_points:
-            return np.empty((0, self.esm_model.config.hidden_size), dtype=np.float32)
+            hidden_dim = self.esm_model.config.hidden_size
+            if self.model_config.pooling == "last_hidden_state":
+                return np.empty((0, 0, hidden_dim), dtype=np.float32)
+            return np.empty((0, hidden_dim), dtype=np.float32)
 
         batch = self.featurise(candidate_points)
         all_input_ids = batch["input_ids"]
         all_attention_mask = batch["attention_mask"]
 
         all_embeddings: list[torch.Tensor] = []
-        batch_size = self._batch_size_inference
-
         self.esm_model.eval()
         with torch.no_grad():
-            for start in range(0, len(candidate_points), batch_size):
-                input_ids = all_input_ids[start : start + batch_size].to(self.device)
-                attention_mask = all_attention_mask[start : start + batch_size].to(self.device)
-
-                all_embeddings.append(self._embed_batch(input_ids, attention_mask).cpu())
-
-        return torch.cat(all_embeddings, dim=0).numpy()
+            for embeddings in self._iter_embedding_batches(all_input_ids, all_attention_mask):
+                all_embeddings.append(embeddings.cpu())
+        return torch.cat(all_embeddings, dim=0).numpy().astype(np.float32)
 
     def _prepare_data_loader(self, data: LabelledCandidates, shuffle: bool = False) -> DataLoader:
         """Create a DataLoader for training or validation.
@@ -539,6 +558,7 @@ class ESM2Model(BaseModel):
             Embeddings of shape (batch, hidden_dim) for mean/cls pooling,
             or (batch, seq_len, hidden_dim) for last_hidden_state.
         """
+        # output_hidden_states=True returns all N layer states; HuggingFace has no per-layer API.
         outputs = self.esm_model(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -546,6 +566,16 @@ class ESM2Model(BaseModel):
         )
         hidden_state = outputs.hidden_states[self.model_config.repr_layer]
         return self._pool_hidden_state(hidden_state, attention_mask)
+
+    def _iter_embedding_batches(
+        self, all_input_ids: torch.Tensor, all_attention_mask: torch.Tensor
+    ) -> Iterator[torch.Tensor]:
+        """Yield per-batch embeddings (on self.device) using batch_size_inference."""
+        batch_size = self._batch_size_inference
+        for start in range(0, all_input_ids.size(0), batch_size):
+            input_ids = all_input_ids[start : start + batch_size].to(self.device)
+            attention_mask = all_attention_mask[start : start + batch_size].to(self.device)
+            yield self._embed_batch(input_ids, attention_mask)
 
     def _pool_hidden_state(
         self, hidden_state: torch.Tensor, attention_mask: torch.Tensor
@@ -571,7 +601,11 @@ class ESM2Model(BaseModel):
             return hidden_state
 
     def _compute_loss(self, preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        """Compute loss between predictions and targets using the configured loss function."""
+        """Compute loss between predictions and targets using the configured loss function.
+
+        Returns:
+            Scalar loss tensor.
+        """
         if self.train_config.loss_fn == "mse":
             return torch.nn.functional.mse_loss(preds.squeeze(-1), targets)
         else:
@@ -595,12 +629,9 @@ class ESM2Model(BaseModel):
             RuntimeError: If the loss becomes NaN or infinite.
             ValueError: If the DataLoader produces no batches.
         """
-        if self._head is None:
-            raise RuntimeError(
-                "_head is None; model was not configured with scoring_function='linear_head'"
-            )
+        head = self._require_head()
         self.esm_model.eval()
-        self._head.train()
+        head.train()
         epoch_losses: list[float] = []
 
         for input_ids, attention_mask, targets in train_loader:
@@ -612,7 +643,7 @@ class ESM2Model(BaseModel):
                 embeddings = self._embed_batch(batch_ids, batch_mask)
 
             optimizer.zero_grad()
-            preds = self._head(embeddings)
+            preds = head(embeddings)
 
             loss = self._compute_loss(preds, batch_targets)
 
@@ -623,9 +654,7 @@ class ESM2Model(BaseModel):
                 )
             loss.backward()
             if self.train_config.max_grad_norm is not None:
-                torch.nn.utils.clip_grad_norm_(
-                    self._head.parameters(), self.train_config.max_grad_norm
-                )
+                torch.nn.utils.clip_grad_norm_(head.parameters(), self.train_config.max_grad_norm)
             optimizer.step()
             epoch_losses.append(loss.item())
 
@@ -649,12 +678,9 @@ class ESM2Model(BaseModel):
             RuntimeError: If the model was not configured with scoring_function='linear_head'.
             ValueError: If the DataLoader produces no batches.
         """
-        if self._head is None:
-            raise RuntimeError(
-                "_head is None; model was not configured with scoring_function='linear_head'"
-            )
+        head = self._require_head()
         self.esm_model.eval()
-        self._head.eval()
+        head.eval()
         val_losses: list[float] = []
 
         with torch.no_grad():
@@ -664,7 +690,7 @@ class ESM2Model(BaseModel):
                 batch_targets = targets.to(self.device)
 
                 embeddings = self._embed_batch(batch_ids, batch_mask)
-                preds = self._head(embeddings)
+                preds = head(embeddings)
                 loss = self._compute_loss(preds, batch_targets)
                 val_losses.append(loss.item())
 
@@ -758,10 +784,7 @@ class ESM2Model(BaseModel):
             f"Fine-tuning ESM-2 ({self.model_config.model_id}) with {len(train_data)} sequences"
         )
 
-        if self._head is None:
-            raise RuntimeError(
-                "_head is None; model was not configured with scoring_function='linear_head'"
-            )
+        self._require_head()
 
         train_loader = self._prepare_data_loader(train_data, shuffle=True)
         val_loader = None
@@ -770,11 +793,11 @@ class ESM2Model(BaseModel):
 
         if self.train_config.optimizer_type == "adamw":
             optimizer: torch.optim.Optimizer = torch.optim.AdamW(
-                self._head.parameters(), lr=self.train_config.learning_rate
+                self._require_head().parameters(), lr=self.train_config.learning_rate
             )
         elif self.train_config.optimizer_type == "adam":
             optimizer = torch.optim.Adam(
-                self._head.parameters(), lr=self.train_config.learning_rate
+                self._require_head().parameters(), lr=self.train_config.learning_rate
             )
         else:
             raise AssertionError(
