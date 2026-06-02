@@ -81,7 +81,6 @@ from alf_tools.datasets.guacamol import (
     zaleplon_mpo,  # noqa: PLC2701
 )
 from pydantic import ValidationError
-
 from rdkit import Chem as _Chem
 from rdkit import DataStructs as _DataStructs
 from rdkit.Chem import rdMolDescriptors as _rdMD
