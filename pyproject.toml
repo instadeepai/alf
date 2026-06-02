@@ -52,6 +52,14 @@ docs = [
     "sphinx-autodoc-typehints>=1.24.0",
 ]
 
+tutorials = [
+    "matplotlib>=3.7.0",
+    "umap-learn>=0.5.0",
+]
+
+esmfold = ["alf_tools[esmfold]"]
+chemprop = ["alf_tools[chemprop]"]
+
 [tool.uv]
 default-groups = ["dev"]
 
