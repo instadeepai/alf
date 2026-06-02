@@ -30,9 +30,14 @@ from typing import Literal
 
 import numpy as np
 import torch
-from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
-from alf_core.model.base_model import BaseTrainConfig
-from alf_core.model.normaliser import InputNormaliser
+from alf_core import (
+    BaseModel,
+    BaseTrainConfig,
+    Candidate,
+    InputNormaliser,
+    LabelledCandidates,
+    Predictions,
+)
 from botorch.fit import fit_gpytorch_mll
 from botorch.models import SingleTaskGP
 from botorch.models.transforms.outcome import Standardize
