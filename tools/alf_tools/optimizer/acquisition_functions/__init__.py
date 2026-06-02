@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from alf_tools.optimizer.acquisition_functions.botorch_acqs import (
+    BotorchAcquisitionConfig,
+    BotorchAcquisitionFunction,
+    expected_improvement,
+    upper_confidence_bound,
+)
 from alf_tools.optimizer.acquisition_functions.core_set import CoreSet
 from alf_tools.optimizer.acquisition_functions.expected_improvement import ExpectedImprovement
 from alf_tools.optimizer.acquisition_functions.greedy import Greedy

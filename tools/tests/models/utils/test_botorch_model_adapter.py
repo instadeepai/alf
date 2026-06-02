@@ -32,7 +32,9 @@ import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates, Modality
 from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel, BoTorchTrainConfig
-from alf_tools.models.utils.botorch_model_adapter import BoTorchModelAdapter
+from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
+    BoTorchModelAdapter,
+)
 from alf_tools.utils.botorch_utils import candidates_to_tensor
 from botorch.posteriors import Posterior
 from botorch.posteriors.gpytorch import GPyTorchPosterior

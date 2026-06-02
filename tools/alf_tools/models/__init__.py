@@ -18,7 +18,6 @@ from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, Su
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.mlp import MLP, MLPModel, MLPModelConfig, MLPTrainConfig
 from alf_tools.models.utils import (
-    BoTorchModelAdapter,
     build_from_target,
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
@@ -28,7 +27,6 @@ from alf_tools.models.utils import (
 
 __all__ = [
     "BoTorchGPModel",
-    "BoTorchModelAdapter",
     "BoTorchTrainConfig",
     "build_from_target",
     "CNNModel",
