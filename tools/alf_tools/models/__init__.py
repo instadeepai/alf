@@ -34,15 +34,26 @@ __all__ = [
     "GPModel",
     "GPModelConfig",
     "GPTrainConfig",
+    "one_hot_encode",
     "EnsembleWrapper",
     "EnsembleWrapperConfig",
     "SubsampleConfig",
-    "one_hot_encode",
     "MLP",
     "MLPModel",
     "MLPModelConfig",
     "MLPTrainConfig",
 ]
+
+
+try:
+    from alf_tools.models.esmfold import ESMFoldModel, ESMFoldModelConfig
+
+    _esmfold_available = True
+except ModuleNotFoundError:
+    _esmfold_available = False
+
+if _esmfold_available:
+    __all__ += ["ESMFoldModelConfig", "ESMFoldModel"]
 
 _chemprop_available = False
 try:

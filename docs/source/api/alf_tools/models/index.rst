@@ -9,6 +9,7 @@ prediction, and sampling.
    :maxdepth: 1
 
    CNN Model <cnn/index>
+   ESMFold Model <esmfold/index>
    GP Model <gp/index>
    ESM2 Model <esm2/index>
    Chemprop Model <chemprop/index>

@@ -52,6 +52,11 @@ uv sync --extra esm2 --extra chemprop
   (`loss_fn='cross_entropy'`); `scoring_function=None` performs zero-shot pseudo-log-likelihood scoring
   with no training. Embeddings can be extracted via `embed()`. Requires the `[esm2]` optional extra:
   `pip install "alf-tools[esm2]"`
+- **ESMFoldModel** - ESMFold protein structure prediction oracle; returns a scalar confidence score per candidate. Use as `Oracle(scorer=ESMFoldModel(ESMFoldModelConfig(...)))`. Requires `transformers>=4.36.0` and `accelerate>=0.26.0`.
+  Three scoring metrics are supported (all in **[0, 1]**, higher is better):
+  - `ptm` *(default)* — global fold confidence (pTM). > 0.5 = confident fold; < 0.1 = disordered / very short peptide.
+  - `mean_plddt` — per-residue local accuracy averaged over all residues. > 0.7 = well-structured; < 0.5 = disordered.
+  - `combined` — weighted average `w * ptm + (1-w) * mean_plddt` (default `w=0.5`); balances global and local confidence.
 - **ChempropModel** - Message Passing Neural Network (MPNN) for small-molecule fitness prediction,
   backed by [Chemprop v2.x](https://chemprop.readthedocs.io/). Accepts SMILES strings directly;
   no hand-crafted features required. Requires the `[chemprop]` optional extra:
