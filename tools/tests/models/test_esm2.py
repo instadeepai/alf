@@ -126,9 +126,9 @@ class TestConfigs:
             ESM2TrainConfig(loss_fn="mlm")
 
     def test_old_loss_fn_values_raise(self):
-        """Old loss_fn values 'log_likelihood' and 'mlp_head' are no longer valid."""
+        """Old loss_fn values 'log_likelihood' and 'linear_head' are no longer valid."""
         with pytest.raises(ValueError, match="loss_fn must be"):
-            ESM2TrainConfig(loss_fn="mlp_head")
+            ESM2TrainConfig(loss_fn="linear_head")
 
     def test_freeze_backbone_false_raises_not_implemented(self):
         """ESM2Model raises NotImplementedError when freeze_backbone=False."""
@@ -428,7 +428,7 @@ def esm2_mlp_classification_model():
 
 
 class TestMLPHead:
-    """Tests for ESM2Model with loss_fn='mlp_head'."""
+    """Tests for ESM2Model with loss_fn='linear_head'."""
 
     def test_head_is_linear_layer(self, esm2_mlp_model):
         """MLP head should be a torch.nn.Linear module."""
@@ -461,7 +461,7 @@ class TestMLPHead:
         assert esm2_mlp_classification_model._head.out_features == 2
 
     def test_prepare_data_loader_yields_labels_in_mlp_mode(self, esm2_mlp_model, sample_data):
-        """DataLoader in mlp_head mode yields (input_ids, attention_mask, targets) triples."""
+        """DataLoader in linear_head mode yields (input_ids, attention_mask, targets) triples."""
         loader = esm2_mlp_model._prepare_data_loader(sample_data)
         batch = next(iter(loader))
         assert len(batch) == 3  # input_ids, attention_mask, targets
@@ -475,13 +475,13 @@ class TestMLPHead:
         assert len(batch) == 2
 
     def test_mlp_train_updates_head_weights(self, esm2_mlp_model, sample_data):
-        """train() in mlp_head mode updates the linear head parameters."""
+        """train() in linear_head mode updates the linear head parameters."""
         initial_weight = esm2_mlp_model._head.weight.clone()
         esm2_mlp_model.train(sample_data)
         assert not torch.equal(initial_weight, esm2_mlp_model._head.weight)
 
     def test_mlp_train_does_not_update_backbone(self, esm2_mlp_model, sample_data):
-        """train() in mlp_head mode must not change any ESM-2 backbone parameters."""
+        """train() in linear_head mode must not change any ESM-2 backbone parameters."""
         initial_params = {
             name: param.clone() for name, param in esm2_mlp_model.esm_model.named_parameters()
         }
@@ -490,7 +490,7 @@ class TestMLPHead:
             assert torch.equal(initial_params[name], param), f"Backbone param {name} changed"
 
     def test_mlp_train_records_epoch_metrics(self, esm2_mlp_model, sample_data):
-        """train() in mlp_head mode records one SurrogateEpochMetrics per epoch."""
+        """train() in linear_head mode records one SurrogateEpochMetrics per epoch."""
         esm2_mlp_model.train(sample_data)
         metrics = esm2_mlp_model.get_epoch_metrics()
         # Relies on log_frequency=1 in the fixture so every epoch is logged.
@@ -542,18 +542,18 @@ class TestMLPHead:
             assert "train_log_likelihood" not in m.additional_metrics
 
     def test_mlp_predict_shape(self, esm2_mlp_model, sample_data):
-        """predict() in mlp_head mode returns means of shape (n_candidates,)."""
+        """predict() in linear_head mode returns means of shape (n_candidates,)."""
         predictions = esm2_mlp_model.predict(sample_data.candidates)
         assert predictions.means.ndim == 1
         assert predictions.means.shape == (len(sample_data),)
 
     def test_mlp_predict_variances_none(self, esm2_mlp_model, sample_data):
-        """predict() in mlp_head mode returns Predictions with variances=None."""
+        """predict() in linear_head mode returns Predictions with variances=None."""
         predictions = esm2_mlp_model.predict(sample_data.candidates)
         assert predictions.variances is None
 
     def test_mlp_predict_finite(self, esm2_mlp_model, sample_data):
-        """predict() in mlp_head mode returns finite values."""
+        """predict() in linear_head mode returns finite values."""
         predictions = esm2_mlp_model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
 
