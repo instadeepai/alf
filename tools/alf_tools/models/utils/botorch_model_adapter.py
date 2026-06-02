@@ -208,6 +208,9 @@ class BoTorchModelAdapter(Model):
     def num_outputs(self) -> int:
         """The number of outputs of the model.
 
+        Raises:
+            NotImplementedError: If the model is a multi-output ALF BaseModel.
+
         Returns:
             Number of outputs. For most models, this is 1 (single-output).
             Multi-output models should override this.
@@ -218,8 +221,12 @@ class BoTorchModelAdapter(Model):
 
         # For ALF BaseModel, assume single output (most common case)
         # Multi-output models would need special handling
-        # TODO: Handle this later
-        return 1
+        raise NotImplementedError(
+            f"num_outputs is not implemented for ALF BaseModel "
+            f"{type(self._wrapped_model).__name__}. "
+            f"Assuming single output (num_outputs=1) for now. "
+            f"Multi-output models require custom handling and should override this property."
+        )
 
     @property
     def batch_shape(self) -> torch.Size:
@@ -236,5 +243,10 @@ class BoTorchModelAdapter(Model):
             return self._wrapped_model.batch_shape  # type: ignore[union-attr]
 
         # For ALF BaseModel, assume no batch dimension (most common case)
-        # TODO: Handle this later
-        return torch.Size([])
+        raise NotImplementedError(
+            f"batch_shape is not implemented for ALF BaseModel "
+            f"{type(self._wrapped_model).__name__}. "
+            f"Assuming no batch dimension (batch_shape=()) for now. "
+            f"Models with batch dimensions require custom handling "
+            "and should override this property."
+        )
