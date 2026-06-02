@@ -28,7 +28,7 @@ Key properties:
 
 - **Input**: Amino acid sequences stored in ``Candidate.data``
 - **Output**: Mean-only scalar predictions (no uncertainty estimates)
-- **Backbone**: Configurable ESM-2 checkpoint (default: ``facebook/esm2_t6_8M_UR50D``)
+- **Backbone**: Configurable ESM-2 checkpoint — specify via ``ESM2ModelConfig(model_id=...)``, e.g. ``facebook/esm2_t6_8M_UR50D``
 - **Sampling**: Not supported — raises ``NotImplementedError``
 - **Tokenisation**: ``featurise()`` converts sequences to ``input_ids`` and
   ``attention_mask`` tensors for the ESM-2 tokeniser. It does **not** produce embeddings —
