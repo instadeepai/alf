@@ -22,6 +22,9 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
+
+pytest.importorskip("rdkit", reason="guacamol not installed; install alf_tools[guacamol]")
+
 import requests
 from alf_core import Candidate, Modality
 from alf_tools.datasets.guacamol import (
@@ -78,6 +81,7 @@ from alf_tools.datasets.guacamol import (
     zaleplon_mpo,  # noqa: PLC2701
 )
 from pydantic import ValidationError
+
 from rdkit import Chem as _Chem
 from rdkit import DataStructs as _DataStructs
 from rdkit.Chem import rdMolDescriptors as _rdMD
