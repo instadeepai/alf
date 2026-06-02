@@ -116,6 +116,7 @@ and provides:
 **Key Methods:**
 - `fit()`: Trains the surrogate on train/validation data
 - `predict()`: Generates predictions (means and uncertainties) for candidates
+- `featurise()`: Returns feature representations for candidates or `LabelledCandidates` by delegating to the underlying model — used by diversity-based acquisition functions such as `CoreSet`
 - `get_training_summary_metrics()`: Returns training metrics
 
 ### 4. Oracle (`Oracle`)
@@ -149,6 +150,7 @@ Acquisition functions determine which candidates are most promising to evaluate.
 score candidates based on:
 
 - Surrogate model predictions (means and uncertainties)
+- Model feature representations (for diversity-based selection)
 - Current task state (training data, round number, etc.)
 
 **Common Acquisition Functions:**
@@ -156,6 +158,7 @@ score candidates based on:
 - **UCB (Upper Confidence Bound)**: Balances exploitation and exploration
 - **Expected Improvement**: Selects candidates with highest expected improvement
 - **Thompson Sampling**: Uses Bayesian sampling for exploration
+- **CoreSet**: Greedy k-centres selection maximising input-space coverage — calls `state.surrogate.featurise()` rather than `predict()`, so it is independent of model uncertainty estimates
 
 ### 7. Search Strategy (`BaseSearch`)
 
@@ -344,13 +347,13 @@ the dataset's `problem_type`.
 
 ### Regression Metrics (`ProblemType.REGRESSION`)
 
-**Accuracy Metrics** (no variance required):
+**Regression — Accuracy Metrics** (no variance required, `utils/metrics/regression.py`):
 - **MSE**: Mean Squared Error between predictions and targets
 - **Pearson**: Pearson correlation between predictions and targets
 - **Spearman**: Spearman correlation between predictions and targets
 - **Pairwise XEnt**: Ranking loss for pairwise classification
 
-**Calibration Metrics** (variance required):
+**Regression — Calibration Metrics** (variance required):
 - **ECE** (Expected Calibration Error): Area between observed coverage and ideal calibration curve (see [this](https://arxiv.org/abs/1706.04599) paper for more details)
 - **Rank ECE**: ECE computed in rank space using Monte Carlo ranking
 - **Coverage**: Percentage of targets falling within confidence intervals at a given alpha level
@@ -358,14 +361,22 @@ the dataset's `problem_type`.
 - **Width**: Average confidence interval width normalized by dataset range
 - **Rank Width**: Width computed in rank space
 
-**Uncertainty Quantification (UQ) Metrics** (variance required):
+**Regression — Uncertainty Quantification (UQ) Metrics** (variance required):
 - **Residual Spearman**: Spearman correlation between absolute residuals and predicted variances
 - **Residual Pearson**: Pearson correlation between absolute residuals and standard deviations
 
-**Acquisition Performance Metrics** (variance required):
+**Regression — Acquisition Performance Metrics** (variance required):
 - **Regret UCB Alpha**: UCB acquisition regret comparing selected vs optimal candidates
 - **Regret UCB Alpha Sweep**: UCB regret computed across multiple alpha exploration parameters
 
+**Classification Metrics** (`utils/metrics/classification.py`):
+- **Accuracy**: Fraction of correctly classified samples
+- **F1**: Macro-averaged F1 score
+- **Precision**: Macro-averaged precision
+- **Recall**: Macro-averaged recall
+- **AUC-ROC**: Area under the ROC curve (binary or multiclass one-vs-rest)
+
+All classification metrics accept `(probs, targets)` where `probs` has shape `(n_samples, num_classes)`.
 Regression metrics accept predictions (means, variances, targets) and return a dictionary of
 computed values. Metrics requiring variance will validate that uncertainty estimates are provided.
 

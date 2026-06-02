@@ -8,7 +8,12 @@ registries by problem type. The ``regression_metric_registry`` contains accuracy
 metrics for binary and multiclass tasks (accuracy, F1, precision, recall, AUC-ROC). ``Results``
 automatically selects the appropriate registry based on the dataset's ``ProblemType``.
 
-.. automodule:: alf_core.utils.metrics
-   :members:
-   :show-inheritance:
-   :undoc-members:
+All metrics are registered at import time and accessible via the global registry instances
+exported from the top-level ``alf_core.utils.metrics`` namespace.
+
+.. toctree::
+   :maxdepth: 1
+
+   Base <base/index>
+   Classification <classification/index>
+   Regression <regression/index>
