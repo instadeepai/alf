@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import dataclasses
 import os
 from unittest.mock import MagicMock, patch
 
@@ -951,20 +952,20 @@ class TestESMFoldGoldenSequences:
     """
 
     @pytest.fixture(autouse=True)
-    def _restore_scoring_metric(self, _golden_esmfold):
-        """Reset scoring_metric to its default after each test.
+    def _restore_config(self, _golden_esmfold):
+        """Restore the full config after each test.
 
         The session-scoped fixture loads the 2.6 GB checkpoint once and shares it
-        across all tests. Each test mutates config.scoring_metric before calling
-        predict(). This autouse fixture restores the original value after each test
-        so test-execution order cannot cause a wrong metric to bleed into the next test.
+        across all tests. Each test may mutate config fields before calling predict().
+        This autouse fixture snapshots and restores the entire config so no mutation
+        can bleed across tests regardless of which fields are changed.
 
         Yields:
             None.
         """
-        original = _golden_esmfold.config.scoring_metric
+        original = dataclasses.replace(_golden_esmfold.config)
         yield
-        _golden_esmfold.config.scoring_metric = original
+        _golden_esmfold.config = original
 
     @pytest.mark.skipif(
         not torch.cuda.is_available(),

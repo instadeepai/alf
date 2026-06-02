@@ -38,7 +38,6 @@ __all__ = [
     "EnsembleWrapper",
     "EnsembleWrapperConfig",
     "SubsampleConfig",
-    "one_hot_encode",
     "MLP",
     "MLPModel",
     "MLPModelConfig",
@@ -49,11 +48,11 @@ __all__ = [
 try:
     from alf_tools.models.esmfold import ESMFoldModel, ESMFoldModelConfig
 
-    _ESMFOLD_AVAILABLE = True
-except ImportError:
-    _ESMFOLD_AVAILABLE = False
+    _esmfold_available = True
+except ModuleNotFoundError:
+    _esmfold_available = False
 
-if _ESMFOLD_AVAILABLE:
+if _esmfold_available:
     __all__ += ["ESMFoldModelConfig", "ESMFoldModel"]
 
 _chemprop_available = False

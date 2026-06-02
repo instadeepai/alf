@@ -17,6 +17,9 @@ from dataclasses import dataclass
 from typing import Any, Literal, NoReturn
 
 import numpy as np
+import pytest
+
+pytest.importorskip("transformers", reason="transformers not installed; install alf_tools[esmfold]")
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Modality, Predictions
 
@@ -43,7 +46,12 @@ class ESMFoldModelConfig:
     Args:
         model_name: HuggingFace hub ID or absolute local path to the ESMFold checkpoint.
         device: PyTorch device string ('cpu', 'cuda', 'cuda:0', 'mps').
-        scoring_metric: Scalar metric returned as the oracle score.
+        scoring_metric: Scalar metric returned as the oracle score. All three are in [0, 1].
+            'ptm': global fold confidence. >0.5 indicates a confident fold; <0.1 is typical
+            for intrinsically disordered or very short peptides.
+            'mean_plddt': per-residue confidence averaged over non-padding residues. >0.7
+            indicates well-structured residues; <0.5 indicates low structural confidence.
+            'combined': weighted sum of ptm and mean_plddt (see combined_ptm_weight).
         combined_ptm_weight: Weight of pTM in the combined metric; (1-w) applied to mean_plddt.
         batch_size: Number of sequences processed per forward pass. Values > 1 are only valid
             with scoring_metric="mean_plddt"; ptm and combined require batch_size=1 because
@@ -229,13 +237,17 @@ class ESMFoldModel(BaseModel):
         elif metric == "mean_plddt":
             means = plddt_scores
         else:
-            assert ptm_scores is not None and plddt_scores is not None
+            if ptm_scores is None or plddt_scores is None:
+                raise RuntimeError(
+                    "Internal error: both ptm_scores and plddt_scores must be allocated for "
+                    "scoring_metric='combined'."
+                )
             w = self.config.combined_ptm_weight
             means = w * ptm_scores + (1.0 - w) * plddt_scores
 
         return Predictions(means=means)
 
-    def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> NoReturn:
+    def featurise(self, inputs: list[Candidate]) -> NoReturn:
         """Not implemented for ESMFoldModel.
 
         Raises:
@@ -277,11 +289,14 @@ class ESMFoldModel(BaseModel):
         After cleanup(), predict() raises RuntimeError. Create a new ESMFoldModel instance
         if inference is needed again.
         """
-        self.model = self.model.to("cpu")
-        self.device = torch.device("cpu")
-        # Restore full model to fp32: esm backbone was fp16 on GPU (fp16_esm=True default),
-        # and the folding trunk may also have been in fp16. CPU requires fp32 for all submodules.
-        self.model.float()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        self._cleaned_up = True
+        try:
+            self.model = self.model.to("cpu")
+            self.device = torch.device("cpu")
+            # Restore full model to fp32: esm backbone was fp16 on GPU (fp16_esm=True default),
+            # and the folding trunk may also have been in fp16.
+            # CPU requires fp32 for all submodules.
+            self.model.float()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        finally:
+            self._cleaned_up = True
