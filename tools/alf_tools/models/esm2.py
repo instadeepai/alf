@@ -79,15 +79,15 @@ class ESM2TrainConfig(BaseTrainConfig):
         num_epochs: Number of epochs to train for.
         log_frequency: Record epoch metrics every N epochs.
         max_grad_norm: Maximum norm for gradient clipping. None disables clipping.
-        linear_head: Whether to attach a trainable linear head on top of frozen ESM-2 embeddings.
-            True (default) enables training via loss_fn. False skips the head; predict() returns
+        scoring_function: Scoring function to use. 'linear_head' (default) freezes the backbone
+            and trains a linear head via loss_fn. None skips the head; predict() returns
             per-sequence masked-marginal scores and train() raises NotImplementedError.
         loss_fn: Loss function for linear head training. 'mse' for regression;
             'cross_entropy' for classification. Cross-entropy expects integer class labels in
             [0, output_dim); float labels are truncated with a warning. Only used when
-            linear_head=True.
+            scoring_function='linear_head'.
         output_dim: Output dimension of the linear head. 1 for regression; N for N-class
-            classification. Only used when linear_head=True.
+            classification. Only used when scoring_function='linear_head'.
     """
 
     freeze_backbone: bool = True
@@ -98,7 +98,7 @@ class ESM2TrainConfig(BaseTrainConfig):
     num_epochs: int = 10
     log_frequency: int = 1
     max_grad_norm: float | None = None
-    linear_head: bool = True
+    scoring_function: Literal["linear_head"] | None = "linear_head"
     loss_fn: Literal["mse", "cross_entropy"] = "mse"
     output_dim: int = 1
 
@@ -125,8 +125,8 @@ class ESM2Model(BaseModel):
 
     Loads a pre-trained ESM-2 checkpoint from HuggingFace and exposes it as a
     BaseModel. predict() returns per-sequence masked-marginal scores
-    (linear_head=False) or passes embeddings through a trainable linear head
-    (linear_head=True). embed() returns per-sequence embeddings.
+    (scoring_function=None) or passes embeddings through a trainable linear head
+    (scoring_function='linear_head'). embed() returns per-sequence embeddings.
     """
 
     def __init__(
@@ -190,7 +190,7 @@ class ESM2Model(BaseModel):
         self._validate_esm_config()
 
         self._head: torch.nn.Linear | None = None
-        if self.train_config.linear_head:
+        if self.train_config.scoring_function == "linear_head":
             hidden_dim = self.esm_model.config.hidden_size
             self._head = torch.nn.Linear(hidden_dim, self.train_config.output_dim)
             self._head.to(self.device)
@@ -225,9 +225,9 @@ class ESM2Model(BaseModel):
                 "concatenated across mini-batches. Set both to 1 or "
                 "use pooling='mean' or pooling='cls' instead."
             )
-        if self.model_config.pooling == "last_hidden_state" and self.train_config.linear_head:
+        if self.model_config.pooling == "last_hidden_state" and self.train_config.scoring_function == "linear_head":
             raise ValueError(
-                "pooling='last_hidden_state' is not supported with linear_head=True. "
+                "pooling='last_hidden_state' is not supported with scoring_function='linear_head'. "
                 "The linear head requires a fixed-size embedding. "
                 "Use pooling='mean' or pooling='cls' instead."
             )
@@ -288,12 +288,12 @@ class ESM2Model(BaseModel):
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Compute predictions for the given candidates.
 
-        When linear_head=False: computes pseudo-log-likelihood (PLL) by masking one
+        When scoring_function=None: computes pseudo-log-likelihood (PLL) by masking one
         residue at a time and recording log P(token_i | all other tokens). Returns the
         mean PLL over residue positions per sequence (higher = more probable). For short
         sequences (≤512 residues), all masked copies are batched into a single forward
         pass; longer sequences are scored position-by-position.
-        When linear_head=True: embeds sequences through the frozen backbone and passes
+        When scoring_function='linear_head': embeds sequences through the frozen backbone and passes
         them through the linear head. Returns regression values (output_dim=1) or
         argmax class indices (output_dim>1).
 
@@ -306,7 +306,7 @@ class ESM2Model(BaseModel):
         Raises:
             ValueError: If candidate_points is empty.
             ValueError: If any sequence has no scoreable residue positions.
-            RuntimeError: If linear_head=True but the head is uninitialised
+            RuntimeError: If scoring_function='linear_head' but the head is uninitialised
                 (should not happen if __init__ ran without error).
         """
         if not candidate_points:
@@ -318,9 +318,9 @@ class ESM2Model(BaseModel):
 
         self.esm_model.eval()
 
-        if self.train_config.linear_head:
+        if self.train_config.scoring_function == "linear_head":
             if self._head is None:
-                raise RuntimeError("_head is None; model was not configured with linear_head=True")
+                raise RuntimeError("_head is None; model was not configured with scoring_function='linear_head'")
             self._head.eval()
             all_preds: list[torch.Tensor] = []
             batch_size = self._batch_size_inference
@@ -483,15 +483,15 @@ class ESM2Model(BaseModel):
         """Create a DataLoader for training or validation.
 
         Args:
-            data: LabelledCandidates containing sequences and (for linear_head=True) labels.
+            data: LabelledCandidates containing sequences and (for scoring_function='linear_head') labels.
             shuffle: Whether to shuffle the dataset.
 
         Returns:
-            DataLoader yielding (input_ids, attention_mask) pairs when linear_head=False,
-            or (input_ids, attention_mask, targets) triples when linear_head=True.
+            DataLoader yielding (input_ids, attention_mask) pairs when scoring_function=None,
+            or (input_ids, attention_mask, targets) triples when scoring_function='linear_head'.
         """
         batch = self.featurise(data)
-        if self.train_config.linear_head:
+        if self.train_config.scoring_function == "linear_head":
             targets = torch.tensor(data.labels, dtype=torch.float32)
             if self.train_config.loss_fn == "cross_entropy":
                 labels_arr = np.asarray(data.labels)
@@ -561,7 +561,7 @@ class ESM2Model(BaseModel):
             ValueError: If the DataLoader produces no batches.
         """
         if self._head is None:
-            raise RuntimeError("_head is None; model was not configured with linear_head=True")
+            raise RuntimeError("_head is None; model was not configured with scoring_function='linear_head'")
         self.esm_model.eval()
         self._head.train()
         epoch_losses: list[float] = []
@@ -618,11 +618,11 @@ class ESM2Model(BaseModel):
             Tuple of (average_loss, empty metrics_dict).
 
         Raises:
-            RuntimeError: If the model was not configured with linear_head=True.
+            RuntimeError: If the model was not configured with scoring_function='linear_head'.
             ValueError: If the DataLoader produces no batches.
         """
         if self._head is None:
-            raise RuntimeError("_head is None; model was not configured with linear_head=True")
+            raise RuntimeError("_head is None; model was not configured with scoring_function='linear_head'")
         self.esm_model.eval()
         self._head.eval()
         val_losses: list[float] = []
@@ -710,8 +710,8 @@ class ESM2Model(BaseModel):
     ) -> None:
         """Fine-tune the linear head using the configured loss function.
 
-        When linear_head=False, train() raises NotImplementedError (predict uses
-        masked-marginal scoring). When linear_head=True, trains the linear head
+        When scoring_function=None, train() raises NotImplementedError (predict uses
+        masked-marginal scoring). When scoring_function='linear_head', trains the linear head
         on top of frozen embeddings.
 
         Args:
@@ -719,14 +719,14 @@ class ESM2Model(BaseModel):
             val_data: Optional validation data for monitoring training loss.
 
         Raises:
-            NotImplementedError: If linear_head=False.
+            NotImplementedError: If scoring_function=None.
             AssertionError: If optimizer_type is invalid (unreachable if __post_init__ ran).
-            RuntimeError: If linear_head=True but head is uninitialised.
+            RuntimeError: If scoring_function='linear_head' but head is uninitialised.
         """
-        if not self.train_config.linear_head:
+        if self.train_config.scoring_function is None:
             raise NotImplementedError(
-                "train() requires linear_head=True. "
-                "Set linear_head=True in ESM2TrainConfig to enable training a linear head, "
+                "train() requires scoring_function='linear_head'. "
+                "Set scoring_function='linear_head' in ESM2TrainConfig to enable training a linear head, "
                 "or use predict() for masked-marginal scoring without training."
             )
 
@@ -738,7 +738,7 @@ class ESM2Model(BaseModel):
         )
 
         if self._head is None:
-            raise RuntimeError("_head is None; model was not configured with linear_head=True")
+            raise RuntimeError("_head is None; model was not configured with scoring_function='linear_head'")
 
         train_loader = self._prepare_data_loader(train_data, shuffle=True)
         val_loader = None

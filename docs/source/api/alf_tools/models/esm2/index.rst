@@ -3,14 +3,14 @@ ESM2 Model
 
 A protein language model surrogate using `ESM-2 <https://huggingface.co/docs/transformers/model_doc/esm>`_
 as the backbone. Accepts amino acid sequences as inputs and supports two operating modes,
-controlled by ``ESM2TrainConfig.linear_head``:
+controlled by ``ESM2TrainConfig.scoring_function``:
 
-- **linear_head=True** (default): the ESM-2 backbone is frozen and a trainable linear head
+- **scoring_function='linear_head'** (default): the ESM-2 backbone is frozen and a trainable linear head
   is stacked on top of pooled sequence embeddings. Use ``loss_fn='mse'`` for regression
   (``output_dim=1``) or ``loss_fn='cross_entropy'`` for classification (``output_dim=N``).
   Call ``train()`` to fit the head on labelled data. Sequence embeddings can also be
   extracted via ``embed()`` for use with downstream models.
-- **linear_head=False**: no head is trained. ``predict()`` returns per-sequence
+- **scoring_function=None**: no head is trained. ``predict()`` returns per-sequence
   pseudo-log-likelihood scores by masking all non-special tokens and computing the mean
   log-probability over those positions under the pre-trained model. This is a pure
   zero-shot scorer — ``train()`` raises ``NotImplementedError``.
