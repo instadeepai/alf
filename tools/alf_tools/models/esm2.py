@@ -19,8 +19,14 @@ from typing import Any, Iterator, Literal
 import numpy as np
 import torch
 import torch.optim as optim
-from alf_core import BaseModel, BaseTrainConfig, Candidate, LabelledCandidates, Predictions
-from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
+from alf_core import (
+    BaseModel,
+    BaseTrainConfig,
+    Candidate,
+    LabelledCandidates,
+    Predictions,
+    SurrogateEpochMetrics,
+)
 from torch.utils.data import DataLoader, TensorDataset
 
 try:

@@ -6,8 +6,15 @@ as the backbone. Accepts amino acid sequences as inputs and supports two operati
 controlled by ``ESM2TrainConfig.scoring_function``:
 
 - **scoring_function='linear_head'** (default): the ESM-2 backbone is frozen and a trainable linear head
-  is stacked on top of pooled sequence embeddings. Use ``loss_fn='mse'`` for regression
-  (``output_dim=1``) or ``loss_fn='cross_entropy'`` for classification (``output_dim=N``).
+  is stacked on top of pooled sequence embeddings. The head is configured via ``loss_fn`` and
+  ``output_dim`` in ``ESM2TrainConfig``:
+
+  - ``loss_fn='mse'`` *(default)*: mean-squared-error regression. Set ``output_dim=1``.
+    ``predict()`` returns raw scalar values.
+  - ``loss_fn='cross_entropy'``: multi-class cross-entropy classification. Set ``output_dim=N``
+    for N classes. Labels must be integers in ``[0, N)``; float labels are truncated to int
+    with a warning. ``predict()`` returns the argmax class index as a float.
+
   Call ``train()`` to fit the head on labelled data. Sequence embeddings can also be
   extracted via ``embed()`` for use with downstream models.
 - **scoring_function=None**: no head is trained. ``predict()`` returns per-sequence
