@@ -342,12 +342,49 @@ class ESM2Model(BaseModel):
                         preds = head_out.argmax(dim=-1).float()
                     all_preds.append(preds.cpu())
             return Predictions(means=torch.cat(all_preds, dim=0).numpy().astype(np.float32))
+        else:
+            return self._predict_zeroshot(all_input_ids, all_attention_mask, len(candidate_points))
+
+    def _predict_zeroshot(
+        self, all_input_ids: torch.Tensor, all_attention_mask: torch.Tensor, n_candidates: int
+    ) -> Predictions:
+        """Compute zero-shot pseudo-log-likelihood (PLL) scores for sequences.
+
+        This method scores each sequence by masking one residue at a time and
+        accumulating the log-probability the model assigns to the correct
+        residue at that position. The per-sequence score is the mean
+        (average) log-probability across all non-special (i.e. amino-acid)
+        positions. Two execution modes are used to trade off memory and
+        speed:
+
+        - If the number of scoreable residues is below a batching threshold
+            (_PLL_BATCH_THRESHOLD), residues are masked in a single batched
+            forward pass (one masked position per batch row) to leverage GPU
+            parallelism.
+        - For longer sequences, positions are masked and scored one-at-a-time
+            to avoid excessive memory usage.
+
+        Args:
+            all_input_ids: Tensor of shape (n_candidates, seq_len) with token IDs.
+            all_attention_mask: Tensor of shape (n_candidates, seq_len) with 1
+                for non-padding tokens.
+            n_candidates: Number of candidate sequences (batch size).
+
+        Raises:
+            ValueError: If any sequence has no scoreable residue positions
+                (e.g. all special tokens).
+
+        Returns:
+            Predictions: means is a float32 numpy array of per-sequence PLL
+                scores (average log-likelihood per residue).
+        """
+        self.esm_model.eval()
 
         # PLL: mask one residue at a time, scored per sequence
         _PLL_BATCH_THRESHOLD = 512  # Use batching for shorter sequences
         log_likelihoods: list[float] = []
         with torch.no_grad():
-            for i in range(len(candidate_points)):
+            for i in range(n_candidates):
                 input_ids_i = all_input_ids[i].unsqueeze(0).to(self.device)  # (1, L)
                 attention_mask_i = all_attention_mask[i].unsqueeze(0).to(self.device)
 
