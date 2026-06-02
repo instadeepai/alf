@@ -37,15 +37,18 @@ from alf_tools.datasets.guacamol import (
     GuacaMol,
     GuacaMolConfig,
     GuacaMolTaskName,
-    _ap,  # noqa: PLC2701
     _cache_path,  # noqa: PLC2701
     _canonical_smiles,  # noqa: PLC2701
     _compute_properties,  # noqa: PLC2701
     _download_file,  # noqa: PLC2701
+    _load_smiles_file,  # noqa: PLC2701
+    download_guacamol,
+)
+from alf_tools.datasets.guacamol_scoring import (
+    _ap,  # noqa: PLC2701
     _ecfp4,  # noqa: PLC2701
     _ecfp6,  # noqa: PLC2701
     _fcfp4,  # noqa: PLC2701
-    _load_smiles_file,  # noqa: PLC2701
     _mol_from_smiles,  # noqa: PLC2701
     _parse_formula,  # noqa: PLC2701
     _phco,  # noqa: PLC2701
@@ -61,7 +64,6 @@ from alf_tools.datasets.guacamol import (
     camphor_menthol_median,  # noqa: PLC2701
     celecoxib_rediscovery,  # noqa: PLC2701
     clipped_score,  # noqa: PLC2701
-    download_guacamol,
     fexofenadine_mpo,  # noqa: PLC2701
     gaussian_score,  # noqa: PLC2701
     geometric_mean,  # noqa: PLC2701

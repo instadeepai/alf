@@ -140,3 +140,8 @@ the dataset.
    :members:
    :show-inheritance:
    :undoc-members:
+
+.. automodule:: alf_tools.datasets.guacamol_scoring
+   :members:
+   :show-inheritance:
+   :undoc-members:
