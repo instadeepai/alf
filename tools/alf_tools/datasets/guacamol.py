@@ -229,7 +229,23 @@ class GuacaMolConfig(BaseDatasetConfig):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def task_type(self) -> Literal["property", "benchmark_task"]:
-        """'property' for RDKit properties, 'benchmark_task' for goal-directed tasks."""
+        """Discriminates the two modes of use in the GuacaMol benchmark corpus.
+
+        ``"property"`` — the label is a continuous RDKit physicochemical value (e.g.
+        ``MolLogP``, ``TPSA``, ``QED``) computed molecule-by-molecule via
+        ``PROPERTY_FNS``.  Molecules are loaded from the corpus and queried by
+        canonical SMILES lookup; novel SMILES not in the corpus are scored on the fly.
+        Each ``Candidate`` carries the requested properties in its ``features`` dict.
+
+        ``"benchmark_task"`` — the label is a score in [0, 1] produced by one of the
+        19 goal-directed scoring functions from Brown et al. (2019).  Scores combine
+        Tanimoto fingerprint similarity to reference drug molecules, multi-property
+        optimisation objectives (TPSA, logP, ring counts, …), pharmacophoric matching,
+        or molecular formula isomer matching — each designed to capture a realistic
+        drug-design challenge.  There is no corpus lookup; every SMILES is re-scored
+        by the task function.  ``Candidate.features`` is always empty for benchmark
+        tasks.
+        """
         return "property" if self.target_property in ALL_PROPERTIES else "benchmark_task"
 
     @model_validator(mode="after")
