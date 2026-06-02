@@ -27,6 +27,7 @@ from botorch.models.model import Model
 from botorch.posteriors import Posterior
 from botorch.posteriors.gpytorch import GPyTorchPosterior
 from gpytorch.distributions import MultivariateNormal
+from linear_operator.operators import DiagLinearOperator
 from torch import Tensor
 
 from alf_tools.utils.botorch_utils import (
@@ -185,6 +186,14 @@ class BoTorchModelAdapter(Model):
             # Reshape mean and covariance to match batch structure
             # Current: MVN with batch_shape=() and event_shape=(batch_size*q,)
             # Target: MVN with batch_shape=(batch_size,) and event_shape=(q,)
+            lazy_covar = posterior.mvn.lazy_covariance_matrix
+            if not isinstance(lazy_covar, DiagLinearOperator):
+                raise NotImplementedError(
+                    f"Model {type(self._wrapped_model).__name__} returns a non-diagonal "
+                    "covariance. The batch reshape assumes per-point independence; "
+                    "cross-candidate correlations are not supported."
+                )
+
             mean = posterior.mvn.mean.reshape(batch_size, q)
             covar_matrix = posterior.mvn.covariance_matrix
 
@@ -220,13 +229,7 @@ class BoTorchModelAdapter(Model):
             return int(self._wrapped_model.num_outputs)  # type: ignore[union-attr, no-any-return]
 
         # For ALF BaseModel, assume single output (most common case)
-        # Multi-output models would need special handling
-        raise NotImplementedError(
-            f"num_outputs is not implemented for ALF BaseModel "
-            f"{type(self._wrapped_model).__name__}. "
-            f"Assuming single output (num_outputs=1) for now. "
-            f"Multi-output models require custom handling and should override this property."
-        )
+        return 1
 
     @property
     def batch_shape(self) -> torch.Size:
@@ -243,10 +246,4 @@ class BoTorchModelAdapter(Model):
             return self._wrapped_model.batch_shape  # type: ignore[union-attr]
 
         # For ALF BaseModel, assume no batch dimension (most common case)
-        raise NotImplementedError(
-            f"batch_shape is not implemented for ALF BaseModel "
-            f"{type(self._wrapped_model).__name__}. "
-            f"Assuming no batch dimension (batch_shape=()) for now. "
-            f"Models with batch dimensions require custom handling "
-            "and should override this property."
-        )
+        return torch.Size([])
