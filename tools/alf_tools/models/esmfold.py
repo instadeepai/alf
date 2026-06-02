@@ -47,11 +47,28 @@ class ESMFoldModelConfig:
         model_name: HuggingFace hub ID or absolute local path to the ESMFold checkpoint.
         device: PyTorch device string ('cpu', 'cuda', 'cuda:0', 'mps').
         scoring_metric: Scalar metric returned as the oracle score. All three are in [0, 1].
-            'ptm': global fold confidence. >0.5 indicates a confident fold; <0.1 is typical
-            for intrinsically disordered or very short peptides.
-            'mean_plddt': per-residue confidence averaged over non-padding residues. >0.7
-            indicates well-structured residues; <0.5 indicates low structural confidence.
-            'combined': weighted sum of ptm and mean_plddt (see combined_ptm_weight).
+
+            **ptm** — predicted template modelling score; measures global structural plausibility
+            of the entire fold. Analogous to TM-score between the prediction and a hypothetical
+            template. Interpretation:
+
+            - > 0.5: confident fold with a well-defined topology
+            - 0.2–0.5: moderate confidence; fold may be partially structured
+            - < 0.1: low confidence; typical for intrinsically disordered proteins or peptides
+              shorter than ~20 residues
+
+            **mean_plddt** — per-residue predicted local distance difference test score, averaged
+            over all non-padding residues. Measures local structural accuracy at the residue level
+            (values already normalised to [0, 1] by ESMFold). Interpretation:
+
+            - > 0.7: well-structured; confident local geometry
+            - 0.5–0.7: moderate confidence; regions may be flexible or partially structured
+            - < 0.5: low confidence; residues are likely disordered or unreliable
+
+            **combined** — weighted average ``w * ptm + (1 - w) * mean_plddt`` controlled by
+            ``combined_ptm_weight`` (default 0.5). Useful when both global topology and local
+            residue accuracy matter equally. Inherits the [0, 1] range and the same thresholds
+            as the individual metrics.
         combined_ptm_weight: Weight of pTM in the combined metric; (1-w) applied to mean_plddt.
         batch_size: Number of sequences processed per forward pass. Values > 1 are only valid
             with scoring_metric="mean_plddt"; ptm and combined require batch_size=1 because
