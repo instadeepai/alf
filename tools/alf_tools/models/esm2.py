@@ -87,12 +87,10 @@ class ESM2TrainConfig(BaseTrainConfig):
         num_epochs: Number of epochs to train for.
         log_frequency: Record epoch metrics every N epochs.
         max_grad_norm: Maximum norm for gradient clipping. None disables clipping.
-        use_zeroshot: If True, enables zero-shot PLL scoring mode. Must be paired with
-            scoring_function=None. If False (default), scoring_function must not be None.
         scoring_function: Scoring function to use. 'linear_head' (default) freezes the backbone
             and trains a linear head via loss_fn. Pseudo log-likelihood 'pll' skips the head;
             predict() returns per-sequence masked-marginal scores and train() raises
-            NotImplementedError. None is valid only when use_zeroshot=True, and behaves like 'pll'.
+            NotImplementedError.
         loss_fn: Loss function for linear head training. 'mse' for regression;
             'cross_entropy' for classification. Cross-entropy expects integer class labels in
             [0, output_dim); float labels are truncated with a warning. Only used when
@@ -109,7 +107,6 @@ class ESM2TrainConfig(BaseTrainConfig):
     num_epochs: int = 10
     log_frequency: int = 1
     max_grad_norm: float | None = None
-    use_zeroshot: bool = False
     scoring_function: Literal["linear_head", "pll"] | None = "linear_head"
     loss_fn: Literal["mse", "cross_entropy"] = "mse"
     output_dim: int = 1
@@ -122,9 +119,7 @@ class ESM2TrainConfig(BaseTrainConfig):
             ValueError: If num_epochs < 1.
             ValueError: If optimizer_type is not 'adam' or 'adamw'.
             ValueError: If loss_fn is not 'mse' or 'cross_entropy'.
-            ValueError: If use_zeroshot=True with scoring_function='linear_head'.
-            ValueError: If use_zeroshot=False with scoring_function=None.
-            ValueError: If scoring_function is not 'linear_head', 'pll', or None.
+            ValueError: If scoring_function is not 'linear_head' or 'pll'.
         """
         if not self.freeze_backbone:
             raise NotImplementedError(
@@ -138,15 +133,9 @@ class ESM2TrainConfig(BaseTrainConfig):
             )
         if self.loss_fn not in ("mse", "cross_entropy"):
             raise ValueError(f"loss_fn must be 'mse' or 'cross_entropy', got {self.loss_fn!r}")
-        if self.use_zeroshot and self.scoring_function == "linear_head":
+        if self.scoring_function is None:
             raise ValueError(
-                "use_zeroshot=True is incompatible with scoring_function='linear_head'. "
-                "Set scoring_function=None to use zero-shot PLL scoring."
-            )
-        if not self.use_zeroshot and self.scoring_function is None:
-            raise ValueError(
-                "use_zeroshot=False requires scoring_function to be 'linear_head' or 'pll'. "
-                "Set use_zeroshot=True to use scoring_function=None."
+                "scoring_function should not be None, but be set to 'linear_head' or 'pll'. "
             )
         if self.scoring_function is not None and self.scoring_function not in (
             "linear_head",

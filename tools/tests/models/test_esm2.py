@@ -40,10 +40,10 @@ def train_config():
     """Create a frozen ESM2TrainConfig for testing.
 
     Returns:
-        An ESM2TrainConfig with freeze_backbone=True, scoring_function=None,
-        and use_zeroshot=True for zero-shot PLL scoring mode.
+        An ESM2TrainConfig with freeze_backbone=True and scoring_function="pll",
+        for zero-shot PLL scoring mode.
     """
-    return ESM2TrainConfig(freeze_backbone=True, scoring_function=None, use_zeroshot=True)
+    return ESM2TrainConfig(freeze_backbone=True, scoring_function="pll")
 
 
 @pytest.fixture(scope="session")
@@ -63,13 +63,11 @@ def esm2_small_batch_model():
     """Frozen ESM-2 with batch_size=2 to exercise multi-batch predict.
 
     Returns:
-        An ESM2Model with batch_size=2, frozen backbone, scoring_function=None,
-        use_zeroshot=True, CPU.
+        An ESM2Model with batch_size=2, frozen backbone,
+        and scoring_function="linear_head", CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID)
-    train_cfg = ESM2TrainConfig(
-        freeze_backbone=True, batch_size=2, scoring_function=None, use_zeroshot=True
-    )
+    train_cfg = ESM2TrainConfig(freeze_backbone=True, batch_size=2, scoring_function="linear_head")
     return ESM2Model(
         name="test_esm2_small_batch", model_config=config, train_config=train_cfg, device="cpu"
     )
@@ -111,7 +109,6 @@ class TestConfigs:
         assert config.batch_size == 8
         assert config.num_epochs == 10
         assert config.log_frequency == 1
-        assert config.use_zeroshot is False
         assert config.scoring_function == "linear_head"
         assert config.loss_fn == "mse"
         assert config.output_dim == 1
@@ -120,21 +117,10 @@ class TestConfigs:
         assert not hasattr(config, "mask_probability")
         assert not hasattr(config, "mask_splitting")
 
-    def test_use_zeroshot_with_linear_head_raises(self):
-        """use_zeroshot=True with scoring_function='linear_head' must raise ValueError."""
-        with pytest.raises(ValueError, match="use_zeroshot=True is incompatible"):
-            ESM2TrainConfig(use_zeroshot=True, scoring_function="linear_head")
-
-    def test_use_zeroshot_true_with_scoring_function_none_is_valid(self):
-        """use_zeroshot=True with scoring_function=None is the valid zero-shot configuration."""
-        config = ESM2TrainConfig(use_zeroshot=True, scoring_function=None)
-        assert config.use_zeroshot is True
-        assert config.scoring_function is None
-
-    def test_use_zeroshot_false_with_scoring_function_none_raises(self):
-        """use_zeroshot=False with scoring_function=None must raise ValueError."""
-        with pytest.raises(ValueError, match="use_zeroshot=False requires scoring_function"):
-            ESM2TrainConfig(use_zeroshot=False, scoring_function=None)
+    def test_scoring_function_none_is_invalid(self):
+        """scoring_function=None must raise ValueError."""
+        with pytest.raises(ValueError, match="scoring_function should not be None"):
+            ESM2TrainConfig(scoring_function=None)
 
     def test_train_config_num_epochs_zero_raises(self):
         """ESM2TrainConfig with num_epochs=0 must raise ValueError."""
@@ -307,7 +293,7 @@ class TestEmbed:
         """embed() with last_hidden_state pooling returns shape (n_seqs, seq_len, hidden_dim)."""
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
         train_cfg = ESM2TrainConfig(
-            freeze_backbone=True, scoring_function=None, use_zeroshot=True, batch_size=1
+            freeze_backbone=True, scoring_function="linear_head", batch_size=1
         )
         model = ESM2Model(
             name="lhs_model", model_config=config, train_config=train_cfg, device="cpu"
@@ -374,11 +360,10 @@ def frozen_train_model():
     """Module-scoped ESM-2 model with scoring_function=None for TestTrainFrozen.
 
     Returns:
-        An ESM2Model with freeze_backbone=True, scoring_function=None,
-        use_zeroshot=True on CPU.
+        An ESM2Model with freeze_backbone=True and scoring_function="linear_head" on CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID)
-    train_cfg = ESM2TrainConfig(freeze_backbone=True, scoring_function=None, use_zeroshot=True)
+    train_cfg = ESM2TrainConfig(freeze_backbone=True, scoring_function="linear_head")
     return ESM2Model(
         name="test_esm2_frozen_train", model_config=config, train_config=train_cfg, device="cpu"
     )
@@ -643,8 +628,7 @@ class TestMLPHead:
         config = ESM2ModelConfig(model_id=MODEL_ID)
         train_cfg = ESM2TrainConfig(
             freeze_backbone=True,
-            scoring_function=None,
-            use_zeroshot=True,
+            scoring_function="linear_head",
             batch_size=8,
             batch_size_inference=1,
         )
