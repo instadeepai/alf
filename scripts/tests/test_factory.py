@@ -180,3 +180,53 @@ def test_build_model_ensemble_no_subsample():
     model = factory.build_model(cfg)
     assert isinstance(model, EnsembleWrapper)
     assert model.config.subsample is None
+
+
+def _ucb_cfg():
+    return OmegaConf.create({
+        "optimizer": {
+            "acquisition_fn": {
+                "_target_": "alf_tools.optimizer.acquisition_functions.ucb.UCB",
+                "alpha": 0.9,
+            },
+            "search_fn": {
+                "_target_": "alf_core.optimizer.search.DatasetSearch",
+            },
+        }
+    })
+
+
+def test_build_optimizer_ucb():
+    import factory
+    from alf_core.optimizer.optimizer import Optimizer
+    from alf_tools.optimizer.acquisition_functions.ucb import UCB
+    opt = factory.build_optimizer(_ucb_cfg())
+    assert isinstance(opt, Optimizer)
+    assert isinstance(opt.acquisition_fn, UCB)
+    assert opt.acquisition_fn.alpha == 0.9
+
+
+def test_build_oracle_dataset_mode():
+    import factory
+    from alf_core.oracle.oracle import Oracle
+    from unittest.mock import MagicMock
+    mock_dataset = MagicMock()
+    cfg = OmegaConf.create({"oracle": {"mode": "dataset"}})
+    oracle = factory.build_oracle(cfg, mock_dataset)
+    assert isinstance(oracle, Oracle)
+    assert oracle.scorer is mock_dataset
+
+
+def test_build_oracle_model_mode():
+    import factory
+    from alf_core.oracle.oracle import Oracle
+    cfg = OmegaConf.create({
+        "oracle": {
+            "mode": "model",
+            "scorer": {
+                "_target_": "alf_tools.optimizer.acquisition_functions.greedy.Greedy",
+            },
+        }
+    })
+    oracle = factory.build_oracle(cfg, dataset=None)
+    assert isinstance(oracle, Oracle)

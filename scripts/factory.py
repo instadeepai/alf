@@ -181,3 +181,42 @@ def _build_ensemble(mcfg: DictConfig) -> EnsembleWrapper:
         config=ensemble_cfg,
         name=mcfg.name,
     )
+
+
+def build_optimizer(cfg: DictConfig) -> Optimizer:
+    """Build an Optimizer from the optimizer config group.
+
+    Args:
+        cfg: Root Hydra DictConfig containing an `optimizer` key.
+
+    Returns:
+        Constructed Optimizer with acquisition function and search function.
+    """
+    acq_fn = instantiate(cfg.optimizer.acquisition_fn)
+    search_fn = instantiate(cfg.optimizer.search_fn)
+    return Optimizer(acquisition_fn=acq_fn, search_fn=search_fn)
+
+
+def build_oracle(cfg: DictConfig, dataset: BaseDataset | None) -> Oracle:
+    """Build an Oracle from the oracle config group.
+
+    Args:
+        cfg: Root Hydra DictConfig containing an `oracle` key.
+        dataset: Already-constructed dataset, used when oracle.mode == 'dataset'.
+
+    Returns:
+        Oracle wrapping either the dataset (offline) or an instantiated scorer (online).
+
+    Raises:
+        ValueError: If mode is 'dataset' but dataset is None.
+        ValueError: If mode is unknown.
+    """
+    mode = cfg.oracle.mode
+    if mode == "dataset":
+        if dataset is None:
+            raise ValueError("oracle.mode='dataset' requires a dataset, got None")
+        return Oracle(scorer=dataset)
+    if mode == "model":
+        scorer = instantiate(cfg.oracle.scorer)
+        return Oracle(scorer=scorer)
+    raise ValueError(f"Unknown oracle.mode: {mode!r}. Expected 'dataset' or 'model'.")
