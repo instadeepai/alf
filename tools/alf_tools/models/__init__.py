@@ -47,7 +47,6 @@ __all__ = [
     "MLPModel",
     "MLPModelConfig",
     "MLPTrainConfig",
-    "one_hot_encode",
 ]
 
 _chemprop_available = False

@@ -28,6 +28,7 @@ import math
 from dataclasses import dataclass
 from typing import Literal
 
+import gpytorch
 import numpy as np
 import torch
 from alf_core import (
@@ -191,7 +192,22 @@ class BoTorchGPModel(BaseModel):
         if tensor.ndim != 2:
             raise ValueError(f"Expected 2D input tensor, got shape {tensor.shape}")
 
-    def _make_kernel(self, ard_num_dims, ls_prior, ls_constraint):
+    def _make_kernel(
+        self,
+        ard_num_dims: int | None,
+        ls_prior: gpytorch.priors.Prior | None,
+        ls_constraint: gpytorch.constraints.Constraint | None,
+    ) -> RBFKernel | MaternKernel:
+        """Build the base (un-scaled) kernel from model_config.
+
+        Args:
+            ard_num_dims: Number of ARD dimensions, or None for isotropic.
+            ls_prior: Prior distribution for lengthscale, or None.
+            ls_constraint: Constraint on lengthscale, or None.
+
+        Returns:
+            Configured GPyTorch base kernel.
+        """
         if self.model_config.kernel_type == "matern":
             base_kernel = MaternKernel(
                 nu=self.model_config.matern_nu,
@@ -221,6 +237,7 @@ class BoTorchGPModel(BaseModel):
 
         Raises:
             ValueError: If training data is empty or has invalid format.
+            RuntimeError: If GP fitting produces a NaN/Inf loss.
         """
         self._training_metrics = {"loss": [], "iteration": []}
 
@@ -307,8 +324,6 @@ class BoTorchGPModel(BaseModel):
                     max_attempts=self.train_config.max_attempts,
                 )
             else:  # torch
-                # Use torch Adam optimizer
-                optim = Adam
                 logging_optimizer = "torch Adam"
 
                 fit_gpytorch_mll(
@@ -316,7 +331,7 @@ class BoTorchGPModel(BaseModel):
                     optimizer=fit_gpytorch_mll_torch,
                     optimizer_kwargs={
                         "step_limit": self.train_config.num_iterations,
-                        "optimizer": lambda params: optim(
+                        "optimizer": lambda params: Adam(
                             params, lr=self.train_config.learning_rate
                         ),
                     },
@@ -341,9 +356,9 @@ class BoTorchGPModel(BaseModel):
                 loss = float(loss_tensor.item())  # type: ignore
 
             if not math.isfinite(loss):
-                logger.warning(
-                    f"NaN/Inf loss detected after training ({loss}). "
-                    "The model may be in a bad state."
+                raise RuntimeError(
+                    f"GP fitting produced NaN/Inf loss ({loss}). "
+                    "The model could not be trained on this data."
                 )
 
             self._training_metrics["loss"].append(loss)

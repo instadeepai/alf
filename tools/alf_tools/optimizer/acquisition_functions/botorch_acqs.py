@@ -148,7 +148,8 @@ class BotorchAcquisitionFunction(AlfAcquisitionFunction):
             _convert_="partial",
         )
 
-        X = candidates_to_tensor(search_candidates)
+        device = getattr(model, "device", None)
+        X = candidates_to_tensor(search_candidates, device=device)
         if X.dim() == 2:
             X = X.unsqueeze(1)  # (n, 1, d) — BoTorch analytic fns expect q-batch dim
 
@@ -168,8 +169,9 @@ class _AcquisitionCallable:
     Args:
         acq_fn: BoTorch acquisition function to evaluate.
         name: Name of the acquisition factory (e.g. ``"expected_improvement"``).
-        kwargs: Serialisable parameters passed to the factory, excluding the
-            model.  Suitable for config round-trips.
+        kwargs: Parameters passed to the factory, excluding the model.
+            Note: some factories (e.g. ``log_noisy_expected_improvement``) accept
+            tensors, which are not JSON/YAML-serializable.
     """
 
     def __init__(self, acq_fn: AcquisitionFunction, name: str, kwargs: dict[str, Any]):
@@ -224,7 +226,7 @@ def acquisition(fn):
         adapted = model if isinstance(model, BotorchModel) else BoTorchModelAdapter(model)
         botorch_acq = fn(adapted, *args, **kwargs)
 
-        # Bind positional and keyword args to parameter names for serialisable storage.
+        # Bind positional and keyword args to parameter names for kwargs storage.
         # Pass `model` (not `adapted`) so inspect.signature sees the original value.
         sig = inspect.signature(fn)
         first_param = next(iter(sig.parameters))

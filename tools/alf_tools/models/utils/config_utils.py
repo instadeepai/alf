@@ -49,11 +49,13 @@ def build_from_target(cfg: dict | None) -> object | None:
     cfg = dict(cfg)  # don't mutate the caller's dict
     target = cfg.pop("_target_")
 
-    if not any(target.startswith(prefix) for prefix in _ALLOWED_MODULES):
+    module_path, cls_name = target.rsplit(".", 1)
+    if module_path not in _ALLOWED_MODULES and not any(
+        module_path.startswith(prefix + ".") for prefix in _ALLOWED_MODULES
+    ):
         raise ValueError(
             f"build_from_target: _target_ '{target}' is not in the allowed module list. "
             f"Only gpytorch.priors.* and gpytorch.constraints.* are permitted."
         )
-    module_path, cls_name = target.rsplit(".", 1)
     cls = getattr(importlib.import_module(module_path), cls_name)
     return cls(**cfg)
