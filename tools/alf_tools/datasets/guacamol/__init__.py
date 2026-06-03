@@ -11,12 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from alf_tools.datasets.flip import FLIP, FLIPConfig
-from alf_tools.datasets.gfp import GFP
-from alf_tools.datasets.proteingym import ProteinGym
-
-try:
-    from alf_tools.datasets.guacamol.guacamol_dataset import GuacaMol, GuacaMolConfig
-except ImportError:
-    pass

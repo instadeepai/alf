@@ -27,7 +27,7 @@ pytest.importorskip("rdkit", reason="guacamol not installed; install alf_tools[g
 
 import requests
 from alf_core import Candidate, Modality
-from alf_tools.datasets.guacamol import (
+from alf_tools.datasets.guacamol.guacamol_dataset import (
     ALL_PROPERTIES,
     DATAPATH,
     FILENAME_ALL,
@@ -44,7 +44,7 @@ from alf_tools.datasets.guacamol import (
     _load_smiles_file,  # noqa: PLC2701
     download_guacamol,
 )
-from alf_tools.datasets.guacamol_scoring import (
+from alf_tools.datasets.guacamol.guacamol_scoring import (
     _ap,  # noqa: PLC2701
     _ecfp4,  # noqa: PLC2701
     _ecfp6,  # noqa: PLC2701
