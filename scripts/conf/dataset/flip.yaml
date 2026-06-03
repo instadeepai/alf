@@ -1,0 +1,14 @@
+# @package _global_
+dataset:
+  class_name: flip
+  name: gb1_experiment
+  modality: SEQUENCE
+  seed: 42
+  train_ratio: 0.1
+  validation_frac: 0.1
+  test_ratio: 0.8
+  split_type: random
+  problem_type: regression
+  max_candidate_pool: 5000
+  flip_dataset: gb1
+  flip_split: one_vs_rest

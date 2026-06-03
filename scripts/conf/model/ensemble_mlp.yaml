@@ -1,0 +1,24 @@
+# @package _global_
+model:
+  class_name: ensemble
+  name: ensemble_mlp
+  n_members: 5
+  base_seed: 0
+  subsample:
+    fraction: 0.8
+    replace: true
+  member:
+    class_name: mlp
+    name: mlp_member
+    hidden_dims: [256, 128]
+    activation: relu
+    norm: none
+    dropout: 0.1
+    n_mc_passes: 0
+    train:
+      learning_rate: 0.001
+      batch_size: 32
+      num_epochs: 50
+      optimizer: adam
+      weight_decay: 0.0
+      log_frequency: 10

@@ -1,0 +1,6 @@
+# @package _global_
+task:
+  type: design
+  num_acq_rounds: 10
+  acq_batch_size: 10
+  save_round_predictions: false

@@ -1,0 +1,6 @@
+# @package _global_
+optimizer:
+  acquisition_fn:
+    _target_: alf_tools.optimizer.acquisition_functions.expected_improvement.ExpectedImprovement
+  search_fn:
+    _target_: alf_core.optimizer.search.DatasetSearch

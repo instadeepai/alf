@@ -1,0 +1,14 @@
+# @package _global_
+model:
+  class_name: cnn
+  name: cnn_default
+  num_filters: 128
+  kernel_size: 3
+  num_conv_layers: 3
+  fc_hidden_dim: 256
+  dropout: 0.3
+  train:
+    learning_rate: 0.001
+    batch_size: 32
+    num_epochs: 50
+    log_frequency: 10

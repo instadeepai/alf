@@ -1,0 +1,6 @@
+# @package _global_
+experiment:
+  phase: development
+  name: single-run
+  seed: 42
+  notes: ""

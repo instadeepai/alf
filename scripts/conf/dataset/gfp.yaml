@@ -1,0 +1,12 @@
+# @package _global_
+dataset:
+  class_name: gfp
+  name: gfp
+  modality: SEQUENCE
+  seed: 42
+  train_ratio: 0.4
+  validation_frac: 0.1
+  test_ratio: 0.1
+  split_type: random
+  problem_type: regression
+  max_candidate_pool: null

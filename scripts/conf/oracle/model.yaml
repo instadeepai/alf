@@ -1,0 +1,5 @@
+# @package _global_
+oracle:
+  mode: model
+  scorer:
+    _target_: REPLACE_WITH_SCORER_CLASS

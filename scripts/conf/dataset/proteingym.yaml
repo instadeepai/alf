@@ -1,0 +1,17 @@
+# @package _global_
+dataset:
+  class_name: proteingym
+  name: IF1_ECOLI
+  modality: SEQUENCE
+  seed: 42
+  train_ratio: 0.2
+  validation_frac: 0.1
+  test_ratio: 0.1
+  split_type: random
+  problem_type: regression
+  max_candidate_pool: null
+  dms_name: IF1_ECOLI_Kelsic_2016
+  dms_type: singles
+  cross_validation: false
+  cross_validation_type: null
+  cross_validation_fold: null

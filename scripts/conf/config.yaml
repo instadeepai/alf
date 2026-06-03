@@ -1,0 +1,16 @@
+defaults:
+  - experiment: development
+  - task: design
+  - model: gp_rbf
+  - dataset: gfp
+  - optimizer: ucb
+  - oracle: dataset
+  - _self_
+
+hydra:
+  output_subdir: .hydra
+  run:
+    dir: outputs/${experiment.phase}/${experiment.name}/${now:%Y-%m-%d_%H-%M-%S}
+  sweep:
+    dir: outputs/${experiment.phase}/${experiment.name}/${now:%Y-%m-%d_%H-%M-%S}
+    subdir: run_${hydra.job.num}

@@ -1,0 +1,6 @@
+# @package _global_
+experiment:
+  phase: model-optimisation
+  name: sweep-seeds
+  seed: 0
+  notes: ""

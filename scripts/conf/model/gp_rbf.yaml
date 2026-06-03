@@ -1,0 +1,24 @@
+# @package _global_
+model:
+  class_name: gp
+  name: gp_rbf
+  kernel_type: rbf
+  ard: true
+  matern_nu: 2.5
+  mean_type: constant
+  featurizer_type: one_hot
+  lengthscale_prior:
+    _target_: gpytorch.priors.GammaPrior
+    concentration: 3.0
+    rate: 6.0
+  outputscale_prior: null
+  noise_constraint: null
+  train:
+    learning_rate: 0.01
+    num_iterations: 100
+    optimizer_type: adam
+    early_stopping_patience: null
+    early_stopping_delta: 0.0001
+    normalise_inputs: true
+    standardise_outputs: true
+    log_frequency: 10
