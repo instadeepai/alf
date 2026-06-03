@@ -1,6 +1,31 @@
+# Copyright 2023 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from unittest.mock import MagicMock, patch
 
+import factory
 import pytest
+from alf_core.optimizer.optimizer import Optimizer
+from alf_core.oracle.oracle import Oracle
+from alf_core.tasks.design_task import DesignTask
+from alf_core.tasks.supervised_task import SupervisedTask
+from alf_core.tasks.zeroshot_task import ZeroShotTask
+from alf_core.utils.state_logger import FileStateLogger, TerminalStateLogger
+from alf_tools.models.ensemble import EnsembleWrapper
+from alf_tools.models.gp import GPModel
+from alf_tools.models.mlp import MLPModel
+from alf_tools.optimizer.acquisition_functions.ucb import UCB
 from omegaconf import OmegaConf
 
 
@@ -22,7 +47,7 @@ def _gfp_cfg():
 
 
 def test_build_dataset_gfp_constructs_correct_config():
-    import factory
+    """build_dataset passes the right config fields to the GFP constructor."""
     with patch("factory.GFP") as mock_cls:
         mock_cls.return_value = MagicMock()
         factory.build_dataset(_gfp_cfg())
@@ -34,7 +59,7 @@ def test_build_dataset_gfp_constructs_correct_config():
 
 
 def test_build_dataset_unknown_class_raises():
-    import factory
+    """build_dataset raises KeyError for an unregistered class_name."""
     cfg = OmegaConf.create({"dataset": {"class_name": "unknown"}})
     with pytest.raises(KeyError):
         factory.build_dataset(cfg)
@@ -95,8 +120,7 @@ def _mlp_cfg():
 
 
 def test_build_model_gp_returns_gp_model():
-    import factory
-    from alf_tools.models.gp import GPModel
+    """build_model returns a GPModel with correct kernel and training config."""
     model = factory.build_model(_gp_cfg())
     assert isinstance(model, GPModel)
     assert model.model_config.kernel_type == "rbf"
@@ -105,16 +129,14 @@ def test_build_model_gp_returns_gp_model():
 
 
 def test_build_model_gp_matern():
-    import factory
-    from alf_tools.models.gp import GPModel
+    """build_model creates a GPModel with matern kernel when specified."""
     model = factory.build_model(_gp_cfg(kernel_type="matern"))
     assert isinstance(model, GPModel)
     assert model.model_config.kernel_type == "matern"
 
 
 def test_build_model_mlp_returns_mlp_model():
-    import factory
-    from alf_tools.models.mlp import MLPModel
+    """build_model returns an MLPModel with correct architecture and training config."""
     model = factory.build_model(_mlp_cfg())
     assert isinstance(model, MLPModel)
     assert model.model_config.hidden_dims == [64, 32]
@@ -122,7 +144,7 @@ def test_build_model_mlp_returns_mlp_model():
 
 
 def test_build_model_unknown_class_raises():
-    import factory
+    """build_model raises KeyError for an unregistered class_name."""
     cfg = OmegaConf.create({"model": {"class_name": "unknown"}})
     with pytest.raises(KeyError):
         factory.build_model(cfg)
@@ -158,23 +180,21 @@ def _ensemble_mlp_cfg():
 
 
 def test_build_model_ensemble_returns_ensemble_wrapper():
-    import factory
-    from alf_tools.models.ensemble import EnsembleWrapper
+    """build_model returns an EnsembleWrapper with the correct number of members."""
     model = factory.build_model(_ensemble_mlp_cfg())
     assert isinstance(model, EnsembleWrapper)
     assert len(model.members) == 3
 
 
 def test_build_model_ensemble_members_have_distinct_seeds():
-    import factory
+    """Each ensemble member is assigned a unique sequential seed."""
     model = factory.build_model(_ensemble_mlp_cfg())
     seeds = [m.model_config.model_seed for m in model.members]
     assert seeds == [0, 1, 2]
 
 
 def test_build_model_ensemble_no_subsample():
-    import factory
-    from alf_tools.models.ensemble import EnsembleWrapper
+    """build_model builds an EnsembleWrapper with no subsampling when subsample is None."""
     cfg = _ensemble_mlp_cfg()
     cfg.model.subsample = None
     model = factory.build_model(cfg)
@@ -197,9 +217,7 @@ def _ucb_cfg():
 
 
 def test_build_optimizer_ucb():
-    import factory
-    from alf_core.optimizer.optimizer import Optimizer
-    from alf_tools.optimizer.acquisition_functions.ucb import UCB
+    """build_optimizer instantiates an Optimizer with a UCB acquisition function."""
     opt = factory.build_optimizer(_ucb_cfg())
     assert isinstance(opt, Optimizer)
     assert isinstance(opt.acquisition_fn, UCB)
@@ -207,9 +225,7 @@ def test_build_optimizer_ucb():
 
 
 def test_build_oracle_dataset_mode():
-    import factory
-    from alf_core.oracle.oracle import Oracle
-    from unittest.mock import MagicMock
+    """build_oracle wraps the dataset as an Oracle scorer in dataset mode."""
     mock_dataset = MagicMock()
     cfg = OmegaConf.create({"oracle": {"mode": "dataset"}})
     oracle = factory.build_oracle(cfg, mock_dataset)
@@ -218,8 +234,7 @@ def test_build_oracle_dataset_mode():
 
 
 def test_build_oracle_model_mode():
-    import factory
-    from alf_core.oracle.oracle import Oracle
+    """build_oracle instantiates a scorer via _target_ in model mode."""
     cfg = OmegaConf.create({
         "oracle": {
             "mode": "model",
@@ -233,8 +248,7 @@ def test_build_oracle_model_mode():
 
 
 def test_build_task_design():
-    import factory
-    from alf_core.tasks.design_task import DesignTask
+    """build_task returns a DesignTask with the configured number of rounds and batch size."""
     cfg = OmegaConf.create({
         "task": {
             "type": "design",
@@ -250,24 +264,21 @@ def test_build_task_design():
 
 
 def test_build_task_supervised():
-    import factory
-    from alf_core.tasks.supervised_task import SupervisedTask
+    """build_task returns a SupervisedTask for type='supervised'."""
     cfg = OmegaConf.create({"task": {"type": "supervised"}})
     task = factory.build_task(cfg)
     assert isinstance(task, SupervisedTask)
 
 
 def test_build_task_zeroshot():
-    import factory
-    from alf_core.tasks.zeroshot_task import ZeroShotTask
+    """build_task returns a ZeroShotTask for type='zeroshot'."""
     cfg = OmegaConf.create({"task": {"type": "zeroshot"}})
     task = factory.build_task(cfg)
     assert isinstance(task, ZeroShotTask)
 
 
 def test_build_state_loggers_includes_file_and_terminal(tmp_path):
-    import factory
-    from alf_core.utils.state_logger import FileStateLogger, TerminalStateLogger
+    """build_state_loggers returns both TerminalStateLogger and FileStateLogger."""
     cfg = OmegaConf.create({})
     loggers = factory.build_state_loggers(cfg, tmp_path)
     types = {type(lg) for lg in loggers}

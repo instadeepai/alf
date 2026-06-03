@@ -1,18 +1,30 @@
+# Copyright 2023 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Integration tests for the factory + ALF pipeline."""
 
-import numpy as np
-import pytest
-from omegaconf import OmegaConf
-from pathlib import Path
-
 import factory
+import numpy as np
+import pandas as pd
+import torch
 from alf_core import (
     BaseDatasetConfig,
     DatasetSearch,
     DesignTask,
     FileStateLogger,
-    Oracle,
     Optimizer,
+    Oracle,
     Surrogate,
     TerminalStateLogger,
 )
@@ -23,11 +35,12 @@ from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.model.base_model import BaseModel
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.optimizer.acquisition_functions.ucb import UCB
-
+from omegaconf import OmegaConf
 
 # ---------------------------------------------------------------------------
 # Minimal in-memory helpers — no network I/O
 # ---------------------------------------------------------------------------
+
 
 class _SinusoidalDataset(BaseDataset):
     """100-point sinusoidal dataset backed entirely in memory."""
@@ -83,6 +96,7 @@ class _SinusoidalOracle(BaseModel):
 # Integration tests
 # ---------------------------------------------------------------------------
 
+
 def test_factory_builds_gp_and_runs_design_task(tmp_path):
     """Factory builds a GP surrogate; DesignTask runs 2 rounds without error.
 
@@ -90,7 +104,6 @@ def test_factory_builds_gp_and_runs_design_task(tmp_path):
     - metrics.csv is written to output_path
     - 3 rows: round 0 + 2 acquisition rounds
     """
-    import torch
 
     def tabular_featurizer(seqs):
         return torch.tensor(np.array(seqs), dtype=torch.float32)
@@ -129,7 +142,6 @@ def test_factory_builds_gp_and_runs_design_task(tmp_path):
     state = task.setup(dataset=dataset, surrogate=surrogate)
     task.run(state=state, state_loggers=loggers, optimizer=optimizer, oracle=oracle)
 
-    import pandas as pd
     metrics_file = tmp_path / "metrics.csv"
     assert metrics_file.exists(), "metrics.csv must be written"
     df = pd.read_csv(metrics_file)

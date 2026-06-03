@@ -1,29 +1,40 @@
+# Copyright 2023 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Factory functions: bridge Hydra DictConfig to existing ALF Python objects."""
 
+import sys
 from pathlib import Path
 
-from hydra.utils import instantiate
-from omegaconf import DictConfig, OmegaConf
-
-from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
+from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig  # noqa: F401
 from alf_core.model.base_model import BaseModel
-from alf_core.oracle.oracle import Oracle
 from alf_core.optimizer.optimizer import Optimizer
+from alf_core.oracle.oracle import Oracle
 from alf_core.tasks.base_task import BaseTask
 from alf_core.tasks.design_task import DesignTask
 from alf_core.tasks.supervised_task import SupervisedTask
 from alf_core.tasks.zeroshot_task import ZeroShotTask
 from alf_core.utils.state_logger import FileStateLogger, StateLogger, TerminalStateLogger
-from alf_tools.datasets.gfp import GFP
-from alf_tools.datasets.proteingym import ProteinGym, ProteinGymConfig
-from alf_tools.datasets.flip import FLIP, FLIPConfig
-from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, SubsampleConfig
-from alf_tools.models.gp import GPModel, GPModelConfig, GPTrainConfig, FeaturizerConfig
-from alf_tools.models.mlp import MLPModel, MLPModelConfig, MLPTrainConfig
+from alf_tools.datasets.flip import FLIP, FLIPConfig  # noqa: F401
+from alf_tools.datasets.gfp import GFP  # noqa: F401
+from alf_tools.datasets.proteingym import ProteinGym, ProteinGymConfig  # noqa: F401
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
-
-
-import sys
+from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, SubsampleConfig
+from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
+from alf_tools.models.mlp import MLPModel, MLPModelConfig, MLPTrainConfig
+from hydra.utils import instantiate
+from omegaconf import DictConfig, OmegaConf
 
 # Registry maps class_name -> (dataset_attr, config_attr) attribute names in this module.
 # Resolved at call time so that test patches on module attributes take effect.
@@ -51,8 +62,9 @@ def build_dataset(cfg: DictConfig) -> BaseDataset:
     module = sys.modules[__name__]
     cls = getattr(module, cls_name)
     config_cls = getattr(module, config_name)
-    fields = {k: v for k, v in OmegaConf.to_container(dcfg, resolve=True).items()
-              if k != "class_name"}
+    fields = {
+        k: v for k, v in OmegaConf.to_container(dcfg, resolve=True).items() if k != "class_name"
+    }
     if "modality" in fields and isinstance(fields["modality"], str):
         fields["modality"] = fields["modality"].lower()
     dataset_config = config_cls(**fields)
@@ -79,7 +91,7 @@ def build_model(cfg: DictConfig) -> BaseModel:
         "ensemble": _build_ensemble,
     }
     builder = dispatch[mcfg.class_name]
-    return builder(mcfg)
+    return builder(mcfg)  # type: ignore[operator]
 
 
 def _build_gp(mcfg: DictConfig) -> GPModel:
@@ -124,7 +136,8 @@ def _build_mlp(mcfg: DictConfig) -> MLPModel:
         Configured MLPModel instance.
     """
     model_fields = {
-        k: v for k, v in OmegaConf.to_container(mcfg, resolve=True).items()
+        k: v
+        for k, v in OmegaConf.to_container(mcfg, resolve=True).items()
         if k not in ("class_name", "name", "train")
     }
     model_config = MLPModelConfig(**model_fields)
@@ -143,7 +156,8 @@ def _build_cnn(mcfg: DictConfig) -> CNNModel:
         Configured CNNModel instance.
     """
     model_fields = {
-        k: v for k, v in OmegaConf.to_container(mcfg, resolve=True).items()
+        k: v
+        for k, v in OmegaConf.to_container(mcfg, resolve=True).items()
         if k not in ("class_name", "name", "train")
     }
     model_config = CNNModelConfig(**model_fields)
