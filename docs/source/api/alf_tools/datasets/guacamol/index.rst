@@ -136,12 +136,17 @@ on-the-fly via RDKit in :meth:`~alf_tools.datasets.guacamol.GuacaMol.query`. Thi
 generative models can propose entirely new molecules and receive valid labels without reloading
 the dataset.
 
-.. automodule:: alf_tools.datasets.guacamol
+.. automodule:: alf_tools.datasets.guacamol.guacamol_dataset
    :members:
    :show-inheritance:
    :undoc-members:
 
-.. automodule:: alf_tools.datasets.guacamol_scoring
+.. automodule:: alf_tools.datasets.guacamol.guacamol_utils
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+.. automodule:: alf_tools.datasets.guacamol.guacamol_scoring
    :members:
    :show-inheritance:
    :undoc-members:
