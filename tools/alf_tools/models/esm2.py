@@ -486,7 +486,7 @@ class ESM2Model(BaseModel):
 
         Note:
             All sequences are tokenized in one pass before batching the forward pass.
-            ``batch_size_inference`` controls the embed() forward pass batch size but has
+            `batch_size_inference` controls the embed() forward pass batch size but has
             no effect on zero-shot PLL predict(). For very large candidate lists, consider
             chunking externally.
 

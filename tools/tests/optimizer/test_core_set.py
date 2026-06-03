@@ -67,7 +67,7 @@ class _BaseTestModel(BaseModel):
 class EmbeddingModel(_BaseTestModel):
     """Test model that looks up embeddings by index encoded in candidate.data.
 
-    Expects candidate.data in the format ``'emb_<int>'``.
+    Expects candidate.data in the format `'emb_<int>'`.
     """
 
     def __init__(self, embeddings: np.ndarray) -> None:
@@ -134,9 +134,9 @@ def _make_state(
     """Build a State and search_candidates list for testing.
 
     The embeddings array has shape (n_train + n_cands, d). The first n_train rows
-    are assigned to the training set (candidates named ``emb_0`` … ``emb_{n_train-1}``);
-    the remaining rows to the search candidates (named ``emb_{n_train}`` …
-    ``emb_{n_train+n_cands-1}``).
+    are assigned to the training set (candidates named `emb_0` … `emb_{n_train-1}`);
+    the remaining rows to the search candidates (named `emb_{n_train}` …
+    `emb_{n_train+n_cands-1}`).
     EmbeddingModel looks up rows by the integer index in candidate.data.
 
     Args:
