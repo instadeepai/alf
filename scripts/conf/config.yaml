@@ -10,7 +10,7 @@ defaults:
 hydra:
   output_subdir: .hydra
   run:
-    dir: outputs/${experiment.phase}/${experiment.name}/${now:%Y-%m-%d_%H-%M-%S}
+    dir: ../outputs/${experiment.phase}/${experiment.name}/${now:%Y-%m-%d_%H-%M-%S}
   sweep:
-    dir: outputs/${experiment.phase}/${experiment.name}/${now:%Y-%m-%d_%H-%M-%S}
+    dir: ../outputs/${experiment.phase}/${experiment.name}/${now:%Y-%m-%d_%H-%M-%S}
     subdir: run_${hydra.job.num}
