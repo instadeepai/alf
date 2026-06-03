@@ -126,3 +126,57 @@ def test_build_model_unknown_class_raises():
     cfg = OmegaConf.create({"model": {"class_name": "unknown"}})
     with pytest.raises(KeyError):
         factory.build_model(cfg)
+
+
+def _ensemble_mlp_cfg():
+    return OmegaConf.create({
+        "model": {
+            "class_name": "ensemble",
+            "name": "ensemble_test",
+            "n_members": 3,
+            "base_seed": 0,
+            "subsample": {"fraction": 0.8, "replace": True},
+            "member": {
+                "class_name": "mlp",
+                "name": "mlp_member",
+                "hidden_dims": [32],
+                "activation": "relu",
+                "norm": "none",
+                "dropout": 0.0,
+                "n_mc_passes": 0,
+                "train": {
+                    "learning_rate": 1e-3,
+                    "batch_size": 32,
+                    "num_epochs": 2,
+                    "optimizer": "adam",
+                    "weight_decay": 0.0,
+                    "log_frequency": 2,
+                },
+            },
+        }
+    })
+
+
+def test_build_model_ensemble_returns_ensemble_wrapper():
+    import factory
+    from alf_tools.models.ensemble import EnsembleWrapper
+    model = factory.build_model(_ensemble_mlp_cfg())
+    assert isinstance(model, EnsembleWrapper)
+    assert len(model.members) == 3
+
+
+def test_build_model_ensemble_members_have_distinct_seeds():
+    import factory
+    model = factory.build_model(_ensemble_mlp_cfg())
+    seeds = [m.model_config.model_seed for m in model.members]
+    assert seeds == [0, 1, 2]
+
+
+def test_build_model_ensemble_no_subsample():
+    import factory
+    from alf_tools.models.ensemble import EnsembleWrapper
+    cfg = _ensemble_mlp_cfg()
+    cfg.model.subsample = None
+    model = factory.build_model(cfg)
+    assert isinstance(model, EnsembleWrapper)
+    assert model.config.subsample is None

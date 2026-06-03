@@ -17,6 +17,7 @@ from alf_core.utils.state_logger import FileStateLogger, StateLogger, TerminalSt
 from alf_tools.datasets.gfp import GFP
 from alf_tools.datasets.proteingym import ProteinGym, ProteinGymConfig
 from alf_tools.datasets.flip import FLIP, FLIPConfig
+from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, SubsampleConfig
 from alf_tools.models.gp import GPModel, GPModelConfig, GPTrainConfig, FeaturizerConfig
 from alf_tools.models.mlp import MLPModel, MLPModelConfig, MLPTrainConfig
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
@@ -151,6 +152,32 @@ def _build_cnn(mcfg: DictConfig) -> CNNModel:
     return CNNModel(name=mcfg.name, model_config=model_config, train_config=train_config)
 
 
-def _build_ensemble(mcfg: DictConfig) -> BaseModel:
-    """Placeholder — implemented in Task 5."""
-    raise NotImplementedError("Ensemble builder not yet implemented")
+def _build_ensemble(mcfg: DictConfig) -> EnsembleWrapper:
+    """Build an EnsembleWrapper from a model sub-config.
+
+    Args:
+        mcfg: The model sub-config (cfg.model), must have class_name='ensemble'.
+
+    Returns:
+        EnsembleWrapper with n_members members, each built by model_factory.
+    """
+    subsample = None
+    if mcfg.get("subsample") is not None:
+        s = mcfg.subsample
+        subsample = SubsampleConfig(fraction=s.fraction, replace=s.replace)
+    ensemble_cfg = EnsembleWrapperConfig(
+        base_seed=mcfg.base_seed,
+        n_members=mcfg.n_members,
+        subsample=subsample,
+    )
+
+    def model_factory(seed: int) -> BaseModel:
+        member_cfg = OmegaConf.merge(mcfg.member, {"model_seed": seed})
+        dispatch = {"mlp": _build_mlp, "cnn": _build_cnn, "gp": _build_gp}
+        return dispatch[member_cfg.class_name](member_cfg)
+
+    return EnsembleWrapper(
+        model_factory=model_factory,
+        config=ensemble_cfg,
+        name=mcfg.name,
+    )
