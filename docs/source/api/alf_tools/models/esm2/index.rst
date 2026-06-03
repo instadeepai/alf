@@ -17,10 +17,11 @@ controlled by ``ESM2TrainConfig.scoring_function``:
 
   Call ``train()`` to fit the head on labelled data. Sequence embeddings can also be
   extracted via ``embed()`` for use with downstream models.
-- **scoring_function='pll'**: ``predict()`` returns per-sequence
-  pseudo-log-likelihood scores by masking all non-special tokens and computing the mean
-  log-probability over those positions under the pre-trained model. This is a pure
-  zero-shot scorer — ``train()`` raises ``NotImplementedError``.
+- **scoring_function='pll'**: ``predict()`` returns per-sequence pseudo-log-likelihood
+  (PLL) scores. Each non-special token is masked one at a time and the log-probability
+  of the correct residue at that position is accumulated; the final score is the mean
+  log-probability across all non-special positions. This is a pure zero-shot scorer —
+  ``train()`` raises ``NotImplementedError``.
 
 The ESM-2 backbone is **always frozen**; full backbone fine-tuning is not currently supported.
 
