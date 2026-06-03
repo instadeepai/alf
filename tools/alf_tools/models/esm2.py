@@ -82,14 +82,17 @@ class ESM2TrainConfig(BaseTrainConfig):
         optimizer_type: Which optimizer to use ('adam' or 'adamw').
         batch_size: Batch size for training.
         batch_size_inference: Batch size for embed() and linear-head predict(). Has no effect on
-            zero-shot PLL scoring (scoring_function='pll'); use smaller call-site batches instead.
+            zero-shot PLL scoring; use smaller call-site batches instead.
             None defaults to batch_size.
         num_epochs: Number of epochs to train for.
         log_frequency: Record epoch metrics every N epochs.
         max_grad_norm: Maximum norm for gradient clipping. None disables clipping.
+        use_zeroshot: If True, enables zero-shot PLL scoring mode. Must be paired with
+            scoring_function=None. If False (default), scoring_function must not be None.
         scoring_function: Scoring function to use. 'linear_head' (default) freezes the backbone
             and trains a linear head via loss_fn. 'pll' skips the head; predict() returns
-            per-sequence masked-marginal scores and train() raises NotImplementedError.
+            per-sequence masked-marginal scores and train() raises NotImplementedError. None is
+            valid only when use_zeroshot=True, and behaves like 'pll'.
         loss_fn: Loss function for linear head training. 'mse' for regression;
             'cross_entropy' for classification. Cross-entropy expects integer class labels in
             [0, output_dim); float labels are truncated with a warning. Only used when
@@ -106,7 +109,8 @@ class ESM2TrainConfig(BaseTrainConfig):
     num_epochs: int = 10
     log_frequency: int = 1
     max_grad_norm: float | None = None
-    scoring_function: Literal["linear_head", "pll"] = "linear_head"
+    use_zeroshot: bool = False
+    scoring_function: Literal["linear_head", "pll"] | None = "linear_head"
     loss_fn: Literal["mse", "cross_entropy"] = "mse"
     output_dim: int = 1
 
@@ -118,7 +122,9 @@ class ESM2TrainConfig(BaseTrainConfig):
             ValueError: If num_epochs < 1.
             ValueError: If optimizer_type is not 'adam' or 'adamw'.
             ValueError: If loss_fn is not 'mse' or 'cross_entropy'.
-            ValueError: If scoring_function is not 'linear_head' or 'pll'.
+            ValueError: If use_zeroshot=True with scoring_function='linear_head'.
+            ValueError: If use_zeroshot=False with scoring_function=None.
+            ValueError: If scoring_function is not 'linear_head', 'pll', or None.
         """
         if not self.freeze_backbone:
             raise NotImplementedError(
@@ -132,7 +138,20 @@ class ESM2TrainConfig(BaseTrainConfig):
             )
         if self.loss_fn not in ("mse", "cross_entropy"):
             raise ValueError(f"loss_fn must be 'mse' or 'cross_entropy', got {self.loss_fn!r}")
-        if self.scoring_function not in ("linear_head", "pll"):
+        if self.use_zeroshot and self.scoring_function == "linear_head":
+            raise ValueError(
+                "use_zeroshot=True is incompatible with scoring_function='linear_head'. "
+                "Set scoring_function=None to use zero-shot PLL scoring."
+            )
+        if not self.use_zeroshot and self.scoring_function is None:
+            raise ValueError(
+                "use_zeroshot=False requires scoring_function to be 'linear_head' or 'pll'. "
+                "Set use_zeroshot=True to use scoring_function=None."
+            )
+        if self.scoring_function is not None and self.scoring_function not in (
+            "linear_head",
+            "pll",
+        ):
             raise ValueError(
                 f"scoring_function must be 'linear_head' or 'pll', got {self.scoring_function!r}"
             )
@@ -360,9 +379,9 @@ class ESM2Model(BaseModel):
                     all_preds.append(preds.cpu())
             return Predictions(means=torch.cat(all_preds, dim=0).numpy().astype(np.float32))
         else:
-            return self._predict_zeroshot(all_input_ids, all_attention_mask, len(candidate_points))
+            return self._compute_pll(all_input_ids, all_attention_mask, len(candidate_points))
 
-    def _predict_zeroshot(
+    def _compute_pll(
         self, all_input_ids: torch.Tensor, all_attention_mask: torch.Tensor, n_candidates: int
     ) -> Predictions:
         """Compute zero-shot pseudo-log-likelihood (PLL) scores for sequences.
@@ -763,7 +782,7 @@ class ESM2Model(BaseModel):
             AssertionError: If optimizer_type is invalid (unreachable if __post_init__ ran).
             RuntimeError: If scoring_function='linear_head' but head is uninitialised.
         """
-        if self.train_config.scoring_function == "pll":
+        if self.train_config.scoring_function in ("pll", None):
             raise NotImplementedError(
                 "train() requires scoring_function='linear_head'. "
                 "Set scoring_function='linear_head' in ESM2TrainConfig to enable "
