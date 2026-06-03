@@ -579,7 +579,7 @@ def get_task_scorer(task_name: str) -> Callable[[str], float]:
         task_name: One of the GuacaMolTaskName literal values.
 
     Returns:
-        A callable ``(smiles: str) -> float`` in [0, 1].
+        A callable `(smiles: str) -> float` in [0, 1].
 
     Raises:
         KeyError: If task_name is not a recognised benchmark task.

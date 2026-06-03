@@ -14,8 +14,8 @@
 
 """Classification metrics.
 
-All metrics are automatically registered in ``classification_metric_registry``
-at import time via the ``@register_classification_metric`` decorator.
+All metrics are automatically registered in `classification_metric_registry`
+at import time via the `@register_classification_metric` decorator.
 """
 
 import logging
@@ -40,9 +40,9 @@ def register_classification_metric(metric_fn: Callable) -> Callable:
     """Decorator to register a classification metric.
 
     Automatically registers the metric in the classification registry and applies
-    basic input validation. The decorated function receives ``(probs, targets)``
-    where ``probs`` has shape ``(n_samples, num_classes)`` and ``targets`` has
-    shape ``(n_samples,)``.
+    basic input validation. The decorated function receives `(probs, targets)`
+    where `probs` has shape `(n_samples, num_classes)` and `targets` has
+    shape `(n_samples,)`.
 
     Args:
         metric_fn: The metric function to decorate.
