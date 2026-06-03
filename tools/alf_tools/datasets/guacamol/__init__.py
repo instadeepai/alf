@@ -12,17 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.datasets.flip import FLIP, FLIPConfig
-from alf_tools.datasets.gfp import GFP
-from alf_tools.datasets.proteingym import ProteinGym
-
-try:
-    from alf_tools.datasets.guacamol import (
-        GuacaMol,
-        GuacaMolConfig,
-        GuacaMolFileInfo,
-        download_guacamol,
-        get_task_scorer,
-    )
-except ImportError:
-    pass
+from alf_tools.datasets.guacamol.guacamol_dataset import GuacaMol, GuacaMolConfig
+from alf_tools.datasets.guacamol.guacamol_scoring import get_task_scorer
+from alf_tools.datasets.guacamol.guacamol_utils import GuacaMolFileInfo, download_guacamol
