@@ -65,8 +65,8 @@ class ESMFoldModelConfig:
             - 0.5–0.7: moderate confidence; regions may be flexible or partially structured
             - < 0.5: low confidence; residues are likely disordered or unreliable
 
-            **combined** — weighted average ``w * ptm + (1 - w) * mean_plddt`` controlled by
-            ``combined_ptm_weight`` (default 0.5). Useful when both global topology and local
+            **combined** — weighted average `w * ptm + (1 - w) * mean_plddt` controlled by
+            `combined_ptm_weight` (default 0.5). Useful when both global topology and local
             residue accuracy matter equally. Inherits the [0, 1] range and the same thresholds
             as the individual metrics.
         combined_ptm_weight: Weight of pTM in the combined metric; (1-w) applied to mean_plddt.

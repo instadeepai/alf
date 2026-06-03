@@ -14,9 +14,9 @@
 
 """Regression metrics and supporting infrastructure.
 
-All metrics are automatically registered in ``regression_metric_registry`` at
-import time via the ``@register_requires_variance`` and
-``@register_no_variance_required`` decorators.
+All metrics are automatically registered in `regression_metric_registry` at
+import time via the `@register_requires_variance` and
+`@register_no_variance_required` decorators.
 """
 
 import logging

@@ -83,7 +83,7 @@ class GPModelConfig:
 class GPTrainConfig(BaseTrainConfig):
     """Configuration for Gaussian Process training.
 
-    Overrides ``normalise_inputs`` to ``True`` because GP kernels measure
+    Overrides `normalise_inputs` to `True` because GP kernels measure
     distances between inputs; scaling continuous features to [0, 1]
     improves marginal log-likelihood optimisation.
 
