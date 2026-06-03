@@ -90,9 +90,9 @@ class ESM2TrainConfig(BaseTrainConfig):
         use_zeroshot: If True, enables zero-shot PLL scoring mode. Must be paired with
             scoring_function=None. If False (default), scoring_function must not be None.
         scoring_function: Scoring function to use. 'linear_head' (default) freezes the backbone
-            and trains a linear head via loss_fn. 'pll' skips the head; predict() returns
-            per-sequence masked-marginal scores and train() raises NotImplementedError. None is
-            valid only when use_zeroshot=True, and behaves like 'pll'.
+            and trains a linear head via loss_fn. Pseudo log-likelihood 'pll' skips the head;
+            predict() returns per-sequence masked-marginal scores and train() raises
+            NotImplementedError. None is valid only when use_zeroshot=True, and behaves like 'pll'.
         loss_fn: Loss function for linear head training. 'mse' for regression;
             'cross_entropy' for classification. Cross-entropy expects integer class labels in
             [0, output_dim); float labels are truncated with a warning. Only used when
