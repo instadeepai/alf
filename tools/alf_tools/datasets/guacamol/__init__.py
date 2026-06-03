@@ -11,3 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from alf_tools.datasets.guacamol.guacamol_dataset import GuacaMol, GuacaMolConfig
+from alf_tools.datasets.guacamol.guacamol_scoring import get_task_scorer
+from alf_tools.datasets.guacamol.guacamol_utils import GuacaMolFileInfo, download_guacamol

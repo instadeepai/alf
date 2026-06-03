@@ -18,5 +18,7 @@ from alf_tools.datasets.proteingym import ProteinGym
 
 try:
     from alf_tools.datasets.guacamol.guacamol_dataset import GuacaMol, GuacaMolConfig
+    from alf_tools.datasets.guacamol.guacamol_scoring import get_task_scorer
+    from alf_tools.datasets.guacamol.guacamol_utils import GuacaMolFileInfo, download_guacamol
 except ImportError:
     pass
