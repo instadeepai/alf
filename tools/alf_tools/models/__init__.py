@@ -54,7 +54,7 @@ try:
     from alf_tools.models.esmfold import ESMFoldModel, ESMFoldModelConfig
 
     _esmfold_available = True
-except ModuleNotFoundError:
+except ImportError:
     _esmfold_available = False
 
 if _esmfold_available:

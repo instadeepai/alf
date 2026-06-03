@@ -17,19 +17,9 @@ from dataclasses import dataclass
 from typing import Any, Literal, NoReturn
 
 import numpy as np
-import pytest
-
-pytest.importorskip("transformers", reason="transformers not installed; install alf_tools[esmfold]")
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Modality, Predictions
-
-try:
-    from transformers import AutoTokenizer, EsmForProteinFolding
-except ImportError:
-    raise ImportError(
-        "transformers is not installed. Install ESMFold dependencies with:\n"
-        "  pip install transformers"
-    )
+from transformers import AutoTokenizer, EsmForProteinFolding
 
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
