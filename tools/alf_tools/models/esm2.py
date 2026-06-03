@@ -787,7 +787,10 @@ class ESM2Model(BaseModel):
                 "train() requires scoring_function='linear_head'. "
                 "Set scoring_function='linear_head' in ESM2TrainConfig to enable "
                 "training a linear head, "
-                "or use predict() for masked-marginal scoring without training."
+                "or use predict() for masked-marginal scoring without training. "
+                "Currently, training/fine-tuning the model with with pseudo "
+                "log-likelihood scores is not implemented; use the 'linear_head'"
+                "for training."
             )
 
         self._epoch_metrics = []

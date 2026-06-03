@@ -17,7 +17,7 @@ controlled by ``ESM2TrainConfig.scoring_function``:
 
   Call ``train()`` to fit the head on labelled data. Sequence embeddings can also be
   extracted via ``embed()`` for use with downstream models.
-- **scoring_function=None**: no head is trained. ``predict()`` returns per-sequence
+- **scoring_function='pll'**: ``predict()`` returns per-sequence
   pseudo-log-likelihood scores by masking all non-special tokens and computing the mean
   log-probability over those positions under the pre-trained model. This is a pure
   zero-shot scorer — ``train()`` raises ``NotImplementedError``.
