@@ -230,3 +230,46 @@ def test_build_oracle_model_mode():
     })
     oracle = factory.build_oracle(cfg, dataset=None)
     assert isinstance(oracle, Oracle)
+
+
+def test_build_task_design():
+    import factory
+    from alf_core.tasks.design_task import DesignTask
+    cfg = OmegaConf.create({
+        "task": {
+            "type": "design",
+            "num_acq_rounds": 5,
+            "acq_batch_size": 10,
+            "save_round_predictions": False,
+        }
+    })
+    task = factory.build_task(cfg)
+    assert isinstance(task, DesignTask)
+    assert task.num_acq_rounds == 5
+    assert task.acq_batch_size == 10
+
+
+def test_build_task_supervised():
+    import factory
+    from alf_core.tasks.supervised_task import SupervisedTask
+    cfg = OmegaConf.create({"task": {"type": "supervised"}})
+    task = factory.build_task(cfg)
+    assert isinstance(task, SupervisedTask)
+
+
+def test_build_task_zeroshot():
+    import factory
+    from alf_core.tasks.zeroshot_task import ZeroShotTask
+    cfg = OmegaConf.create({"task": {"type": "zeroshot"}})
+    task = factory.build_task(cfg)
+    assert isinstance(task, ZeroShotTask)
+
+
+def test_build_state_loggers_includes_file_and_terminal(tmp_path):
+    import factory
+    from alf_core.utils.state_logger import FileStateLogger, TerminalStateLogger
+    cfg = OmegaConf.create({})
+    loggers = factory.build_state_loggers(cfg, tmp_path)
+    types = {type(lg) for lg in loggers}
+    assert TerminalStateLogger in types
+    assert FileStateLogger in types

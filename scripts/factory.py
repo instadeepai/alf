@@ -220,3 +220,47 @@ def build_oracle(cfg: DictConfig, dataset: BaseDataset | None) -> Oracle:
         scorer = instantiate(cfg.oracle.scorer)
         return Oracle(scorer=scorer)
     raise ValueError(f"Unknown oracle.mode: {mode!r}. Expected 'dataset' or 'model'.")
+
+
+def build_task(cfg: DictConfig) -> BaseTask:
+    """Build a BaseTask from the task config group.
+
+    Args:
+        cfg: Root Hydra DictConfig containing a `task` key.
+
+    Returns:
+        Constructed task instance.
+
+    Raises:
+        ValueError: If task.type is unknown.
+    """
+    tcfg = cfg.task
+    task_type = tcfg.type
+    if task_type == "design":
+        return DesignTask(
+            num_acq_rounds=tcfg.num_acq_rounds,
+            acq_batch_size=tcfg.acq_batch_size,
+            save_round_predictions=tcfg.get("save_round_predictions", False),
+        )
+    if task_type == "supervised":
+        return SupervisedTask()
+    if task_type == "zeroshot":
+        return ZeroShotTask()
+    raise ValueError(
+        f"Unknown task.type: {task_type!r}. Expected 'design', 'supervised', or 'zeroshot'."
+    )
+
+
+def build_state_loggers(cfg: DictConfig, output_dir: Path) -> list[StateLogger]:
+    """Build the list of StateLoggers for a run.
+
+    Always includes a TerminalStateLogger and a FileStateLogger writing to output_dir.
+
+    Args:
+        cfg: Root Hydra DictConfig (reserved for future per-logger config).
+        output_dir: Directory where FileStateLogger writes its outputs.
+
+    Returns:
+        List containing a TerminalStateLogger and a FileStateLogger.
+    """
+    return [TerminalStateLogger(), FileStateLogger(output_path=output_dir)]
