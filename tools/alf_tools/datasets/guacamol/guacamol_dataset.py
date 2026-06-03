@@ -202,21 +202,23 @@ class GuacaMol(BaseDataset):
         properties = list(self.config.computed_properties or [target])
         return _label_smiles(smiles_list, properties, target, self.modality)
 
-    def _load_paper_splits(self) -> LabelledCandidates:
+    def _load_paper_splits_with(
+        self, label_fn: Callable[[list[str]], LabelledCandidates]
+    ) -> LabelledCandidates:
         """Download (if absent) train/valid/test files and label all candidates.
 
         Stores the three splits in `self._paper_splits` keyed by
         `"train"`, `"validation"`, and `"test"`. Returns a combined
-        LabelledCandidates (without any split tag in features) for use as
-        `_raw_dataset` — this powers the SMILES lookup index in :meth:`query`.
+        LabelledCandidates for use as `_raw_dataset`.
+
+        Args:
+            label_fn: Callable mapping a list of SMILES to LabelledCandidates.
 
         Returns:
             Combined LabelledCandidates across all three paper splits.
         """
         split_files = {k: v for k, v in GUACAMOL_FILES.items() if k != "ALL"}
         tag_to_key = {"TRAIN": "train", "VALID": "validation", "TEST": "test"}
-        target = cast(GuacaMolPropertyName, self.config.target_property)
-        properties = list(self.config.computed_properties or [target])
         if self.config.max_molecules is not None:
             logger.warning(
                 "max_molecules=%d is applied per split file in paper mode — "
@@ -237,7 +239,7 @@ class GuacaMol(BaseDataset):
             smiles_list = _load_smiles_file(filepath)
             if self.config.max_molecules is not None:
                 smiles_list = smiles_list[: self.config.max_molecules]
-            split_lc = _label_smiles(smiles_list, properties, target, self.modality)
+            split_lc = label_fn(smiles_list)
             logger.debug(
                 "Paper split '%s': %d SMILES → %d valid candidates",
                 tag,
@@ -249,6 +251,23 @@ class GuacaMol(BaseDataset):
             all_labels.extend(split_lc.labels.tolist())
         return LabelledCandidates(
             candidates=all_candidates, labels=np.array(all_labels, dtype=float)
+        )
+
+    def _load_paper_splits(self) -> LabelledCandidates:
+        """Download (if absent) train/valid/test files and label all candidates.
+
+        Stores the three splits in `self._paper_splits` keyed by
+        `"train"`, `"validation"`, and `"test"`. Returns a combined
+        LabelledCandidates (without any split tag in features) for use as
+        `_raw_dataset` — this powers the SMILES lookup index in :meth:`query`.
+
+        Returns:
+            Combined LabelledCandidates across all three paper splits.
+        """
+        target = cast(GuacaMolPropertyName, self.config.target_property)
+        properties = list(self.config.computed_properties or [target])
+        return self._load_paper_splits_with(
+            lambda smiles_list: _label_smiles(smiles_list, properties, target, self.modality)
         )
 
     def _load_benchmark_task(self) -> LabelledCandidates:
@@ -288,34 +307,8 @@ class GuacaMol(BaseDataset):
         Returns:
             LabelledCandidates: All scored candidates across train/valid/test splits.
         """
-        split_files = {k: v for k, v in GUACAMOL_FILES.items() if k != "ALL"}
-        tag_to_key = {"TRAIN": "train", "VALID": "validation", "TEST": "test"}
-        if self.config.max_molecules is not None:
-            logger.warning(
-                "max_molecules=%d is applied per split file in paper mode — "
-                "total molecules may reach %d × 3.",
-                self.config.max_molecules,
-                self.config.max_molecules,
-            )
-        self._paper_splits = {}
-        all_candidates: list[Candidate] = []
-        all_labels: list[float] = []
-        for tag, entry_info in split_files.items():
-            filepath = _download_file(
-                entry_info["url"],
-                self.config.data_dir / entry_info["name"],
-                self.config.max_molecules,
-                sha256=entry_info.get("sha256"),
-            )
-            smiles_list = _load_smiles_file(filepath)
-            if self.config.max_molecules is not None:
-                smiles_list = smiles_list[: self.config.max_molecules]
-            split_lc = _label_smiles_benchmark(smiles_list, scorer, self.modality)
-            self._paper_splits[tag_to_key[tag]] = split_lc
-            all_candidates.extend(split_lc.candidates)
-            all_labels.extend(split_lc.labels.tolist())
-        return LabelledCandidates(
-            candidates=all_candidates, labels=np.array(all_labels, dtype=float)
+        return self._load_paper_splits_with(
+            lambda smiles_list: _label_smiles_benchmark(smiles_list, scorer, self.modality)
         )
 
     def _query_benchmark(self, candidates: list[Candidate]) -> LabelledCandidates:
