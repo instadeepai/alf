@@ -22,10 +22,14 @@ from typing import Callable, Final, Literal, NotRequired, TypedDict, cast, get_a
 
 import numpy as np
 import requests
-from alf_core import BaseDataset, Candidate, LabelledCandidates
-from alf_core.dataclasses.candidate import Modality
-from alf_core.dataset.base_dataset import BaseDatasetConfig
-from alf_core.utils.enums import ProblemType
+from alf_core import (
+    BaseDataset,
+    BaseDatasetConfig,
+    Candidate,
+    LabelledCandidates,
+    Modality,
+    ProblemType,
+)
 from pydantic import Field, computed_field, model_validator
 from rdkit import Chem
 from rdkit.Chem import QED as RDKitQED
