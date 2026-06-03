@@ -25,6 +25,10 @@ dependencies = [
 chemprop = [
     "chemprop>=2.0.0,<3.0.0",
 ]
+esmfold = [
+    "transformers>=4.36.0",
+    "accelerate>=0.26.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -44,6 +48,11 @@ explicit = true
 alf_core = { path = "../core", editable = true }
 torch = [
   { index = "pytorch-cpu" },
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests requiring the real model (deselect with '-m not integration')",
 ]
 
 [dependency-groups]
