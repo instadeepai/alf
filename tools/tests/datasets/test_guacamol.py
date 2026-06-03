@@ -28,21 +28,8 @@ pytest.importorskip("rdkit", reason="guacamol not installed; install alf_tools[g
 import requests
 from alf_core import Candidate, Modality
 from alf_tools.datasets.guacamol.guacamol_dataset import (
-    ALL_PROPERTIES,
-    DATAPATH,
-    FILENAME_ALL,
-    FILENAME_TEST,
-    FILENAME_TRAIN,
-    FILENAME_VALID,
     GuacaMol,
     GuacaMolConfig,
-    GuacaMolTaskName,
-    _cache_path,  # noqa: PLC2701
-    _canonical_smiles,  # noqa: PLC2701
-    _compute_properties,  # noqa: PLC2701
-    _download_file,  # noqa: PLC2701
-    _load_smiles_file,  # noqa: PLC2701
-    download_guacamol,
 )
 from alf_tools.datasets.guacamol.guacamol_scoring import (
     _ap,  # noqa: PLC2701
@@ -81,6 +68,21 @@ from alf_tools.datasets.guacamol.guacamol_scoring import (
     thiothixene_rediscovery,  # noqa: PLC2701
     troglitazone_rediscovery,  # noqa: PLC2701
     zaleplon_mpo,  # noqa: PLC2701
+)
+from alf_tools.datasets.guacamol.guacamol_utils import (
+    ALL_PROPERTIES,
+    DATAPATH,
+    FILENAME_ALL,
+    FILENAME_TEST,
+    FILENAME_TRAIN,
+    FILENAME_VALID,
+    GuacaMolTaskName,
+    _cache_path,  # noqa: PLC2701
+    _canonical_smiles,  # noqa: PLC2701
+    _compute_properties,  # noqa: PLC2701
+    _download_file,  # noqa: PLC2701
+    _load_smiles_file,  # noqa: PLC2701
+    download_guacamol,
 )
 from pydantic import ValidationError
 from rdkit import Chem as _Chem

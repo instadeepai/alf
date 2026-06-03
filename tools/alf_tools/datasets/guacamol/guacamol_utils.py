@@ -30,7 +30,7 @@ from .guacamol_scoring import _mol_from_smiles
 
 logger = logging.getLogger("alf-tools")
 
-DATAPATH = Path.home() / ".cache" / "alf"
+DATAPATH = Path(__file__).parent / "data"
 
 # All 4 GuacaMol files via Figshare public API
 # Source: https://api.figshare.com/v2/articles/{id}
