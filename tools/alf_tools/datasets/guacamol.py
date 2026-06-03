@@ -69,7 +69,7 @@ class GuacaMolFileInfo(TypedDict):
     """File metadata for a single GuacaMol download.
 
     Attributes:
-        name: Local filename (e.g. ``guacamol_v1_train.smiles``).
+        name: Local filename (e.g. `guacamol_v1_train.smiles`).
         url: HTTPS download URL.
         sha256: Expected SHA-256 hex digest. When present, the downloaded file is
             verified against this value. Set to None or omit to skip verification.
@@ -139,7 +139,7 @@ GuacaMolTaskName = Literal[
 ]
 
 ALL_PROPERTIES: frozenset[GuacaMolPropertyName] = frozenset(get_args(GuacaMolPropertyName))
-# Stable ordered tuple — use ``computed_properties=list(_ALL_PROPERTIES_ORDERED)`` when
+# Stable ordered tuple — use `computed_properties=list(_ALL_PROPERTIES_ORDERED)` when
 # deterministic iteration over all 10 properties is required.
 _ALL_PROPERTIES_ORDERED: tuple[GuacaMolPropertyName, ...] = get_args(GuacaMolPropertyName)
 
@@ -153,7 +153,7 @@ class GuacaMolConfig(BaseDatasetConfig):
             Any value supplied at construction is silently overwritten. Do not set.
         computed_properties: RDKit properties computed and stored in Candidate.features.
             None defaults to computing only [target_property]. Pass
-            ``list(_ALL_PROPERTIES_ORDERED)`` to compute all 10. Only applies when
+            `list(_ALL_PROPERTIES_ORDERED)` to compute all 10. Only applies when
             task_type == "property".
         max_molecules: Cap on SMILES lines written to disk and loaded per file. None = full corpus.
         split_mode: "random" and "low_vs_high" use BaseDataset splitting on the combined
@@ -174,19 +174,19 @@ class GuacaMolConfig(BaseDatasetConfig):
     def task_type(self) -> Literal["property", "benchmark_task"]:
         """Discriminates the two modes of use in the GuacaMol benchmark corpus.
 
-        ``"property"`` — the label is a continuous RDKit physicochemical value (e.g.
-        ``MolLogP``, ``TPSA``, ``QED``) computed molecule-by-molecule via
-        ``PROPERTY_FNS``.  Molecules are loaded from the corpus and queried by
+        `"property"` — the label is a continuous RDKit physicochemical value (e.g.
+        `MolLogP`, `TPSA`, `QED`) computed molecule-by-molecule via
+        `PROPERTY_FNS`.  Molecules are loaded from the corpus and queried by
         canonical SMILES lookup; novel SMILES not in the corpus are scored on the fly.
-        Each ``Candidate`` carries the requested properties in its ``features`` dict.
+        Each `Candidate` carries the requested properties in its `features` dict.
 
-        ``"benchmark_task"`` — the label is a score in [0, 1] produced by one of the
+        `"benchmark_task"` — the label is a score in [0, 1] produced by one of the
         19 goal-directed scoring functions from Brown et al. (2019).  Scores combine
         Tanimoto fingerprint similarity to reference drug molecules, multi-property
         optimisation objectives (TPSA, logP, ring counts, …), pharmacophoric matching,
         or molecular formula isomer matching — each designed to capture a realistic
         drug-design challenge.  There is no corpus lookup; every SMILES is re-scored
-        by the task function.  ``Candidate.features`` is always empty for benchmark
+        by the task function.  `Candidate.features` is always empty for benchmark
         tasks.
         """
         return "property" if self.target_property in ALL_PROPERTIES else "benchmark_task"
@@ -238,13 +238,13 @@ def _cache_path(base: Path, max_lines: int | None) -> Path:
     """Return the cache filepath for a given base path and optional max_lines cap.
 
     Args:
-        base: Base file path (e.g. ``~/.cache/alf/guacamol_v1_all.smiles``).
+        base: Base file path (e.g. `~/.cache/alf/guacamol_v1_all.smiles`).
         max_lines: Line cap. When set, the count is embedded in the filename so that
             different caps never share the same cached file.
 
     Returns:
-        ``base`` unchanged when max_lines is None, otherwise
-        ``base.parent / f"{base.stem}_{max_lines}lines{base.suffix}"``.
+        `base` unchanged when max_lines is None, otherwise
+        `base.parent / f"{base.stem}_{max_lines}lines{base.suffix}"`.
     """
     if max_lines is None:
         return base
@@ -260,8 +260,8 @@ def _download_file(
     """Stream a text file from url to filepath, optionally truncating to max_lines lines.
 
     When max_lines is given the line count is embedded in the filename via
-    :func:`_cache_path` (e.g. ``guacamol_v1_all_1000lines.smiles``) so that
-    different caps never collide in the cache.  Writes to a ``.tmp`` file first
+    :func:`_cache_path` (e.g. `guacamol_v1_all_1000lines.smiles`) so that
+    different caps never collide in the cache.  Writes to a `.tmp` file first
     and renames on success to prevent partial downloads from appearing valid.
 
     Args:
@@ -455,8 +455,8 @@ class GuacaMol(BaseDataset):
     RDKit physicochemical properties (e.g. MolLogP, TPSA, QED) as regression targets.
 
     Three split modes are supported:
-    - ``"random"`` / ``"low_vs_high"``: BaseDataset splitting on the combined corpus.
-    - ``"paper"``: uses the original train/valid/test file boundaries from the
+    - `"random"` / `"low_vs_high"`: BaseDataset splitting on the combined corpus.
+    - `"paper"`: uses the original train/valid/test file boundaries from the
       GuacaMol paper (Brown et al., 2019), allowing direct comparison with published results.
 
     Novel SMILES not present in the corpus can be queried on-the-fly via :meth:`query`;
@@ -535,10 +535,10 @@ class GuacaMol(BaseDataset):
     def _load_paper_splits(self) -> LabelledCandidates:
         """Download (if absent) train/valid/test files and label all candidates.
 
-        Stores the three splits in ``self._paper_splits`` keyed by
-        ``"train"``, ``"validation"``, and ``"test"``. Returns a combined
+        Stores the three splits in `self._paper_splits` keyed by
+        `"train"`, `"validation"`, and `"test"`. Returns a combined
         LabelledCandidates (without any split tag in features) for use as
-        ``_raw_dataset`` — this powers the SMILES lookup index in :meth:`query`.
+        `_raw_dataset` — this powers the SMILES lookup index in :meth:`query`.
 
         Returns:
             Combined LabelledCandidates across all three paper splits.
@@ -613,7 +613,7 @@ class GuacaMol(BaseDataset):
     def _load_paper_splits_benchmark(self, scorer: Callable[[str], float]) -> LabelledCandidates:
         """Download (if absent) train/valid/test files and score all candidates.
 
-        Stores the three splits in ``self._paper_splits``.
+        Stores the three splits in `self._paper_splits`.
 
         Returns:
             LabelledCandidates: All scored candidates across train/valid/test splits.
