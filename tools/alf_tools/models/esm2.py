@@ -82,16 +82,13 @@ class ESM2TrainConfig(BaseTrainConfig):
         optimizer_type: Which optimizer to use ('adam' or 'adamw').
         batch_size: Batch size for training.
         batch_size_inference: Batch size for embed() and linear-head predict(). Has no effect on
-            zero-shot PLL scoring (scoring_function=None); use smaller call-site batches instead.
+            zero-shot PLL scoring (scoring_function='pll'); use smaller call-site batches instead.
             None defaults to batch_size.
         num_epochs: Number of epochs to train for.
         log_frequency: Record epoch metrics every N epochs.
         max_grad_norm: Maximum norm for gradient clipping. None disables clipping.
-        use_zeroshot: If True, predict() uses masked-marginal (PLL) zero-shot scoring via the
-            frozen backbone. Must be True when scoring_function=None. Mutually exclusive with
-            scoring_function='linear_head'.
         scoring_function: Scoring function to use. 'linear_head' (default) freezes the backbone
-            and trains a linear head via loss_fn. None skips the head; predict() returns
+            and trains a linear head via loss_fn. 'pll' skips the head; predict() returns
             per-sequence masked-marginal scores and train() raises NotImplementedError.
         loss_fn: Loss function for linear head training. 'mse' for regression;
             'cross_entropy' for classification. Cross-entropy expects integer class labels in
@@ -109,8 +106,7 @@ class ESM2TrainConfig(BaseTrainConfig):
     num_epochs: int = 10
     log_frequency: int = 1
     max_grad_norm: float | None = None
-    use_zeroshot: bool = False
-    scoring_function: Literal["linear_head"] | None = "linear_head"
+    scoring_function: Literal["linear_head", "pll"] = "linear_head"
     loss_fn: Literal["mse", "cross_entropy"] = "mse"
     output_dim: int = 1
 
@@ -122,8 +118,7 @@ class ESM2TrainConfig(BaseTrainConfig):
             ValueError: If num_epochs < 1.
             ValueError: If optimizer_type is not 'adam' or 'adamw'.
             ValueError: If loss_fn is not 'mse' or 'cross_entropy'.
-            ValueError: If use_zeroshot=True and scoring_function='linear_head'.
-            ValueError: If use_zeroshot=False and scoring_function=None.
+            ValueError: If scoring_function is not 'linear_head' or 'pll'.
         """
         if not self.freeze_backbone:
             raise NotImplementedError(
@@ -137,16 +132,9 @@ class ESM2TrainConfig(BaseTrainConfig):
             )
         if self.loss_fn not in ("mse", "cross_entropy"):
             raise ValueError(f"loss_fn must be 'mse' or 'cross_entropy', got {self.loss_fn!r}")
-        if self.use_zeroshot and (self.scoring_function == "linear_head"):
+        if self.scoring_function not in ("linear_head", "pll"):
             raise ValueError(
-                "use_zeroshot=True is incompatible with scoring_function='linear_head'. "
-                "Set scoring_function=None to use zero-shot masked-marginal scoring, "
-                "or set use_zeroshot=False to use the linear head."
-            )
-        if not (self.use_zeroshot) and (self.scoring_function is None):
-            raise ValueError(
-                "use_zeroshot=False requires scoring_function to be set (not None). "
-                "Set scoring_function='linear_head' or set use_zeroshot=True."
+                f"scoring_function must be 'linear_head' or 'pll', got {self.scoring_function!r}"
             )
 
 
@@ -155,7 +143,7 @@ class ESM2Model(BaseModel):
 
     Loads a pre-trained ESM-2 checkpoint from HuggingFace and exposes it as a
     BaseModel. predict() returns per-sequence masked-marginal scores
-    (scoring_function=None) or passes embeddings through a trainable linear head
+    (scoring_function='pll') or passes embeddings through a trainable linear head
     (scoring_function='linear_head'). embed() returns per-sequence embeddings.
     """
 
@@ -328,7 +316,7 @@ class ESM2Model(BaseModel):
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Compute predictions for the given candidates.
 
-        When scoring_function=None: computes pseudo-log-likelihood (PLL) by masking one
+        When scoring_function='pll': computes pseudo-log-likelihood (PLL) by masking one
         residue at a time and recording log P(token_i | all other tokens). Returns the
         mean PLL over residue positions per sequence (higher = more probable). Sequences
         with ≤_PLL_BATCH_THRESHOLD residues are scored in a single batched forward pass;
@@ -521,7 +509,7 @@ class ESM2Model(BaseModel):
             shuffle: Whether to shuffle the dataset.
 
         Returns:
-            DataLoader yielding (input_ids, attention_mask) pairs when scoring_function=None,
+            DataLoader yielding (input_ids, attention_mask) pairs when scoring_function='pll',
             or (input_ids, attention_mask, targets) triples when scoring_function='linear_head'.
         """
         batch = self.featurise(data)
@@ -762,7 +750,7 @@ class ESM2Model(BaseModel):
     ) -> None:
         """Fine-tune the linear head using the configured loss function.
 
-        When scoring_function=None, train() raises NotImplementedError (predict uses
+        When scoring_function='pll', train() raises NotImplementedError (predict uses
         masked-marginal scoring). When scoring_function='linear_head', trains the linear head
         on top of frozen embeddings.
 
@@ -771,11 +759,11 @@ class ESM2Model(BaseModel):
             val_data: Optional validation data for monitoring training loss.
 
         Raises:
-            NotImplementedError: If scoring_function=None.
+            NotImplementedError: If scoring_function='pll'.
             AssertionError: If optimizer_type is invalid (unreachable if __post_init__ ran).
             RuntimeError: If scoring_function='linear_head' but head is uninitialised.
         """
-        if self.train_config.scoring_function is None:
+        if self.train_config.scoring_function == "pll":
             raise NotImplementedError(
                 "train() requires scoring_function='linear_head'. "
                 "Set scoring_function='linear_head' in ESM2TrainConfig to enable "
