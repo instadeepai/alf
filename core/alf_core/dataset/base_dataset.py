@@ -315,6 +315,8 @@ class BaseDataset(abc.ABC):
                 "_raw_dataset is None — call dataset.setup() before querying"
             )
         problem_type = self.config.problem_type
+        if problem_type == ProblemType.REGRESSION:
+            return 1
         labels = self._raw_dataset.labels
         unique_labels = np.unique(labels)
         if len(unique_labels) == 0:
@@ -333,7 +335,9 @@ class BaseDataset(abc.ABC):
             return 2
         if problem_type == ProblemType.MULTICLASS:
             return len(unique_labels)
-        return 1
+        raise NotImplementedError(
+            f"determine_num_classes not implemented for ProblemType {problem_type!r}"
+        )
 
     def get_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Get summary metrics for all dataset splits.

@@ -51,6 +51,7 @@ docs = [
     "myst-parser>=2.0.0",
     "sphinx-autodoc-typehints>=1.24.0",
 ]
+guacamol = ["alf_tools[guacamol]"]
 
 tutorials = [
     "matplotlib>=3.7.0",

@@ -144,6 +144,12 @@ End-to-end guides for running active learning experiments:
 - **[Offline Design Tutorial](tutorials/experiments/offline_design_tutorial.ipynb)** - Dataset-based optimization
 - **[Online Design Tutorial](tutorials/experiments/online_design_tutorial.ipynb)** - Model-based optimization
 
+### Dataset Tutorials
+
+Deep-dives into specific datasets including download, statistics, and querying:
+
+- **[GuacaMol Tutorial](tutorials/datasets/guacamol_tutorial.ipynb)** - Drug-like molecule corpus: download, property analysis, and SMILES querying
+
 ### Model Tutorials
 
 Deep-dives into specific model types including configuration, uncertainty quantification, and comparison:

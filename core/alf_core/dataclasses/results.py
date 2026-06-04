@@ -54,7 +54,7 @@ class Results:
 
         For regression, routes to the variance-aware regression registry.
         For classification (binary or multiclass), routes to the classification
-        metric registry using the probability array stored in ``predictions.means``.
+        metric registry using the probability array stored in `predictions.means`.
 
         Raises:
             ValueError: If the problem type is unrecognized.

@@ -23,6 +23,7 @@ import pytest
 from alf_core.dataclasses import Candidate, LabelledCandidates
 from alf_core.dataclasses.candidate import Modality
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
+from alf_core.utils.enums import ProblemType
 from pydantic import ValidationError
 
 
@@ -461,6 +462,39 @@ class TestBaseDatasetGetMetrics:
         assert np.isclose(metrics["train_mean"], np.mean(dataset.train_dataset.labels))
         assert np.isclose(metrics["validation_mean"], np.mean(dataset.validation_dataset.labels))
         assert np.isclose(metrics["test_mean"], np.mean(dataset.test_dataset.labels))
+
+
+class TestDetermineNumClasses:
+    """Tests for determine_num_classes (get_num_outputs) on REGRESSION datasets."""
+
+    def test_regression_dataset_returns_one(self, dummy_dataset_factory):
+        """determine_num_classes() returns 1 for a REGRESSION dataset."""
+        dataset = dummy_dataset_factory(
+            train_ratio=0.6,
+            validation_frac=0.2,
+            test_ratio=0.2,
+            problem_type=ProblemType.REGRESSION,
+            num_samples=20,
+        )
+        assert dataset.num_classes == 1
+
+    def test_regression_dataset_does_not_raise_for_empty_labels(self, dummy_dataset_factory):
+        """determine_num_classes() does not raise ValueError for an empty REGRESSION dataset.
+
+        Regression short-circuits before inspecting labels, so an empty label array
+        must not trigger the 'Dataset is empty' ValueError that guards classification paths.
+        """
+        # Construct a regression dataset with zero samples
+        dataset = dummy_dataset_factory(
+            train_ratio=0.6,
+            validation_frac=0.2,
+            test_ratio=0.2,
+            problem_type=ProblemType.REGRESSION,
+            num_samples=0,
+        )
+        # Should not raise
+        num_classes = dataset.determine_num_classes()
+        assert num_classes == 1
 
 
 class TestBaseDatasetReproducibility:

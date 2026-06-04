@@ -268,7 +268,7 @@ class MLPModel(BaseModel):
 
         Returns:
             Tuple of (average_loss, metrics_dict). metrics_dict contains any additional
-            metrics from ``Results.metrics`` (e.g. ``spearman``, ``mse``).
+            metrics from `Results.metrics` (e.g. `spearman`, `mse`).
         """
         if self.net is None:
             raise ValueError("Network not initialised; call train() before _run_epoch.")
