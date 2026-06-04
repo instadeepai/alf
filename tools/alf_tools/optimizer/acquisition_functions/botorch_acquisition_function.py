@@ -14,23 +14,16 @@
 
 """BoTorch acquisition functions adapted for ALF and native BoTorch models.
 
-Provides the `acquisition` decorator, two ready-to-use factories
-`expected_improvement` and `upper_confidence_bound`, and the
-:class:`BotorchAcquisitionFunction` class that wraps any BoTorch acquisition
-via Hydra instantiation.  All of these accept either a native BoTorch `Model`
-or an ALF `BaseModel` — the decorator / class inserts a
+Provides the :func:`acquisition` decorator, four ready-to-use factories
+(:func:`expected_improvement`, :func:`upper_confidence_bound`,
+:func:`probability_of_improvement`, :func:`log_noisy_expected_improvement`),
+and the :class:`BotorchAcquisitionFunction` class that wraps any BoTorch
+acquisition via Hydra instantiation.  All of these accept either a native
+BoTorch ``Model`` or an ALF ``BaseModel`` — the decorator / class inserts a
 :class:`~alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter.BoTorchModelAdapter`
 automatically when needed.
 
 Usage::
-
-    from alf_tools.optimizer.acquisition_functions.botorch_acqs import (
-        BotorchAcquisitionConfig,
-        BotorchAcquisitionFunction,
-        expected_improvement,
-        upper_confidence_bound,
-    )
-
     # Hydra-driven usage
     cfg = BotorchAcquisitionConfig(
         {"_target_": "botorch.acquisition.analytic.ExpectedImprovement", "best_f": 0.5}
@@ -41,6 +34,10 @@ Usage::
     # Low-level functional usage
     acq = expected_improvement(surrogate_model, best_f=0.5)
     scores = acq(candidates_tensor)   # returns Predictions
+
+    acq = upper_confidence_bound(surrogate_model, beta=2.0)
+    acq = probability_of_improvement(surrogate_model, best_f=0.5)
+    acq = log_noisy_expected_improvement(surrogate_model, X_baseline=X_train)
 """
 
 import functools
