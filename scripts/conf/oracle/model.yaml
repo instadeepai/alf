@@ -1,5 +1,6 @@
 # @package _global_
 oracle:
   mode: model
-  scorer:
-    _target_: REPLACE_WITH_SCORER_CLASS
+  # Override scorer on the CLI or in your experiment YAML, e.g.:
+  #   +oracle.scorer._target_=alf_tools.models.esmfold.ESMFoldModel
+  scorer: ???

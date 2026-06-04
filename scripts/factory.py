@@ -14,11 +14,14 @@
 
 """Factory functions: bridge Hydra DictConfig to existing ALF Python objects."""
 
+import dataclasses
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig  # noqa: F401
 from alf_core.model.base_model import BaseModel
+from alf_core.optimizer.acquisition_function import AcquisitionFunction
 from alf_core.optimizer.optimizer import Optimizer
 from alf_core.oracle.oracle import Oracle
 from alf_core.tasks.base_task import BaseTask
@@ -33,6 +36,11 @@ from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, SubsampleConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.mlp import MLPModel, MLPModelConfig, MLPTrainConfig
+from alf_tools.optimizer.acquisition_functions.core_set import CoreSet
+from alf_tools.optimizer.acquisition_functions.expected_improvement import ExpectedImprovement
+from alf_tools.optimizer.acquisition_functions.greedy import Greedy
+from alf_tools.optimizer.acquisition_functions.thompson_sampling import ThompsonSampling
+from alf_tools.optimizer.acquisition_functions.ucb import UCB
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
@@ -42,6 +50,14 @@ _DATASET_REGISTRY: dict[str, tuple[str, str]] = {
     "gfp": ("GFP", "BaseDatasetConfig"),
     "proteingym": ("ProteinGym", "ProteinGymConfig"),
     "flip": ("FLIP", "FLIPConfig"),
+}
+
+_ACQ_FN_REGISTRY: dict[str, type[AcquisitionFunction]] = {
+    "ucb": UCB,
+    "ei": ExpectedImprovement,
+    "greedy": Greedy,
+    "thompson": ThompsonSampling,
+    "core_set": CoreSet,
 }
 
 
@@ -56,8 +72,13 @@ def build_dataset(cfg: DictConfig) -> BaseDataset:
 
     Raises:
         KeyError: If cfg.dataset.class_name is not registered.
+        ValueError: If cfg.dataset.class_name is registered but has missing config fields.
     """
     dcfg = cfg.dataset
+    if dcfg.class_name not in _DATASET_REGISTRY:
+        raise ValueError(
+            f"Unknown dataset.class_name: {dcfg.class_name!r}. Valid: {sorted(_DATASET_REGISTRY)}"
+        )
     cls_name, config_name = _DATASET_REGISTRY[dcfg.class_name]
     module = sys.modules[__name__]
     cls = getattr(module, cls_name)
@@ -66,6 +87,7 @@ def build_dataset(cfg: DictConfig) -> BaseDataset:
         k: v for k, v in OmegaConf.to_container(dcfg, resolve=True).items() if k != "class_name"
     }
     if "modality" in fields and isinstance(fields["modality"], str):
+        # YAML uses uppercase (e.g. "SEQUENCE"); Modality enum values are lowercase ("sequence").
         fields["modality"] = fields["modality"].lower()
     dataset_config = config_cls(**fields)
     return cls(dataset_config)
@@ -82,16 +104,21 @@ def build_model(cfg: DictConfig) -> BaseModel:
 
     Raises:
         KeyError: If cfg.model.class_name is not a known model type.
+        ValueError: If cfg.model.class_name is 'ensemble' but
+            cfg.model.member.class_name is not a known model type.
     """
     mcfg = cfg.model
-    dispatch: dict[str, object] = {
+    dispatch: dict[str, Callable[[DictConfig], BaseModel]] = {
         "gp": _build_gp,
         "mlp": _build_mlp,
         "cnn": _build_cnn,
         "ensemble": _build_ensemble,
     }
-    builder = dispatch[mcfg.class_name]
-    return builder(mcfg)  # type: ignore[operator]
+    if mcfg.class_name not in dispatch:
+        raise ValueError(
+            f"Unknown model.class_name: {mcfg.class_name!r}. Valid: {sorted(dispatch)}"
+        )
+    return dispatch[mcfg.class_name](mcfg)
 
 
 def _build_gp(mcfg: DictConfig) -> GPModel:
@@ -135,12 +162,9 @@ def _build_mlp(mcfg: DictConfig) -> MLPModel:
     Returns:
         Configured MLPModel instance.
     """
-    model_fields = {
-        k: v
-        for k, v in OmegaConf.to_container(mcfg, resolve=True).items()
-        if k not in ("class_name", "name", "train")
-    }
-    model_config = MLPModelConfig(**model_fields)
+    raw = OmegaConf.to_container(mcfg, resolve=True)
+    valid_fields = {f.name for f in dataclasses.fields(MLPModelConfig)}
+    model_config = MLPModelConfig(**{k: v for k, v in raw.items() if k in valid_fields})
     train_fields = {k: v for k, v in OmegaConf.to_container(mcfg.train, resolve=True).items()}
     train_config = MLPTrainConfig(**train_fields)
     return MLPModel(name=mcfg.name, model_config=model_config, train_config=train_config)
@@ -155,12 +179,9 @@ def _build_cnn(mcfg: DictConfig) -> CNNModel:
     Returns:
         Configured CNNModel instance.
     """
-    model_fields = {
-        k: v
-        for k, v in OmegaConf.to_container(mcfg, resolve=True).items()
-        if k not in ("class_name", "name", "train")
-    }
-    model_config = CNNModelConfig(**model_fields)
+    raw = OmegaConf.to_container(mcfg, resolve=True)
+    valid_fields = {f.name for f in dataclasses.fields(CNNModelConfig)}
+    model_config = CNNModelConfig(**{k: v for k, v in raw.items() if k in valid_fields})
     train_fields = {k: v for k, v in OmegaConf.to_container(mcfg.train, resolve=True).items()}
     train_config = CNNTrainConfig(**train_fields)
     return CNNModel(name=mcfg.name, model_config=model_config, train_config=train_config)
@@ -184,17 +205,45 @@ def _build_ensemble(mcfg: DictConfig) -> EnsembleWrapper:
         n_members=mcfg.n_members,
         subsample=subsample,
     )
+    member_dispatch: dict[str, Callable[[DictConfig], BaseModel]] = {
+        "mlp": _build_mlp,
+        "cnn": _build_cnn,
+        "gp": _build_gp,
+    }
 
     def model_factory(seed: int) -> BaseModel:
         member_cfg = OmegaConf.merge(mcfg.member, {"model_seed": seed})
-        dispatch = {"mlp": _build_mlp, "cnn": _build_cnn, "gp": _build_gp}
-        return dispatch[member_cfg.class_name](member_cfg)
+        return member_dispatch[member_cfg.class_name](member_cfg)
 
     return EnsembleWrapper(
         model_factory=model_factory,
         config=ensemble_cfg,
         name=mcfg.name,
     )
+
+
+def _build_acq_fn(acq_cfg: DictConfig) -> AcquisitionFunction:
+    """Build an AcquisitionFunction from an acquisition_fn sub-config.
+
+    Args:
+        acq_cfg: The acquisition_fn sub-config (cfg.optimizer.acquisition_fn).
+            Must contain a `name` key mapping to a registered acquisition function.
+            All other keys are forwarded as constructor keyword arguments (e.g. `alpha` for UCB).
+
+    Returns:
+        Constructed AcquisitionFunction instance.
+
+    Raises:
+        ValueError: If acq_cfg.name is not a registered acquisition function name.
+    """
+    name = acq_cfg.name
+    if name not in _ACQ_FN_REGISTRY:
+        raise ValueError(
+            f"Unknown acquisition_fn.name: {name!r}. Valid: {sorted(_ACQ_FN_REGISTRY)}"
+        )
+    cls = _ACQ_FN_REGISTRY[name]
+    kwargs = {k: v for k, v in OmegaConf.to_container(acq_cfg, resolve=True).items() if k != "name"}
+    return cls(**kwargs)
 
 
 def build_optimizer(cfg: DictConfig) -> Optimizer:
@@ -206,7 +255,7 @@ def build_optimizer(cfg: DictConfig) -> Optimizer:
     Returns:
         Constructed Optimizer with acquisition function and search function.
     """
-    acq_fn = instantiate(cfg.optimizer.acquisition_fn)
+    acq_fn = _build_acq_fn(cfg.optimizer.acquisition_fn)
     search_fn = instantiate(cfg.optimizer.search_fn)
     return Optimizer(acquisition_fn=acq_fn, search_fn=search_fn)
 

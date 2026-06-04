@@ -59,9 +59,9 @@ def test_build_dataset_gfp_constructs_correct_config():
 
 
 def test_build_dataset_unknown_class_raises():
-    """build_dataset raises KeyError for an unregistered class_name."""
+    """build_dataset raises ValueError with helpful message for an unregistered class_name."""
     cfg = OmegaConf.create({"dataset": {"class_name": "unknown"}})
-    with pytest.raises(KeyError):
+    with pytest.raises(ValueError, match="Unknown dataset.class_name"):
         factory.build_dataset(cfg)
 
 
@@ -144,9 +144,9 @@ def test_build_model_mlp_returns_mlp_model():
 
 
 def test_build_model_unknown_class_raises():
-    """build_model raises KeyError for an unregistered class_name."""
+    """build_model raises ValueError with helpful message for an unregistered class_name."""
     cfg = OmegaConf.create({"model": {"class_name": "unknown"}})
-    with pytest.raises(KeyError):
+    with pytest.raises(ValueError, match="Unknown model.class_name"):
         factory.build_model(cfg)
 
 
@@ -206,7 +206,7 @@ def _ucb_cfg():
     return OmegaConf.create({
         "optimizer": {
             "acquisition_fn": {
-                "_target_": "alf_tools.optimizer.acquisition_functions.ucb.UCB",
+                "name": "ucb",
                 "alpha": 0.9,
             },
             "search_fn": {
@@ -222,6 +222,18 @@ def test_build_optimizer_ucb():
     assert isinstance(opt, Optimizer)
     assert isinstance(opt.acquisition_fn, UCB)
     assert opt.acquisition_fn.alpha == 0.9
+
+
+def test_build_optimizer_unknown_acq_fn_raises():
+    """build_optimizer raises ValueError with helpful message for an unknown acquisition_fn name."""
+    cfg = OmegaConf.create({
+        "optimizer": {
+            "acquisition_fn": {"name": "unknown_fn"},
+            "search_fn": {"_target_": "alf_core.optimizer.search.DatasetSearch"},
+        }
+    })
+    with pytest.raises(ValueError, match="Unknown acquisition_fn.name"):
+        factory.build_optimizer(cfg)
 
 
 def test_build_oracle_dataset_mode():

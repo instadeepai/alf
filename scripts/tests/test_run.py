@@ -149,11 +149,11 @@ def test_factory_builds_gp_and_runs_design_task(tmp_path):
 
 
 def test_build_optimizer_from_yaml_ucb_config():
-    """build_optimizer correctly instantiates UCB via _target_."""
+    """build_optimizer correctly instantiates UCB via name registry."""
     cfg = OmegaConf.create({
         "optimizer": {
             "acquisition_fn": {
-                "_target_": "alf_tools.optimizer.acquisition_functions.ucb.UCB",
+                "name": "ucb",
                 "alpha": 0.5,
             },
             "search_fn": {"_target_": "alf_core.optimizer.search.DatasetSearch"},
