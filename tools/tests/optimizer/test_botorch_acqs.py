@@ -28,6 +28,7 @@ import pytest
 import torch
 from alf_core import LabelledCandidates, Predictions
 from alf_tools.optimizer.acquisition_functions.botorch_acquisition_function import (
+    ACQUISITION_REGISTRY,
     BotorchAcquisitionConfig,
     BotorchAcquisitionFunction,
     _AcquisitionCallable,  # noqa: PLC2701
@@ -43,7 +44,6 @@ from botorch.acquisition.analytic import (
 )
 from botorch.models import SingleTaskGP
 from botorch.models.model import Model
-from omegaconf import OmegaConf
 
 # =============================================================================
 # _AcquisitionCallable attribute tests
@@ -289,35 +289,30 @@ def test_upper_confidence_bound_default_beta_stored(botorch_gp_model):
 # =============================================================================
 
 
-def test_botorch_acquisition_config_accepts_valid_target():
-    """BotorchAcquisitionConfig does not raise for a valid botorch.acquisition target."""
-    cfg = BotorchAcquisitionConfig({
-        "_target_": "botorch.acquisition.analytic.ExpectedImprovement",
-        "best_f": 0.0,
-    })
-    assert cfg.cfg["_target_"] == "botorch.acquisition.analytic.ExpectedImprovement"
+def test_botorch_acquisition_config_accepts_valid_name():
+    """BotorchAcquisitionConfig does not raise for a registered acquisition name."""
+    cfg = BotorchAcquisitionConfig(name="expected_improvement", kwargs={"best_f": 0.0})
+    assert cfg.name == "expected_improvement"
+    assert cfg.kwargs == {"best_f": 0.0}
 
 
-def test_botorch_acquisition_config_rejects_non_botorch_target():
-    """BotorchAcquisitionConfig raises ValueError for a target outside botorch.acquisition."""
-    with pytest.raises(ValueError, match="botorch.acquisition"):
-        BotorchAcquisitionConfig({"_target_": "torch.nn.Linear"})
+def test_botorch_acquisition_config_rejects_unknown_name():
+    """BotorchAcquisitionConfig raises ValueError for an unregistered name."""
+    with pytest.raises(ValueError, match="Unknown acquisition function"):
+        BotorchAcquisitionConfig(name="nonexistent_acq")
 
 
-def test_botorch_acquisition_config_rejects_missing_target():
-    """BotorchAcquisitionConfig raises ValueError when _target_ is absent."""
-    with pytest.raises(ValueError, match="botorch.acquisition"):
-        BotorchAcquisitionConfig({"best_f": 0.0})
+def test_botorch_acquisition_config_default_kwargs_is_empty_dict():
+    """BotorchAcquisitionConfig defaults kwargs to an empty dict."""
+    cfg = BotorchAcquisitionConfig(name="upper_confidence_bound")
+    assert cfg.kwargs == {}
 
 
-def test_botorch_acquisition_config_accepts_dictconfig():
-    """BotorchAcquisitionConfig accepts an omegaconf DictConfig."""
-    cfg_dict = OmegaConf.create({
-        "_target_": "botorch.acquisition.analytic.UpperConfidenceBound",
-        "beta": 2.0,
-    })
-    cfg = BotorchAcquisitionConfig(cfg_dict)
-    assert cfg.cfg["_target_"] == "botorch.acquisition.analytic.UpperConfidenceBound"
+def test_botorch_acquisition_config_all_registry_names_are_valid():
+    """Every key in ACQUISITION_REGISTRY is accepted by BotorchAcquisitionConfig."""
+    for name in ACQUISITION_REGISTRY:
+        cfg = BotorchAcquisitionConfig(name=name)
+        assert cfg.name == name
 
 
 # =============================================================================
@@ -348,10 +343,7 @@ def test_botorch_acquisition_function_returns_labelled_candidates(
     botorch_gp_model, test_candidates_2d
 ):
     """BotorchAcquisitionFunction returns LabelledCandidates with one score per candidate."""
-    cfg = BotorchAcquisitionConfig({
-        "_target_": "botorch.acquisition.analytic.ExpectedImprovement",
-        "best_f": 0.0,
-    })
+    cfg = BotorchAcquisitionConfig(name="expected_improvement", kwargs={"best_f": 0.0})
     acq_fn = BotorchAcquisitionFunction(cfg)
     state = _MockState(botorch_gp_model)
 
@@ -363,10 +355,7 @@ def test_botorch_acquisition_function_returns_labelled_candidates(
 
 def test_botorch_acquisition_function_scores_are_finite(botorch_gp_model, test_candidates_2d):
     """BotorchAcquisitionFunction produces finite scores."""
-    cfg = BotorchAcquisitionConfig({
-        "_target_": "botorch.acquisition.analytic.ExpectedImprovement",
-        "best_f": 0.0,
-    })
+    cfg = BotorchAcquisitionConfig(name="expected_improvement", kwargs={"best_f": 0.0})
     acq_fn = BotorchAcquisitionFunction(cfg)
     state = _MockState(botorch_gp_model)
 
@@ -379,10 +368,7 @@ def test_botorch_acquisition_function_wraps_alf_model(
     mock_alf_model_with_variances, test_candidates_2d
 ):
     """BotorchAcquisitionFunction adapts an ALF BaseModel via BoTorchModelAdapter."""
-    cfg = BotorchAcquisitionConfig({
-        "_target_": "botorch.acquisition.analytic.UpperConfidenceBound",
-        "beta": 2.0,
-    })
+    cfg = BotorchAcquisitionConfig(name="upper_confidence_bound", kwargs={"beta": 2.0})
     acq_fn = BotorchAcquisitionFunction(cfg)
     state = _MockState(mock_alf_model_with_variances)
 

@@ -17,17 +17,15 @@
 Provides the :func:`acquisition` decorator, four ready-to-use factories
 (:func:`expected_improvement`, :func:`upper_confidence_bound`,
 :func:`probability_of_improvement`, :func:`log_noisy_expected_improvement`),
-and the :class:`BotorchAcquisitionFunction` class that wraps any BoTorch
-acquisition via Hydra instantiation.  All of these accept either a native
-BoTorch ``Model`` or an ALF ``BaseModel`` — the decorator / class inserts a
+the :data:`ACQUISITION_REGISTRY` mapping names to those factories, and the
+:class:`BotorchAcquisitionFunction` class.  All factories accept either a native
+BoTorch ``Model`` or an ALF ``BaseModel`` — the decorator inserts a
 :class:`~alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter.BoTorchModelAdapter`
 automatically when needed.
 
 Usage::
-    # Hydra-driven usage
-    cfg = BotorchAcquisitionConfig(
-        {"_target_": "botorch.acquisition.analytic.ExpectedImprovement", "best_f": 0.5}
-    )
+    # Config-driven usage
+    cfg = BotorchAcquisitionConfig(name="expected_improvement", kwargs={"best_f": 0.5})
     acq_fn = BotorchAcquisitionFunction(cfg)
     labelled = acq_fn(candidates, state)
 
@@ -42,10 +40,9 @@ Usage::
 
 import functools
 import inspect
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
-import hydra
 import torch
 from alf_core import AcquisitionFunction as AlfAcquisitionFunction
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, State
@@ -61,99 +58,6 @@ from botorch.acquisition.analytic import (
 )
 from botorch.acquisition.logei import qLogNoisyExpectedImprovement
 from botorch.models.model import Model as BotorchModel
-from omegaconf import DictConfig
-
-
-@dataclass
-class BotorchAcquisitionConfig:
-    """Validated Hydra config for a BoTorch acquisition function.
-
-    Wraps a Hydra-compatible configuration dict or DictConfig and validates that
-    `_target_` references a class within the `botorch.acquisition` package.
-
-    Args:
-        cfg: Config dict or :class:`omegaconf.DictConfig` with at least a
-            `_target_` key pointing to a `botorch.acquisition` class.
-            Additional keys are forwarded verbatim to
-            :func:`hydra.utils.instantiate` as keyword arguments.
-
-    Raises:
-        ValueError: If `_target_` is absent or does not start with
-            `botorch.acquisition`.
-    """
-
-    cfg: DictConfig | dict[str, Any]
-
-    def __post_init__(self) -> None:
-        """Validate that `_target_` points to a `botorch.acquisition` class.
-
-        Raises:
-            ValueError: If `_target_` is absent or outside `botorch.acquisition`.
-        """
-        target = str(self.cfg.get("_target_", ""))
-        if not target.startswith("botorch.acquisition"):
-            raise ValueError(
-                f"_target_ must be within the botorch.acquisition package, "
-                f"got: {self.cfg.get('_target_')!r}"
-            )
-
-
-class BotorchAcquisitionFunction(AlfAcquisitionFunction):
-    """ALF :class:`~alf_core.AcquisitionFunction` backed by any BoTorch acquisition class.
-
-    The BoTorch acquisition function is instantiated via
-    :func:`hydra.utils.instantiate` on each call, with `model` injected
-    automatically.  If the surrogate model is an ALF `BaseModel` it is
-    adapted via
-    :class:`~alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter.BoTorchModelAdapter`
-    before being passed to the BoTorch acquisition.
-
-    Args:
-        cfg: Validated config specifying the `_target_` BoTorch class and its
-            keyword arguments.  `model` must *not* appear in the config — it
-            is always injected from `state.surrogate.model` at call time.
-    """
-
-    def __init__(self, cfg: BotorchAcquisitionConfig) -> None:
-        """Initialise with a validated BoTorch acquisition config.
-
-        Args:
-            cfg: Validated config for the BoTorch acquisition function.
-        """
-        self._cfg = cfg
-
-    def __call__(
-        self,
-        search_candidates: list[Candidate],
-        state: State,
-    ) -> LabelledCandidates:
-        """Compute acquisition scores for candidate points.
-
-        Args:
-            search_candidates: Unlabelled candidates to score.
-            state: Task state; `state.surrogate.model` is used as the model.
-
-        Returns:
-            :class:`~alf_core.LabelledCandidates` with acquisition scores as labels.
-        """
-        model = state.surrogate.model
-        adapted = model if isinstance(model, BotorchModel) else BoTorchModelAdapter(model)
-
-        acq = hydra.utils.instantiate(
-            self._cfg.cfg,
-            model=adapted,
-            _convert_="partial",
-        )
-
-        device = getattr(model, "device", None)
-        X = candidates_to_tensor(search_candidates, device=device)
-        if X.dim() == 2:
-            X = X.unsqueeze(1)  # (n, 1, d) — BoTorch analytic fns expect q-batch dim
-
-        with torch.no_grad():
-            scores = acq(X).cpu().numpy()
-
-        return LabelledCandidates(candidates=search_candidates, labels=scores)
 
 
 class _AcquisitionCallable:
@@ -305,3 +209,94 @@ def log_noisy_expected_improvement(
         X_baseline=X_baseline,
         prune_baseline=prune_baseline,
     )
+
+
+ACQUISITION_REGISTRY: dict[str, Any] = {
+    "expected_improvement": expected_improvement,
+    "upper_confidence_bound": upper_confidence_bound,
+    "probability_of_improvement": probability_of_improvement,
+    "log_noisy_expected_improvement": log_noisy_expected_improvement,
+}
+"""Maps acquisition function names to their factory callables.
+
+Keys correspond to the `name` field of :class:`BotorchAcquisitionConfig`.
+"""
+
+
+@dataclass
+class BotorchAcquisitionConfig:
+    """Config for a registered ALF BoTorch acquisition function.
+
+    Args:
+        name: Name of the acquisition function.  Must be a key in
+            :data:`ACQUISITION_REGISTRY` (one of ``"expected_improvement"``,
+            ``"upper_confidence_bound"``, ``"probability_of_improvement"``,
+            ``"log_noisy_expected_improvement"``).
+        kwargs: Keyword arguments forwarded to the acquisition factory
+            (everything except `model`).
+
+    Raises:
+        ValueError: If `name` is not a key in :data:`ACQUISITION_REGISTRY`.
+    """
+
+    name: str
+    kwargs: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Validate that `name` refers to a registered acquisition function.
+
+        Raises:
+            ValueError: If `name` is not found in :data:`ACQUISITION_REGISTRY`.
+        """
+        if self.name not in ACQUISITION_REGISTRY:
+            raise ValueError(
+                f"Unknown acquisition function: {self.name!r}. "
+                f"Must be one of {sorted(ACQUISITION_REGISTRY)}"
+            )
+
+
+class BotorchAcquisitionFunction(AlfAcquisitionFunction):
+    """ALF :class:`~alf_core.AcquisitionFunction` backed by a registered BoTorch acquisition.
+
+    The acquisition function is looked up by name in :data:`ACQUISITION_REGISTRY`
+    and instantiated on each call with `model` injected from `state.surrogate.model`.
+    If the surrogate model is an ALF `BaseModel` it is adapted via
+    :class:`~alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter.BoTorchModelAdapter`
+    before being passed to the BoTorch acquisition.
+
+    Args:
+        cfg: Config specifying the acquisition function name and its keyword
+            arguments.  `model` must *not* appear in `cfg.kwargs` — it is
+            always injected from `state.surrogate.model` at call time.
+    """
+
+    def __init__(self, cfg: BotorchAcquisitionConfig) -> None:
+        """Initialise with a validated BoTorch acquisition config.
+
+        Args:
+            cfg: Validated config for the BoTorch acquisition function.
+        """
+        self._cfg = cfg
+
+    def __call__(
+        self,
+        search_candidates: list[Candidate],
+        state: State,
+    ) -> LabelledCandidates:
+        """Compute acquisition scores for candidate points.
+
+        Args:
+            search_candidates: Unlabelled candidates to score.
+            state: Task state; `state.surrogate.model` is used as the model.
+
+        Returns:
+            :class:`~alf_core.LabelledCandidates` with acquisition scores as labels.
+        """
+        model = state.surrogate.model
+        device = getattr(model, "device", None)
+        X = candidates_to_tensor(search_candidates, device=device)
+
+        acq_fn = ACQUISITION_REGISTRY[self._cfg.name](model, **self._cfg.kwargs)
+        predictions = acq_fn(X)
+
+        return LabelledCandidates(candidates=search_candidates, labels=predictions.means)
