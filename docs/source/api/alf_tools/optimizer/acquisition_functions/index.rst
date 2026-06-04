@@ -14,3 +14,4 @@ promising for evaluation.
    Greedy <greedy/index>
    Thompson Sampling <thompson_sampling/index>
    Upper Confidence Bound (UCB) <ucb/index>
+   Utils <utils/index>
