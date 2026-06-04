@@ -289,12 +289,21 @@ class TestEmbed:
         hidden_dim = model.esm_model.config.hidden_size
         assert embeddings.shape == (len(sample_data), hidden_dim)
 
-    def test_embed_last_hidden_state_shape(self, sample_data):
-        """embed() with last_hidden_state pooling returns shape (n_seqs, seq_len, hidden_dim)."""
+    def test_embed_last_hidden_state_raises_with_scoring_pll(self, sample_data):
+        """embed() with last_hidden_state pooling raises a ValueError ."""
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
         train_cfg = ESM2TrainConfig(
             freeze_backbone=True, scoring_function="linear_head", batch_size=1
         )
+        with pytest.raises(ValueError, match="pooling='last_hidden_state' is not supported with"):
+            model = ESM2Model(
+                name="lhs_model", model_config=config, train_config=train_cfg, device="cpu"
+            )
+
+    def test_embed_last_hidden_state_shape(self, sample_data):
+        """embed() with last_hidden_state pooling returns shape (n_seqs, seq_len, hidden_dim)."""
+        config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
+        train_cfg = ESM2TrainConfig(freeze_backbone=True, scoring_function="pll", batch_size=1)
         model = ESM2Model(
             name="lhs_model", model_config=config, train_config=train_cfg, device="cpu"
         )
@@ -360,10 +369,10 @@ def frozen_train_model():
     """Module-scoped ESM-2 model with scoring_function=None for TestTrainFrozen.
 
     Returns:
-        An ESM2Model with freeze_backbone=True and scoring_function="linear_head" on CPU.
+        An ESM2Model with freeze_backbone=True and scoring_function="pll" on CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID)
-    train_cfg = ESM2TrainConfig(freeze_backbone=True, scoring_function="linear_head")
+    train_cfg = ESM2TrainConfig(freeze_backbone=True, scoring_function="pll")
     return ESM2Model(
         name="test_esm2_frozen_train", model_config=config, train_config=train_cfg, device="cpu"
     )
