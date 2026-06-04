@@ -53,12 +53,14 @@ class ESM2ModelConfig:
             'last_hidden_state' returns the full (seq_len, hidden_dim) tensor per sequence.
         repr_layer: Transformer layer index to extract embeddings from. -1 = final layer.
         max_length: Maximum tokenisation length. Defaults to the tokeniser's model_max_length.
+        seed: Random seed for reproducible linear head initialisation.
     """
 
     model_id: str
     pooling: Literal["mean", "cls", "last_hidden_state"] = "mean"
     repr_layer: int = -1
     max_length: int | None = None
+    seed: int = 42
 
     def __post_init__(self) -> None:
         """Validate ESM2ModelConfig fields.
@@ -213,6 +215,7 @@ class ESM2Model(BaseModel):
 
         self._head: torch.nn.Linear | None = None
         if self.train_config.scoring_function == "linear_head":
+            torch.manual_seed(self.model_config.seed)
             hidden_dim = self.esm_model.config.hidden_size
             self._head = torch.nn.Linear(hidden_dim, self.train_config.output_dim)
             self._head.to(self.device)
