@@ -18,9 +18,13 @@ import numpy as np
 import pytest
 from alf_core.utils.metrics.base import regression_metric_registry
 from alf_core.utils.metrics.regression import (
+    auc_top_k,
+    calibration_curve,
     coverage,
     expected_calibration_error,
+    hit_rate,
     mse,
+    nll_gaussian,
     pairwise_xent,
     pearson,
     rank_coverage,
@@ -31,6 +35,8 @@ from alf_core.utils.metrics.regression import (
     residual_pearson,
     residual_spearman,
     spearman,
+    top_k_max,
+    top_k_mean,
     width,
 )
 
@@ -450,3 +456,220 @@ class TestPairwiseXent:
         )
         assert isinstance(result, dict)
         assert isinstance(float(result["pairwise_xent"]), float)
+
+
+class TestTopKMean:
+    """Tests for top_k_mean metric."""
+
+    def test_returns_correct_key(self):
+        """top_k_mean returns a dict with the correct dynamic key."""
+        result = top_k_mean(np.zeros(5), None, np.array([1.0, 2.0, 3.0, 4.0, 5.0]), k=3)
+        assert "top_3_mean" in result
+
+    def test_known_value(self):
+        """top_k_mean returns the mean of the top-k targets."""
+        result = top_k_mean(np.zeros(5), None, np.array([1.0, 2.0, 3.0, 4.0, 5.0]), k=2)
+        assert result["top_2_mean"] == pytest.approx(4.5)
+
+    def test_k_exceeds_length_uses_all(self):
+        """When k > len(targets), all targets are used."""
+        result = top_k_mean(np.zeros(3), None, np.array([1.0, 2.0, 3.0]), k=100)
+        assert "top_3_mean" in result
+        assert result["top_3_mean"] == pytest.approx(2.0)
+
+    def test_registered_no_variance(self):
+        """top_k_mean is registered in the no-variance registry."""
+        assert "top_k_mean" in regression_metric_registry.get_metrics(requires_variance=False)
+
+
+class TestTopKMax:
+    """Tests for top_k_max metric."""
+
+    def test_returns_correct_key(self):
+        """top_k_max returns a dict with the correct dynamic key."""
+        result = top_k_max(np.zeros(5), None, np.array([1.0, 2.0, 3.0, 4.0, 5.0]), k=3)
+        assert "top_3_max" in result
+
+    def test_known_value(self):
+        """top_k_max returns the maximum of the top-k targets."""
+        result = top_k_max(np.zeros(5), None, np.array([1.0, 2.0, 3.0, 4.0, 5.0]), k=3)
+        assert result["top_3_max"] == pytest.approx(5.0)
+
+    def test_k_exceeds_length_uses_all(self):
+        """When k > len(targets), all targets are used."""
+        result = top_k_max(np.zeros(3), None, np.array([1.0, 2.0, 3.0]), k=100)
+        assert "top_3_max" in result
+        assert result["top_3_max"] == pytest.approx(3.0)
+
+    def test_registered_no_variance(self):
+        """top_k_max is registered in the no-variance registry."""
+        assert "top_k_max" in regression_metric_registry.get_metrics(requires_variance=False)
+
+
+class TestAucTopK:
+    """Tests for auc_top_k standalone function."""
+
+    def test_perfect_campaign_scores_one(self):
+        """A campaign that always achieves best_value scores 1.0."""
+        result = auc_top_k(np.array([1.0, 1.0, 1.0, 1.0]), best_value=1.0)
+        assert result["auc_top_k"] == pytest.approx(1.0)
+
+    def test_returns_auc_top_k_key(self):
+        """auc_top_k returns a dict with key 'auc_top_k'."""
+        result = auc_top_k(np.array([0.5, 0.7, 0.8]), best_value=1.0)
+        assert "auc_top_k" in result
+
+    def test_value_in_reasonable_range(self):
+        """AUC is non-negative for non-negative round values."""
+        result = auc_top_k(np.array([0.3, 0.5, 0.7, 0.9]), best_value=1.0)
+        assert result["auc_top_k"] >= 0.0
+
+    def test_early_campaign_scores_higher_than_late(self):
+        """A campaign that finds hits early scores higher AUC than one that finds them late."""
+        early_bloom = auc_top_k(np.array([0.9, 0.85, 0.8, 0.75]), best_value=1.0)
+        late_bloom = auc_top_k(np.array([0.1, 0.3, 0.7, 0.9]), best_value=1.0)
+        assert early_bloom["auc_top_k"] > late_bloom["auc_top_k"]
+
+    def test_single_round_raises(self):
+        """Fewer than 2 rounds raises ValueError."""
+        with pytest.raises(ValueError, match="at least 2 rounds"):
+            auc_top_k(np.array([0.9]), best_value=1.0)
+
+    def test_zero_best_value_raises(self):
+        """best_value of 0 raises ValueError."""
+        with pytest.raises(ValueError, match="non-zero"):
+            auc_top_k(np.array([0.5, 0.6]), best_value=0.0)
+
+
+class TestHitRate:
+    """Tests for hit_rate metric."""
+
+    def test_all_hits(self):
+        """All targets above threshold gives hit rate 1.0."""
+        result = hit_rate(np.zeros(3), None, np.array([0.9, 0.8, 0.7]), threshold=0.5)
+        assert result["hit_rate_0.500"] == pytest.approx(1.0)
+
+    def test_no_hits(self):
+        """No targets above threshold gives hit rate 0.0."""
+        result = hit_rate(np.zeros(3), None, np.array([0.1, 0.2, 0.3]), threshold=0.5)
+        assert result["hit_rate_0.500"] == pytest.approx(0.0)
+
+    def test_partial_hits(self):
+        """Half the targets above threshold gives hit rate 0.5."""
+        result = hit_rate(np.zeros(4), None, np.array([0.9, 0.1, 0.8, 0.2]), threshold=0.5)
+        assert result["hit_rate_0.500"] == pytest.approx(0.5)
+
+    def test_threshold_inclusive(self):
+        """Targets exactly at threshold are counted as hits."""
+        result = hit_rate(np.zeros(2), None, np.array([0.5, 0.4]), threshold=0.5)
+        assert result["hit_rate_0.500"] == pytest.approx(0.5)
+
+    def test_returns_dynamic_key(self):
+        """Key reflects the threshold value."""
+        result = hit_rate(np.zeros(3), None, np.array([1.0, 2.0, 3.0]), threshold=1.5)
+        assert "hit_rate_1.500" in result
+
+    def test_registered_no_variance(self):
+        """hit_rate is registered in the no-variance registry."""
+        assert "hit_rate" in regression_metric_registry.get_metrics(requires_variance=False)
+
+
+class TestNllGaussian:
+    """Tests for nll_gaussian metric."""
+
+    def test_returns_nll_key(self):
+        """nll_gaussian returns a dict with key 'nll'."""
+        result = nll_gaussian(
+            np.array([0.0, 1.0, 2.0]),
+            np.array([1.0, 1.0, 1.0]),
+            np.array([0.0, 1.0, 2.0]),
+        )
+        assert "nll" in result
+
+    def test_perfect_predictions_low_nll(self):
+        """Predictions matching targets with low variance produce low NLL."""
+        means = np.array([1.0, 2.0, 3.0])
+        variances = np.full(3, 0.01)
+        targets = np.array([1.0, 2.0, 3.0])
+        result = nll_gaussian(means, variances, targets)
+        assert result["nll"] < 0.0
+
+    def test_nll_increases_with_error(self):
+        """Higher prediction error leads to higher NLL."""
+        means_good = np.array([1.0, 2.0, 3.0])
+        means_bad = np.array([3.0, 0.0, 1.0])
+        variances = np.ones(3)
+        targets = np.array([1.0, 2.0, 3.0])
+        nll_good = nll_gaussian(means_good, variances, targets)["nll"]
+        nll_bad = nll_gaussian(means_bad, variances, targets)["nll"]
+        assert nll_good < nll_bad
+
+    def test_zero_variance_does_not_raise(self):
+        """Zero variance is handled without raising (clipped internally)."""
+        result = nll_gaussian(
+            np.array([1.0, 2.0]),
+            np.array([0.0, 0.0]),
+            np.array([1.0, 2.0]),
+        )
+        assert "nll" in result
+        assert np.isfinite(result["nll"])
+
+    def test_registered_requires_variance(self):
+        """nll_gaussian is registered in the requires-variance registry."""
+        assert "nll_gaussian" in regression_metric_registry.get_metrics(requires_variance=True)
+
+
+class TestCalibrationCurve:
+    """Tests for calibration_curve standalone helper."""
+
+    def test_returns_two_arrays(self):
+        """calibration_curve returns a tuple of two arrays."""
+        result = calibration_curve(
+            np.array([0.0, 1.0, 2.0]),
+            np.array([1.0, 1.0, 1.0]),
+            np.array([0.0, 1.0, 2.0]),
+        )
+        assert len(result) == 2
+        expected, observed = result
+        assert isinstance(expected, np.ndarray)
+        assert isinstance(observed, np.ndarray)
+
+    def test_arrays_same_length_as_grid(self):
+        """Both returned arrays match the requested n_grid_points."""
+        expected, observed = calibration_curve(
+            np.array([0.0, 1.0]),
+            np.array([1.0, 1.0]),
+            np.array([0.0, 1.0]),
+            n_grid_points=50,
+        )
+        assert len(expected) == 50
+        assert len(observed) == 50
+
+    def test_expected_is_uniform_grid(self):
+        """Expected coverage array is a uniform grid from 0 to 1."""
+        expected, _ = calibration_curve(
+            np.array([0.0, 1.0, 2.0]),
+            np.array([1.0, 1.0, 1.0]),
+            np.array([0.0, 1.0, 2.0]),
+        )
+        assert expected[0] == pytest.approx(0.0)
+        assert expected[-1] == pytest.approx(1.0)
+
+    def test_observed_values_in_range(self):
+        """Observed coverage values are in [0, 1]."""
+        _, observed = calibration_curve(
+            np.array([0.0, 1.0, 2.0]),
+            np.array([1.0, 1.0, 1.0]),
+            np.array([0.0, 1.0, 2.0]),
+        )
+        assert np.all(observed >= 0.0)
+        assert np.all(observed <= 1.0)
+
+    def test_well_calibrated_near_diagonal(self):
+        """A well-calibrated model produces observed coverage close to expected."""
+        rng = np.random.default_rng(42)
+        means = rng.standard_normal(500)
+        variances = np.ones(500)
+        targets = means + rng.standard_normal(500)
+        expected, observed = calibration_curve(means, variances, targets, n_grid_points=20)
+        assert np.mean(np.abs(observed - expected)) < 0.15

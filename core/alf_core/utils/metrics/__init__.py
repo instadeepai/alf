@@ -36,11 +36,16 @@ from alf_core.utils.metrics.classification import (
     recall,
     register_classification_metric,
 )
+from alf_core.utils.metrics.diversity import intra_batch_diversity
 from alf_core.utils.metrics.regression import (
+    auc_top_k,
+    calibration_curve,
     coverage,
     expected_calibration_error,
+    hit_rate,
     monte_carlo_ranking,
     mse,
+    nll_gaussian,
     pairwise_xent,
     pearson,
     rank_coverage,
@@ -53,5 +58,7 @@ from alf_core.utils.metrics.regression import (
     residual_pearson,
     residual_spearman,
     spearman,
+    top_k_max,
+    top_k_mean,
     width,
 )
