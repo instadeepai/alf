@@ -152,7 +152,7 @@ class TestConfigs:
 
     def test_scoring_function_none_is_invalid(self):
         """scoring_function=None must raise ValueError."""
-        with pytest.raises(ValueError, match="scoring_function should not be None"):
+        with pytest.raises(ValueError, match="scoring_function must be"):
             ESM2TrainConfig(scoring_function=None)
 
     def test_train_config_num_epochs_zero_raises(self):
@@ -322,8 +322,10 @@ class TestEmbed:
         hidden_dim = model.esm_model.config.hidden_size
         assert embeddings.shape == (len(sample_data), hidden_dim)
 
-    def test_embed_last_hidden_state_raises_with_scoring_pll(self, sample_data):
-        """embed() with last_hidden_state pooling raises a ValueError ."""
+    def test_embed_last_hidden_state_raises_with_scoring_linear_head(self, sample_data):
+        """last_hidden_state pooling is incompatible with scoring_function='linear_head' — raises
+        at init.
+        """
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
         train_cfg = ESM2TrainConfig(
             freeze_backbone=True, scoring_function="linear_head", batch_size=1
@@ -778,3 +780,12 @@ class TestSeed:
             device="cpu",
         )
         assert not torch.equal(model_a._head.weight, model_b._head.weight)
+
+
+class TestSample:
+    """Tests for ESM2Model.sample()."""
+
+    def test_sample_raises_not_implemented(self, esm2_model):
+        """sample() always raises NotImplementedError."""
+        with pytest.raises(NotImplementedError):
+            esm2_model.sample()

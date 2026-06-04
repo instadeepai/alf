@@ -109,7 +109,7 @@ class ESM2TrainConfig(BaseTrainConfig):
     num_epochs: int = 10
     log_frequency: int = 1
     max_grad_norm: float | None = None
-    scoring_function: Literal["linear_head", "pll"] | None = "linear_head"
+    scoring_function: Literal["linear_head", "pll"] = "linear_head"
     loss_fn: Literal["mse", "cross_entropy"] = "mse"
     output_dim: int = 1
 
@@ -135,14 +135,7 @@ class ESM2TrainConfig(BaseTrainConfig):
             )
         if self.loss_fn not in ("mse", "cross_entropy"):
             raise ValueError(f"loss_fn must be 'mse' or 'cross_entropy', got {self.loss_fn!r}")
-        if self.scoring_function is None:
-            raise ValueError(
-                "scoring_function should not be None, but be set to 'linear_head' or 'pll'. "
-            )
-        if self.scoring_function is not None and self.scoring_function not in (
-            "linear_head",
-            "pll",
-        ):
+        if self.scoring_function not in ("linear_head", "pll"):
             raise ValueError(
                 f"scoring_function must be 'linear_head' or 'pll', got {self.scoring_function!r}"
             )
@@ -243,11 +236,11 @@ class ESM2Model(BaseModel):
             self.train_config.batch_size > 1 or self._batch_size_inference > 1
         ):
             raise ValueError(
-                "pooling='last_hidden_state' requires batch_size=1 and batch_size_inference=1. "
+                "pooling='last_hidden_state' requires batch_size=1. "
                 "Each sequence has a different length, so per-sequence hidden-state tensors "
                 "have incompatible shapes along the sequence dimension and cannot be "
-                "concatenated across mini-batches. Set both to 1 or "
-                "use pooling='mean' or pooling='cls' instead."
+                "concatenated across mini-batches. Set batch_size=1 (and batch_size_inference=1 "
+                "or None) or use pooling='mean' or pooling='cls' instead."
             )
         if (
             self.model_config.pooling == "last_hidden_state"
@@ -347,6 +340,10 @@ class ESM2Model(BaseModel):
             ValueError: If any sequence has no scoreable residue positions.
             RuntimeError: If scoring_function='linear_head' but the head is uninitialised
                 (should not happen if __init__ ran without error).
+
+        Note:
+            All sequences are tokenised in one pass before batching. For very large
+            candidate lists, consider calling predict() on smaller chunks externally.
         """
         if not candidate_points:
             raise ValueError("candidate_points must be non-empty")
@@ -371,10 +368,10 @@ class ESM2Model(BaseModel):
                     all_preds.append(preds.cpu())
             return Predictions(means=torch.cat(all_preds, dim=0).numpy().astype(np.float32))
         else:
-            return self._compute_pll(all_input_ids, all_attention_mask, len(candidate_points))
+            return self._compute_pll(all_input_ids, all_attention_mask)
 
     def _compute_pll(
-        self, all_input_ids: torch.Tensor, all_attention_mask: torch.Tensor, n_candidates: int
+        self, all_input_ids: torch.Tensor, all_attention_mask: torch.Tensor
     ) -> Predictions:
         """Compute zero-shot pseudo-log-likelihood (PLL) scores for sequences.
 
@@ -397,7 +394,6 @@ class ESM2Model(BaseModel):
             all_input_ids: Tensor of shape (n_candidates, seq_len) with token IDs.
             all_attention_mask: Tensor of shape (n_candidates, seq_len) with 1
                 for non-padding tokens.
-            n_candidates: Number of candidate sequences (batch size).
 
         Raises:
             ValueError: If any sequence has no scoreable residue positions
@@ -407,7 +403,7 @@ class ESM2Model(BaseModel):
             Predictions: means is a float32 numpy array of per-sequence PLL
                 scores (average log-likelihood per residue).
         """
-        self.esm_model.eval()
+        n_candidates = all_input_ids.shape[0]
 
         # PLL: mask one residue at a time, scored per sequence
         log_likelihoods: list[float] = []
@@ -774,14 +770,14 @@ class ESM2Model(BaseModel):
             AssertionError: If optimizer_type is invalid (unreachable if __post_init__ ran).
             RuntimeError: If scoring_function='linear_head' but head is uninitialised.
         """
-        if self.train_config.scoring_function in ("pll", None):
+        if self.train_config.scoring_function == "pll":
             raise NotImplementedError(
                 "train() requires scoring_function='linear_head'. "
                 "Set scoring_function='linear_head' in ESM2TrainConfig to enable "
                 "training a linear head, "
                 "or use predict() for masked-marginal scoring without training. "
-                "Currently, training/fine-tuning the model with with pseudo "
-                "log-likelihood scores is not implemented; use the 'linear_head'"
+                "Currently, training/fine-tuning the model with pseudo "
+                "log-likelihood scores is not implemented; use the 'linear_head' "
                 "for training."
             )
 
