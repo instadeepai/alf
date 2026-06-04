@@ -397,9 +397,7 @@ class BoTorchGPModel(BaseModel):
             raise ValueError("Candidates list cannot be empty")
 
         # Convert candidates to tensor
-        test_X = candidates_to_tensor(
-            candidate_points, device=self.device, dtype=self._dtype
-        )
+        test_X = candidates_to_tensor(candidate_points, device=self.device, dtype=self._dtype)
 
         # Validate shapes
         self._validate_shape(test_X)

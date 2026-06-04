@@ -56,7 +56,8 @@ class BoTorchModelAdapter(Model):
 
     Raises:
         TypeError: If the model is neither a BoTorch Model nor ALF BaseModel.
-        ValueError: If a BaseModel doesn't provide variances in predictions (raised during `posterior()`).
+        ValueError: If a BaseModel doesn't provide variances in predictions
+            (raised during `posterior()`).
     """
 
     def __init__(self, model: Model | BaseModel):
