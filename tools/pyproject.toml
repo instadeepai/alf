@@ -11,7 +11,7 @@ requires-python = ">=3.12"
 dependencies = [
     "alf_core",
     "requests>=2.25.0",
-    "huggingface_hub>=0.27.0",
+    "huggingface_hub==0.27.0",
     "jaxtyping>=0.3.5",
     "torch>=2.10.0",
     "gpytorch>=1.9.0",
