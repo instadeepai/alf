@@ -8,6 +8,7 @@ promising for evaluation.
 .. toctree::
    :maxdepth: 1
 
+   BoTorch Acquisition Functions <botorch_acquisition_function/index>
    CoreSet <core_set/index>
    Expected Improvement <expected_improvement/index>
    Greedy <greedy/index>
