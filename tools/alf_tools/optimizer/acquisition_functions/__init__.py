@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.optimizer.acquisition_functions.botorch_acqs import (
+from alf_tools.optimizer.acquisition_functions.botorch_acquisition_function import (
     BotorchAcquisitionConfig,
     BotorchAcquisitionFunction,
     expected_improvement,

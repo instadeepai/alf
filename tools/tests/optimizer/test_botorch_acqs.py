@@ -27,7 +27,7 @@ import numpy as np
 import pytest
 import torch
 from alf_core import LabelledCandidates, Predictions
-from alf_tools.optimizer.acquisition_functions.botorch_acqs import (
+from alf_tools.optimizer.acquisition_functions.botorch_acquisition_function import (
     BotorchAcquisitionConfig,
     BotorchAcquisitionFunction,
     _AcquisitionCallable,  # noqa: PLC2701
