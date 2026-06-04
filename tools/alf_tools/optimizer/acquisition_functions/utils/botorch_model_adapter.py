@@ -50,39 +50,6 @@ class BoTorchModelAdapter(Model):
     and Upper Confidence Bound require uncertainty estimates; attempting to use such
     models raises a `ValueError`.
 
-    Example with BoTorch GP Model:
-        >>> from botorch.models import SingleTaskGP
-        >>> from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
-        ...     BoTorchModelAdapter,
-        ... )
-        >>>
-        >>> # Native BoTorch model
-        >>> gp_model = SingleTaskGP(train_X, train_Y)
-        >>> adapter = BoTorchModelAdapter(gp_model)
-        >>> posterior = adapter.posterior(test_X)
-
-    Example with ALF BaseModel:
-        >>> from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
-        >>> from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
-        ...     BoTorchModelAdapter,
-        ... )
-        >>>
-        >>> # ALF BaseModel wrapping BoTorch model
-        >>> alf_model = BoTorchGPModel()
-        >>> alf_model.train(train_data, val_data)
-        >>> adapter = BoTorchModelAdapter(alf_model)
-        >>> posterior = adapter.posterior(test_X)
-
-    Example with acquisition function:
-        >>> from botorch.acquisition import qExpectedImprovement
-        >>> from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
-        ...     BoTorchModelAdapter,
-        ... )
-        >>>
-        >>> adapter = BoTorchModelAdapter(surrogate_model)
-        >>> acq_fn = qExpectedImprovement(model=adapter, best_f=best_value)
-        >>> acq_values = acq_fn(candidates)
-
     Args:
         model: Either a BoTorch Model or an ALF BaseModel instance.
             If BaseModel, it must provide prediction variances.
