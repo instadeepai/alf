@@ -14,8 +14,8 @@
 
 """Tests for BoTorch acquisition function wrappers.
 
-Covers the ``acquisition`` decorator, ``_AcquisitionCallable``, and the two
-concrete factories ``expected_improvement`` and ``upper_confidence_bound``.
+Covers the `acquisition` decorator, `_AcquisitionCallable`, and the two
+concrete factories `expected_improvement` and `upper_confidence_bound`.
 
 Fixtures are shared from tools/tests/conftest.py:
 - mock_alf_model_with_variances

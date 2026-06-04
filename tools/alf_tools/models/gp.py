@@ -60,15 +60,15 @@ class GPModelConfig:
         ard: Whether to use Automatic Relevance Determination (separate lengthscale
             per dimension).
         mean_type: Type of mean function ('constant' or 'zero').
-        lengthscale_prior: Prior for the kernel lengthscale, as a ``_target_`` dict.
+        lengthscale_prior: Prior for the kernel lengthscale, as a `_target_` dict.
             Defaults to LogNormal(sqrt(2), sqrt(3)) (Hvarfner et al. 2024 fixed form).
-            Set to ``None`` to use no prior.
+            Set to `None` to use no prior.
         lengthscale_constraint: Constraint on the kernel lengthscale, as a
-            ``_target_`` dict. Defaults to ``None`` (no constraint).
-        outputscale_prior: Prior for the kernel output scale, as a ``_target_`` dict.
-            Defaults to ``None``.
-        noise_constraint: Constraint on the likelihood noise, as a ``_target_`` dict.
-            Defaults to ``None`` (a GreaterThan(1e-4) fallback is applied internally).
+            `_target_` dict. Defaults to `None` (no constraint).
+        outputscale_prior: Prior for the kernel output scale, as a `_target_` dict.
+            Defaults to `None`.
+        noise_constraint: Constraint on the likelihood noise, as a `_target_` dict.
+            Defaults to `None` (a GreaterThan(1e-4) fallback is applied internally).
         build_kernel_fn: Optional custom function to build the kernel. If provided,
             used instead of the default kernel construction logic. Not serializable —
             for advanced Python-only use. Should return a gpytorch.kernels.Kernel.
@@ -95,7 +95,7 @@ class GPModelConfig:
 class GPTrainConfig(BaseTrainConfig):
     """Configuration for Gaussian Process training.
 
-    Overrides ``normalise_inputs`` to ``True`` because GP kernels measure
+    Overrides `normalise_inputs` to `True` because GP kernels measure
     distances between inputs; scaling continuous features to [0, 1]
     improves marginal log-likelihood optimisation.
 

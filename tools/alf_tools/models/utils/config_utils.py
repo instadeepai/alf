@@ -23,18 +23,18 @@ def build_from_target(cfg: dict | None) -> object | None:
     """Instantiate a GPyTorch object from a _target_ config dict.
 
     Supports any GPyTorch prior or constraint. The dict must contain a
-    ``_target_`` key with a fully-qualified class path; all other keys
+    `_target_` key with a fully-qualified class path; all other keys
     are passed as constructor kwargs.
 
     Args:
-        cfg: Dict with ``_target_`` (e.g. ``"gpytorch.priors.LogNormalPrior"``)
-            and any constructor kwargs. ``None`` returns ``None``.
+        cfg: Dict with `_target_` (e.g. `"gpytorch.priors.LogNormalPrior"`)
+            and any constructor kwargs. `None` returns `None`.
 
     Raises:
-        ValueError: If ``_target_`` is not in the allowed module list.
+        ValueError: If `_target_` is not in the allowed module list.
 
     Returns:
-        Instantiated object, or ``None`` if ``cfg`` is ``None``.
+        Instantiated object, or `None` if `cfg` is `None`.
 
     Example::
 

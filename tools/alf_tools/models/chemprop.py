@@ -252,13 +252,13 @@ class ChempropModel(BaseModel):
     ) -> tuple[float, dict[str, float]]:
         """Run one epoch over a DataLoader.
 
-        Performs a training pass with gradient updates when ``optimizer`` is provided,
-        or an evaluation pass without gradients when it is ``None``.
+        Performs a training pass with gradient updates when `optimizer` is provided,
+        or an evaluation pass without gradients when it is `None`.
 
         Args:
             loader: DataLoader to iterate over.
             criterion: Loss function.
-            optimizer: Optimizer for gradient updates, or ``None`` for eval mode.
+            optimizer: Optimizer for gradient updates, or `None` for eval mode.
 
         Returns:
             Tuple of (average loss weighted by batch size, metrics dict).
@@ -328,8 +328,8 @@ class ChempropModel(BaseModel):
             epoch: Zero-based epoch index.
             avg_train_loss: Average training loss for the epoch.
             train_metrics: Metrics dict from the training pass.
-            avg_val_loss: Average validation loss, or ``None`` if no validation set.
-            val_metrics: Metrics dict from the validation pass, or ``None``.
+            avg_val_loss: Average validation loss, or `None` if no validation set.
+            val_metrics: Metrics dict from the validation pass, or `None`.
         """
         additional: dict[str, float] = {}
         for key in ("spearman", "mse"):

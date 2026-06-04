@@ -41,14 +41,14 @@ if TYPE_CHECKING:
 class BoTorchModelAdapter(Model):
     """Universal adapter for BoTorch acquisition functions compatibility.
 
-    Accepts either a native BoTorch ``Model`` (direct pass-through to
-    ``posterior()``) or an ALF ``BaseModel`` (adapts ``predict()`` to BoTorch's
-    ``posterior()`` interface). The adapter detects the model type automatically.
+    Accepts either a native BoTorch `Model` (direct pass-through to
+    `posterior()`) or an ALF `BaseModel` (adapts `predict()` to BoTorch's
+    `posterior()` interface). The adapter detects the model type automatically.
 
     Models that don't provide prediction variances (e.g., CNNModel, deterministic
     models) cannot be used with BoTorch acquisition functions. Expected Improvement
     and Upper Confidence Bound require uncertainty estimates; attempting to use such
-    models raises a ``ValueError``.
+    models raises a `ValueError`.
 
     Example with BoTorch GP Model:
         >>> from botorch.models import SingleTaskGP

@@ -14,11 +14,11 @@
 
 """BoTorch acquisition functions adapted for ALF and native BoTorch models.
 
-Provides the ``acquisition`` decorator, two ready-to-use factories
-``expected_improvement`` and ``upper_confidence_bound``, and the
+Provides the `acquisition` decorator, two ready-to-use factories
+`expected_improvement` and `upper_confidence_bound`, and the
 :class:`BotorchAcquisitionFunction` class that wraps any BoTorch acquisition
-via Hydra instantiation.  All of these accept either a native BoTorch ``Model``
-or an ALF ``BaseModel`` — the decorator / class inserts a
+via Hydra instantiation.  All of these accept either a native BoTorch `Model`
+or an ALF `BaseModel` — the decorator / class inserts a
 :class:`~alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter.BoTorchModelAdapter`
 automatically when needed.
 
@@ -72,26 +72,26 @@ class BotorchAcquisitionConfig:
     """Validated Hydra config for a BoTorch acquisition function.
 
     Wraps a Hydra-compatible configuration dict or DictConfig and validates that
-    ``_target_`` references a class within the ``botorch.acquisition`` package.
+    `_target_` references a class within the `botorch.acquisition` package.
 
     Args:
         cfg: Config dict or :class:`omegaconf.DictConfig` with at least a
-            ``_target_`` key pointing to a ``botorch.acquisition`` class.
+            `_target_` key pointing to a `botorch.acquisition` class.
             Additional keys are forwarded verbatim to
             :func:`hydra.utils.instantiate` as keyword arguments.
 
     Raises:
-        ValueError: If ``_target_`` is absent or does not start with
-            ``botorch.acquisition``.
+        ValueError: If `_target_` is absent or does not start with
+            `botorch.acquisition`.
     """
 
     cfg: DictConfig | dict[str, Any]
 
     def __post_init__(self) -> None:
-        """Validate that ``_target_`` points to a ``botorch.acquisition`` class.
+        """Validate that `_target_` points to a `botorch.acquisition` class.
 
         Raises:
-            ValueError: If ``_target_`` is absent or outside ``botorch.acquisition``.
+            ValueError: If `_target_` is absent or outside `botorch.acquisition`.
         """
         target = str(self.cfg.get("_target_", ""))
         if not target.startswith("botorch.acquisition"):
@@ -105,16 +105,16 @@ class BotorchAcquisitionFunction(AlfAcquisitionFunction):
     """ALF :class:`~alf_core.AcquisitionFunction` backed by any BoTorch acquisition class.
 
     The BoTorch acquisition function is instantiated via
-    :func:`hydra.utils.instantiate` on each call, with ``model`` injected
-    automatically.  If the surrogate model is an ALF ``BaseModel`` it is
+    :func:`hydra.utils.instantiate` on each call, with `model` injected
+    automatically.  If the surrogate model is an ALF `BaseModel` it is
     adapted via
     :class:`~alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter.BoTorchModelAdapter`
     before being passed to the BoTorch acquisition.
 
     Args:
-        cfg: Validated config specifying the ``_target_`` BoTorch class and its
-            keyword arguments.  ``model`` must *not* appear in the config — it
-            is always injected from ``state.surrogate.model`` at call time.
+        cfg: Validated config specifying the `_target_` BoTorch class and its
+            keyword arguments.  `model` must *not* appear in the config — it
+            is always injected from `state.surrogate.model` at call time.
     """
 
     def __init__(self, cfg: BotorchAcquisitionConfig) -> None:
@@ -134,7 +134,7 @@ class BotorchAcquisitionFunction(AlfAcquisitionFunction):
 
         Args:
             search_candidates: Unlabelled candidates to score.
-            state: Task state; ``state.surrogate.model`` is used as the model.
+            state: Task state; `state.surrogate.model` is used as the model.
 
         Returns:
             :class:`~alf_core.LabelledCandidates` with acquisition scores as labels.
@@ -168,9 +168,9 @@ class _AcquisitionCallable:
 
     Args:
         acq_fn: BoTorch acquisition function to evaluate.
-        name: Name of the acquisition factory (e.g. ``"expected_improvement"``).
+        name: Name of the acquisition factory (e.g. `"expected_improvement"`).
         kwargs: Parameters passed to the factory, excluding the model.
-            Note: some factories (e.g. ``log_noisy_expected_improvement``) accept
+            Note: some factories (e.g. `log_noisy_expected_improvement`) accept
             tensors, which are not JSON/YAML-serializable.
     """
 
@@ -183,10 +183,10 @@ class _AcquisitionCallable:
         """Evaluate acquisition scores on candidate points.
 
         Args:
-            candidates: Tensor of shape ``(n, d)``.
+            candidates: Tensor of shape `(n, d)`.
 
         Returns:
-            :class:`~alf_core.Predictions` with acquisition scores as ``means``.
+            :class:`~alf_core.Predictions` with acquisition scores as `means`.
         """
         X = candidates
         if X.dim() == 2:
@@ -199,11 +199,11 @@ class _AcquisitionCallable:
 def acquisition(fn):
     """Decorator that makes a BoTorch acquisition factory model-agnostic.
 
-    The decorated function receives a ``botorch.models.model.Model`` regardless
-    of whether the caller passed a native BoTorch model or an ALF ``BaseModel``;
+    The decorated function receives a `botorch.models.model.Model` regardless
+    of whether the caller passed a native BoTorch model or an ALF `BaseModel`;
     the decorator inserts a :class:`BoTorchModelAdapter` when needed.
 
-    The returned :class:`_AcquisitionCallable` exposes ``name`` and ``kwargs``
+    The returned :class:`_AcquisitionCallable` exposes `name` and `kwargs`
     for config serialisation.
 
     Example::
@@ -246,12 +246,12 @@ def expected_improvement(
     """Expected Improvement acquisition function.
 
     Args:
-        model: ALF ``BaseModel`` or native BoTorch ``Model``.
+        model: ALF `BaseModel` or native BoTorch `Model`.
         best_f: Best observed function value so far.
-        maximize: If ``True`` (default), optimise for the maximum.
+        maximize: If `True` (default), optimise for the maximum.
 
     Returns:
-        :class:`_AcquisitionCallable` wrapping BoTorch ``ExpectedImprovement``.
+        :class:`_AcquisitionCallable` wrapping BoTorch `ExpectedImprovement`.
     """
     return ExpectedImprovement(model=model, best_f=best_f, maximize=maximize)
 
@@ -261,12 +261,12 @@ def upper_confidence_bound(model: BotorchModel, beta: float = 2.0) -> Acquisitio
     """Upper Confidence Bound acquisition function.
 
     Args:
-        model: ALF ``BaseModel`` or native BoTorch ``Model``.
-        beta: Exploration-exploitation trade-off (default: ``2.0``).  Higher
+        model: ALF `BaseModel` or native BoTorch `Model`.
+        beta: Exploration-exploitation trade-off (default: `2.0`).  Higher
             values favour exploration.
 
     Returns:
-        :class:`_AcquisitionCallable` wrapping BoTorch ``UpperConfidenceBound``.
+        :class:`_AcquisitionCallable` wrapping BoTorch `UpperConfidenceBound`.
     """
     return UpperConfidenceBound(model=model, beta=beta)
 
@@ -276,12 +276,12 @@ def probability_of_improvement(model: BotorchModel, best_f: float, maximize: boo
     """Probability of Improvement over best_f.
 
     Args:
-        model: ALF ``BaseModel`` or native BoTorch ``Model``.
+        model: ALF `BaseModel` or native BoTorch `Model`.
         best_f: Best observed function value so far.
-        maximize: If ``True`` (default), optimise for the maximum.
+        maximize: If `True` (default), optimise for the maximum.
 
     Returns:
-        :class:`_AcquisitionCallable` wrapping BoTorch ``ProbabilityOfImprovement``.
+        :class:`_AcquisitionCallable` wrapping BoTorch `ProbabilityOfImprovement`.
     """
     return ProbabilityOfImprovement(model=model, best_f=best_f, maximize=maximize)
 
@@ -295,13 +295,13 @@ def log_noisy_expected_improvement(
     """Log q-Noisy Expected Improvement; robust to observation noise.
 
     Args:
-        model: ALF ``BaseModel`` or native BoTorch ``Model``.
+        model: ALF `BaseModel` or native BoTorch `Model`.
         X_baseline: Baseline points for noisy improvement estimation.
-        prune_baseline: If ``True`` (default), prune the baseline.
+        prune_baseline: If `True` (default), prune the baseline.
 
     Returns:
         :class:`_AcquisitionCallable` wrapping BoTorch
-        ``qLogNoisyExpectedImprovement``.
+        `qLogNoisyExpectedImprovement`.
     """
     return qLogNoisyExpectedImprovement(
         model=model,
