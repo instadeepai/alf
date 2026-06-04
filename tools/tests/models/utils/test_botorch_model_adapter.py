@@ -50,7 +50,6 @@ def test_adapter_init_with_botorch_model(botorch_gp_model):
 
     assert adapter._wrapped_model is botorch_gp_model
     assert adapter._is_botorch_model is True
-    assert adapter._is_alf_model is False
 
 
 def test_adapter_init_with_alf_model(mock_alf_model_with_variances):
@@ -59,7 +58,6 @@ def test_adapter_init_with_alf_model(mock_alf_model_with_variances):
 
     assert adapter._wrapped_model is mock_alf_model_with_variances
     assert adapter._is_botorch_model is False
-    assert adapter._is_alf_model is True
 
 
 def test_adapter_init_with_invalid_model():

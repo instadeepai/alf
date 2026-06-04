@@ -101,7 +101,7 @@ class TestBoTorchGPModelInitialization:
         assert model.train_config.learning_rate == 0.1
         assert model.train_config.optimizer == "scipy"
         assert model.train_config.max_attempts == 5
-        assert model.train_config.dtype == torch.float32
+        assert model.train_config.dtype == "float32"
 
     def test_default_model_config_values(self):
         """Test that the default model config values are set correctly,

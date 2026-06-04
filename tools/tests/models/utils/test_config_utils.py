@@ -83,3 +83,10 @@ def test_build_from_target_invalid_target_raises():
     cfg = {"_target_": "gpytorch.priors.NonExistentPrior"}
     with pytest.raises(AttributeError):
         build_from_target(cfg)
+
+
+def test_build_from_target_blocks_disallowed_module():
+    """Tests that a _target_ outside the allowed modules raises ValueError."""
+    cfg = {"_target_": "os.path.join"}
+    with pytest.raises(ValueError, match="not in the allowed module list"):
+        build_from_target(cfg)

@@ -55,8 +55,8 @@ class BoTorchModelAdapter(Model):
             If BaseModel, it must provide prediction variances.
 
     Raises:
-        ValueError: If a BaseModel doesn't provide variances in predictions.
         TypeError: If the model is neither a BoTorch Model nor ALF BaseModel.
+        ValueError: If a BaseModel doesn't provide variances in predictions (raised during `posterior()`).
     """
 
     def __init__(self, model: Model | BaseModel):
@@ -71,9 +71,8 @@ class BoTorchModelAdapter(Model):
         super().__init__()
         self._wrapped_model = model
         self._is_botorch_model = isinstance(model, Model)
-        self._is_alf_model = isinstance(model, BaseModel)
 
-        if not (self._is_botorch_model or self._is_alf_model):
+        if not isinstance(model, (Model, BaseModel)):
             raise TypeError(
                 f"Model must be either a BoTorch Model or ALF BaseModel, got {type(model).__name__}"
             )
@@ -196,11 +195,8 @@ class BoTorchModelAdapter(Model):
             Number of outputs. For most models, this is 1 (single-output).
             Multi-output models should override this.
         """
-        # If native BoTorch model, use its num_outputs
         if self._is_botorch_model:
             return int(self._wrapped_model.num_outputs)  # type: ignore[union-attr, no-any-return]
-
-        # For ALF BaseModel, assume single output (most common case)
         return 1
 
     @property
@@ -213,9 +209,6 @@ class BoTorchModelAdapter(Model):
         Returns:
             Batch shape. Empty for most models (no batching).
         """
-        # If native BoTorch model, use its batch_shape
         if self._is_botorch_model:
             return self._wrapped_model.batch_shape  # type: ignore[union-attr]
-
-        # For ALF BaseModel, assume no batch dimension (most common case)
         return torch.Size([])

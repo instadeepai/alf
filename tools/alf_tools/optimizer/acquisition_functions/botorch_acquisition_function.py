@@ -40,6 +40,7 @@ Usage::
 
 import functools
 import inspect
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -89,9 +90,7 @@ class _AcquisitionCallable:
         Returns:
             :class:`~alf_core.Predictions` with acquisition scores as `means`.
         """
-        X = candidates
-        if X.dim() == 2:
-            X = X.unsqueeze(1)  # (n, 1, d) — BoTorch analytic fns expect q-batch dim
+        X = candidates.unsqueeze(1) if candidates.dim() == 2 else candidates  # (n, 1, d) — BoTorch analytic fns expect q-batch dim
         with torch.no_grad():
             scores = self._acq(X)
         return Predictions(means=scores.cpu().numpy())
@@ -211,7 +210,7 @@ def log_noisy_expected_improvement(
     )
 
 
-ACQUISITION_REGISTRY: dict[str, Any] = {
+ACQUISITION_REGISTRY: dict[str, Callable[..., _AcquisitionCallable]] = {
     "expected_improvement": expected_improvement,
     "upper_confidence_bound": upper_confidence_bound,
     "probability_of_improvement": probability_of_improvement,

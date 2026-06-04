@@ -69,7 +69,7 @@ class BoTorchTrainConfig(BaseTrainConfig):
             'torch' uses Adam.
         max_attempts: Maximum fitting attempts on numerical failure. Default: 5.
         device: Device string ('cpu', 'cuda'). None auto-detects. Default: None.
-        dtype: Tensor dtype. Default: torch.float32.
+        dtype: Tensor dtype as a string (e.g. 'float32', 'float64'). Default: 'float32'.
     """
 
     normalise_inputs: bool = True
@@ -79,7 +79,7 @@ class BoTorchTrainConfig(BaseTrainConfig):
     optimizer: Literal["scipy", "torch"] = "scipy"
     max_attempts: int = 5
     device: str | None = None
-    dtype: torch.dtype = torch.float32
+    dtype: str = "float32"
 
 
 class BoTorchGPModel(BaseModel):
@@ -157,6 +157,14 @@ class BoTorchGPModel(BaseModel):
         else:
             self.device = torch.device(self.train_config.device)
 
+        resolved = getattr(torch, self.train_config.dtype, None)
+        if not isinstance(resolved, torch.dtype):
+            raise ValueError(
+                f"dtype {self.train_config.dtype!r} is not a valid torch dtype. "
+                f"Use 'float32', 'float64', etc."
+            )
+        self._dtype: torch.dtype = resolved
+
         self.model: SingleTaskGP | None = None
         self.train_X: torch.Tensor | None = None
         self.train_Y: torch.Tensor | None = None
@@ -178,7 +186,7 @@ class BoTorchGPModel(BaseModel):
         Raises:
             ValueError: If candidates don't contain valid tensor data.
         """
-        return candidates_to_tensor(inputs, device=self.device, dtype=self.train_config.dtype)
+        return candidates_to_tensor(inputs, device=self.device, dtype=self._dtype)
 
     def _validate_shape(self, tensor: torch.Tensor) -> None:
         """Validate that a tensor is 2-D.
@@ -248,10 +256,10 @@ class BoTorchGPModel(BaseModel):
 
         # Convert candidates to tensors
         self.train_X = candidates_to_tensor(
-            train_data.candidates, device=self.device, dtype=self.train_config.dtype
+            train_data.candidates, device=self.device, dtype=self._dtype
         )
         self.train_Y = torch.tensor(
-            train_data.labels, dtype=self.train_config.dtype, device=self.device
+            train_data.labels, dtype=self._dtype, device=self.device
         ).unsqueeze(-1)
 
         # Validate shapes
@@ -265,7 +273,7 @@ class BoTorchGPModel(BaseModel):
             self._input_normaliser.fit(train_x_np)
             self.train_X = torch.tensor(
                 self._input_normaliser.transform(train_x_np),
-                dtype=self.train_config.dtype,
+                dtype=self._dtype,
                 device=self.device,
             )
 
@@ -301,19 +309,16 @@ class BoTorchGPModel(BaseModel):
         covar_module = ScaleKernel(base_kernel)
 
         outcome_transform = Standardize(m=1) if self.train_config.standardise_outputs else None
-        self.model = SingleTaskGP(
-            train_X=self.train_X,
-            train_Y=self.train_Y,
-            covar_module=covar_module,
-            outcome_transform=outcome_transform,
-        )
-        self.model = self.model.to(device=self.device, dtype=self.train_config.dtype)
 
-        # Set up MLL and optimizer
-        mll = ExactMarginalLogLikelihood(self.model.likelihood, self.model)
-
-        # Fit model using BoTorch's fit_gpytorch_mll
         try:
+            self.model = SingleTaskGP(
+                train_X=self.train_X,
+                train_Y=self.train_Y,
+                covar_module=covar_module,
+                outcome_transform=outcome_transform,
+            )
+            self.model = self.model.to(device=self.device, dtype=self._dtype)
+            mll = ExactMarginalLogLikelihood(self.model.likelihood, self.model)
             if self.train_config.optimizer == "scipy":
                 # Use L-BFGS-B optimizer with scipy
                 logging_optimizer = "scipy L-BFGS-B"
@@ -393,7 +398,7 @@ class BoTorchGPModel(BaseModel):
 
         # Convert candidates to tensor
         test_X = candidates_to_tensor(
-            candidate_points, device=self.device, dtype=self.train_config.dtype
+            candidate_points, device=self.device, dtype=self._dtype
         )
 
         # Validate shapes
@@ -408,7 +413,7 @@ class BoTorchGPModel(BaseModel):
             test_x_np = test_X.cpu().numpy()
             test_X = torch.tensor(
                 self._input_normaliser.transform(test_x_np),
-                dtype=self.train_config.dtype,
+                dtype=self._dtype,
                 device=self.device,
             )
 
