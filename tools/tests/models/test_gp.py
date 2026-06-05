@@ -25,8 +25,7 @@ from alf_tools.models.gp import (
     GPModelConfig,
     GPTrainConfig,
 )
-from alf_tools.models.utils import one_hot_encode
-from alf_tools.models.utils.config_utils import build_from_target
+from alf_tools.models.utils import build_from_target, one_hot_encode
 
 
 @pytest.fixture
