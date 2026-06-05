@@ -19,7 +19,7 @@ making it easy to switch between different acquisition strategies.
 """
 
 import logging
-from typing import Literal, Optional
+from typing import Literal, Optional, get_args
 
 import numpy as np
 import torch
@@ -53,18 +53,6 @@ logger = logging.getLogger("alf-tools")
 
 # Type alias for supported acquisition function types
 AcquisitionType = Literal[
-    "qEI",
-    "qLogEI",
-    "qNEI",
-    "qUCB",
-    "qKG",
-    "expected_improvement",
-    "upper_confidence_bound",
-    "probability_of_improvement",
-    "log_noisy_expected_improvement",
-]
-
-_VALID_TYPES = [
     "qEI",
     "qLogEI",
     "qNEI",
@@ -207,10 +195,11 @@ class BoTorchAcquisition(AcquisitionFunction):
         self.optimization_config = BoTorchAcquisitionOptConfig()
 
         # Validate acquisition type
-        if acquisition_type not in _VALID_TYPES:
+        valid_types = get_args(AcquisitionType)
+        if acquisition_type not in valid_types:
             raise ValueError(
                 f"Unsupported acquisition_type: {acquisition_type}. "
-                f"Must be one of: {', '.join(_VALID_TYPES)}"
+                f"Must be one of: {', '.join(valid_types)}"
             )
 
         # Set up sampler
