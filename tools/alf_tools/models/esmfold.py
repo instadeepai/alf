@@ -19,7 +19,14 @@ from typing import Any, Literal, NoReturn
 import numpy as np
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Modality, Predictions
-from transformers import AutoTokenizer, EsmForProteinFolding
+
+try:
+    from transformers import AutoTokenizer, EsmForProteinFolding
+except ImportError:
+    raise ImportError(
+        "transformers is not installed. Install ESMFold dependencies with:\n"
+        "  pip install transformers"
+    )
 
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 

@@ -34,13 +34,13 @@ from alf_core.utils.enums import ProblemType
 from jaxtyping import Float
 
 from alf_tools.models.utils import (
+    build_from_target,
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
+    get_device,
     one_hot_encode,
     transform_data,
 )
-from alf_tools.models.utils.config_utils import build_from_target
-from alf_tools.models.utils.torch_utils import get_device
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 logger = logging.getLogger("alf-tools")

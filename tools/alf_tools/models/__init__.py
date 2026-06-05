@@ -72,3 +72,16 @@ if _chemprop_available:
     from alf_tools.models.chemprop import ChempropModel, ChempropModelConfig, ChempropTrainConfig
 
     __all__ += ["ChempropModel", "ChempropModelConfig", "ChempropTrainConfig"]
+
+_esm2_available = False
+try:
+    import transformers as _transformers  # noqa: F401
+
+    _esm2_available = True
+except ImportError:
+    pass
+
+if _esm2_available:
+    from alf_tools.models.esm2 import ESM2Model, ESM2ModelConfig, ESM2TrainConfig
+
+    __all__ += ["ESM2Model", "ESM2ModelConfig", "ESM2TrainConfig"]

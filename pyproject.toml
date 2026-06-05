@@ -58,6 +58,7 @@ tutorials = [
     "umap-learn>=0.5.0",
 ]
 
+esm2 = ["alf_tools[esm2]"]
 esmfold = ["alf_tools[esmfold]"]
 chemprop = ["alf_tools[chemprop]"]
 

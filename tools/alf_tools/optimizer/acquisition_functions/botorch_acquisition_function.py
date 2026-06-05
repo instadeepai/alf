@@ -16,7 +16,7 @@
 
 Provides :data:`ACQUISITION_REGISTRY` mapping names to BoTorch acquisition
 function classes and :class:`BotorchAcquisitionFunction`.  The class accepts
-either a native BoTorch ``Model`` or an ALF ``BaseModel`` — a
+either a native BoTorch `Model` or an ALF `BaseModel` — a
 :class:`~alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter.BoTorchModelAdapter`
 is inserted automatically when needed.
 
@@ -28,15 +28,15 @@ Usage::
 
 import inspect
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any
 
 import torch
 from alf_core import AcquisitionFunction as AlfAcquisitionFunction
 from alf_core import Candidate, LabelledCandidates, State
+from alf_tools.models.utils.botorch_utils import candidates_to_tensor
 from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
     BoTorchModelAdapter,
 )
-from alf_tools.utils.botorch_utils import candidates_to_tensor
 from botorch.acquisition import AcquisitionFunction
 from botorch.acquisition.analytic import (
     LogExpectedImprovement,
@@ -64,30 +64,23 @@ class BotorchAcquisitionConfig:
 
     Args:
         name: Name of the acquisition function.  Must be a key in
-            :data:`ACQUISITION_REGISTRY` (one of ``"expected_improvement"``,
-            ``"upper_confidence_bound"``, ``"probability_of_improvement"``,
-            ``"log_noisy_expected_improvement"``).
+            :data:`ACQUISITION_REGISTRY`.
         kwargs: Keyword arguments forwarded to the acquisition constructor
-            (everything except ``model``).
+            (everything except `model`).
 
     Raises:
-        ValueError: If ``name`` is not a key in :data:`ACQUISITION_REGISTRY`.
+        ValueError: If `name` is not a key in :data:`ACQUISITION_REGISTRY`.
         ValueError: If any required kwargs for the named acquisition class are missing.
     """
 
-    name: Literal[
-        "expected_improvement",
-        "upper_confidence_bound",
-        "probability_of_improvement",
-        "log_noisy_expected_improvement",
-    ] = "upper_confidence_bound"
+    name: str = "upper_confidence_bound"
     kwargs: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate name and required kwargs.
 
         Raises:
-            ValueError: If ``name`` is not found in :data:`ACQUISITION_REGISTRY`.
+            ValueError: If `name` is not found in :data:`ACQUISITION_REGISTRY`.
             ValueError: If required constructor kwargs for the named class are missing.
         """
         if self.name not in ACQUISITION_REGISTRY:
@@ -115,16 +108,16 @@ class BotorchAcquisitionConfig:
 class BotorchAcquisitionFunction(AlfAcquisitionFunction):
     """ALF :class:`~alf_core.AcquisitionFunction` backed by a registered BoTorch acquisition.
 
-    The acquisition function is looked up by name in :data:`ACQUISITION_REGISTRY`
-    and instantiated on each call with ``model`` injected from ``state.surrogate.model``.
-    If the surrogate model is an ALF ``BaseModel`` it is adapted via
+    The acquisition class is resolved from :data:`ACQUISITION_REGISTRY` once at
+    construction and instantiated on each call with `model` injected from `state.surrogate.model`.
+    If the surrogate model is an ALF `BaseModel` it is adapted via
     :class:`~alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter.BoTorchModelAdapter`
     before being passed to the BoTorch acquisition.
 
     Args:
         cfg: Config specifying the acquisition function name and its keyword
-            arguments.  ``model`` must *not* appear in ``cfg.kwargs`` — it is
-            always injected from ``state.surrogate.model`` at call time.
+            arguments.  `model` must *not* appear in `cfg.kwargs` — it is
+            always injected from `state.surrogate.model` at call time.
     """
 
     def __init__(self, cfg: BotorchAcquisitionConfig) -> None:
@@ -134,6 +127,7 @@ class BotorchAcquisitionFunction(AlfAcquisitionFunction):
             cfg: Validated config for the BoTorch acquisition function.
         """
         self._cfg = cfg
+        self._acq_cls = ACQUISITION_REGISTRY[cfg.name]
 
     def __call__(
         self,
@@ -144,7 +138,7 @@ class BotorchAcquisitionFunction(AlfAcquisitionFunction):
 
         Args:
             search_candidates: Unlabelled candidates to score.
-            state: Task state; ``state.surrogate.model`` is used as the model.
+            state: Task state; `state.surrogate.model` is used as the model.
 
         Returns:
             :class:`~alf_core.LabelledCandidates` with acquisition scores as labels.
@@ -154,8 +148,7 @@ class BotorchAcquisitionFunction(AlfAcquisitionFunction):
         X = candidates_to_tensor(search_candidates, device=device)
 
         adapted = model if isinstance(model, BotorchModel) else BoTorchModelAdapter(model)
-        acq_cls = ACQUISITION_REGISTRY[self._cfg.name]
-        botorch_acq = acq_cls(model=adapted, **self._cfg.kwargs)
+        botorch_acq = self._acq_cls(model=adapted, **self._cfg.kwargs)
 
         X_batched = X.unsqueeze(1) if X.dim() == 2 else X
         with torch.no_grad():
