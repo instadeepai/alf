@@ -28,7 +28,7 @@ Usage::
 
 import inspect
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any
 
 import torch
 from alf_core import AcquisitionFunction as AlfAcquisitionFunction
@@ -64,9 +64,7 @@ class BotorchAcquisitionConfig:
 
     Args:
         name: Name of the acquisition function.  Must be a key in
-            :data:`ACQUISITION_REGISTRY` (one of `"expected_improvement"`,
-            `"upper_confidence_bound"`, `"probability_of_improvement"`,
-            `"log_noisy_expected_improvement"`).
+            :data:`ACQUISITION_REGISTRY`.
         kwargs: Keyword arguments forwarded to the acquisition constructor
             (everything except `model`).
 
@@ -75,12 +73,7 @@ class BotorchAcquisitionConfig:
         ValueError: If any required kwargs for the named acquisition class are missing.
     """
 
-    name: Literal[
-        "expected_improvement",
-        "upper_confidence_bound",
-        "probability_of_improvement",
-        "log_noisy_expected_improvement",
-    ] = "upper_confidence_bound"
+    name: str = "upper_confidence_bound"
     kwargs: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -115,8 +108,8 @@ class BotorchAcquisitionConfig:
 class BotorchAcquisitionFunction(AlfAcquisitionFunction):
     """ALF :class:`~alf_core.AcquisitionFunction` backed by a registered BoTorch acquisition.
 
-    The acquisition function is looked up by name in :data:`ACQUISITION_REGISTRY`
-    and instantiated on each call with `model` injected from `state.surrogate.model`.
+    The acquisition class is resolved from :data:`ACQUISITION_REGISTRY` once at
+    construction and instantiated on each call with `model` injected from `state.surrogate.model`.
     If the surrogate model is an ALF `BaseModel` it is adapted via
     :class:`~alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter.BoTorchModelAdapter`
     before being passed to the BoTorch acquisition.
@@ -134,6 +127,7 @@ class BotorchAcquisitionFunction(AlfAcquisitionFunction):
             cfg: Validated config for the BoTorch acquisition function.
         """
         self._cfg = cfg
+        self._acq_cls = ACQUISITION_REGISTRY[cfg.name]
 
     def __call__(
         self,
@@ -154,8 +148,7 @@ class BotorchAcquisitionFunction(AlfAcquisitionFunction):
         X = candidates_to_tensor(search_candidates, device=device)
 
         adapted = model if isinstance(model, BotorchModel) else BoTorchModelAdapter(model)
-        acq_cls = ACQUISITION_REGISTRY[self._cfg.name]
-        botorch_acq = acq_cls(model=adapted, **self._cfg.kwargs)
+        botorch_acq = self._acq_cls(model=adapted, **self._cfg.kwargs)
 
         X_batched = X.unsqueeze(1) if X.dim() == 2 else X
         with torch.no_grad():
