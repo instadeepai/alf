@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
+from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel, BoTorchTrainConfig
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, SubsampleConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.mlp import MLP, MLPModel, MLPModelConfig, MLPTrainConfig
 from alf_tools.models.utils import (
+    build_from_target,
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
     get_device,
@@ -26,6 +27,8 @@ from alf_tools.models.utils import (
 
 __all__ = [
     "BoTorchGPModel",
+    "BoTorchTrainConfig",
+    "build_from_target",
     "CNNModel",
     "CNNModelConfig",
     "CNNTrainConfig",
@@ -51,7 +54,7 @@ try:
     from alf_tools.models.esmfold import ESMFoldModel, ESMFoldModelConfig
 
     _esmfold_available = True
-except ModuleNotFoundError:
+except ImportError:
     _esmfold_available = False
 
 if _esmfold_available:

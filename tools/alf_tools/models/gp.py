@@ -15,7 +15,8 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, field
 from typing import Any, Callable, Literal, TypeAlias, Union
 
 import gpytorch
@@ -38,6 +39,7 @@ from alf_tools.models.utils import (
     one_hot_encode,
     transform_data,
 )
+from alf_tools.models.utils.config_utils import build_from_target
 from alf_tools.models.utils.torch_utils import get_device
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
@@ -57,25 +59,35 @@ class GPModelConfig:
             Only used when kernel_type='matern'.
         ard: Whether to use Automatic Relevance Determination (separate lengthscale
             per dimension).
-        lengthscale_prior: Prior distribution for kernel lengthscale. If None, uses
-            GPyTorch defaults.
-        outputscale_prior: Prior distribution for kernel output scale. If None, uses
-            GPyTorch defaults.
-        noise_constraint: Constraint on the likelihood noise. If None, uses reasonable
-            defaults (e.g., GreaterThan(1e-4)).
         mean_type: Type of mean function ('constant' or 'zero').
+        lengthscale_prior: Prior for the kernel lengthscale, as a `_target_` dict.
+            Defaults to LogNormal(sqrt(2), sqrt(3)) (Hvarfner et al. 2024 fixed form).
+            Set to `None` to use no prior.
+        lengthscale_constraint: Constraint on the kernel lengthscale, as a
+            `_target_` dict. Defaults to `None` (no constraint).
+        outputscale_prior: Prior for the kernel output scale, as a `_target_` dict.
+            Defaults to `None`.
+        noise_constraint: Constraint on the likelihood noise, as a `_target_` dict.
+            Defaults to `None` (a GreaterThan(1e-4) fallback is applied internally).
         build_kernel_fn: Optional custom function to build the kernel. If provided,
-            it will be used instead of the default kernel construction logic. Should take
-            the same arguments as _build_kernel and return a gpytorch.kernels.Kernel.
+            used instead of the default kernel construction logic. Not serializable —
+            for advanced Python-only use. Should return a gpytorch.kernels.Kernel.
     """
 
     kernel_type: KernelTypes = "rbf"
     matern_nu: float = 2.5
     ard: bool = True
-    lengthscale_prior: gpytorch.priors.Prior | None = None
-    outputscale_prior: gpytorch.priors.Prior | None = None
-    noise_constraint: gpytorch.constraints.Interval | None = None
     mean_type: Literal["constant", "zero"] = "constant"
+    lengthscale_prior: dict | None = field(
+        default_factory=lambda: {
+            "_target_": "gpytorch.priors.LogNormalPrior",
+            "loc": math.sqrt(2),
+            "scale": math.sqrt(3),
+        }
+    )
+    lengthscale_constraint: dict | None = None
+    outputscale_prior: dict | None = None
+    noise_constraint: dict | None = None
     build_kernel_fn: Callable[..., gpytorch.kernels.Kernel] | None = None
 
 
@@ -157,6 +169,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         ard: bool = True,
         mean_type: str = "constant",
         lengthscale_prior: gpytorch.priors.Prior | None = None,
+        lengthscale_constraint: gpytorch.constraints.Constraint | None = None,
         outputscale_prior: gpytorch.priors.Prior | None = None,
         build_kernel_fn: Callable[..., gpytorch.kernels.Kernel] | None = None,
     ):
@@ -171,6 +184,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
             ard: Whether to use Automatic Relevance Determination.
             mean_type: Type of mean function.
             lengthscale_prior: Prior for kernel lengthscale.
+            lengthscale_constraint: Constraint for kernel lengthscale.
             outputscale_prior: Prior for kernel output scale.
             build_kernel_fn: Optional custom function to build the kernel.
                 If provided, it will be used instead of the default kernel
@@ -201,6 +215,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
                 ard=ard,
                 matern_nu=matern_nu,
                 lengthscale_prior=lengthscale_prior,
+                lengthscale_constraint=lengthscale_constraint,
                 outputscale_prior=outputscale_prior,
             )
 
@@ -211,6 +226,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
         ard: bool,
         matern_nu: float,
         lengthscale_prior: gpytorch.priors.Prior | None,
+        lengthscale_constraint: gpytorch.constraints.Constraint | None,
         outputscale_prior: gpytorch.priors.Prior | None,
     ) -> gpytorch.kernels.Kernel:
         """Build the kernel based on configuration.
@@ -220,8 +236,9 @@ class ExactGPModel(gpytorch.models.ExactGP):
             input_dim: Dimensionality of input features.
             ard: Whether to use ARD.
             matern_nu: Smoothness for Matern kernel.
-            lengthscale_prior: Prior for lengthscale.
-            outputscale_prior: Prior for output scale.
+            lengthscale_prior: Prior for lengthscale (already instantiated).
+            lengthscale_constraint: Constraint for lengthscale (already instantiated).
+            outputscale_prior: Prior for output scale (already instantiated).
 
         Returns:
             Configured GPyTorch kernel.
@@ -229,21 +246,31 @@ class ExactGPModel(gpytorch.models.ExactGP):
         Raises:
             ValueError: If kernel_type is not supported.
         """
-        # Determine ARD dimensions
         ard_num_dims = input_dim if ard else None
 
-        # Build base kernel
         if kernel_type == "rbf":
-            base_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=ard_num_dims)
+            base_kernel = gpytorch.kernels.RBFKernel(
+                ard_num_dims=ard_num_dims,
+                lengthscale_prior=lengthscale_prior,
+                lengthscale_constraint=lengthscale_constraint,
+            )
         elif kernel_type == "matern":
-            base_kernel = gpytorch.kernels.MaternKernel(nu=matern_nu, ard_num_dims=ard_num_dims)
+            base_kernel = gpytorch.kernels.MaternKernel(
+                nu=matern_nu,
+                ard_num_dims=ard_num_dims,
+                lengthscale_prior=lengthscale_prior,
+                lengthscale_constraint=lengthscale_constraint,
+            )
         elif kernel_type == "linear":
             base_kernel = gpytorch.kernels.LinearKernel(ard_num_dims=ard_num_dims)
         elif kernel_type == "polynomial":
             base_kernel = gpytorch.kernels.PolynomialKernel(power=2, ard_num_dims=ard_num_dims)
         elif kernel_type == "rbf_linear":
-            # Composite kernel: RBF + Linear
-            rbf_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=ard_num_dims)
+            rbf_kernel = gpytorch.kernels.RBFKernel(
+                ard_num_dims=ard_num_dims,
+                lengthscale_prior=lengthscale_prior,
+                lengthscale_constraint=lengthscale_constraint,
+            )
             linear_kernel = gpytorch.kernels.LinearKernel(ard_num_dims=ard_num_dims)
             base_kernel = rbf_kernel + linear_kernel
         else:
@@ -252,27 +279,7 @@ class ExactGPModel(gpytorch.models.ExactGP):
                 f"Supported types: 'rbf', 'matern', 'linear', 'polynomial', 'rbf_linear'"
             )
 
-        # Set priors if provided
-        if lengthscale_prior is not None and hasattr(base_kernel, "lengthscale"):
-            base_kernel.register_prior(
-                "lengthscale_prior",
-                lengthscale_prior,
-                lambda m: m.lengthscale,
-                lambda m, v: m._set_lengthscale(v),
-            )
-
-        # Wrap with scale kernel to learn output scale
-        kernel = gpytorch.kernels.ScaleKernel(base_kernel)
-
-        if outputscale_prior is not None:
-            kernel.register_prior(
-                "outputscale_prior",
-                outputscale_prior,
-                lambda m: m.outputscale,
-                lambda m, v: m._set_outputscale(v),
-            )
-
-        return kernel
+        return gpytorch.kernels.ScaleKernel(base_kernel, outputscale_prior=outputscale_prior)
 
     def forward(
         self, x: Float[torch.Tensor, "n_samples n_features"]
@@ -418,15 +425,10 @@ class GPModel(BaseModel):
         Returns:
             Configured Gaussian likelihood.
         """
-        # Use configured noise constraint or default
-        if self.model_config.noise_constraint is not None:
-            noise_constraint = self.model_config.noise_constraint
-        else:
-            # Default: constrain noise to be >= 1e-4
+        noise_constraint = build_from_target(self.model_config.noise_constraint)
+        if noise_constraint is None:
             noise_constraint = gpytorch.constraints.GreaterThan(1e-4)
-
-        likelihood = gpytorch.likelihoods.GaussianLikelihood(noise_constraint=noise_constraint)
-        return likelihood
+        return gpytorch.likelihoods.GaussianLikelihood(noise_constraint=noise_constraint)
 
     def _initialize_gp_model(
         self,
@@ -459,8 +461,9 @@ class GPModel(BaseModel):
             matern_nu=self.model_config.matern_nu,
             ard=self.model_config.ard,
             mean_type=self.model_config.mean_type,
-            lengthscale_prior=self.model_config.lengthscale_prior,
-            outputscale_prior=self.model_config.outputscale_prior,
+            lengthscale_prior=build_from_target(self.model_config.lengthscale_prior),
+            lengthscale_constraint=build_from_target(self.model_config.lengthscale_constraint),
+            outputscale_prior=build_from_target(self.model_config.outputscale_prior),
             build_kernel_fn=self.model_config.build_kernel_fn,
         )
 

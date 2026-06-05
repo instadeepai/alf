@@ -12,20 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.models.utils.config_utils import build_from_target
-from alf_tools.models.utils.data_utils import transform_data
-from alf_tools.models.utils.sequence_utils import (
-    create_char_to_idx_mapping,
-    extract_sequences_from_inputs,
-    one_hot_encode,
+from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
+    BoTorchModelAdapter,
 )
-from alf_tools.models.utils.torch_utils import get_device
 
-__all__ = [
-    "build_from_target",
-    "create_char_to_idx_mapping",
-    "extract_sequences_from_inputs",
-    "get_device",
-    "one_hot_encode",
-    "transform_data",
-]
+__all__ = ["BoTorchModelAdapter"]

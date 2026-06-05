@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
+
+import gpytorch
 import numpy as np
 import pytest
 import torch
@@ -23,6 +26,7 @@ from alf_tools.models.gp import (
     GPTrainConfig,
 )
 from alf_tools.models.utils import one_hot_encode
+from alf_tools.models.utils.config_utils import build_from_target
 
 
 @pytest.fixture
@@ -496,4 +500,153 @@ class TestGPNormalisation:
         assert metrics["final_val_coverage_0.95"] > 0.3, (
             f"final_val_coverage_0.95={metrics['final_val_coverage_0.95']:.3f} — "
             "val metrics appear to be in standardised space, not original label scale"
+        )
+
+
+class TestGPModelConfigDefaults:
+    """Tests for the updated GPModelConfig dict-based fields."""
+
+    def test_lengthscale_prior_defaults_to_lognormal_dict(self):
+        """Test that the default lengthscale_prior is a dict specifying a
+        LogNormalPrior with the expected parameters.
+        """
+        cfg = GPModelConfig()
+        assert isinstance(cfg.lengthscale_prior, dict)
+        assert cfg.lengthscale_prior["_target_"] == "gpytorch.priors.LogNormalPrior"
+        assert cfg.lengthscale_prior["loc"] == pytest.approx(math.sqrt(2))
+        assert cfg.lengthscale_prior["scale"] == pytest.approx(math.sqrt(3))
+
+    def test_lengthscale_constraint_defaults_to_none(self):
+        """Test that the default lengthscale_constraint is None, meaning no
+        constraint is applied to the lengthscale parameter.
+        """
+        cfg = GPModelConfig()
+        assert cfg.lengthscale_constraint is None
+
+    def test_outputscale_prior_defaults_to_none(self):
+        """Test that the default outputscale_prior is None, meaning no prior is
+        applied to the outputscale parameter.
+        """
+        cfg = GPModelConfig()
+        assert cfg.outputscale_prior is None
+
+    def test_noise_constraint_defaults_to_none(self):
+        """Test that the default noise_constraint is None, meaning no constraint
+        is applied to the noise parameter.
+        """
+        cfg = GPModelConfig()
+        assert cfg.noise_constraint is None
+
+    def test_custom_gamma_prior_accepted(self):
+        """Test that a custom GammaPrior configuration is accepted and stored
+        correctly in the config.
+        """
+        prior_cfg = {
+            "_target_": "gpytorch.priors.GammaPrior",
+            "concentration": 3.0,
+            "rate": 6.0,
+        }
+        cfg = GPModelConfig(lengthscale_prior=prior_cfg)
+        assert cfg.lengthscale_prior["_target_"] == "gpytorch.priors.GammaPrior"
+
+    def test_lengthscale_prior_can_be_set_to_none(self):
+        """Test that setting lengthscale_prior to None is accepted and results
+        in no prior being used.
+        """
+        cfg = GPModelConfig(lengthscale_prior=None)
+        assert cfg.lengthscale_prior is None
+
+    def test_build_from_target_works_with_default_prior(self):
+        """Test that the default lengthscale_prior dict can be successfully
+        built into a LogNormalPrior instance.
+        """
+        cfg = GPModelConfig()
+        prior = build_from_target(cfg.lengthscale_prior)
+        assert isinstance(prior, gpytorch.priors.LogNormalPrior)
+
+    def test_default_prior_dicts_are_independent(self):
+        """Each GPModelConfig() gets its own dict, not a shared reference."""
+        cfg1 = GPModelConfig()
+        cfg2 = GPModelConfig()
+        assert cfg1.lengthscale_prior is not cfg2.lengthscale_prior
+
+
+class TestGPModelPriorWiring:
+    """Integration tests: confirm prior and constraint reach the kernel."""
+
+    _train_cfg = GPTrainConfig(num_iterations=5, log_frequency=5)
+    _feat_cfg = FeaturizerConfig(
+        featurizer_type="custom",
+        custom_featurizer=lambda x: torch.tensor(x, dtype=torch.float32),
+    )
+
+    def test_default_lognormal_prior_is_registered(
+        self, sample_sinusoidal_data, val_sinusoidal_data
+    ):
+        """Test that the default LogNormalPrior is correctly registered on the kernel."""
+        model = GPModel(
+            model_config=GPModelConfig(),
+            train_config=self._train_cfg,
+            featurizer_config=self._feat_cfg,
+        )
+        model.train(sample_sinusoidal_data, val_sinusoidal_data)
+        base_kernel = model.gp_model.covar_module.base_kernel
+        # Prior should be registered on the base kernel
+        prior_names = {name for name, *_ in base_kernel.named_priors()}
+        assert "lengthscale_prior" in prior_names
+
+    def test_gamma_prior_is_registered(self, sample_sinusoidal_data, val_sinusoidal_data):
+        """Test that a custom GammaPrior is correctly registered on the kernel."""
+        cfg = GPModelConfig(
+            lengthscale_prior={
+                "_target_": "gpytorch.priors.GammaPrior",
+                "concentration": 3.0,
+                "rate": 6.0,
+            }
+        )
+        model = GPModel(
+            model_config=cfg,
+            train_config=self._train_cfg,
+            featurizer_config=self._feat_cfg,
+        )
+        model.train(sample_sinusoidal_data, val_sinusoidal_data)
+        base_kernel = model.gp_model.covar_module.base_kernel
+        named = {name: prior for name, _module, prior, *_ in base_kernel.named_priors()}
+        assert "lengthscale_prior" in named
+        assert isinstance(named["lengthscale_prior"], gpytorch.priors.GammaPrior)
+
+    def test_no_prior_when_lengthscale_prior_is_none(
+        self, sample_sinusoidal_data, val_sinusoidal_data
+    ):
+        """Test that setting lengthscale_prior to None results in no prior being registered."""
+        cfg = GPModelConfig(lengthscale_prior=None)
+        model = GPModel(
+            model_config=cfg,
+            train_config=self._train_cfg,
+            featurizer_config=self._feat_cfg,
+        )
+        model.train(sample_sinusoidal_data, val_sinusoidal_data)
+        base_kernel = model.gp_model.covar_module.base_kernel
+        prior_names = {name for name, *_ in base_kernel.named_priors()}
+        assert "lengthscale_prior" not in prior_names
+
+    def test_lengthscale_constraint_is_applied(self, sample_sinusoidal_data, val_sinusoidal_data):
+        """Test that a custom lengthscale constraint is correctly applied to the kernel."""
+        cfg = GPModelConfig(
+            lengthscale_constraint={
+                "_target_": "gpytorch.constraints.GreaterThan",
+                "lower_bound": 0.05,
+            }
+        )
+        model = GPModel(
+            model_config=cfg,
+            train_config=self._train_cfg,
+            featurizer_config=self._feat_cfg,
+        )
+        model.train(sample_sinusoidal_data, val_sinusoidal_data)
+        base_kernel = model.gp_model.covar_module.base_kernel
+        assert hasattr(base_kernel, "raw_lengthscale_constraint")
+        assert isinstance(
+            base_kernel.raw_lengthscale_constraint,
+            gpytorch.constraints.GreaterThan,
         )

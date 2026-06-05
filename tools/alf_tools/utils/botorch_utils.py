@@ -175,7 +175,6 @@ def predictions_to_posterior(
     if device is None:
         device = torch.device("cpu")
 
-    # TODO: double check that we don't need .detach() here
     mean = torch.from_numpy(predictions.means).to(dtype).to(device)
     variance = torch.from_numpy(predictions.variances).to(dtype).to(device)
 
@@ -217,7 +216,7 @@ def get_bounds_tensor(
 
     Raises:
         ValueError: If bounds are not in a valid format or if lower
-        bounds are not <= upper bounds.
+            bounds are not <= upper bounds.
 
     Returns:
         Tensor of shape (2, d) in BoTorch format.
@@ -231,7 +230,7 @@ def get_bounds_tensor(
     if device is None:
         device = torch.device("cpu")
 
-    def is_valid_bounds_array(arr):
+    def is_valid_bounds_array(arr: np.ndarray) -> bool:
         return (
             isinstance(arr, np.ndarray)
             and arr.ndim == 2

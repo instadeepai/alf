@@ -8,6 +8,7 @@ prediction, and sampling.
 .. toctree::
    :maxdepth: 1
 
+   BoTorch GP Model <botorch_exact_gp_model/index>
    CNN Model <cnn/index>
    ESMFold Model <esmfold/index>
    GP Model <gp/index>
