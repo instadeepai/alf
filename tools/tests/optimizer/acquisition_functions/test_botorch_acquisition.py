@@ -15,9 +15,11 @@
 """Tests for generic BoTorch acquisition function wrapper."""
 
 import math
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
+import torch
 from alf_core import (
     BaseDatasetConfig,
     Candidate,
@@ -702,7 +704,7 @@ def test_analytic_pi_scores_candidates(task_state):
 
 
 def test_log_noisy_ei_scores_candidates(task_state):
-    """qLogNoisyExpectedImprovement returns finite scores for each candidate."""
+    """QLogNoisyExpectedImprovement returns finite scores for each candidate."""
     acq_fn = BoTorchAcquisition(acquisition_type="log_noisy_expected_improvement", batch_size=1)
     candidates = [Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR)]
     labelled = acq_fn(search_candidates=candidates, state=task_state)
@@ -728,21 +730,19 @@ def test_invalid_acquisition_type_rejects_new_names():
 
 def test_score_candidates_skips_adapter_for_native_botorch_model(task_state, botorch_gp_model):
     """_score_candidates does not wrap a native BotorchModel in BoTorchModelAdapter."""
-    from unittest.mock import MagicMock, patch
-
     task_state.surrogate.model = botorch_gp_model
 
     acq_fn = BoTorchAcquisition(acquisition_type="qEI", batch_size=1)
     candidates = [Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR)]
 
     mock_acq_fn = MagicMock()
-    import torch
     mock_acq_fn.return_value = torch.tensor([0.5])
 
-    with patch(
-        "alf_tools.optimizer.acquisition_functions.botorch_acquisition.BoTorchModelAdapter"
-    ) as mock_adapter, patch.object(
-        acq_fn, "_create_acquisition_function", return_value=mock_acq_fn
+    with (
+        patch(
+            "alf_tools.optimizer.acquisition_functions.botorch_acquisition.BoTorchModelAdapter"
+        ) as mock_adapter,
+        patch.object(acq_fn, "_create_acquisition_function", return_value=mock_acq_fn),
     ):
         acq_fn(search_candidates=candidates, state=task_state)
         mock_adapter.assert_not_called()
@@ -750,8 +750,6 @@ def test_score_candidates_skips_adapter_for_native_botorch_model(task_state, bot
 
 def test_score_candidates_wraps_alf_model(mock_alf_model_with_variances):
     """_score_candidates wraps an ALF BaseModel in BoTorchModelAdapter."""
-    from unittest.mock import MagicMock
-
     surrogate = MagicMock()
     surrogate.model = mock_alf_model_with_variances
 

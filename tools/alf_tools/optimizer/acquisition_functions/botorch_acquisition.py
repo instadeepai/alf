@@ -21,19 +21,17 @@ making it easy to switch between different acquisition strategies.
 import logging
 from typing import Literal, Optional
 
-from botorch.models.model import Model as BotorchModel
-
 import numpy as np
 import torch
 from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
-from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
-from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
-    BoTorchModelAdapter,
-)
 from alf_tools.models.utils.botorch_utils import (
     candidates_to_tensor,
     get_bounds_tensor,
     tensor_to_candidates,
+)
+from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
+from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
+    BoTorchModelAdapter,
 )
 from botorch.acquisition.analytic import (
     LogExpectedImprovement,
@@ -47,6 +45,7 @@ from botorch.acquisition.monte_carlo import (
     qUpperConfidenceBound,
 )
 from botorch.generation import gen_candidates_scipy
+from botorch.models.model import Model as BotorchModel
 from botorch.optim import optimize_acqf
 from jaxtyping import Float
 
@@ -54,15 +53,27 @@ logger = logging.getLogger("alf-tools")
 
 # Type alias for supported acquisition function types
 AcquisitionType = Literal[
-    "qEI", "qLogEI", "qNEI", "qUCB", "qKG",
-    "expected_improvement", "upper_confidence_bound",
-    "probability_of_improvement", "log_noisy_expected_improvement",
+    "qEI",
+    "qLogEI",
+    "qNEI",
+    "qUCB",
+    "qKG",
+    "expected_improvement",
+    "upper_confidence_bound",
+    "probability_of_improvement",
+    "log_noisy_expected_improvement",
 ]
 
 _VALID_TYPES = [
-    "qEI", "qLogEI", "qNEI", "qUCB", "qKG",
-    "expected_improvement", "upper_confidence_bound",
-    "probability_of_improvement", "log_noisy_expected_improvement",
+    "qEI",
+    "qLogEI",
+    "qNEI",
+    "qUCB",
+    "qKG",
+    "expected_improvement",
+    "upper_confidence_bound",
+    "probability_of_improvement",
+    "log_noisy_expected_improvement",
 ]
 
 
@@ -245,7 +256,9 @@ class BoTorchAcquisition(AcquisitionFunction):
             return UpperConfidenceBound(model=model, beta=self.beta)
         elif self.acquisition_type == "log_noisy_expected_improvement":
             if X_baseline is None:
-                raise ValueError("log_noisy_expected_improvement requires X_baseline (training data)")
+                raise ValueError(
+                    "log_noisy_expected_improvement requires X_baseline (training data)"
+                )
             return qLogNoisyExpectedImprovement(
                 model=model,
                 X_baseline=X_baseline,
@@ -352,7 +365,9 @@ class BoTorchAcquisition(AcquisitionFunction):
             X_baseline = candidates_to_tensor(state.dataset.train_dataset.candidates)
 
         raw_model = state.surrogate.model
-        adapted_model = raw_model if isinstance(raw_model, BotorchModel) else BoTorchModelAdapter(raw_model)
+        adapted_model = (
+            raw_model if isinstance(raw_model, BotorchModel) else BoTorchModelAdapter(raw_model)
+        )
         acq_fn = self._create_acquisition_function(adapted_model, best_f, X_baseline)
 
         # Evaluate acquisition function
