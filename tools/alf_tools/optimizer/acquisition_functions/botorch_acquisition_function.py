@@ -28,7 +28,7 @@ Usage::
 
 import inspect
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 import torch
 from alf_core import AcquisitionFunction as AlfAcquisitionFunction
@@ -75,7 +75,12 @@ class BotorchAcquisitionConfig:
         ValueError: If any required kwargs for the named acquisition class are missing.
     """
 
-    name: str
+    name: Literal[
+        "expected_improvement",
+        "upper_confidence_bound",
+        "probability_of_improvement",
+        "log_noisy_expected_improvement",
+    ] = "upper_confidence_bound"
     kwargs: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
