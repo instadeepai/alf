@@ -15,6 +15,7 @@
 """Tests for generic BoTorch acquisition function wrapper."""
 
 import math
+from typing import get_args
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -32,7 +33,9 @@ from alf_core.dataclasses.state import State
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel, BoTorchTrainConfig
 from alf_tools.optimizer.acquisition_functions.botorch_acquisition import (
+    AcquisitionType,
     BoTorchAcquisition,
+    BoTorchAcquisitionOptConfig,
 )
 from alf_tools.optimizer.acquisition_functions.botorch_samplers import (
     BoTorchMCSampler,
@@ -214,15 +217,13 @@ def test_initialization_invalid_acquisition_type():
         )
 
 
-def test_initialization_qkg_not_implemented():
-    """Test that qKG raises NotImplementedError when creating acquisition function."""
-    acq_fn = BoTorchAcquisition(
-        acquisition_type="qKG",
-        bounds=[[0.0, 1.0], [0.0, 1.0]],
-    )
-
-    # Initialization should work, but calling it should raise NotImplementedError
-    assert acq_fn.acquisition_type == "qKG"
+def test_initialization_qkg_raises_not_implemented():
+    """QKG raises NotImplementedError at init time (planned but not yet implemented)."""
+    with pytest.raises(NotImplementedError, match="qKG.*not yet implemented"):
+        BoTorchAcquisition(
+            acquisition_type="qKG",  # type: ignore[arg-type]
+            bounds=[[0.0, 1.0], [0.0, 1.0]],
+        )
 
 
 # =============================================================================
@@ -465,21 +466,6 @@ def test_requires_trained_surrogate(simple_dataset):
 
     with pytest.raises(RuntimeError, match="Surrogate model is required"):
         acq_fn(search_candidates=test_candidates, state=state)
-
-
-def test_qkg_raises_not_implemented(task_state):
-    """Test that qKG raises NotImplementedError."""
-    acq_fn = BoTorchAcquisition(
-        acquisition_type="qKG",
-        bounds=[[0.0, 1.0], [0.0, 1.0]],
-    )
-
-    test_candidates = [
-        Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR),
-    ]
-
-    with pytest.raises(NotImplementedError, match="qKG.*not yet implemented"):
-        acq_fn(search_candidates=test_candidates, state=task_state)
 
 
 # =============================================================================
@@ -763,3 +749,51 @@ def test_score_candidates_wraps_alf_model(mock_alf_model_with_variances):
     result = acq_fn(search_candidates=candidates, state=state)
     assert len(result.labels) == 1
     assert all(np.isfinite(result.labels))
+
+
+# =============================================================================
+# AcquisitionType / _VALID_TYPES consistency
+# =============================================================================
+
+
+def test_acquisition_type_in_sync_with_valid_types():
+    """AcquisitionType Literal and the runtime get_args list must stay identical."""
+    valid = set(get_args(AcquisitionType))
+    # Ensure the type alias includes all expected families and no extras.
+    assert "qEI" in valid
+    assert "qLogEI" in valid
+    assert "qNEI" in valid
+    assert "qUCB" in valid
+    assert "expected_improvement" in valid
+    assert "upper_confidence_bound" in valid
+    assert "probability_of_improvement" in valid
+    assert "log_noisy_expected_improvement" in valid
+    # qKG must NOT be in the type (not yet implemented; raises at init).
+    assert "qKG" not in valid
+
+
+# =============================================================================
+# BoTorchAcquisitionOptConfig configurability
+# =============================================================================
+
+
+def test_custom_optimization_config(task_state, simple_dataset):
+    """Custom BoTorchAcquisitionOptConfig is respected during continuous optimization."""
+    bounds = [[b[0], b[1]] for b in simple_dataset.bounds.T]
+    opt_cfg = BoTorchAcquisitionOptConfig(maxiter=10, batch_limit=8)
+
+    acq_fn = BoTorchAcquisition(
+        acquisition_type="qEI",
+        bounds=bounds,
+        batch_size=1,
+        num_restarts=2,
+        raw_samples=32,
+        optimization_config=opt_cfg,
+    )
+
+    assert acq_fn.optimization_config.maxiter == 10
+    assert acq_fn.optimization_config.batch_limit == 8
+
+    labelled = acq_fn(search_candidates=[], state=task_state)
+    assert len(labelled) == 1
+    assert np.isfinite(labelled.labels[0])

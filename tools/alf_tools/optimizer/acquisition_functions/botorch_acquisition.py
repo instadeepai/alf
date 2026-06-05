@@ -19,6 +19,7 @@ making it easy to switch between different acquisition strategies.
 """
 
 import logging
+from dataclasses import dataclass
 from typing import Literal, Optional, get_args
 
 import numpy as np
@@ -57,7 +58,6 @@ AcquisitionType = Literal[
     "qLogEI",
     "qNEI",
     "qUCB",
-    "qKG",
     "expected_improvement",
     "upper_confidence_bound",
     "probability_of_improvement",
@@ -65,6 +65,7 @@ AcquisitionType = Literal[
 ]
 
 
+@dataclass
 class BoTorchAcquisitionOptConfig:
     """Configuration for acquisition function optimization.
 
@@ -72,7 +73,7 @@ class BoTorchAcquisitionOptConfig:
     ``options`` dict, which is forwarded to the underlying scipy optimizer
     (``gen_candidates_scipy``).
 
-    Attributes:
+    Args:
         batch_limit: Maximum number of candidate points processed in a single
             batch during optimization. Smaller values reduce memory usage at
             the cost of more iterations. Default: 64.
@@ -109,7 +110,6 @@ class BoTorchAcquisition(AcquisitionFunction):
     - **qLogEI** (qLogExpectedImprovement): Log batch expected improvement
     - **qNEI** (qNoisyExpectedImprovement): For noisy observations
     - **qUCB** (qUpperConfidenceBound): Upper confidence bound with exploration bonus
-    - **qKG** (qKnowledgeGradient): More sophisticated but expensive
 
     Example - Switching acquisition functions:
         >>> from alf_tools.optimizer.acquisition_functions import (
@@ -147,7 +147,6 @@ class BoTorchAcquisition(AcquisitionFunction):
             - "qLogEI": Log Expected Improvement (See [Ament2023logei]_ for details.)
             - "qNEI": Noisy Expected Improvement (for noisy observations)
             - "qUCB": Upper Confidence Bound (tunable exploration)
-            - "qKG": Knowledge Gradient (expensive but sophisticated)
         sampler: BoTorchMCSampler configuration or None for analytic acquisition.
             If None, uses default Sobol sampler with 512 samples.
         bounds: Bounds for continuous optimization. List of [lower, upper] for each
@@ -160,10 +159,13 @@ class BoTorchAcquisition(AcquisitionFunction):
             If False, jointly optimize (slower but better diversity). Default: False.
         beta: Exploration parameter for qUCB. Higher = more exploration. Default: 0.2.
             Only used when acquisition_type="qUCB".
+        optimization_config: Scipy optimizer options forwarded to ``optimize_acqf``.
+            If None, uses ``BoTorchAcquisitionOptConfig`` defaults.
         kwargs: Additional keyword arguments passed to the specific acquisition function.
 
     Raises:
         ValueError: If acquisition_type is not supported.
+        NotImplementedError: If acquisition_type is "qKG" (planned but not yet implemented).
     """
 
     def __init__(
@@ -176,23 +178,22 @@ class BoTorchAcquisition(AcquisitionFunction):
         batch_size: int = 1,
         sequential: bool = False,
         beta: float = 0.2,
+        optimization_config: Optional[BoTorchAcquisitionOptConfig] = None,
         **kwargs,
     ):
         """Initialize generic BoTorch acquisition function.
 
         Raises:
             ValueError: If acquisition_type is not supported.
+            NotImplementedError: If acquisition_type is "qKG".
         """
         super().__init__()
-        self.acquisition_type = acquisition_type
-        self.bounds = bounds
-        self.num_restarts = num_restarts
-        self.raw_samples = raw_samples
-        self.batch_size = batch_size
-        self.sequential = sequential
-        self.beta = beta
-        self.kwargs = kwargs
-        self.optimization_config = BoTorchAcquisitionOptConfig()
+
+        # qKG is planned but not implemented; raise early so the error is clear.
+        if acquisition_type == "qKG":
+            raise NotImplementedError(
+                "qKG (Knowledge Gradient) is not yet implemented. Use qEI, qNEI, or qUCB instead."
+            )
 
         # Validate acquisition type
         valid_types = get_args(AcquisitionType)
@@ -201,6 +202,16 @@ class BoTorchAcquisition(AcquisitionFunction):
                 f"Unsupported acquisition_type: {acquisition_type}. "
                 f"Must be one of: {', '.join(valid_types)}"
             )
+
+        self.acquisition_type = acquisition_type
+        self.bounds = bounds
+        self.num_restarts = num_restarts
+        self.raw_samples = raw_samples
+        self.batch_size = batch_size
+        self.sequential = sequential
+        self.beta = beta
+        self.kwargs = kwargs
+        self.optimization_config = optimization_config or BoTorchAcquisitionOptConfig()
 
         # Set up sampler
         if sampler is None:
@@ -229,9 +240,8 @@ class BoTorchAcquisition(AcquisitionFunction):
             BoTorch acquisition function instance.
 
         Raises:
-            ValueError: If qNEI requires X_baseline but none provided, or if
-                acquisition_type is unknown.
-            NotImplementedError: If qKG is requested (not yet implemented).
+            ValueError: If qNEI / log_noisy_expected_improvement requires X_baseline
+                but none was provided, or if acquisition_type is unknown.
         """
         # Create sampler
         sampler = self.sampler_config.get_sampler()
@@ -285,11 +295,6 @@ class BoTorchAcquisition(AcquisitionFunction):
                 sampler=sampler,
                 **self.kwargs,
             )
-        elif self.acquisition_type == "qKG":
-            # Note: qKG requires different setup - would need qKnowledgeGradient import
-            raise NotImplementedError(
-                "qKG (Knowledge Gradient) is not yet implemented. Use qEI, qNEI, or qUCB instead."
-            )
         else:
             raise ValueError(f"Unknown acquisition type: {self.acquisition_type}")
 
@@ -317,7 +322,7 @@ class BoTorchAcquisition(AcquisitionFunction):
 
         # Get predictions from surrogate
         train_data = state.dataset.train_dataset
-        best_f = train_data.labels.max()
+        best_f = float(train_data.labels.max())
 
         # Mode 1: Score discrete candidates
         if search_candidates:
@@ -348,20 +353,30 @@ class BoTorchAcquisition(AcquisitionFunction):
         """
         logger.info(f"Scoring {len(candidates)} candidates with {self.acquisition_type}")
 
-        # Get training data for qNEI / log_noisy_expected_improvement
-        X_baseline = None
-        if self.acquisition_type in ("qNEI", "log_noisy_expected_improvement"):
-            X_baseline = candidates_to_tensor(state.dataset.train_dataset.candidates)
-
         raw_model = state.surrogate.model
         adapted_model = (
             raw_model if isinstance(raw_model, BotorchModel) else BoTorchModelAdapter(raw_model)
         )
+
+        # Infer tensor dtype from model parameters; fall back to float64 (BoTorch default)
+        # if the model has no registered PyTorch parameters (e.g. pure ALF BaseModel).
+        try:
+            infer_dtype = next(adapted_model.parameters()).dtype
+        except StopIteration:
+            infer_dtype = torch.float64
+
+        # Get training data for qNEI / log_noisy_expected_improvement
+        X_baseline = None
+        if self.acquisition_type in ("qNEI", "log_noisy_expected_improvement"):
+            X_baseline = candidates_to_tensor(
+                state.dataset.train_dataset.candidates, dtype=infer_dtype
+            )
+
         acq_fn = self._create_acquisition_function(adapted_model, best_f, X_baseline)
 
         # Evaluate acquisition function
         # For discrete scoring, evaluate each candidate independently
-        X = candidates_to_tensor(candidates)
+        X = candidates_to_tensor(candidates, dtype=infer_dtype)
 
         if self.batch_size > X.shape[0]:
             raise ValueError("batch_size(q) greater than the length of candidates")
@@ -419,8 +434,13 @@ class BoTorchAcquisition(AcquisitionFunction):
             # Fall back to adapter for ALF models (uses numerical gradients)
             model = BoTorchModelAdapter(state.surrogate.model)
 
-        # Infer model dtype so bounds/data tensors match (avoids double != float errors)
-        model_dtype = next(model.parameters()).dtype
+        # Infer model dtype so bounds/data tensors match (avoids double != float errors).
+        # Fall back to float64 (BoTorch default) when the model has no registered parameters
+        # (e.g. an ALF BaseModel that is not an nn.Module).
+        try:
+            model_dtype = next(model.parameters()).dtype
+        except StopIteration:
+            model_dtype = torch.float64
 
         # Convert bounds from list[list[float]] to list[tuple[float, float]]
         bounds_tuples = [(b[0], b[1]) for b in self.bounds]
@@ -428,9 +448,9 @@ class BoTorchAcquisition(AcquisitionFunction):
             bounds_tuples, device=state.surrogate.model.device, dtype=model_dtype
         )
 
-        # Get training data for qNEI
+        # Get training data for qNEI / log_noisy_expected_improvement
         X_baseline = None
-        if self.acquisition_type == "qNEI":
+        if self.acquisition_type in ("qNEI", "log_noisy_expected_improvement"):
             X_baseline = candidates_to_tensor(
                 state.dataset.train_dataset.candidates, dtype=model_dtype
             )

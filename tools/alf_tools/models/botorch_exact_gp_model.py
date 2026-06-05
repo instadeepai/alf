@@ -281,12 +281,12 @@ class BoTorchGPModel(BaseModel):
         ls_constraint = build_from_target(self.model_config.lengthscale_constraint)
         ard_num_dims = self.train_X.shape[-1] if self.model_config.ard else None
 
+        _lp = self.model_config.lengthscale_prior
         if (
             self.model_config.ard
-            and self.model_config.lengthscale_prior is not None
-            and self.model_config.lengthscale_prior.get("_target_")
-            == "gpytorch.priors.LogNormalPrior"
-            and abs(self.model_config.lengthscale_prior.get("loc", 0) - math.sqrt(2)) < 1e-9
+            and isinstance(_lp, dict)
+            and _lp.get("_target_") == "gpytorch.priors.LogNormalPrior"
+            and abs(_lp.get("loc", 0) - math.sqrt(2)) < 1e-9
         ):
             logger.warning(
                 "ARD is enabled with the default LogNormal prior (loc=sqrt(2)). "

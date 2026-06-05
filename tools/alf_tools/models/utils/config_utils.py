@@ -19,16 +19,25 @@ import importlib
 _ALLOWED_MODULES = frozenset({"gpytorch.priors", "gpytorch.constraints"})
 
 
-def build_from_target(cfg: dict | None) -> object | None:
+def build_from_target(cfg: dict | object | None) -> object | None:
     """Instantiate a GPyTorch object from a _target_ config dict.
 
     Supports any GPyTorch prior or constraint. The dict must contain a
     `_target_` key with a fully-qualified class path; all other keys
     are passed as constructor kwargs.
 
+    Already-instantiated objects (e.g. a ``gpytorch.priors.Prior`` instance)
+    are passed through unchanged, which preserves backward compatibility with
+    code that constructs priors directly rather than via the ``_target_`` dict
+    format.
+
     Args:
-        cfg: Dict with `_target_` (e.g. `"gpytorch.priors.LogNormalPrior"`)
-            and any constructor kwargs. `None` returns `None`.
+        cfg: One of:
+            - A dict with `_target_` (e.g. `"gpytorch.priors.LogNormalPrior"`)
+              and any constructor kwargs.
+            - An already-instantiated GPyTorch prior or constraint object
+              (passed through unchanged).
+            - `None`, which returns `None`.
 
     Raises:
         ValueError: If `_target_` is not in the allowed module list.
@@ -46,6 +55,9 @@ def build_from_target(cfg: dict | None) -> object | None:
     """
     if cfg is None:
         return None
+    if not isinstance(cfg, dict):
+        # Already instantiated — pass through for backward compatibility.
+        return cfg
     cfg = dict(cfg)  # don't mutate the caller's dict
     target = cfg.pop("_target_")
 

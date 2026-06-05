@@ -19,6 +19,7 @@ and ALF BaseModel instances to work seamlessly with BoTorch acquisition
 functions. This essentially wraps the ALF models to be used as BoTorch models
 """
 
+import warnings
 from typing import TYPE_CHECKING
 
 import torch
@@ -70,13 +71,14 @@ class BoTorchModelAdapter(Model):
             TypeError: If model is not a BoTorch Model or ALF BaseModel.
         """
         super().__init__()
-        self._wrapped_model = model
-        self._is_botorch_model = isinstance(model, Model)
-
         if not isinstance(model, (Model, BaseModel)):
             raise TypeError(
                 f"Model must be either a BoTorch Model or ALF BaseModel, got {type(model).__name__}"
             )
+        self._wrapped_model = model
+        # Defensive pass-through: callers (e.g. _score_candidates) already skip wrapping
+        # native BoTorch models, but the adapter handles them correctly if one does arrive.
+        self._is_botorch_model = isinstance(model, Model)
 
     def posterior(
         self,
@@ -115,6 +117,19 @@ class BoTorchModelAdapter(Model):
         # BoTorch passes either 2D (n, d) or 3D (batch, q, d) tensors
         # ALF models expect lists of candidates, so we need to flatten 3D inputs
         # then reshape the output posterior to match BoTorch's expectations
+
+        if output_indices is not None:
+            warnings.warn(
+                "output_indices is not supported for ALF BaseModel and will be ignored.",
+                UserWarning,
+                stacklevel=2,
+            )
+        if posterior_transform is not None:
+            warnings.warn(
+                "posterior_transform is not supported for ALF BaseModel and will be ignored.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         # Save original shape for later reshaping
         if X.ndim == 3:
@@ -167,20 +182,11 @@ class BoTorchModelAdapter(Model):
                 )
 
             mean = posterior.mvn.mean.reshape(batch_size, q)
-            covar_matrix = posterior.mvn.covariance_matrix
-
-            # Create block diagonal covariance for independent evaluations
-            # Shape: (batch_size, q, q)
-            new_covar = torch.zeros(
-                batch_size, q, q, dtype=covar_matrix.dtype, device=covar_matrix.device
-            )
-            for i in range(batch_size):
-                start_idx = i * q
-                end_idx = start_idx + q
-                new_covar[i] = covar_matrix[start_idx:end_idx, start_idx:end_idx]
-
+            # Slice the diagonal directly (O(n)) rather than materialising the
+            # full dense matrix (O(n²)) before taking block sub-matrices.
+            diag = lazy_covar.diagonal().reshape(batch_size, q)
+            new_covar = DiagLinearOperator(diag)
             mvn = MultivariateNormal(mean, new_covar)
-
             posterior = GPyTorchPosterior(mvn)
 
         return posterior
