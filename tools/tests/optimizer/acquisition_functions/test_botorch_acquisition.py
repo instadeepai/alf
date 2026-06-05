@@ -28,7 +28,7 @@ from alf_core import (
 )
 from alf_core.dataclasses.state import State
 from alf_core.dataset.base_dataset import BaseDataset
-from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
+from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel, BoTorchTrainConfig
 from alf_tools.optimizer.acquisition_functions.botorch_acquisition import (
     BoTorchAcquisition,
 )
@@ -120,7 +120,8 @@ def trained_surrogate(simple_dataset: _InlineBraninDataset) -> Surrogate:
     Returns:
         Surrogate: A trained GP surrogate model.
     """
-    gp_model = BoTorchGPModel(num_iterations=50, learning_rate=0.1)
+    train_config = BoTorchTrainConfig(num_iterations=50, learning_rate=0.1)
+    gp_model = BoTorchGPModel(train_config=train_config)
     surrogate = Surrogate(model=gp_model)
     surrogate.fit(simple_dataset.train_dataset, simple_dataset.validation_dataset)
     return surrogate
@@ -551,7 +552,8 @@ def test_high_dimensional_input(trained_surrogate):
     dataset.setup()
 
     # Train surrogate
-    gp_model = BoTorchGPModel(num_iterations=50)
+    train_config = BoTorchTrainConfig(num_iterations=50)
+    gp_model = BoTorchGPModel(train_config=train_config)
     surrogate = Surrogate(model=gp_model)
     surrogate.fit(dataset.train_dataset, dataset.validation_dataset)
 

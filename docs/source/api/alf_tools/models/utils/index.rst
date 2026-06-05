@@ -19,7 +19,7 @@ from a serialisable ``_target_`` config dict, enabling fully configuration-drive
    :show-inheritance:
    :undoc-members:
 
-.. automodule:: alf_tools.models.utils.botorch_model_adapter
+.. automodule:: alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter
    :members:
    :show-inheritance:
    :undoc-members:

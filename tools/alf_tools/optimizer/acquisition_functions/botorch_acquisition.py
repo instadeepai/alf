@@ -24,8 +24,10 @@ from typing import Literal, Optional
 import numpy as np
 import torch
 from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
-from alf_tools.models.utils.botorch_model_adapter import BoTorchModelAdapter
 from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
+from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
+    BoTorchModelAdapter,
+)
 from alf_tools.utils.botorch_utils import (
     candidates_to_tensor,
     get_bounds_tensor,
