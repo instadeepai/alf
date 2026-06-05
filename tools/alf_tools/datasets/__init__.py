@@ -15,3 +15,14 @@
 from alf_tools.datasets.flip import FLIP, FLIPConfig
 from alf_tools.datasets.gfp import GFP
 from alf_tools.datasets.proteingym import ProteinGym
+
+try:
+    from alf_tools.datasets.guacamol import (
+        GuacaMol,
+        GuacaMolConfig,
+        GuacaMolFileInfo,
+        download_guacamol,
+        get_task_scorer,
+    )
+except ImportError:
+    pass

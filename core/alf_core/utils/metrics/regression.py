@@ -12,131 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Regression metrics and supporting infrastructure.
+
+All metrics are automatically registered in `regression_metric_registry` at
+import time via the `@register_requires_variance` and
+`@register_no_variance_required` decorators.
+"""
+
 import logging
 import warnings
 from functools import wraps
 from typing import Any, Callable
 
 import numpy as np
-from jaxtyping import Float, Int
-from scipy.stats import norm, pearsonr, spearmanr
-from sklearn.metrics import (
-    accuracy_score,
-    f1_score,
-    precision_score,
-    recall_score,
-    roc_auc_score,
+from alf_core.utils.metrics.base import (
+    check_inputs,
+    check_variance_validity,
+    regression_metric_registry,
+    require_min_samples,
 )
+from jaxtyping import Float
+from scipy.stats import norm, pearsonr, spearmanr
 
-logger = logging.getLogger(__name__)
-
-
-def check_inputs(means: np.ndarray, targets: np.ndarray) -> None:
-    """Validate that means and targets arrays are compatible and valid.
-
-    Args:
-        means: Array of predicted means.
-        targets: Array of target values.
-
-    Raises:
-        AssertionError: If shapes don't match, arrays are empty, or contain NaN values.
-    """
-    assert means.shape == targets.shape, (
-        f"Means shape {means.shape} does not match targets shape {targets.shape} "
-        f"(both must be (b,))"
-    )
-    assert len(means) != 0, "Means and targets must not be empty (expected shape (b,) with b > 0)"
-    assert not (np.any(np.isnan(means))), "Mean prediction array contains NaN values"
-    assert not (np.any(np.isnan(targets))), "Target array contains NaN values"
-
-
-def check_variance_validity(variances: np.ndarray, targets: np.ndarray) -> None:
-    """Validate that variance array is valid and compatible with targets.
-
-    Args:
-        variances: Array of predicted variances.
-        targets: Array of target values.
-
-    Raises:
-        AssertionError: If variances is None, contains negative values, length
-            doesn't match targets, or contains NaN values.
-    """
-    assert variances is not None, (
-        "variances is None — this metric requires uncertainty estimates; "
-        "ensure your model's predict() returns a Predictions object with variances set "
-        "or that the problem type is correctly specified."
-    )
-    assert np.all(variances >= 0), (
-        f"variances must be non-negative, but {np.sum(variances < 0)} values are negative "
-        f"(min={variances.min():.4g})"
-    )
-    assert len(variances) == len(targets), (
-        f"variances has {len(variances)} elements but targets has {len(targets)} — "
-        f"both must have shape (b,)"
-    )
-    assert not (np.any(np.isnan(variances))), "Variance arrays contain NaN values"
-
-
-class RegressionMetricRegistry:
-    """Simple registry for metrics with variance requirements."""
-
-    def __init__(self) -> None:
-        """Initialise an empty metric registry."""
-        self.metrics: dict[str, Callable] = {}
-        self.variance_required: dict[str, bool] = {}
-
-    def register(self, name: str, metric_fn: Callable, requires_variance: bool = False) -> None:
-        """Register a metric function in the registry.
-
-        Args:
-            name: Name identifier for the metric.
-            metric_fn: Callable function that computes the metric.
-            requires_variance: Whether this metric requires variance information.
-        """
-        self.metrics[name] = metric_fn
-        self.variance_required[name] = requires_variance
-
-    def get_metrics(self, requires_variance: bool) -> dict[str, Callable]:
-        """Get all registered metrics.
-
-        Returns:
-            Dictionary mapping metric names to their functions.
-        """
-        return {
-            name: fn
-            for name, fn in self.metrics.items()
-            if self.variance_required[name] == requires_variance
-        }
-
-
-class ClassificationMetricRegistry:
-    """Simple registry for classification metrics not requiring variance information."""
-
-    def __init__(self) -> None:
-        """Initialise an empty classification metric registry."""
-        self.metrics: dict[str, Callable] = {}
-
-    def register(self, name: str, fn: Callable) -> None:
-        """Register a classification metric function in the registry.
-
-        Args:
-            name (str): Name of the metric.
-            fn (Callable): The metric function to register.
-        """
-        self.metrics[name] = fn
-
-    def get_metrics(self) -> dict[str, Callable]:
-        """Get all registered metrics that don't require variance.
-
-        Returns:
-            Dictionary mapping metric names to their functions.
-        """
-        return {name: fn for name, fn in self.metrics.items()}
-
-
-# Create the global registry instances
-regression_metric_registry = RegressionMetricRegistry()
-classification_metric_registry = ClassificationMetricRegistry()
+logger = logging.getLogger("alf-core")
 
 
 def register_requires_variance(metric_fn: Callable) -> Callable:
@@ -198,73 +96,11 @@ def register_no_variance_required(metric_fn: Callable) -> Callable:
     return wrapper
 
 
-def require_min_samples(n: int) -> Callable:
-    """Decorator factory that requires a minimum number of samples.
-
-    If the decorated function is called with fewer than n samples (based on
-    the length of the means array), returns an empty dictionary instead of
-    calling the function.
-
-    Args:
-        n: Minimum number of samples required.
-
-    Returns:
-        A decorator that wraps metric functions.
-    """
-
-    def decorator(fn: Callable) -> Callable:
-        @wraps(fn)
-        def wrapper(*args: Any, **kwargs: Any) -> dict[str, float]:
-            if len(args[0]) < n:
-                logger.warning(
-                    f"Insufficient samples for metric{fn.__name__}: got "
-                    f"{len(args[0])}, expected at least {n}"
-                )
-                return {}
-            return fn(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
-def register_classification_metric(metric_fn: Callable) -> Callable:
-    """Decorator to register a classification metric.
-
-    Automatically registers the metric in the classification registry and applies
-    basic input validation. The decorated function receives ``(probs, targets)``
-    where ``probs`` has shape ``(n_samples, num_classes)`` and ``targets`` has
-    shape ``(n_samples,)``.
-
-    Args:
-        metric_fn: The metric function to decorate.
-
-    Returns:
-        Wrapped metric function with validation and registration.
-    """
-
-    @wraps(metric_fn)
-    def wrapper(
-        probs: Float[np.ndarray, "n_samples num_classes"], targets: Float[np.ndarray, " n_samples"]
-    ) -> dict[str, float]:
-        assert probs.ndim == 2, (
-            f"probs must be with shape (n_samples, num_classes), got shape {probs.shape}"
-        )
-        assert len(probs) != 0, "Empty input arrays"
-        assert probs.shape[0] == targets.shape[0], (
-            f"probs and targets batch size mismatch: {probs.shape[0]} vs {targets.shape[0]}"
-        )
-        targets = targets.astype(int)
-        return metric_fn(probs, targets)
-
-    classification_metric_registry.register(metric_fn.__name__, wrapper)
-    return wrapper
-
-
 def monte_carlo_ranking(
     means: Float[np.ndarray, " b"],
     variances: Float[np.ndarray, " b"],
     num_samples: int = 10000,
+    seed: int = 42,
 ) -> tuple[Float[np.ndarray, " b"], Float[np.ndarray, " b"]]:
     """Compute ranks, their means and variances using Monte Carlo simulation.
 
@@ -276,17 +112,18 @@ def monte_carlo_ranking(
         variances: Array of shape (b,). Predicted variances.
         num_samples: Number of random samples to draw for the simulation.
             Defaults to 10000.
+        seed: Random seed for reproducibility. Defaults to 42.
 
     Returns:
         A tuple containing:
         - mean_rank: Mean rank for each candidate
         - rank_variances: Variance of ranks for each candidate
     """
-    np.random.seed(42)
+    rng = np.random.default_rng(seed)
     n = len(means)
 
     # Simulate Gaussian scores
-    mean_samples = np.random.normal(loc=means, scale=np.sqrt(variances), size=(num_samples, n))
+    mean_samples = rng.normal(loc=means, scale=np.sqrt(variances), size=(num_samples, n))
 
     # Compute hard ranks for each sample
     rank_samples = np.argsort(np.argsort(-mean_samples, axis=1), axis=1) + 1
@@ -465,7 +302,7 @@ def rank_expected_calibration_error(
     Returns:
         Dictionary with key "rank_ece" mapping to the ECE value.
     """
-    mean_rank, rank_variances = monte_carlo_ranking(means, variances)
+    mean_rank, rank_variances = monte_carlo_ranking(means, variances, seed=42)
     target_ranks = (-targets).argsort().argsort() + 1
 
     ece = expected_calibration_error(mean_rank, rank_variances, target_ranks)["ece"]
@@ -546,7 +383,7 @@ def rank_width(
     """
     assert (alpha >= 0) and (alpha <= 1), "alpha should be in [0,1]"
 
-    mean_rank, rank_variances = monte_carlo_ranking(means, variances)
+    mean_rank, rank_variances = monte_carlo_ranking(means, variances, seed=42)
     target_ranks = (-targets).argsort().argsort() + 1
 
     avg_width_ratio = width(mean_rank, rank_variances, target_ranks, alpha)[f"width_{alpha:.2f}"]
@@ -618,7 +455,7 @@ def rank_coverage(
     """
     assert (alpha >= 0) and (alpha <= 1), "alpha should be in [0,1]"
 
-    mean_rank, rank_variances = monte_carlo_ranking(means, variances)
+    mean_rank, rank_variances = monte_carlo_ranking(means, variances, seed=42)
     target_ranks = (-targets).argsort().argsort() + 1
     coverage_at_alpha = coverage(mean_rank, rank_variances, target_ranks, alpha)[
         f"coverage_{alpha:.2f}"
@@ -806,116 +643,3 @@ def regret_ucb_alpha_sweep(
 
         regret_alpha_list.update(regret_alpha)
     return regret_alpha_list
-
-
-# ---------------------------------------------------------------------------
-# Classification metrics
-# ---------------------------------------------------------------------------
-
-
-@register_classification_metric
-def accuracy(
-    probs: Float[np.ndarray, "n_samples num_classes"],
-    targets: Int[np.ndarray, " n_samples"],
-) -> dict[str, float]:
-    """Compute classification accuracy.
-
-    Args:
-        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
-        targets: Array of shape (n_samples,). Integer class labels.
-
-    Returns:
-        {"accuracy": accuracy float}
-    """
-    preds = np.argmax(probs, axis=1)
-    return {"accuracy": float(accuracy_score(targets, preds))}
-
-
-@register_classification_metric
-def f1(
-    probs: Float[np.ndarray, "n_samples num_classes"],
-    targets: Int[np.ndarray, " n_samples"],
-) -> dict[str, float]:
-    """Compute macro-averaged F1 score.
-
-    Args:
-        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
-        targets: Array of shape (n_samples,). Integer class labels.
-
-    Returns:
-        {"f1": macro F1 float}
-    """
-    preds = np.argmax(probs, axis=1)
-    return {"f1": float(f1_score(targets, preds, average="macro", zero_division=0))}
-
-
-@register_classification_metric
-def precision(
-    probs: Float[np.ndarray, "n_samples num_classes"],
-    targets: Int[np.ndarray, " n_samples"],
-) -> dict[str, float]:
-    """Compute macro-averaged precision.
-
-    Args:
-        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
-        targets: Array of shape (n_samples,). Integer class labels.
-
-    Returns:
-        {"precision": macro precision float}
-    """
-    preds = np.argmax(probs, axis=1)
-    return {"precision": float(precision_score(targets, preds, average="macro", zero_division=0))}
-
-
-@register_classification_metric
-def recall(
-    probs: Float[np.ndarray, "n_samples num_classes"],
-    targets: Int[np.ndarray, " n_samples"],
-) -> dict[str, float]:
-    """Compute macro-averaged recall.
-
-    Args:
-        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
-        targets: Array of shape (n_samples,). Integer class labels.
-
-    Returns:
-        {"recall": macro recall float}
-    """
-    preds = np.argmax(probs, axis=1)
-    return {"recall": float(recall_score(targets, preds, average="macro", zero_division=0))}
-
-
-@register_classification_metric
-@require_min_samples(2)
-def auc_roc(
-    probs: Float[np.ndarray, "n_samples num_classes"],
-    targets: Int[np.ndarray, " n_samples"],
-) -> dict[str, float]:
-    """Compute Area Under the ROC Curve (AUC-ROC).
-
-    For binary classification, uses the positive-class probabilities.
-    For multiclass, uses one-vs-rest averaging.
-
-    Args:
-        probs: Array of shape (n_samples, num_classes). Predicted class probabilities.
-        targets: Array of shape (n_samples,). Integer class labels.
-
-    Returns:
-        {"auc_roc": AUC-ROC float}
-    """
-    if len(np.unique(targets)) < 2:
-        logger.warning("auc_roc: fewer than 2 unique classes in targets — returning empty dict.")
-        return {}
-    if probs.shape[1] == 2:
-        try:
-            return {"auc_roc": float(roc_auc_score(targets, probs[:, 1]))}
-        except ValueError as e:
-            logger.warning(
-                "auc_roc: sklearn raised ValueError (likely targets missing a class): %s", e
-            )
-            return {}
-    try:
-        return {"auc_roc": float(roc_auc_score(targets, probs, multi_class="ovr"))}
-    except ValueError as e:
-        logger.warning("auc_roc: sklearn raised ValueError (likely targets missing a class): %s", e)
-        return {}

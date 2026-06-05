@@ -14,7 +14,9 @@
 
 from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
+from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, SubsampleConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
+from alf_tools.models.mlp import MLP, MLPModel, MLPModelConfig, MLPTrainConfig
 from alf_tools.models.utils import (
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
@@ -29,10 +31,41 @@ __all__ = [
     "CNNTrainConfig",
     "create_char_to_idx_mapping",
     "extract_sequences_from_inputs",
-    "get_device",
-    "one_hot_encode",
     "FeaturizerConfig",
-    "GPModelConfig",
+    "get_device",
     "GPModel",
+    "GPModelConfig",
     "GPTrainConfig",
+    "one_hot_encode",
+    "EnsembleWrapper",
+    "EnsembleWrapperConfig",
+    "SubsampleConfig",
+    "MLP",
+    "MLPModel",
+    "MLPModelConfig",
+    "MLPTrainConfig",
 ]
+
+
+try:
+    from alf_tools.models.esmfold import ESMFoldModel, ESMFoldModelConfig
+
+    _esmfold_available = True
+except ModuleNotFoundError:
+    _esmfold_available = False
+
+if _esmfold_available:
+    __all__ += ["ESMFoldModelConfig", "ESMFoldModel"]
+
+_chemprop_available = False
+try:
+    import chemprop as _chemprop  # noqa: F401
+
+    _chemprop_available = True
+except ImportError:
+    pass
+
+if _chemprop_available:
+    from alf_tools.models.chemprop import ChempropModel, ChempropModelConfig, ChempropTrainConfig
+
+    __all__ += ["ChempropModel", "ChempropModelConfig", "ChempropTrainConfig"]
