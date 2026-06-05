@@ -41,11 +41,11 @@ def simple_2d_training_data():
     Returns:
         LabelledCandidates with 10 samples in 2D space.
     """
+    rng = np.random.default_rng(42)
     torch.manual_seed(42)
-    np.random.seed(42)
 
     # Create 10 random 2D points in [0, 1]
-    X = np.random.rand(10, 2).astype(np.float32)
+    X = rng.random((10, 2)).astype(np.float32)
     # Create labels from a simple function
     y = np.sin(X[:, 0] * 3.14159) + np.cos(X[:, 1] * 3.14159)
 

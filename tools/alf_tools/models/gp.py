@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
-from typing import Any, Callable, Literal, TypeAlias, Union
+from typing import Any, Callable, Literal, TypeAlias
 
 import gpytorch
 import numpy as np
@@ -373,7 +373,7 @@ class GPModel(BaseModel):
         self._output_standardiser: OutputStandardiser | None = None
 
         # Track metrics
-        self.training_metrics: dict[str, Union[float, int, np.number]] = {}
+        self.training_metrics: dict[str, float | int | np.number] = {}
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
 
     def _apply_custom_featurizer(self, sequences: list[str]) -> torch.Tensor:
@@ -396,7 +396,7 @@ class GPModel(BaseModel):
         return self.featurizer_config.custom_featurizer(sequences)
 
     def featurise(
-        self, inputs: Union[LabelledCandidates, list[Candidate]]
+        self, inputs: LabelledCandidates | list[Candidate]
     ) -> Float[torch.Tensor, "batch_size n_features"]:
         """Convert inputs to feature tensors.
 
@@ -787,7 +787,7 @@ class GPModel(BaseModel):
 
     def get_training_summary_metrics(
         self,
-    ) -> dict[str, Union[float, int, np.number]]:
+    ) -> dict[str, float | int | np.number]:
         """Return training metrics including learned hyperparameters.
 
         Returns:

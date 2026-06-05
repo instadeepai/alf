@@ -29,7 +29,7 @@ from botorch.posteriors.gpytorch import GPyTorchPosterior
 from gpytorch.distributions import MultivariateNormal
 from linear_operator.operators import DiagLinearOperator
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("alf-tools")
 
 
 def candidates_to_tensor(

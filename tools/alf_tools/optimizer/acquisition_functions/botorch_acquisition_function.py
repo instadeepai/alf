@@ -73,7 +73,7 @@ class BotorchAcquisitionConfig:
         ValueError: If any required kwargs for the named acquisition class are missing.
     """
 
-    name: str = "upper_confidence_bound"
+    name: str
     kwargs: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
