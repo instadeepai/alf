@@ -111,3 +111,9 @@ class TestIntraBatchDiversityEdgeCases:
         ]
         with pytest.raises(ValueError, match="does not support"):
             intra_batch_diversity(candidates)
+
+    def test_zero_vector_embedding_raises(self):
+        """All-zero embedding raises ValueError (cosine distance undefined)."""
+        candidates = [_emb(np.zeros(4)), _emb(np.array([1.0, 0.0, 0.0, 0.0]))]
+        with pytest.raises(ValueError, match="all-zero"):
+            intra_batch_diversity(candidates)

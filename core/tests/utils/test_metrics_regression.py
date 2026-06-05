@@ -540,6 +540,11 @@ class TestAucTopK:
         with pytest.raises(ValueError, match="non-zero"):
             auc_top_k(np.array([0.5, 0.6]), best_value=0.0)
 
+    def test_negative_best_value_raises(self):
+        """Negative best_value raises ValueError."""
+        with pytest.raises(ValueError, match="non-zero"):
+            auc_top_k(np.array([0.5, 0.6]), best_value=-1.0)
+
 
 class TestHitRate:
     """Tests for hit_rate metric."""

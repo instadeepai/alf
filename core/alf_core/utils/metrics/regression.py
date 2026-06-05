@@ -613,7 +613,7 @@ def top_k_mean(
         k: Number of top candidates to consider. Defaults to 10.
 
     Returns:
-        Dictionary with key ``top_{k_eff}_mean`` mapping to the mean value of
+        Dictionary with key `top_{k_eff}_mean` mapping to the mean value of
         the top-k targets.
     """
     k_eff = min(k, len(targets))
@@ -632,7 +632,7 @@ def top_k_max(
 
     Selects the k highest target values and returns the maximum.  When k
     exceeds the number of available targets the function falls back to all
-    available targets.  Use alongside ``top_k_mean`` to distinguish between
+    available targets.  Use alongside `top_k_mean` to distinguish between
     campaigns that find one very good candidate versus many good ones.
 
     Args:
@@ -642,7 +642,7 @@ def top_k_max(
         k: Number of top candidates to consider. Defaults to 10.
 
     Returns:
-        Dictionary with key ``top_{k_eff}_max`` mapping to the maximum value
+        Dictionary with key `top_{k_eff}_max` mapping to the maximum value
         of the top-k targets.
     """
     k_eff = min(k, len(targets))
@@ -658,28 +658,31 @@ def auc_top_k(
 
     Integrates the per-round top-k mean values using the trapezoidal rule,
     then normalises the result so that a perfect campaign (one that always
-    achieves ``best_value``) scores 1.0.  Lower values indicate that high-
+    achieves `best_value`) scores 1.0.  Lower values indicate that high-
     performing candidates were found later in the campaign.  Use as the
     primary leaderboard ranking metric for sample efficiency.
 
     Args:
         round_values: Array of shape (n_rounds,).  Per-round top-k mean, where
-            entry ``i`` is the top-k mean of all candidates acquired by round
-            ``i`` (inclusive).
-        best_value: The global best oracle label in the dataset.  Used to
-            normalise the AUC to [0, 1].
+            entry `i` is the top-k mean of all candidates acquired by round
+            `i` (inclusive).
+        best_value: The global best oracle label in the dataset.  Must be
+            strictly positive.  Used to normalise the AUC to [0, 1].
 
     Returns:
-        Dictionary with key ``auc_top_k`` mapping to the normalised AUC.
+        Dictionary with key `auc_top_k` mapping to the normalised AUC.
 
     Raises:
-        ValueError: If ``round_values`` has fewer than 2 entries or
-            ``best_value`` is zero.
+        ValueError: If `round_values` has fewer than 2 entries or
+            `best_value` is not strictly positive (non-zero).
     """
     if len(round_values) < 2:
         raise ValueError(f"auc_top_k requires at least 2 rounds, got {len(round_values)}")
-    if best_value == 0.0:
-        raise ValueError("best_value must be non-zero to normalise the AUC")
+    if best_value <= 0.0:
+        raise ValueError(
+            f"best_value must be strictly positive (non-zero) to normalise the AUC, "
+            f"got {best_value}"
+        )
     n = len(round_values)
     auc = float(_np_trapz(round_values / best_value, dx=1.0 / (n - 1)))
     return {"auc_top_k": auc}
@@ -695,7 +698,7 @@ def hit_rate(
     """Compute the fraction of acquired candidates whose label exceeds a threshold.
 
     Counts how many oracle-labelled candidates are considered "hits" (i.e.
-    their label is at or above ``threshold``) and returns this as a fraction
+    their label is at or above `threshold`) and returns this as a fraction
     of the total.  Suitable for discovery-framing tasks such as drug screening
     or protein fitness optimisation, where "active" or "fit" is a binary
     concept derived from a continuous score.
@@ -707,7 +710,7 @@ def hit_rate(
         threshold: Minimum label value to count as a hit. Defaults to 0.5.
 
     Returns:
-        Dictionary with key ``hit_rate_{threshold:.3f}`` mapping to the hit
+        Dictionary with key `hit_rate_{threshold:.3f}` mapping to the hit
         rate in [0, 1].
     """
     return {f"hit_rate_{threshold:.3f}": float((targets >= threshold).mean())}
@@ -727,7 +730,7 @@ def nll_gaussian(
         NLL = 0.5 * mean(log(2π) + log(σ²_i) + (y_i - μ_i)² / σ²_i)
 
     Lower values indicate that the model places high probability mass on the
-    true targets.  Use together with ``expected_calibration_error`` to
+    true targets.  Use together with `expected_calibration_error` to
     characterise both sharpness and calibration of the surrogate's uncertainty
     estimates.  Variances are clipped to a small positive value before
     computing the logarithm to guard against numerical instability.
@@ -739,7 +742,7 @@ def nll_gaussian(
         targets: Array of shape (b,). True labels.
 
     Returns:
-        Dictionary with key ``nll`` mapping to the mean NLL value.
+        Dictionary with key `nll` mapping to the mean NLL value.
     """
     eps = np.finfo(float).tiny
     safe_vars = np.maximum(variances, eps)
@@ -761,7 +764,7 @@ def calibration_curve(
     reliability diagram; perfect calibration lies on the diagonal.
 
     This function exposes the raw arrays used internally by
-    ``expected_calibration_error``, enabling callers to render the diagram
+    `expected_calibration_error`, enabling callers to render the diagram
     without re-computing the coverage sweep.
 
     Args:
@@ -772,19 +775,18 @@ def calibration_curve(
             Defaults to 100.
 
     Returns:
-        A tuple ``(expected_coverage, observed_coverage)`` where each array
+        A tuple `(expected_coverage, observed_coverage)` where each array
         has shape (n_grid_points,) and values in [0, 1].
     """
     check_inputs(means, targets)
     check_variance_validity(variances, targets)
     grid = np.linspace(0, 1, n_grid_points)
     observed = np.zeros(n_grid_points)
+    std_devs = np.sqrt(variances)
     for i, alpha in enumerate(grid):
         n_stds = norm.ppf(1 - (1 - alpha) / 2)
-        observed[i] = (
-            (targets >= means - n_stds * np.sqrt(variances))
-            & (targets <= means + n_stds * np.sqrt(variances))
-        ).mean()
+        half_width = n_stds * std_devs
+        observed[i] = ((targets >= means - half_width) & (targets <= means + half_width)).mean()
     return grid, observed
 
 

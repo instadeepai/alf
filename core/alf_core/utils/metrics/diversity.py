@@ -36,8 +36,8 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
     Dissimilarity is computed as follows depending on candidate modality:
 
     - **SEQUENCE**: normalised edit distance derived from
-      :class:`difflib.SequenceMatcher`.  ``dissimilarity = 1 - ratio``,
-      where ``ratio`` is 0 for completely different sequences and 1 for
+      :class:`difflib.SequenceMatcher`.  `dissimilarity = 1 - ratio`,
+      where `ratio` is 0 for completely different sequences and 1 for
       identical ones.
     - **EMBEDDING** / **TABULAR**: cosine distance computed via
       :func:`scipy.spatial.distance.pdist`.  Candidates are flattened to 1-D
@@ -51,13 +51,14 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
             candidates must share the same modality.
 
     Returns:
-        Dictionary with key ``intra_batch_diversity`` mapping to the average
+        Dictionary with key `intra_batch_diversity` mapping to the average
         pairwise dissimilarity in [0, 1].  Returns an empty dict when fewer
         than 2 candidates are provided.
 
     Raises:
-        ValueError: If candidates span multiple modalities, or if the modality
-            is not one of SEQUENCE, EMBEDDING, or TABULAR.
+        ValueError: If candidates span multiple modalities, if the modality
+            is not one of SEQUENCE, EMBEDDING, or TABULAR, or if any candidate
+            has an all-zero feature vector (cosine distance undefined).
     """
     if len(candidates) < 2:
         return {}
@@ -86,6 +87,11 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
             raise ValueError(
                 f"Cannot convert candidate data to a numeric feature matrix: {exc}"
             ) from exc
+        if np.any(np.all(features == 0, axis=1)):
+            raise ValueError(
+                "intra_batch_diversity: one or more candidates have an all-zero feature "
+                "vector; cosine distance is undefined."
+            )
         distances = pdist(features, metric="cosine")
         return {"intra_batch_diversity": float(np.mean(distances))}
 
