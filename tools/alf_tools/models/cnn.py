@@ -498,13 +498,13 @@ class CNNModel(BaseModel):
     def train(
         self,
         train_data: LabelledCandidates,
-        val_data: LabelledCandidates,
+        val_data: LabelledCandidates | None = None,
     ) -> None:
         """Train the CNN model.
 
         Args:
             train_data: Training data containing sequences and oracle values.
-            val_data: Validation data.
+            val_data: Optional validation data.
 
         Raises:
             ValueError: If the model's problem_type disagrees with the dataset's.
@@ -610,9 +610,9 @@ class CNNModel(BaseModel):
 
         For regression, returns raw scalar predictions.
         For binary classification, returns class probabilities of shape
-        ``(n_samples, 2)`` via sigmoid on the single output neuron.
+        `(n_samples, 2)` via sigmoid on the single output neuron.
         For multiclass, returns softmax probabilities of shape
-        ``(n_samples, num_classes)``.
+        `(n_samples, num_classes)`.
 
         Args:
             candidate_points: List of candidates to predict for.

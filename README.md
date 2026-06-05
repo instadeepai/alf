@@ -40,6 +40,19 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=core
 pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 ```
 
+**Optional extras** (required for ESM2Model and ChempropModel):
+
+```bash
+# ESM2 — protein language model
+pip install "alf_tools[esm2] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+
+# Chemprop — small-molecule MPNN
+pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+
+# Both extras together
+pip install "alf_tools[esm2,chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+```
+
 **Authentication:** Set up a `.netrc` file in your home directory with your GitHub personal access token:
 
 ```
@@ -125,7 +138,7 @@ alf/
 ├── tools/                 # Example implementations and tools (see tools/README.md)
 │   └── alf_tools/         # Tools package
 │       ├── datasets/      # Example datasets (e.g., GFP)
-│       ├── models/        # Example models (CNN, Random)
+│       ├── models/        # Example models (CNN, GP, Chemprop MPNN)
 │       └── optimizer/     # Example acquisition functions (UCB, Thompson Sampling, etc.) and search strategies
 ├── tutorials/             # Tutorials and example scripts
 └── docs/                  # Documentation
@@ -143,6 +156,21 @@ End-to-end guides for running active learning experiments:
 
 - **[Offline Design Tutorial](tutorials/experiments/offline_design_tutorial.ipynb)** - Dataset-based optimization
 - **[Online Design Tutorial](tutorials/experiments/online_design_tutorial.ipynb)** - Model-based optimization
+
+### Dataset Tutorials
+
+Deep-dives into specific datasets including download, statistics, and querying:
+
+- **[GuacaMol Tutorial](tutorials/datasets/guacamol_tutorial.ipynb)** - Drug-like molecule corpus: download, property analysis, and SMILES querying
+
+### Model Tutorials
+
+Deep-dives into specific model types including configuration, uncertainty quantification, and comparison:
+
+- **[Ensemble Tutorial](tutorials/models/ensemble_tutorial.ipynb)** - Seed ensembles, MC dropout, and combined ensembles for uncertainty-aware prediction
+- **[ESM2 Tutorial](tutorials/models/esm2_tutorial.ipynb)** - Fine-tuning ESM-2 as a protein fitness surrogate
+- **[Chemprop MPNN Tutorial](tutorials/models/chemprop_tutorial.ipynb)** - Active learning for small molecules using SMILES inputs and the Chemprop MPNN
+- **[GP Tutorial](tutorials/models/gp_tutorial.ipynb)** - Gaussian Process surrogate model usage
 
 ### Extension Tutorials
 
@@ -169,6 +197,7 @@ uv sync
 ```
 
 For GPU support, see the [GPU Configuration](docs/INSTALLATION.md#gpu-support-optional) section in the installation guide.
+For including models like ESM2 or Chemprop, see the [Optional Extras](docs/INSTALLATION.md#optional-extras) section in the installation guide.
 
 ### Run Tests
 

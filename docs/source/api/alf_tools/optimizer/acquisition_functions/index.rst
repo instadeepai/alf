@@ -8,6 +8,7 @@ promising for evaluation.
 .. toctree::
    :maxdepth: 1
 
+   CoreSet <core_set/index>
    Expected Improvement <expected_improvement/index>
    Greedy <greedy/index>
    Thompson Sampling <thompson_sampling/index>

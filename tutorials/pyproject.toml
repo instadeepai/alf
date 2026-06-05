@@ -11,8 +11,10 @@ dependencies = [
     "alf_core",
     "alf_tools",
     "matplotlib>=3.3.0",
+    "umap-learn>=0.5.0",
     "ipykernel>=6.25.0",
     "pyrosetta-installer",
+    "seaborn>=0.12.0",
 ]
 
 [tool.setuptools]
@@ -21,3 +23,9 @@ packages = []  # No Python packages, just notebooks
 [tool.uv.sources]
 alf_core = {path = "../core", editable = true}
 alf_tools = {path = "../tools", editable = true}
+
+[dependency-groups]
+dev = [
+    "jupyter>=1.1.1",
+    "nbconvert>=7.17.1",
+]
