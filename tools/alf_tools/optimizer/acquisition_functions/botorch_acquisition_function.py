@@ -32,7 +32,7 @@ from typing import Any
 
 import torch
 from alf_core import AcquisitionFunction as AlfAcquisitionFunction
-from alf_core import BaseModel, Candidate, LabelledCandidates, State
+from alf_core import Candidate, LabelledCandidates, State
 from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
     BoTorchModelAdapter,
 )
@@ -45,7 +45,6 @@ from botorch.acquisition.analytic import (
 )
 from botorch.acquisition.logei import qLogNoisyExpectedImprovement
 from botorch.models.model import Model as BotorchModel
-
 
 ACQUISITION_REGISTRY: dict[str, type[AcquisitionFunction]] = {
     "expected_improvement": ExpectedImprovement,

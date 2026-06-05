@@ -31,7 +31,6 @@ from alf_tools.optimizer.acquisition_functions.botorch_acquisition_function impo
     BotorchAcquisitionFunction,
 )
 
-
 # =============================================================================
 # BotorchAcquisitionConfig — name validation
 # =============================================================================
