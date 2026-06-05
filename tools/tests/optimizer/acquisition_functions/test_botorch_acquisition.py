@@ -667,6 +667,61 @@ def test_optimization_produces_reasonable_candidates(task_state, simple_dataset)
 
 
 # =============================================================================
+# Analytic acquisition type tests
+# =============================================================================
+
+
+def test_analytic_ei_scores_candidates(task_state):
+    """LogExpectedImprovement returns finite scores for each candidate."""
+    acq_fn = BoTorchAcquisition(acquisition_type="expected_improvement", batch_size=1)
+    candidates = [
+        Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR),
+        Candidate(data=np.array([0.1, 0.9]), modality=Modality.TABULAR),
+    ]
+    labelled = acq_fn(search_candidates=candidates, state=task_state)
+    assert len(labelled) == 2
+    assert all(np.isfinite(labelled.labels))
+
+
+def test_analytic_ucb_scores_candidates(task_state):
+    """UpperConfidenceBound returns finite scores for each candidate."""
+    acq_fn = BoTorchAcquisition(acquisition_type="upper_confidence_bound", beta=2.0, batch_size=1)
+    candidates = [Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR)]
+    labelled = acq_fn(search_candidates=candidates, state=task_state)
+    assert len(labelled) == 1
+    assert np.isfinite(labelled.labels[0])
+
+
+def test_analytic_pi_scores_candidates(task_state):
+    """ProbabilityOfImprovement returns finite scores for each candidate."""
+    acq_fn = BoTorchAcquisition(acquisition_type="probability_of_improvement", batch_size=1)
+    candidates = [Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR)]
+    labelled = acq_fn(search_candidates=candidates, state=task_state)
+    assert len(labelled) == 1
+    assert np.isfinite(labelled.labels[0])
+
+
+def test_log_noisy_ei_scores_candidates(task_state):
+    """qLogNoisyExpectedImprovement returns finite scores for each candidate."""
+    acq_fn = BoTorchAcquisition(acquisition_type="log_noisy_expected_improvement", batch_size=1)
+    candidates = [Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR)]
+    labelled = acq_fn(search_candidates=candidates, state=task_state)
+    assert len(labelled) == 1
+    assert np.isfinite(labelled.labels[0])
+
+
+def test_invalid_acquisition_type_rejects_new_names():
+    """New analytic type names are accepted; an unrecognised name still raises ValueError."""
+    BoTorchAcquisition(acquisition_type="expected_improvement")
+    BoTorchAcquisition(acquisition_type="upper_confidence_bound")
+    BoTorchAcquisition(acquisition_type="probability_of_improvement")
+    BoTorchAcquisition(acquisition_type="log_noisy_expected_improvement")
+
+    with pytest.raises(ValueError, match="Unsupported acquisition_type"):
+        BoTorchAcquisition(acquisition_type="banana")  # type: ignore
+
+
+# =============================================================================
 # Model wrapping tests (migrated from test_botorch_acquisition_function.py)
 # =============================================================================
 

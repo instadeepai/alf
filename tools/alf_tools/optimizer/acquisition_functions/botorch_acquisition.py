@@ -35,7 +35,12 @@ from alf_tools.models.utils.botorch_utils import (
     get_bounds_tensor,
     tensor_to_candidates,
 )
-from botorch.acquisition.logei import qLogExpectedImprovement
+from botorch.acquisition.analytic import (
+    LogExpectedImprovement,
+    ProbabilityOfImprovement,
+    UpperConfidenceBound,
+)
+from botorch.acquisition.logei import qLogExpectedImprovement, qLogNoisyExpectedImprovement
 from botorch.acquisition.monte_carlo import (
     qExpectedImprovement,
     qNoisyExpectedImprovement,
@@ -48,7 +53,17 @@ from jaxtyping import Float
 logger = logging.getLogger("alf-tools")
 
 # Type alias for supported acquisition function types
-AcquisitionType = Literal["qEI", "qNEI", "qUCB", "qKG"]
+AcquisitionType = Literal[
+    "qEI", "qLogEI", "qNEI", "qUCB", "qKG",
+    "expected_improvement", "upper_confidence_bound",
+    "probability_of_improvement", "log_noisy_expected_improvement",
+]
+
+_VALID_TYPES = [
+    "qEI", "qLogEI", "qNEI", "qUCB", "qKG",
+    "expected_improvement", "upper_confidence_bound",
+    "probability_of_improvement", "log_noisy_expected_improvement",
+]
 
 
 class BoTorchAcquisitionOptConfig:
@@ -181,10 +196,10 @@ class BoTorchAcquisition(AcquisitionFunction):
         self.optimization_config = BoTorchAcquisitionOptConfig()
 
         # Validate acquisition type
-        if acquisition_type not in ["qEI", "qLogEI", "qNEI", "qUCB", "qKG"]:
+        if acquisition_type not in _VALID_TYPES:
             raise ValueError(
                 f"Unsupported acquisition_type: {acquisition_type}. "
-                f"Must be one of: qEI, qLogEI, qNEI, qUCB, qKG"
+                f"Must be one of: {', '.join(_VALID_TYPES)}"
             )
 
         # Set up sampler
@@ -222,14 +237,29 @@ class BoTorchAcquisition(AcquisitionFunction):
         sampler = self.sampler_config.get_sampler()
 
         # Create acquisition function based on type
-        if self.acquisition_type == "qEI":
+        if self.acquisition_type == "expected_improvement":
+            return LogExpectedImprovement(model=model, best_f=best_f)
+        elif self.acquisition_type == "probability_of_improvement":
+            return ProbabilityOfImprovement(model=model, best_f=best_f)
+        elif self.acquisition_type == "upper_confidence_bound":
+            return UpperConfidenceBound(model=model, beta=self.beta)
+        elif self.acquisition_type == "log_noisy_expected_improvement":
+            if X_baseline is None:
+                raise ValueError("log_noisy_expected_improvement requires X_baseline (training data)")
+            return qLogNoisyExpectedImprovement(
+                model=model,
+                X_baseline=X_baseline,
+                sampler=sampler,
+                **self.kwargs,
+            )
+        elif self.acquisition_type == "qEI":
             return qExpectedImprovement(
                 model=model,
                 best_f=best_f,
                 sampler=sampler,
                 **self.kwargs,
             )
-        if self.acquisition_type == "qLogEI":
+        elif self.acquisition_type == "qLogEI":
             return qLogExpectedImprovement(
                 model=model,
                 best_f=best_f,
@@ -316,9 +346,9 @@ class BoTorchAcquisition(AcquisitionFunction):
         """
         logger.info(f"Scoring {len(candidates)} candidates with {self.acquisition_type}")
 
-        # Get training data for qNEI
+        # Get training data for qNEI / log_noisy_expected_improvement
         X_baseline = None
-        if self.acquisition_type == "qNEI":
+        if self.acquisition_type in ("qNEI", "log_noisy_expected_improvement"):
             X_baseline = candidates_to_tensor(state.dataset.train_dataset.candidates)
 
         raw_model = state.surrogate.model
