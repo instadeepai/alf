@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 
 import torch
 from alf_core.model.base_model import BaseModel
-from alf_tools.utils.botorch_utils import (
+from alf_tools.models.utils.botorch_utils import (
     predictions_to_posterior,
     tensor_to_candidates,
 )

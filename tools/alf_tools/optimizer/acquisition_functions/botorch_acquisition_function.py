@@ -33,10 +33,10 @@ from typing import Any
 import torch
 from alf_core import AcquisitionFunction as AlfAcquisitionFunction
 from alf_core import Candidate, LabelledCandidates, State
+from alf_tools.models.utils.botorch_utils import candidates_to_tensor
 from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
     BoTorchModelAdapter,
 )
-from alf_tools.utils.botorch_utils import candidates_to_tensor
 from botorch.acquisition import AcquisitionFunction
 from botorch.acquisition.analytic import (
     LogExpectedImprovement,

@@ -49,7 +49,7 @@ from torch.optim import Adam
 
 from alf_tools.models.gp import GPModelConfig
 from alf_tools.models.utils import build_from_target, get_device
-from alf_tools.utils.botorch_utils import candidates_to_tensor
+from alf_tools.models.utils.botorch_utils import candidates_to_tensor
 
 logger = logging.getLogger("alf-tools")
 

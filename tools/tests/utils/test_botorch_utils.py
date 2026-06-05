@@ -19,7 +19,7 @@ import pytest
 import torch
 from alf_core import Candidate, Predictions
 from alf_core.dataclasses.candidate import Modality
-from alf_tools.utils.botorch_utils import (
+from alf_tools.models.utils.botorch_utils import (
     candidates_to_tensor,
     get_bounds_tensor,
     predictions_to_posterior,
