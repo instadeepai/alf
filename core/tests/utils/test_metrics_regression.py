@@ -138,9 +138,10 @@ class TestRegretUcbAlpha:
 
     def test_small_dataset_returns_empty(self):
         """Dataset of size 1 returns empty dict."""
-        result = regret_ucb_alpha(
-            np.array([1.0]), np.array([0.1]), np.array([1.0]), num_acquisitions=1
-        )
+        with pytest.warns(UserWarning, match="too small"):
+            result = regret_ucb_alpha(
+                np.array([1.0]), np.array([0.1]), np.array([1.0]), num_acquisitions=1
+            )
         assert result == {}
 
     def test_returns_non_negative_regret(self):
@@ -235,7 +236,8 @@ class TestRegretUcbAlphaSweep:
         means = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
         variances = np.ones(5)
         targets = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
-        result = regret_ucb_alpha_sweep(means, variances, targets, alpha=0.5)
+        with pytest.warns(UserWarning, match="greater than the number"):
+            result = regret_ucb_alpha_sweep(means, variances, targets, alpha=0.5)
         assert len(result) > 0
 
 

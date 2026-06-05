@@ -108,7 +108,8 @@ class TestSplitStratified:
         labels = [0] * 3 + [1] * 3 + [2] * 3
         dataset = make_dataset(labels)
         requested = dict(train_size=2, validation_size=2, test_size=2, candidate_pool_size=2)
-        splits = split_stratified(dataset, **requested, seed=0)
+        with pytest.warns(UserWarning, match="due to rounding"):
+            splits = split_stratified(dataset, **requested, seed=0)
 
         assert len(splits["train"]) == requested["train_size"]
         assert len(splits["validation"]) == requested["validation_size"]
