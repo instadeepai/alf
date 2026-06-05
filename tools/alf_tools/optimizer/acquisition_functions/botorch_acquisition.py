@@ -21,6 +21,8 @@ making it easy to switch between different acquisition strategies.
 import logging
 from typing import Literal, Optional
 
+from botorch.models.model import Model as BotorchModel
+
 import numpy as np
 import torch
 from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
@@ -28,7 +30,7 @@ from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMC
 from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
     BoTorchModelAdapter,
 )
-from alf_tools.utils.botorch_utils import (
+from alf_tools.models.utils.botorch_utils import (
     candidates_to_tensor,
     get_bounds_tensor,
     tensor_to_candidates,
@@ -319,11 +321,9 @@ class BoTorchAcquisition(AcquisitionFunction):
         if self.acquisition_type == "qNEI":
             X_baseline = candidates_to_tensor(state.dataset.train_dataset.candidates)
 
-        # Use BoTorchModelAdapter to wrap the surrogate model
-        # The adapter handles conversion between ALF's BaseModel interface and
-        # BoTorch's Model interface
-        adapter = BoTorchModelAdapter(state.surrogate.model)
-        acq_fn = self._create_acquisition_function(adapter, best_f, X_baseline)
+        raw_model = state.surrogate.model
+        adapted_model = raw_model if isinstance(raw_model, BotorchModel) else BoTorchModelAdapter(raw_model)
+        acq_fn = self._create_acquisition_function(adapted_model, best_f, X_baseline)
 
         # Evaluate acquisition function
         # For discrete scoring, evaluate each candidate independently
