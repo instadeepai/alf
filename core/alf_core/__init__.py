@@ -20,6 +20,7 @@ from alf_core.dataclasses import (
     Predictions,
     Results,
     State,
+    SurrogateEpochMetrics,
 )
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.model.base_model import BaseModel, BaseTrainConfig
