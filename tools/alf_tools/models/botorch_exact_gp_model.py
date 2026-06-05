@@ -98,22 +98,22 @@ class BoTorchGPModel(BaseModel):
     - Outputs are standardised (handled automatically)
 
     Example:
+        >>> import numpy as np
+        >>> from alf_core import Candidate, LabelledCandidates, Modality
         >>> from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
-        >>> from alf_tools.datasets.botorch_synthetic_dataset import BoTorchSyntheticDataset
         >>>
-        >>> # Create dataset
-        >>> dataset = BoTorchSyntheticDataset(function_name="Branin")
-        >>> train_data = dataset.load_dataset()
+        >>> X = np.random.rand(20, 2).astype(np.float32)
+        >>> y = np.sin(X[:, 0]) + np.cos(X[:, 1])
+        >>> candidates = [Candidate(data=x, modality=Modality.TABULAR) for x in X]
+        >>> train_data = LabelledCandidates(candidates=candidates, labels=y)
         >>>
-        >>> # Train model
         >>> model = BoTorchGPModel()
         >>> model.train(train_data, val_data=None)
         >>> metrics = model.get_training_summary_metrics()
         >>> print(f"Final loss: {metrics['final_loss']:.4f}")
         >>>
-        >>> # Make predictions
-        >>> candidates = dataset.candidate_pool.candidates[:10]
-        >>> predictions = model.predict(candidates)
+        >>> test_candidates = [Candidate(data=x, modality=Modality.TABULAR) for x in X[:5]]
+        >>> predictions = model.predict(test_candidates)
         >>> print(f"Mean predictions: {predictions.means}")
 
     """
@@ -319,17 +319,14 @@ class BoTorchGPModel(BaseModel):
             self.model = self.model.to(device=self.device, dtype=self._dtype)
             mll = ExactMarginalLogLikelihood(self.model.likelihood, self.model)
             if self.train_config.optimizer == "scipy":
-                # Use L-BFGS-B optimizer with scipy
                 logging_optimizer = "scipy L-BFGS-B"
-
                 fit_gpytorch_mll(
                     mll,
                     optimizer_kwargs={"options": {"maxiter": self.train_config.num_iterations}},
                     max_attempts=self.train_config.max_attempts,
                 )
             else:  # torch
-                logging_optimizer = "torch Adam"
-
+                logging_optimizer = f"torch Adam (lr={self.train_config.learning_rate})"
                 fit_gpytorch_mll(
                     mll,
                     optimizer=fit_gpytorch_mll_torch,
@@ -345,19 +342,14 @@ class BoTorchGPModel(BaseModel):
                 f"Successfully trained BoTorch GP model using {logging_optimizer} "
                 f"(step_limit={self.train_config.num_iterations}, "
                 f"max_attempts={self.train_config.max_attempts})"
-                + (
-                    f", lr={self.train_config.learning_rate}"
-                    if self.train_config.optimizer == "torch"
-                    else ""
-                )
             )
 
             # Record final loss
             self.model.eval()
             with torch.no_grad():
                 output = self.model(self.train_X)
-                loss_tensor = -mll(output, self.train_Y.squeeze(-1))  # type: ignore
-                loss = float(loss_tensor.item())  # type: ignore
+                loss_tensor = -mll(output, self.train_Y.squeeze(-1))
+                loss = loss_tensor.item()
 
             if not math.isfinite(loss):
                 raise RuntimeError(

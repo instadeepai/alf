@@ -69,14 +69,13 @@ class BoTorchModelAdapter(Model):
         Raises:
             TypeError: If model is not a BoTorch Model or ALF BaseModel.
         """
-        super().__init__()
-        self._wrapped_model = model
-        self._is_botorch_model = isinstance(model, Model)
-
         if not isinstance(model, (Model, BaseModel)):
             raise TypeError(
                 f"Model must be either a BoTorch Model or ALF BaseModel, got {type(model).__name__}"
             )
+        super().__init__()
+        self._wrapped_model = model
+        self._is_botorch_model = isinstance(model, Model)
 
     def posterior(
         self,
@@ -167,19 +166,10 @@ class BoTorchModelAdapter(Model):
                 )
 
             mean = posterior.mvn.mean.reshape(batch_size, q)
-            covar_matrix = posterior.mvn.covariance_matrix
-
-            # Create block diagonal covariance for independent evaluations
-            # Shape: (batch_size, q, q)
-            new_covar = torch.zeros(
-                batch_size, q, q, dtype=covar_matrix.dtype, device=covar_matrix.device
-            )
-            for i in range(batch_size):
-                start_idx = i * q
-                end_idx = start_idx + q
-                new_covar[i] = covar_matrix[start_idx:end_idx, start_idx:end_idx]
-
-            mvn = MultivariateNormal(mean, new_covar)
+            # Read the stored diagonal directly — O(B*q) — instead of
+            # materialising the dense (B*q, B*q) covariance matrix.
+            diag_vals = lazy_covar.diagonal().reshape(batch_size, q)
+            mvn = MultivariateNormal(mean, DiagLinearOperator(diag_vals))
 
             posterior = GPyTorchPosterior(mvn)
 

@@ -47,7 +47,17 @@ def build_from_target(cfg: dict | None) -> object | None:
     if cfg is None:
         return None
     cfg = dict(cfg)  # don't mutate the caller's dict
-    target = cfg.pop("_target_")
+    target = cfg.pop("_target_", None)
+    if target is None:
+        raise ValueError(
+            "build_from_target: config dict must contain a '_target_' key "
+            f"(e.g. 'gpytorch.priors.LogNormalPrior'). Got keys: {sorted(cfg)}"
+        )
+    if "." not in target:
+        raise ValueError(
+            f"build_from_target: '_target_' must be a fully-qualified class path "
+            f"(e.g. 'gpytorch.priors.LogNormalPrior'), got {target!r}"
+        )
 
     module_path, cls_name = target.rsplit(".", 1)
     if module_path not in _ALLOWED_MODULES and not any(

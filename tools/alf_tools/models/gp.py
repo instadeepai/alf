@@ -90,6 +90,27 @@ class GPModelConfig:
     noise_constraint: dict | None = None
     build_kernel_fn: Callable[..., gpytorch.kernels.Kernel] | None = None
 
+    def __post_init__(self) -> None:
+        """Validate that prior/constraint fields are dicts or None.
+
+        Raises:
+            TypeError: If a prior or constraint field receives a non-dict value.
+                Pass a `_target_` dict instead (see `build_from_target`).
+        """
+        for attr in (
+            "lengthscale_prior",
+            "lengthscale_constraint",
+            "outputscale_prior",
+            "noise_constraint",
+        ):
+            val = getattr(self, attr)
+            if val is not None and not isinstance(val, dict):
+                raise TypeError(
+                    f"GPModelConfig.{attr} must be a '_target_' dict or None "
+                    f"(got {type(val).__name__}). "
+                    f"See build_from_target() for the expected format."
+                )
+
 
 @dataclass
 class GPTrainConfig(BaseTrainConfig):

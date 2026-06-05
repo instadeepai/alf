@@ -145,6 +145,11 @@ class BotorchAcquisitionFunction(AlfAcquisitionFunction):
         """
         model = state.surrogate.model
         device = getattr(model, "device", None)
+        if device is None and hasattr(model, "parameters"):
+            try:
+                device = next(model.parameters()).device
+            except StopIteration:
+                pass
         X = candidates_to_tensor(search_candidates, device=device)
 
         adapted = model if isinstance(model, BotorchModel) else BoTorchModelAdapter(model)
