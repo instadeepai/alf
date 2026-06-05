@@ -23,11 +23,14 @@ dependencies = [
 chemprop = [
     "chemprop>=2.0.0,<3.0.0",
 ]
-guacamol = ["rdkit>=2022.9.0"]
+esm2 = [
+    "transformers>=4.36.0",
+]
 esmfold = [
     "transformers>=4.36.0",
     "accelerate>=0.26.0",
 ]
+guacamol = ["rdkit>=2022.9.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]

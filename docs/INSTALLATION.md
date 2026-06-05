@@ -129,6 +129,31 @@ uv pip install torch --index-url https://download.pytorch.org/whl/cu128 --reinst
 uv run --no-sync python script.py
 ```
 
+### Optional Extras
+
+Some models require additional dependencies not installed by default. Use extras to include them.
+
+**Package install (pip):**
+
+```bash
+# ESM2 — protein language model (for ESM2Model)
+pip install "alf_tools[esm2] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+
+# Chemprop — small-molecule MPNN (for ChempropModel)
+pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+
+# Both extras together
+pip install "alf_tools[esm2,chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+```
+
+**Development install (uv sync):**
+
+```bash
+uv sync --extra esm2
+uv sync --extra chemprop
+uv sync --extra esm2 --extra chemprop
+```
+
 ---
 
 ## Architecture
