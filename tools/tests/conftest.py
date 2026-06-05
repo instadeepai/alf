@@ -267,7 +267,7 @@ def botorch_gp_model(simple_train_data):
         Trained SingleTaskGP model.
     """
     train_X, train_Y = simple_train_data
-    return SingleTaskGP(train_X, train_Y)
+    return SingleTaskGP(train_X.double(), train_Y.double())
 
 
 # =============================================================================

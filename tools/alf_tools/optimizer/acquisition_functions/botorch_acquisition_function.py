@@ -39,7 +39,7 @@ from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter impor
 from alf_tools.utils.botorch_utils import candidates_to_tensor
 from botorch.acquisition import AcquisitionFunction
 from botorch.acquisition.analytic import (
-    ExpectedImprovement,
+    LogExpectedImprovement,
     ProbabilityOfImprovement,
     UpperConfidenceBound,
 )
@@ -47,7 +47,7 @@ from botorch.acquisition.logei import qLogNoisyExpectedImprovement
 from botorch.models.model import Model as BotorchModel
 
 ACQUISITION_REGISTRY: dict[str, type[AcquisitionFunction]] = {
-    "expected_improvement": ExpectedImprovement,
+    "expected_improvement": LogExpectedImprovement,
     "upper_confidence_bound": UpperConfidenceBound,
     "probability_of_improvement": ProbabilityOfImprovement,
     "log_noisy_expected_improvement": qLogNoisyExpectedImprovement,
