@@ -7,8 +7,8 @@ objects, see [Core Concepts](core-concepts.md).
 
 Active learning turns a fixed-budget search into a feedback loop. Each round has two halves:
 
-- **ask** — given everything measured so far, *propose* the next batch of candidates to evaluate.
-- **tell** — *reveal* the true labels for that batch and fold them back into what we know.
+- **ask**: given everything measured so far, *propose* the next batch of candidates to evaluate.
+- **tell**: *reveal* the true labels for that batch and fold them back into what we know.
 
 ```text
         ┌──────────────────────────────────────────────┐
@@ -24,17 +24,17 @@ Active learning turns a fixed-budget search into a feedback loop. Each round has
                      repeat for N rounds
 ```
 
-Each turn of the loop, the {term}`surrogate` is **retrained** on the growing set of labelled data,
-so its predictions — and the acquisition decisions built on them — improve round over round. The
+Each turn of the loop, the `surrogate` is **retrained** on the growing set of labelled data,
+so its predictions (and the acquisition decisions built on them) improve round over round. The
 goal is to reach good designs in **as few rounds as possible**, because rounds are what cost money.
 
 ## Why information-per-round matters
 
 A model that is 2% more accurate offline may be worthless if it leads you to measure the wrong
-batch first. Conversely, a less accurate but **well-{term}`calibrated <Calibration>`** model can
-win, because acquisition can trust its uncertainty to explore where it matters. This is why ALF
-measures performance *versus round* ({term}`regret`, {term}`best-found <Best-found>`,
-{term}`recall`) rather than as a single static score — see [Why ALF?](why-alf.md).
+batch first. Conversely, a model with good `Calibration` can win even when less accurate,
+because acquisition can trust its uncertainty to explore where it matters. This is why ALF
+measures performance *versus round* (`regret`, `best-found`,
+`recall`) rather than as a single static score; see [Why ALF?](why-alf.md).
 
 ## Offline vs online
 
@@ -42,10 +42,10 @@ The loop is the same; what differs is **where the labels come from**.
 
 | Mode | Oracle source | Use case |
 |------|---------------|----------|
-| **Offline** | A held-out dataset / pre-scored pool | Benchmarking and method development — fully reproducible, no external calls |
+| **Offline** | A held-out dataset / pre-scored pool | Benchmarking and method development; fully reproducible, no external calls |
 | **Online** | A live scorer (a trained model, a simulator) | Driving a real campaign where labels are generated on demand |
 
-In ALF both modes run through the *same* task and loop; you swap the {term}`oracle`'s scorer. This
+In ALF both modes run through the *same* task and loop; you swap the `oracle`'s scorer. This
 is why a method validated offline can move to an online campaign without rewriting it.
 
-→ Next: [Core Concepts](core-concepts.md) — the objects that make up the loop.
+→ Next: [Core Concepts](core-concepts.md), the objects that make up the loop.

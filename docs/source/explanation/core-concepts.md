@@ -1,6 +1,6 @@
 # Core Concepts
 
-This page is the mental model of ALF's objects — what each one is, and how they combine into a
+This page is the mental model of ALF's objects: what each one is, and how they combine into a
 single round of the [ask/tell loop](intro-to-active-learning.md). All of these live in
 `alf_core`; concrete implementations live in `alf_tools`.
 
@@ -8,15 +8,15 @@ single round of the [ask/tell loop](intro-to-active-learning.md). All of these l
 
 | Object | Role | Base class |
 |--------|------|------------|
-| {term}`Dataset` | The candidate pool and its labels; train/validation splits and a query interface | `BaseDataset` |
-| {term}`Model` | A learnable predictor — `featurise` / `train` / `predict` / `sample` | `BaseModel` |
-| {term}`Surrogate` | Wraps a model; the *cheap* approximation retrained each round on acquired data | `Surrogate` |
-| {term}`Oracle` | Wraps a scorer (a model **or** a dataset); returns the *true* label for a batch | `Oracle` |
-| {term}`Acquisition function` | Scores candidates by expected value (e.g. Greedy, UCB, EI, Thompson, CoreSet) | `AcquisitionFunction` |
-| {term}`Search function` | Generates the candidate pool to score (e.g. from a dataset or a generator) | `BaseSearch` |
-| {term}`Optimizer` | Bundles an acquisition + search function; implements `ask` and `tell` | `Optimizer` |
-| {term}`Task` | Orchestrates the loop end to end (`setup` → `run`) | `BaseTask` |
-| {term}`State` | The carrier passed through the loop: dataset, surrogate, round, history, metrics | `State` |
+| `Dataset` | The candidate pool and its labels; train/validation splits and a query interface | `BaseDataset` |
+| `Model` | A learnable predictor with `featurise` / `train` / `predict` / `sample` | `BaseModel` |
+| `Surrogate` | Wraps a model; the *cheap* approximation retrained each round on acquired data | `Surrogate` |
+| `Oracle` | Wraps a scorer (a model **or** a dataset); returns the *true* label for a batch | `Oracle` |
+| `Acquisition function` | Scores candidates by expected value (e.g. Greedy, UCB, EI, Thompson, CoreSet) | `AcquisitionFunction` |
+| `Search function` | Generates the candidate pool to score (e.g. from a dataset or a generator) | `BaseSearch` |
+| `Optimizer` | Bundles an acquisition + search function; implements `ask` and `tell` | `Optimizer` |
+| `Task` | Orchestrates the loop end to end (`setup` → `run`) | `BaseTask` |
+| `State` | The carrier passed through the loop: dataset, surrogate, round, history, metrics | `State` |
 
 The key relationships: a **Surrogate wraps a Model**, an **Oracle wraps a scorer**, and an
 **Optimizer bundles an acquisition function and a search function**. The **Task** owns the loop and
@@ -57,8 +57,8 @@ experiment
 ```
 
 Within a family, an experiment is further specified by **modality** (e.g. protein sequence,
-small-molecule SMILES), **dataset**, and **mode** ({term}`offline vs online <Offline>`). The full
-cross-product — `dataset × surrogate × acquisition × search × oracle × seed` — is exactly what the
+small-molecule SMILES), **dataset**, and **mode** (`Offline` or `Online`). The full
+cross-product, `dataset × surrogate × acquisition × search × oracle × seed`, is exactly what the
 ALF benchmark suite sweeps over; see [Why ALF?](why-alf.md).
 
 ## Putting it together
