@@ -15,8 +15,7 @@
 """Diversity metrics for acquired candidate batches.
 
 These metrics operate on lists of :class:`~alf_core.dataclasses.candidate.Candidate`
-objects rather than on prediction arrays, so they are not registered in the
-standard regression or classification registries.
+objects rather than on prediction arrays.
 """
 
 from difflib import SequenceMatcher
@@ -30,7 +29,7 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
     """Compute average pairwise dissimilarity within a batch of candidates.
 
     Measures how spread out the acquired batch is in the design space.
-    Low diversity indicates the surrogate model is proposing near-duplicate
+    Low diversity indicates the acquisition function is proposing near-duplicate
     candidates, which wastes the oracle budget.
 
     Dissimilarity is computed as follows depending on candidate modality:
