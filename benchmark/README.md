@@ -7,10 +7,11 @@ active-learning performance** (best-found, regret, recall, calibration **vs
 acquisition round**) — the gap that static benchmarks like ProteinGym and FLIP
 leave open.
 
-> **Status: Phase 1 (usability core).** This phase delivers the registry,
-> config-as-code models, and a resumable sweep runner that reuses the existing
-> ALF tasks unchanged. Aggregation/plots (Phase 2), a YAML + CLI front end
-> (Phase 3), and a versioned suite with reference results (Phase 4) follow.
+> **Status: Phase 2 (aggregation, statistics & plots).** Phases 1–2 deliver the
+> registry, config-as-code models, a resumable sweep runner (reusing the existing
+> ALF tasks unchanged), and analysis: mean ± bootstrap-CI aggregation, paired
+> significance tests, a leaderboard, and active-learning curve plots. A YAML + CLI
+> front end (Phase 3) and a versioned suite with reference results (Phase 4) follow.
 
 ## Concepts
 
@@ -22,6 +23,7 @@ leave open.
 | `BenchmarkSuite` | A named, versioned collection of problems. |
 | `BenchmarkRunner` | Expands `(problem × method × seed)` into replications. Each replication is one unchanged `task.run()`. |
 | `Manifest` | Per-replication reproducibility record (resolved configs, versions, git SHA, status). |
+| `BenchmarkResults` | Loads replications into a tidy long-form table; computes mean ± bootstrap CI, paired significance tests, and a leaderboard. |
 
 One replication writes to `runs/<problem>/<method>/seed=<n>/`:
 
@@ -73,6 +75,31 @@ suite = BenchmarkSuite.from_configs("adhoc", "0.1.0", [problem])
 runner = BenchmarkRunner()
 manifests = runner.run(suite, [BenchmarkMethod(method)], output_dir="runs")
 ```
+
+## Analysing results
+
+```python
+from alf_benchmark import BenchmarkResults
+from alf_benchmark.plotting import plot_curves, plot_leaderboard
+
+results = BenchmarkResults.from_dir("runs")
+results.aggregate()        # mean ± bootstrap CI per (problem, method, round, metric)
+results.leaderboard()      # final-round ranking on each problem's primary metric
+results.significance()     # paired t-tests between methods
+
+# Active-learning curves with CI bands (best-found, regret, recall, calibration vs round)
+plot_curves(results, metric="derived/best_found").savefig("best_found.png")
+plot_leaderboard(results).savefig("leaderboard.png")
+```
+
+`best-found-so-far` is *derived* as `derived/best_found` (running max of the
+per-round acquired batch maxima). `optimizer/regret` is already a *simple*
+(best-found-so-far) regret and is plotted directly as the regret-vs-round curve.
+*Cumulative* regret is intentionally not derived: it needs per-round instantaneous
+regret against the fixed pool optimum, which the current schema does not log.
+Curves guard missing metrics: regret/recall require a `DatasetSearch` method, and
+calibration requires an uncertainty-capable model, so a metric only appears for the
+methods that produced it.
 
 ## Registering your own component
 

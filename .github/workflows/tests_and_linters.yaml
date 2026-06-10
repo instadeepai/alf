@@ -72,6 +72,14 @@ jobs:
                             --junitxml=tools/pytest-tools.xml \
                             --cov=alf_tools
 
+        - name: Run tests (benchmark) 🧪
+          run: |
+            uv run --no-sync pytest benchmark --verbose \
+                            --cov-report xml:benchmark/coverage-benchmark.xml \
+                            --cov-report term-missing \
+                            --junitxml=benchmark/pytest-benchmark.xml \
+                            --cov=alf_benchmark
+
         - name: Pytest coverage comment (core) 💬
           id: coverageCommentCore
           uses: MishaKav/pytest-coverage-comment@287292879eaaff04116f36d3eb1a670f6e5df1a4
@@ -89,6 +97,15 @@ jobs:
             unique-id-for-comment: coverage-tools
             pytest-xml-coverage-path: tools/coverage-tools.xml
             junitxml-path: tools/pytest-tools.xml
+
+        - name: Pytest coverage comment (benchmark) 💬
+          id: coverageCommentBenchmark
+          uses: MishaKav/pytest-coverage-comment@287292879eaaff04116f36d3eb1a670f6e5df1a4
+          with:
+            title: Benchmark Coverage Report
+            unique-id-for-comment: coverage-benchmark
+            pytest-xml-coverage-path: benchmark/coverage-benchmark.xml
+            junitxml-path: benchmark/pytest-benchmark.xml
 
         - name: Update core coverage badge 🏷️
           if: github.ref == 'refs/heads/main'

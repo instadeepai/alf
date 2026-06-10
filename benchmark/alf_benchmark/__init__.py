@@ -31,6 +31,7 @@ from alf_benchmark.registry import (
     default_registry,
     register,
 )
+from alf_benchmark.results import BenchmarkResults
 from alf_benchmark.runner import BenchmarkRunner
 from alf_benchmark.schema import Manifest, read_manifest, write_manifest
 from alf_benchmark.seeding import seed_everything
@@ -39,6 +40,7 @@ __all__ = [
     "GROUPS",
     "BenchmarkMethod",
     "BenchmarkProblem",
+    "BenchmarkResults",
     "BenchmarkRunner",
     "BenchmarkSuite",
     "ComponentSpec",
