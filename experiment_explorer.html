@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ALF Experiment Explorer (mockup)</title>
+<style>
+  :root{
+    --navy:#0B2138; --navy2:#12314F; --teal:#0D9488; --tealLt:#14B8A6; --mint:#5EEAD4;
+    --ink:#1E293B; --slate:#64748B; --cloud:#F1F5F9; --card:#FFFFFF; --line:#E2E8F0; --amber:#F59E0B;
+    --okbg:#ECFDF5; --okline:#A7F3D0; --okink:#065F46; --errbg:#FEF2F2; --errline:#FECACA; --errink:#991B1B;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--cloud);}
+  header{background:var(--navy);color:#fff;padding:24px 40px 20px;}
+  .brand{font-family:Georgia,serif;font-size:13px;letter-spacing:3px;color:var(--mint);text-transform:uppercase;}
+  header h1{font-family:Georgia,serif;font-size:27px;margin:6px 0 4px;font-weight:700;}
+  header p{margin:0;color:#9FB3C8;font-size:14px;max-width:860px;line-height:1.45;}
+  .mock{background:var(--amber);color:#3b2600;font-size:11px;font-weight:800;border-radius:6px;padding:3px 8px;letter-spacing:.5px;vertical-align:middle;}
+  .wrap{max-width:1100px;margin:0 auto;padding:22px 24px 70px;}
+  /* breadcrumb */
+  .crumbs{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:2px 0 18px;font-size:13px;color:var(--slate);min-height:24px;}
+  .crumb{background:var(--navy2);color:#fff;border-radius:6px;padding:4px 10px;font-weight:600;}
+  .crumb .k{color:var(--mint);font-weight:400;font-size:11px;margin-right:5px;text-transform:uppercase;letter-spacing:.5px;}
+  .sep{color:#CBD5E1;}
+  /* rows */
+  .row{margin:0 0 4px;padding:16px 0;border-top:1px solid var(--line);}
+  .row:first-of-type{border-top:none;}
+  .row .lab{font-family:Georgia,serif;font-size:15px;font-weight:700;color:var(--navy);margin-bottom:3px;}
+  .row .hint{font-size:12.5px;color:var(--slate);margin-bottom:11px;line-height:1.45;}
+  .opts{display:flex;flex-wrap:wrap;gap:9px;}
+  .opt{background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:10px 15px;cursor:pointer;font-size:14px;font-weight:600;color:var(--ink);transition:.13s;box-shadow:0 1px 2px rgba(15,23,42,.04);}
+  .opt small{display:block;font-weight:400;font-size:11px;color:var(--slate);margin-top:2px;}
+  .opt:hover:not(.disabled){border-color:var(--teal);}
+  .opt.active{background:var(--teal);border-color:var(--teal);color:#fff;}
+  .opt.active small{color:#D7F5EF;}
+  .opt.disabled{opacity:.5;cursor:not-allowed;background:#F8FAFC;color:#94A3B8;}
+  .opt.fam{padding:13px 20px;font-family:Georgia,serif;font-size:16px;}
+  .locked{display:inline-flex;align-items:center;gap:7px;background:#F1F5F9;border:1.5px dashed var(--line);border-radius:10px;padding:10px 15px;font-size:13.5px;color:var(--slate);font-weight:600;}
+  .locked .lk{font-size:11px;}
+  .note{font-size:12px;color:var(--amber);background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:6px 10px;margin-top:10px;display:inline-block;}
+  /* output */
+  .out{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px;}
+  @media(max-width:820px){.out{grid-template-columns:1fr;}}
+  .codecard{background:#071726;border-radius:12px;overflow:hidden;box-shadow:0 6px 20px rgba(15,23,42,.12);}
+  .codecard .ttl{background:#0B2A45;color:var(--mint);font-size:11px;font-weight:800;letter-spacing:1px;padding:9px 16px;text-transform:uppercase;}
+  pre{margin:0;padding:16px 18px;font-family:Consolas,Menlo,monospace;font-size:12.5px;line-height:1.55;color:#E6EEF6;white-space:pre-wrap;word-break:break-word;}
+  .k1{color:var(--mint);} .k2{color:#9FD0FF;} .k3{color:#C7D6E5;} .cmt{color:#6E8BA6;}
+  .banner{border-radius:10px;padding:13px 16px;font-size:14px;margin:18px 0 6px;font-weight:600;display:flex;align-items:center;gap:9px;}
+  .banner.ok{background:var(--okbg);border:1px solid var(--okline);color:var(--okink);}
+  .banner.err{background:var(--errbg);border:1px solid var(--errline);color:var(--errink);}
+  .banner.idle{background:#fff;border:1px dashed var(--line);color:var(--slate);font-weight:500;}
+  .metric{margin-top:14px;font-size:13.5px;color:var(--ink);}
+  .metric b{color:var(--navy);}
+  .pillbadge{display:inline-block;background:var(--navy2);color:var(--mint);font-size:11px;font-weight:700;border-radius:6px;padding:3px 9px;margin-right:8px;letter-spacing:.5px;}
+  footer{color:var(--slate);font-size:12px;text-align:center;padding:26px 20px;border-top:1px solid var(--line);margin-top:34px;}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">ALF&nbsp;·&nbsp;Active&nbsp;Learning&nbsp;Framework</div>
+  <h1>Experiment Explorer <span class="mock">MOCKUP</span></h1>
+  <p>Drill down <b>family → modality → dataset → mode</b>, then fill the method leaf. Only compatible
+     components are offered — the explorer enforces the same rules the registry validates — and the
+     resulting <code style="color:#9FD0FF">alf-bench</code> config is generated live.</p>
+</header>
+
+<div class="wrap">
+  <div class="crumbs" id="crumbs"></div>
+  <div id="rows"></div>
+
+  <div class="banner idle" id="banner">Pick an experiment family to begin.</div>
+  <div class="metric" id="metric"></div>
+  <div class="out">
+    <div class="codecard"><div class="ttl">benchmark.yaml</div><pre id="yaml"><span class="cmt"># your selection will appear here</span></pre></div>
+    <div class="codecard"><div class="ttl">Python (benchmark API)</div><pre id="py"><span class="cmt"># your selection will appear here</span></pre></div>
+  </div>
+</div>
+
+<footer>Illustrative mockup of the planned <b>alf-bench Experiment Explorer</b> · component names match the entry-point registry.</footer>
+
+<script>
+/* ---------------- catalogue ---------------- */
+const FAMILIES = {
+  zero_shot:  {label:'Zero-shot',  task:'ZeroShotTask',   rounds:false, leaf:'model',
+               desc:'Score a pretrained model once — no training, no acquisition rounds.',
+               metric:'Spearman ρ · top-K recall, against the dataset’s held-out labels.'},
+  supervised: {label:'Supervised', task:'SupervisedTask', rounds:false, leaf:'model',
+               desc:'Train once on a fixed split, predict on the held-out test set.',
+               metric:'test Spearman / Pearson / MSE · ECE (calibration).'},
+  design:     {label:'Design / Active Learning', task:'DesignTask', rounds:true, leaf:'full',
+               desc:'The full sequential loop: acquire a batch each round against an oracle.',
+               metric:'best-found · simple/cumulative regret · top-K recall · calibration — vs acquisition round.'},
+};
+const MODELS = {
+  cnn:      {label:'CNN',      modality:['protein'],            uq:false, zeroshot:false, cls:'CNNModel'},
+  gp:       {label:'GP',       modality:['protein','molecule'], uq:true,  zeroshot:false, cls:'GPModel'},
+  esm2:     {label:'ESM-2',    modality:['protein'],            uq:false, zeroshot:true,  cls:'ESM2Model'},
+  chemprop: {label:'Chemprop', modality:['molecule'],           uq:false, zeroshot:false, cls:'ChempropModel'},
+  ensemble: {label:'Ensemble', modality:['protein','molecule'], uq:true,  zeroshot:false, cls:'EnsembleWrapper'},
+};
+const ACQS = {
+  greedy:   {label:'Greedy',                uq:false},
+  ucb:      {label:'UCB',                   uq:true},
+  ei:       {label:'Expected Improvement',  uq:true},
+  thompson: {label:'Thompson',              uq:true},
+  coreset:  {label:'CoreSet',               uq:false},
+};
+const ONLINE_ORACLES = {
+  esmfold:  {label:'ESMFold (pTM)',     cfg:'scoring_function: ptm'},
+  pyrosetta:{label:'PyRosetta (energy)',cfg:'scorefxn: ref2015'},
+};
+const DATASETS = {
+  protein: [
+    {id:'gfp', label:'GFP'},
+    {id:'flip-aav', label:'FLIP · AAV'},
+    {id:'flip-gb1', label:'FLIP · GB1'},
+    {id:'flip-meltome', label:'FLIP · Meltome'},
+    {id:'proteingym-BLAT_ECOLX', label:'ProteinGym · BLAT_ECOLX'},
+  ],
+  molecule: [
+    {id:'guacamol-logp', label:'GuacaMol · MolLogP'},
+    {id:'guacamol-qed', label:'GuacaMol · QED'},
+  ],
+};
+
+/* ---------------- state ---------------- */
+let S = {family:null, modality:null, dataset:null, mode:null, model:null, acq:null, oracle:null, nseeds:5};
+
+const clearMethod = ()=>{S.model=null;S.acq=null;S.oracle=null;};
+function setFamily(f){S.family=f;S.modality=null;S.dataset=null;S.mode=null;clearMethod();render();}
+function setModality(m){S.modality=m;S.dataset=null;S.mode=null;clearMethod();render();}
+function setDataset(d){S.dataset=d;render();}
+function setMode(md){S.mode=md;clearMethod();render();}
+function setModel(m){S.model=m; if(S.acq && ACQS[S.acq].uq && !MODELS[m].uq) S.acq=null; render();}
+function setAcq(a){S.acq=a;render();}
+function setOracle(o){S.oracle=o;render();}
+function setSeeds(n){S.nseeds=n;render();}
+
+/* ---------------- ui builders ---------------- */
+function el(tag,cls,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;}
+function optBtn(label,sub,active,disabled,onClick,tip,extra){
+  const b=el('div','opt'+(extra?' '+extra:'')+(active?' active':'')+(disabled?' disabled':''));
+  b.innerHTML = label + (sub?`<small>${sub}</small>`:'');
+  if(tip)b.title=tip;
+  if(!disabled)b.onclick=onClick;
+  return b;
+}
+function lockedChip(label){const c=el('div','locked');c.innerHTML=`<span class="lk">🔒</span>${label}`;return c;}
+function rowEl(lab,hint){const r=el('div','row');r.appendChild(el('div','lab',lab));if(hint){const h=el('div','hint');h.innerHTML=hint;r.appendChild(h);}const o=el('div','opts');r.appendChild(o);r._opts=o;return r;}
+
+/* ---------------- render ---------------- */
+function render(){
+  const rows=document.getElementById('rows'); rows.innerHTML='';
+
+  // Row 1 — family
+  const r1=rowEl('1 · Experiment family','What kind of evaluation? This sets how deep the tree goes.');
+  Object.entries(FAMILIES).forEach(([id,f])=>
+    r1._opts.appendChild(optBtn(f.label,f.task,S.family===id,false,()=>setFamily(id),f.desc,'fam')));
+  rows.appendChild(r1);
+
+  if(S.family){
+    const fam=FAMILIES[S.family];
+    // Row 2 — modality
+    const r2=rowEl('2 · Modality','The dataset determines the modality; the model must be compatible with it.');
+    ['protein','molecule'].forEach(m=>{
+      const noZS = (S.family==='zero_shot' && m==='molecule'); // no zero-shot molecule model in alf-tools
+      r2._opts.appendChild(optBtn(m==='protein'?'Protein':'Molecule', m==='protein'?'sequence':'SMILES',
+        S.modality===m, noZS, ()=>setModality(m),
+        noZS?'No zero-shot molecule model in alf-tools (ESM-2 is protein-only).':''));
+    });
+    rows.appendChild(r2);
+
+    if(S.modality){
+      // Row 3 — dataset
+      const r3=rowEl('3 · Dataset','The concrete benchmark problem.');
+      DATASETS[S.modality].forEach(d=>
+        r3._opts.appendChild(optBtn(d.label,null,S.dataset===d.id,false,()=>setDataset(d.id))));
+      rows.appendChild(r3);
+
+      if(S.dataset){
+        // Row 4 — mode (design only)
+        if(fam.rounds){
+          const r4=rowEl('4 · Evaluation mode','Offline scores against the dataset (pool); online queries a model oracle on synthesised candidates.');
+          const onlineOK = S.modality==='protein'; // model oracles (ESMFold/PyRosetta) are protein-only
+          r4._opts.appendChild(optBtn('Offline','oracle = dataset · pool',S.mode==='offline',false,()=>setMode('offline')));
+          r4._opts.appendChild(optBtn('Online','oracle = model · generative',S.mode==='online',!onlineOK,()=>setMode('online'),
+            onlineOK?'':'Online model oracles (ESMFold / PyRosetta) are protein-only.'));
+          rows.appendChild(r4);
+        }
+
+        const modeReady = !fam.rounds || S.mode;
+        if(modeReady){
+          // Row 5 — method leaf
+          const r5=rowEl('5 · Method', fam.leaf==='full'
+            ? 'Pick a surrogate and acquisition fn. Search &amp; oracle are fixed by the mode. UQ-only acq fns unlock with a GP/Ensemble surrogate.'
+            : (S.family==='zero_shot' ? 'Pick the zero-shot scorer.' : 'Pick the surrogate to train.'));
+
+          // model options filtered by modality + (zero-shot capability)
+          const modelRow=el('div'); modelRow.style.marginBottom='12px';
+          modelRow.appendChild(Object.assign(el('div','hint'),{textContent:'Surrogate model'}));
+          const mo=el('div','opts');
+          Object.entries(MODELS).forEach(([id,m])=>{
+            const okMod=m.modality.includes(S.modality);
+            const okZS = S.family!=='zero_shot' || m.zeroshot;
+            const ok=okMod&&okZS;
+            const sub = id==='esm2'&&S.family==='zero_shot' ? 'no head · PLL' : (m.uq?'uncertainty ✓':'point estimate');
+            mo.appendChild(optBtn(m.label,ok?sub:'incompatible',S.model===id,!ok,()=>setModel(id),
+              !okMod?`${m.label} is not a ${S.modality} model.`:(!okZS?`${m.label} has no zero-shot mode.`:'')));
+          });
+          modelRow.appendChild(mo); r5._opts.parentElement.appendChild(modelRow);
+
+          if(fam.leaf==='full'){
+            // acquisition (gated by model uq)
+            const acqRow=el('div'); acqRow.style.marginBottom='12px';
+            acqRow.appendChild(Object.assign(el('div','hint'),{textContent:'Acquisition function'}));
+            const ao=el('div','opts');
+            const modelUQ = S.model && MODELS[S.model].uq;
+            Object.entries(ACQS).forEach(([id,a])=>{
+              const needUQ=a.uq;
+              const dis = !S.model || (needUQ && !modelUQ);
+              ao.appendChild(optBtn(a.label, needUQ?'needs uncertainty':'works with any model',
+                S.acq===id, dis, ()=>setAcq(id),
+                !S.model?'Pick a surrogate first.':(dis?'Requires a UQ surrogate (GP or Ensemble).':'')));
+            });
+            acqRow.appendChild(ao); r5._opts.parentElement.appendChild(acqRow);
+
+            // search + oracle (locked by mode)
+            const soRow=el('div');
+            soRow.appendChild(Object.assign(el('div','hint'),{textContent:'Search & oracle (fixed by mode)'}));
+            const so=el('div','opts');
+            if(S.mode==='offline'){
+              so.appendChild(lockedChip('DatasetSearch · pool'));
+              so.appendChild(lockedChip('Oracle = dataset held-out labels'));
+            }else{
+              so.appendChild(lockedChip('SingleMutantSearch · generative'));
+              Object.entries(ONLINE_ORACLES).forEach(([id,o])=>
+                so.appendChild(optBtn(o.label,'model oracle',S.oracle===id,false,()=>setOracle(id))));
+            }
+            soRow.appendChild(so); r5._opts.parentElement.appendChild(soRow);
+          }
+          rows.appendChild(r5);
+
+          // Row 6 — seeds (not for zero-shot)
+          if(S.family!=='zero_shot'){
+            const r6=rowEl('6 · Replications','Each seed re-seeds numpy / torch / CUDA — more seeds tighten the bootstrap CI.');
+            [1,3,5,10].forEach(n=>
+              r6._opts.appendChild(optBtn(n+(n===1?' seed':' seeds'),'seeds 0…'+(n-1),S.nseeds===n,false,()=>setSeeds(n))));
+            rows.appendChild(r6);
+          }
+        }
+      }
+    }
+  }
+
+  renderCrumbs(); renderOutput();
+}
+
+function renderCrumbs(){
+  const c=document.getElementById('crumbs'); c.innerHTML='';
+  const parts=[];
+  if(S.family) parts.push(['family',FAMILIES[S.family].label]);
+  if(S.modality) parts.push(['modality',S.modality]);
+  if(S.dataset) parts.push(['dataset',S.dataset]);
+  if(S.family && FAMILIES[S.family].rounds && S.mode) parts.push(['mode',S.mode]);
+  if(S.model) parts.push(['model',MODELS[S.model].label]);
+  if(S.acq) parts.push(['acq',ACQS[S.acq].label]);
+  if(S.oracle) parts.push(['oracle',ONLINE_ORACLES[S.oracle].label]);
+  if(!parts.length){c.innerHTML='<span class="sep">no selection yet</span>';return;}
+  parts.forEach((p,i)=>{
+    if(i)c.appendChild(Object.assign(el('span','sep'),{textContent:'›'}));
+    const cr=el('div','crumb'); cr.innerHTML=`<span class="k">${p[0]}</span>${p[1]}`; c.appendChild(cr);
+  });
+}
+
+/* ---------------- validation + config ---------------- */
+function validate(){
+  if(!S.family) return {state:'idle', msg:'Pick an experiment family to begin.'};
+  if(!S.modality) return {state:'idle', msg:'Choose a modality.'};
+  if(!S.dataset) return {state:'idle', msg:'Choose a dataset.'};
+  const fam=FAMILIES[S.family];
+  if(fam.rounds && !S.mode) return {state:'idle', msg:'Choose offline or online.'};
+  if(!S.model) return {state:'idle', msg:'Choose a surrogate model.'};
+  if(fam.leaf==='full'){
+    if(!S.acq) return {state:'idle', msg:'Choose an acquisition function.'};
+    if(ACQS[S.acq].uq && !MODELS[S.model].uq)
+      return {state:'err', msg:`${ACQS[S.acq].label} needs an uncertainty model — pick GP or Ensemble, or switch to Greedy / CoreSet.`};
+    if(S.mode==='online' && !S.oracle) return {state:'idle', msg:'Choose an online model oracle.'};
+  }
+  const reps = S.family==='zero_shot' ? 1 : S.nseeds;
+  return {state:'ok', msg:`Valid experiment — ${reps} replication${reps>1?'s':''} · 1 dataset.`};
+}
+
+function seedsArr(){return '['+Array.from({length:S.nseeds},(_,i)=>i).join(', ')+']';}
+
+function buildYaml(){
+  const fam=FAMILIES[S.family];
+  let y='';
+  const L=(t,c)=>`<span class="${c||''}">${t}</span>`;
+  if(S.family==='zero_shot'){
+    y =L('task:','k1')+' zero_shot\n'+
+       L('problem:','k1')+'\n'+
+       '  '+L('dataset:','k2')+' '+S.dataset+'   '+L('# '+S.modality,'cmt')+'\n'+
+       L('method:','k1')+'\n'+
+       '  '+L('model:','k2')+' '+S.model+'\n'+
+       '  '+L('model_config:','k2')+' {'+L('scoring_function','k3')+': null}   '+L('# pseudo-log-likelihood, no training','cmt');
+  }else if(S.family==='supervised'){
+    y =L('task:','k1')+' supervised\n'+
+       L('problem:','k1')+'\n'+
+       '  '+L('dataset:','k2')+' '+S.dataset+'   '+L('# '+S.modality,'cmt')+'\n'+
+       '  '+L('seeds:','k2')+' '+seedsArr()+'\n'+
+       L('method:','k1')+'\n'+
+       '  '+L('model:','k2')+' '+S.model;
+  }else{
+    const search = S.mode==='offline' ? 'dataset' : 'single_mutant';
+    let oracle;
+    if(S.mode==='offline'){
+      oracle='\n    '+L('mode:','k2')+' offline        '+L('# scorer = dataset','cmt');
+    }else{
+      oracle='\n    '+L('mode:','k2')+' online\n    '+L('scorer:','k2')+' '+S.oracle+
+             '\n    '+L('config:','k2')+' {'+ONLINE_ORACLES[S.oracle].cfg+'}';
+    }
+    y =L('task:','k1')+' design\n'+
+       L('problem:','k1')+'\n'+
+       '  '+L('dataset:','k2')+' '+(S.mode==='online'?'<seed sequences>':S.dataset)+'   '+L('# '+S.modality,'cmt')+'\n'+
+       '  '+L('seeds:','k2')+' '+seedsArr()+'\n'+
+       L('method:','k1')+'\n'+
+       '  '+L('model:','k2')+' '+S.model+'\n'+
+       '  '+L('acquisition_fn:','k2')+' '+S.acq+'\n'+
+       '  '+L('search_fn:','k2')+' '+search+'   '+L(S.mode==='offline'?'# pool-based':'# generative','cmt')+'\n'+
+       '  '+L('oracle:','k2')+oracle+'\n'+
+       '  '+L('task:','k2')+' {'+L('num_acq_rounds','k3')+': 6, '+L('acq_batch_size','k3')+': 100}';
+  }
+  return y;
+}
+
+function buildPy(){
+  const L=(t,c)=>`<span class="${c||''}">${t}</span>`;
+  const imp=L('from','k1')+' alf_benchmark '+L('import','k1')+' BenchmarkProblem, BenchmarkMethod, BenchmarkRunner\n\n';
+  if(S.family==='zero_shot'){
+    return imp+
+      'problem = BenchmarkProblem('+L('dataset','k3')+'='+L('"'+S.dataset+'"','k2')+')\n'+
+      'method  = BenchmarkMethod('+L('task','k3')+'='+L('"zero_shot"','k2')+', '+L('model','k3')+'='+L('"'+S.model+'"','k2')+',\n'+
+      '                          '+L('model_config','k3')+'={'+L('"scoring_function"','k2')+': '+L('None','k1')+'})\n'+
+      'BenchmarkRunner().run(problem, method, '+L('output_dir','k3')+'='+L('"runs/"','k2')+')';
+  }
+  if(S.family==='supervised'){
+    return imp+
+      'problem = BenchmarkProblem('+L('dataset','k3')+'='+L('"'+S.dataset+'"','k2')+', '+L('seeds','k3')+'='+seedsArr()+')\n'+
+      'method  = BenchmarkMethod('+L('task','k3')+'='+L('"supervised"','k2')+', '+L('model','k3')+'='+L('"'+S.model+'"','k2')+')\n'+
+      'BenchmarkRunner().run(problem, method, '+L('output_dir','k3')+'='+L('"runs/"','k2')+')';
+  }
+  const search = S.mode==='offline' ? '"dataset"' : '"single_mutant"';
+  const oracle = S.mode==='offline'
+    ? '{'+L('"mode"','k2')+': '+L('"offline"','k2')+'}'
+    : '{'+L('"mode"','k2')+': '+L('"online"','k2')+', '+L('"scorer"','k2')+': '+L('"'+S.oracle+'"','k2')+'}';
+  const ds = S.mode==='online' ? '"<seed-sequences>"' : '"'+S.dataset+'"';
+  return imp+
+    'problem = BenchmarkProblem('+L('dataset','k3')+'='+L(ds,'k2')+', '+L('seeds','k3')+'='+seedsArr()+')\n'+
+    'method  = BenchmarkMethod(\n'+
+    '    '+L('task','k3')+'='+L('"design"','k2')+',\n'+
+    '    '+L('model','k3')+'='+L('"'+S.model+'"','k2')+', '+L('acquisition_fn','k3')+'='+L('"'+S.acq+'"','k2')+',\n'+
+    '    '+L('search_fn','k3')+'='+L(search,'k2')+', '+L('oracle','k3')+'='+oracle+',\n'+
+    '    '+L('task','k3')+'={'+L('"num_acq_rounds"','k2')+': 6, '+L('"acq_batch_size"','k2')+': 100})\n'+
+    'BenchmarkRunner().run(problem, method, '+L('output_dir','k3')+'='+L('"runs/"','k2')+')';
+}
+
+function renderOutput(){
+  const v=validate();
+  const banner=document.getElementById('banner');
+  banner.className='banner '+v.state;
+  banner.textContent=(v.state==='ok'?'✓ ':v.state==='err'?'✕ ':'• ')+v.msg;
+
+  const metric=document.getElementById('metric');
+  if(S.family){
+    metric.innerHTML=`<span class="pillbadge">HEADLINE METRIC</span><b>${FAMILIES[S.family].label}:</b> ${FAMILIES[S.family].metric}`;
+  }else metric.innerHTML='';
+
+  const showCfg = v.state!=='idle';
+  document.getElementById('yaml').innerHTML = showCfg ? buildYaml() : '<span class="cmt"># complete the selection above to generate a config</span>';
+  document.getElementById('py').innerHTML   = showCfg ? buildPy()   : '<span class="cmt"># complete the selection above to generate a snippet</span>';
+}
+
+render();
+</script>
+</body>
+</html>

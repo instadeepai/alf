@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ALF Benchmarks — Active-Learning Leaderboard (mockup)</title>
+<style>
+  :root{
+    --navy:#0B2138; --navy2:#12314F; --teal:#0D9488; --tealLt:#14B8A6; --mint:#5EEAD4;
+    --ink:#1E293B; --slate:#64748B; --cloud:#F1F5F9; --card:#FFFFFF; --line:#E2E8F0; --amber:#F59E0B;
+    --bestbg:#ECFDF5; --gold:#E9B949; --silver:#AEB8C2; --bronze:#C8814B;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--cloud);}
+  /* header */
+  header{background:var(--navy);color:#fff;padding:26px 40px 22px;}
+  .brand{font-family:Georgia,serif;font-size:13px;letter-spacing:3px;color:var(--mint);text-transform:uppercase;}
+  header h1{font-family:Georgia,serif;font-size:30px;margin:6px 0 4px;font-weight:700;}
+  header p{margin:0;color:#9FB3C8;font-size:14.5px;max-width:820px;line-height:1.45;}
+  .wrap{max-width:1120px;margin:0 auto;padding:26px 24px 60px;}
+  /* suite pills */
+  .pills{display:flex;gap:10px;flex-wrap:wrap;margin:-14px 0 0;}
+  .pill{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:9px 18px;cursor:pointer;font-size:14px;font-weight:600;color:var(--slate);box-shadow:0 1px 2px rgba(15,23,42,.05);transition:.15s;}
+  .pill:hover{border-color:var(--teal);color:var(--teal);}
+  .pill.active{background:var(--teal);border-color:var(--teal);color:#fff;}
+  .pill small{display:block;font-weight:400;font-size:11px;opacity:.8;}
+  /* suite meta */
+  .meta{display:flex;gap:26px;flex-wrap:wrap;margin:22px 2px 4px;color:var(--slate);font-size:13px;}
+  .meta b{color:var(--ink);}
+  .suite-desc{margin:8px 2px 0;color:var(--slate);font-size:14px;max-width:900px;line-height:1.5;}
+  /* tabs */
+  .tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:2px solid var(--line);margin:22px 0 0;}
+  .tab{padding:11px 16px;cursor:pointer;font-size:13.5px;font-weight:600;color:var(--slate);border-bottom:3px solid transparent;margin-bottom:-2px;transition:.15s;white-space:nowrap;}
+  .tab:hover{color:var(--teal);}
+  .tab.active{color:var(--navy);border-bottom-color:var(--teal);}
+  .tab.agg{color:var(--teal);}
+  .tab.agg.active{color:var(--navy);}
+  /* board head */
+  .board-head{margin:24px 0 10px;}
+  .board-head h2{font-family:Georgia,serif;font-size:21px;margin:0 0 4px;color:var(--navy);}
+  .board-head .ctx{color:var(--slate);font-size:13px;line-height:1.5;}
+  .badge{display:inline-block;background:var(--navy2);color:var(--mint);font-size:11px;font-weight:700;letter-spacing:.5px;border-radius:6px;padding:4px 9px;margin-right:8px;vertical-align:middle;}
+  /* table */
+  .tbl-card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow-x:auto;box-shadow:0 6px 20px rgba(15,23,42,.06);}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;}
+  thead th{background:#F8FAFC;color:var(--slate);text-align:right;font-weight:700;padding:13px 14px;border-bottom:2px solid var(--line);cursor:pointer;user-select:none;white-space:nowrap;font-size:12.5px;}
+  thead th.l{text-align:left;}
+  thead th:hover{color:var(--teal);}
+  thead th .arrow{font-size:10px;color:var(--teal);}
+  thead th .dir{display:block;font-weight:400;font-size:10px;color:#94A3B8;}
+  tbody td{padding:12px 14px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;}
+  tbody td.l{text-align:left;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:#FBFDFE;}
+  .rank{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-weight:800;font-size:12.5px;color:#fff;background:var(--slate);}
+  .rank.r1{background:var(--gold);} .rank.r2{background:var(--silver);} .rank.r3{background:var(--bronze);}
+  .rank.plain{background:transparent;color:var(--slate);}
+  .method{font-weight:700;color:var(--navy);}
+  .method .tags{display:block;font-weight:400;font-size:11.5px;color:var(--slate);margin-top:2px;}
+  .ci{color:#94A3B8;font-size:11.5px;font-weight:400;}
+  .best{font-weight:800;color:var(--teal);background:var(--bestbg);}
+  .baseline td{background:#FBFBFC;font-style:italic;color:var(--slate);}
+  .baseline .method{color:var(--slate);font-weight:600;font-style:normal;}
+  .na{color:#CBD5E1;}
+  .bar{height:4px;border-radius:3px;background:linear-gradient(90deg,var(--teal),var(--tealLt));margin-top:5px;}
+  .bartrack{height:4px;border-radius:3px;background:#EEF2F6;margin-top:5px;}
+  .legend{margin:14px 2px 0;color:var(--slate);font-size:12px;line-height:1.6;}
+  .legend code{background:#fff;border:1px solid var(--line);border-radius:4px;padding:1px 6px;color:var(--ink);}
+  footer{color:var(--slate);font-size:12px;text-align:center;padding:30px 20px;border-top:1px solid var(--line);margin-top:40px;}
+  .mock{background:var(--amber);color:#3b2600;font-size:11px;font-weight:800;border-radius:6px;padding:3px 8px;letter-spacing:.5px;}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">ALF&nbsp;·&nbsp;Active&nbsp;Learning&nbsp;Framework</div>
+  <h1>Benchmark Leaderboard <span class="mock">MOCKUP</span></h1>
+  <p>Methods are ranked on the <b>sequential active-learning</b> task: how well a surrogate&nbsp;×&nbsp;acquisition policy
+     finds high-fitness designs <i>as acquisition rounds progress</i> — not on a single fixed split.
+     All numbers are mean over seeds with 95% bootstrap confidence intervals.</p>
+</header>
+
+<div class="wrap">
+  <div class="pills" id="pills"></div>
+  <div class="suite-desc" id="suiteDesc"></div>
+  <div class="meta" id="suiteMeta"></div>
+  <div class="tabs" id="tabs"></div>
+  <div class="board-head" id="boardHead"></div>
+  <div class="tbl-card"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+  <div class="legend" id="legend"></div>
+</div>
+
+<footer>
+  Illustrative mockup of the planned <b>alf-bench leaderboard</b> · numbers are placeholders ·
+  reference baselines reproducible via <code style="background:#fff;border:1px solid var(--line);border-radius:4px;padding:1px 6px;">alf-bench run alf-protein-v1.yaml</code>
+</footer>
+
+<script>
+/* ---------- metric schema ---------- */
+// key, label, direction ('max'|'min'), formatter
+const METRICS = [
+  {k:'best', label:'Best-found', dir:'max', sub:'frac. of optimum @ final round', fmt:v=>v.toFixed(2), bar:true, ci:true},
+  {k:'regret', label:'Cum. regret', dir:'min', sub:'lower is better', fmt:v=>v.toFixed(2)},
+  {k:'recall', label:'Top-10% recall', dir:'max', sub:'higher is better', fmt:v=>v.toFixed(2)},
+  {k:'spearman', label:'Surrogate ρ', dir:'max', sub:'Spearman, final round', fmt:v=>v.toFixed(2)},
+  {k:'ece', label:'ECE', dir:'min', sub:'calibration, lower better', fmt:v=>v.toFixed(3)},
+];
+
+/* ---------- helper to build a row ---------- */
+// arr = [best, ci, regret, recall, spearman(null=baseline), ece(null)]
+function M(surrogate, acq, best, ci, regret, recall, spearman, ece, seeds=5){
+  return {surrogate, acq, best, ci, regret, recall, spearman, ece, seeds};
+}
+
+/* ---------- DATA ---------- */
+const SUITES = {
+  'alf-protein-v1':{
+    name:'alf-protein-v1', tag:'PROTEIN · ACTIVE LEARNING',
+    sub:'Protein fitness optimisation',
+    desc:'Four protein landscapes. Each run starts from a small labelled seed set and acquires '+
+         '100 designs/round for 6 rounds against an offline oracle (the held-out dataset). The headline '+
+         'metric is best-found fitness, normalised so 1.0 = the dataset optimum.',
+    meta:{Modality:'Sequence', Oracle:'Offline (dataset)', Rounds:'6 × 100', Seeds:'5', Datasets:'4'},
+    problems:{
+      'flip-gb1':{
+        title:'FLIP · GB1', ctx:'Epistatic 4-site combinatorial landscape (149k variants). Hard: rugged, sparse peaks.',
+        rows:[
+          M('ESM-2','UCB',          0.93,0.02, 0.42, 0.71, 0.78, 0.061),
+          M('GP','UCB',             0.91,0.02, 0.48, 0.69, 0.74, 0.072),
+          M('GP','Expected Impr.',  0.88,0.03, 0.55, 0.64, 0.74, 0.075),
+          M('GP','Thompson',        0.86,0.03, 0.59, 0.62, 0.73, 0.081),
+          M('CNN','UCB',            0.84,0.03, 0.66, 0.58, 0.66, 0.110),
+          M('CNN','Greedy',         0.79,0.04, 0.81, 0.51, 0.66, 0.118),
+          M('CNN','CoreSet',        0.74,0.04, 0.93, 0.46, 0.65, 0.121),
+          M('—','Random',           0.58,0.05, 1.34, 0.18, null, null),
+        ]},
+      'flip-aav':{
+        title:'FLIP · AAV', ctx:'AAV capsid VP1 insertion fitness (~mutational scan). Smoother landscape.',
+        rows:[
+          M('ESM-2','UCB',          0.95,0.01, 0.31, 0.80, 0.82, 0.048),
+          M('GP','UCB',             0.93,0.02, 0.37, 0.77, 0.78, 0.055),
+          M('GP','Expected Impr.',  0.92,0.02, 0.40, 0.75, 0.78, 0.058),
+          M('CNN','UCB',            0.90,0.02, 0.46, 0.72, 0.71, 0.082),
+          M('GP','Thompson',        0.90,0.03, 0.45, 0.71, 0.77, 0.061),
+          M('CNN','Greedy',         0.86,0.03, 0.58, 0.65, 0.70, 0.090),
+          M('CNN','CoreSet',        0.82,0.03, 0.69, 0.59, 0.69, 0.094),
+          M('—','Random',           0.67,0.04, 1.05, 0.27, null, null),
+        ]},
+      'gfp':{
+        title:'GFP', ctx:'avGFP brightness landscape (~56k variants). Many neutral mutations, narrow bright peak.',
+        rows:[
+          M('ESM-2','UCB',          0.90,0.03, 0.51, 0.66, 0.71, 0.078),
+          M('GP','UCB',             0.89,0.02, 0.54, 0.65, 0.70, 0.069),
+          M('GP','Expected Impr.',  0.86,0.03, 0.62, 0.61, 0.70, 0.074),
+          M('GP','Thompson',        0.85,0.03, 0.64, 0.60, 0.69, 0.079),
+          M('CNN','UCB',            0.82,0.04, 0.73, 0.55, 0.63, 0.121),
+          M('CNN','Greedy',         0.78,0.04, 0.85, 0.49, 0.62, 0.128),
+          M('CNN','CoreSet',        0.71,0.05, 1.02, 0.42, 0.61, 0.133),
+          M('—','Random',           0.55,0.06, 1.48, 0.16, null, null),
+        ]},
+      'proteingym-BLAT_ECOLX':{
+        title:'ProteinGym · BLAT_ECOLX', ctx:'β-lactamase DMS assay (~5k single mutants). Antibiotic resistance fitness.',
+        rows:[
+          M('ESM-2','UCB',          0.94,0.02, 0.36, 0.76, 0.80, 0.052),
+          M('GP','UCB',             0.90,0.02, 0.49, 0.70, 0.75, 0.066),
+          M('GP','Expected Impr.',  0.89,0.03, 0.52, 0.67, 0.75, 0.070),
+          M('GP','Thompson',        0.87,0.03, 0.57, 0.64, 0.74, 0.073),
+          M('CNN','UCB',            0.83,0.04, 0.70, 0.57, 0.65, 0.115),
+          M('CNN','Greedy',         0.80,0.04, 0.78, 0.52, 0.64, 0.119),
+          M('CNN','CoreSet',        0.76,0.04, 0.88, 0.47, 0.63, 0.124),
+          M('—','Random',           0.60,0.05, 1.28, 0.19, null, null),
+        ]},
+    }
+  },
+  'alf-mol-v1':{
+    name:'alf-mol-v1', tag:'SMALL MOLECULE · ACTIVE LEARNING',
+    sub:'Molecular property optimisation',
+    desc:'Small-molecule property optimisation over the GuacaMol corpus. Designs are SMILES; the surrogate '+
+         'is trained on acquired molecules each round and the offline oracle returns the RDKit property.',
+    meta:{Modality:'SMILES', Oracle:'Offline (RDKit)', Rounds:'6 × 100', Seeds:'5', Datasets:'2'},
+    problems:{
+      'guacamol-logp':{
+        title:'GuacaMol · MolLogP', ctx:'Maximise predicted octanol–water logP over ~1.6M drug-like SMILES.',
+        rows:[
+          M('Chemprop','UCB',     0.92,0.02, 0.44, 0.74, 0.81, 0.058),
+          M('Chemprop','Greedy',  0.88,0.03, 0.57, 0.66, 0.80, 0.064),
+          M('GP','UCB',           0.84,0.03, 0.68, 0.60, 0.72, 0.083),
+          M('CNN','Thompson',     0.80,0.04, 0.79, 0.55, 0.67, 0.108),
+          M('—','Random',         0.62,0.05, 1.22, 0.21, null, null),
+        ]},
+      'guacamol-qed':{
+        title:'GuacaMol · QED', ctx:'Maximise quantitative drug-likeness (QED). Bounded [0,1], multi-modal.',
+        rows:[
+          M('Chemprop','UCB',     0.90,0.02, 0.49, 0.71, 0.79, 0.061),
+          M('Chemprop','Greedy',  0.86,0.03, 0.61, 0.63, 0.78, 0.067),
+          M('GP','UCB',           0.82,0.03, 0.72, 0.57, 0.70, 0.088),
+          M('CNN','Thompson',     0.78,0.04, 0.84, 0.52, 0.65, 0.113),
+          M('—','Random',         0.59,0.05, 1.31, 0.19, null, null),
+        ]},
+    }
+  }
+};
+
+/* ---------- aggregate computation (mean over a suite's problems) ---------- */
+function aggregate(suite){
+  const probs = Object.values(suite.problems);
+  const acc = {}; // key by surrogate|acq
+  probs.forEach(p=>p.rows.forEach(r=>{
+    const key = r.surrogate+'|'+r.acq;
+    if(!acc[key]) acc[key]={surrogate:r.surrogate,acq:r.acq,best:[],ci:[],regret:[],recall:[],spearman:[],ece:[],seeds:r.seeds,n:0};
+    const a=acc[key];
+    a.best.push(r.best); a.ci.push(r.ci); a.regret.push(r.regret); a.recall.push(r.recall);
+    if(r.spearman!=null)a.spearman.push(r.spearman); if(r.ece!=null)a.ece.push(r.ece); a.n++;
+  }));
+  const mean = arr => arr.reduce((s,x)=>s+x,0)/arr.length;
+  return Object.values(acc).map(a=>({
+    surrogate:a.surrogate, acq:a.acq, seeds:a.seeds, nprob:a.n,
+    best:mean(a.best), ci:mean(a.ci), regret:mean(a.regret), recall:mean(a.recall),
+    spearman:a.spearman.length?mean(a.spearman):null, ece:a.ece.length?mean(a.ece):null,
+  }));
+}
+
+/* ---------- rendering ---------- */
+let state = {suite:'alf-protein-v1', tab:'__agg__', sortKey:'best', sortDir:'max'};
+
+function bestValues(rows){
+  const best={};
+  METRICS.forEach(m=>{
+    const vals=rows.map(r=>r[m.k]).filter(v=>v!=null);
+    if(!vals.length){best[m.k]=null;return;}
+    best[m.k]= m.dir==='max'?Math.max(...vals):Math.min(...vals);
+  });
+  return best;
+}
+
+function sortRows(rows){
+  const m=METRICS.find(x=>x.k===state.sortKey)||METRICS[0];
+  const baseline=rows.filter(r=>r.acq==='Random');
+  const main=rows.filter(r=>r.acq!=='Random');
+  main.sort((a,b)=>{
+    const av=a[m.k], bv=b[m.k];
+    if(av==null)return 1; if(bv==null)return -1;
+    return m.dir==='max'? bv-av : av-bv;
+  });
+  return main.concat(baseline); // baseline always last
+}
+
+function renderPills(){
+  const el=document.getElementById('pills'); el.innerHTML='';
+  Object.keys(SUITES).forEach(id=>{
+    const s=SUITES[id];
+    const d=document.createElement('div');
+    d.className='pill'+(id===state.suite?' active':'');
+    d.innerHTML=`${s.name}<small>${s.sub}</small>`;
+    d.onclick=()=>{state.suite=id; state.tab='__agg__'; state.sortKey='best'; state.sortDir='max'; renderAll();};
+    el.appendChild(d);
+  });
+}
+
+function renderSuiteMeta(){
+  const s=SUITES[state.suite];
+  document.getElementById('suiteDesc').textContent=s.desc;
+  const m=document.getElementById('suiteMeta'); m.innerHTML='';
+  Object.entries(s.meta).forEach(([k,v])=>{
+    const d=document.createElement('div'); d.innerHTML=`${k}: <b>${v}</b>`; m.appendChild(d);
+  });
+}
+
+function renderTabs(){
+  const s=SUITES[state.suite];
+  const el=document.getElementById('tabs'); el.innerHTML='';
+  const agg=document.createElement('div');
+  agg.className='tab agg'+(state.tab==='__agg__'?' active':'');
+  agg.textContent='★ Suite aggregate';
+  agg.onclick=()=>{state.tab='__agg__'; state.sortKey='best'; state.sortDir='max'; renderAll();};
+  el.appendChild(agg);
+  Object.keys(s.problems).forEach(pid=>{
+    const t=document.createElement('div');
+    t.className='tab'+(state.tab===pid?' active':'');
+    t.textContent=s.problems[pid].title;
+    t.onclick=()=>{state.tab=pid; state.sortKey='best'; state.sortDir='max'; renderAll();};
+    el.appendChild(t);
+  });
+}
+
+function currentRows(){
+  const s=SUITES[state.suite];
+  if(state.tab==='__agg__') return aggregate(s);
+  return s.problems[state.tab].rows.map(r=>({...r}));
+}
+
+function renderBoardHead(){
+  const s=SUITES[state.suite]; const el=document.getElementById('boardHead');
+  if(state.tab==='__agg__'){
+    el.innerHTML=`<h2><span class="badge">${s.tag}</span>${s.name} — suite aggregate</h2>
+      <div class="ctx">Mean across all ${Object.keys(s.problems).length} problems in the suite. Ranked by mean best-found fitness.</div>`;
+  }else{
+    const p=s.problems[state.tab];
+    el.innerHTML=`<h2><span class="badge">PROBLEM</span>${p.title}</h2><div class="ctx">${p.ctx}</div>`;
+  }
+}
+
+function renderTable(){
+  const rows=sortRows(currentRows());
+  const best=bestValues(rows);
+  const agg = state.tab==='__agg__';
+  // head
+  const thead=document.getElementById('thead');
+  let h='<tr><th class="l">#</th><th class="l">Method</th>';
+  METRICS.forEach(m=>{
+    const active = state.sortKey===m.k ? ' <span class="arrow">'+(m.dir==='max'?'▾':'▴')+'</span>' : '';
+    h+=`<th data-k="${m.k}">${m.label}${active}<span class="dir">${m.sub}</span></th>`;
+  });
+  h+= agg ? '<th>Probs</th>' : '';
+  h+='<th>Seeds</th></tr>';
+  thead.innerHTML=h;
+  thead.querySelectorAll('th[data-k]').forEach(th=>{
+    th.onclick=()=>{const k=th.getAttribute('data-k'); const m=METRICS.find(x=>x.k===k);
+      state.sortKey=k; state.sortDir=m.dir; renderTable();};
+  });
+  // body
+  const tbody=document.getElementById('tbody'); let b='';
+  rows.forEach((r,i)=>{
+    const isBase=r.acq==='Random';
+    const rank=i+1;
+    const rcls= isBase?'plain':(rank===1?'r1':rank===2?'r2':rank===3?'r3':'plain');
+    b+=`<tr class="${isBase?'baseline':''}">`;
+    b+=`<td class="l"><span class="rank ${rcls}">${isBase?'·':rank}</span></td>`;
+    const surr = r.surrogate==='—' ? '' : r.surrogate;
+    b+=`<td class="l"><span class="method">${r.acq}${surr?'':' baseline'}<span class="tags">${surr?'surrogate: '+surr:'no surrogate · random acquisition'}</span></span></td>`;
+    METRICS.forEach(m=>{
+      const v=r[m.k];
+      if(v==null){b+=`<td class="na">—</td>`;return;}
+      const isBest = best[m.k]!=null && Math.abs(v-best[m.k])<1e-9 && !isBase;
+      let inner=m.fmt(v);
+      if(m.ci){inner+=` <span class="ci">±${r.ci.toFixed(2)}</span>`;}
+      if(m.bar){
+        const pct=Math.round(v*100);
+        inner+=`<div class="bartrack"><div class="bar" style="width:${pct}%"></div></div>`;
+      }
+      b+=`<td class="${isBest?'best':''}">${inner}</td>`;
+    });
+    if(agg) b+=`<td>${r.nprob}</td>`;
+    b+=`<td>${r.seeds}</td>`;
+    b+='</tr>';
+  });
+  tbody.innerHTML=b;
+}
+
+function renderLegend(){
+  document.getElementById('legend').innerHTML =
+    'Sort by any column (click a header). <b>Bold teal</b> = best in column. '+
+    'Each replication = one <code>task.run()</code>; seeds re-seed numpy / torch / CUDA. '+
+    'CIs are 95% bootstrap over seeds; the planned report also runs paired significance tests vs. the top method. '+
+    '<b>Best-found</b> is normalised so 1.0 = the dataset optimum. The <i>Random</i> baseline uses random acquisition (no surrogate-driven selection).';
+}
+
+function renderAll(){ renderPills(); renderSuiteMeta(); renderTabs(); renderBoardHead(); renderTable(); renderLegend(); }
+renderAll();
+</script>
+</body>
+</html>
