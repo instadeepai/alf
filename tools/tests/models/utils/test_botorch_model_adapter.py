@@ -232,11 +232,11 @@ def test_num_outputs_botorch_model(botorch_gp_model):
 
 
 def test_num_outputs_alf_model(mock_alf_model_with_variances):
-    """Test num_outputs property with ALF model (defaults to 1)."""
+    """Test num_outputs raises for ALF models (use BoTorchGPModel instead)."""
     adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
 
-    # ALF models default to single output
-    assert adapter.num_outputs == 1
+    with pytest.raises(NotImplementedError, match="num_outputs is not supported for ALF BaseModel"):
+        _ = adapter.num_outputs
 
 
 def test_batch_shape_botorch_model(botorch_gp_model):
@@ -247,11 +247,11 @@ def test_batch_shape_botorch_model(botorch_gp_model):
 
 
 def test_batch_shape_alf_model(mock_alf_model_with_variances):
-    """Test batch_shape property with ALF model (defaults to empty)."""
+    """Test batch_shape raises for ALF models (use BoTorchGPModel instead)."""
     adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
 
-    # ALF models default to no batch dimension
-    assert adapter.batch_shape == torch.Size([])
+    with pytest.raises(NotImplementedError, match="batch_shape is not supported for ALF BaseModel"):
+        _ = adapter.batch_shape
 
 
 # =============================================================================

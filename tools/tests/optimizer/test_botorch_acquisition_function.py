@@ -137,12 +137,14 @@ def test_botorch_acquisition_function_scores_are_finite(botorch_gp_model, test_c
 def test_botorch_acquisition_function_wraps_alf_model(
     mock_alf_model_with_variances, test_candidates_2d
 ):
-    """BotorchAcquisitionFunction adapts an ALF BaseModel via BoTorchModelAdapter."""
+    """BotorchAcquisitionFunction raises NotImplementedError for ALF BaseModel.
+
+    BoTorch acquisition functions call model.num_outputs during construction;
+    BoTorchModelAdapter raises for ALF models. Use BoTorchGPModel instead.
+    """
     cfg = BotorchAcquisitionConfig(name="upper_confidence_bound", kwargs={"beta": 2.0})
     acq_fn = BotorchAcquisitionFunction(cfg)
     state = _MockState(mock_alf_model_with_variances)
 
-    result = acq_fn(test_candidates_2d, state)
-
-    assert len(result.labels) == len(test_candidates_2d)
-    assert np.all(np.isfinite(result.labels))
+    with pytest.raises(NotImplementedError, match="num_outputs is not supported for ALF BaseModel"):
+        acq_fn(test_candidates_2d, state)
