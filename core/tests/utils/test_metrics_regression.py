@@ -580,5 +580,3 @@ class TestNllGaussian:
     def test_registered_requires_variance(self):
         """nll_gaussian is registered in the requires-variance registry."""
         assert "nll_gaussian" in regression_metric_registry.get_metrics(requires_variance=True)
-
-
