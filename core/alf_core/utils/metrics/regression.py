@@ -36,12 +36,6 @@ from scipy.stats import norm, pearsonr, spearmanr
 
 logger = logging.getLogger("alf-core")
 
-# np.trapezoid replaced np.trapz in NumPy 2.0; support both.
-try:
-    _np_trapz = np.trapezoid  # type: ignore[attr-defined]
-except AttributeError:
-    _np_trapz = np.trapz  # type: ignore[attr-defined]
-
 
 def register_requires_variance(metric_fn: Callable) -> Callable:
     """Decorator to mark a metric as requiring variance.
@@ -603,7 +597,7 @@ def top_k_mean(
     Selects the k highest target values and returns their mean.  When k
     exceeds the number of available targets the function falls back to all
     available targets.  Use this as the primary optimisation metric to track
-    how quickly an active-learning campaign surfaces high-performing
+    how quickly an active-learning experiment surfaces high-performing
     candidates across rounds.
 
     Args:
@@ -633,7 +627,7 @@ def top_k_max(
     Selects the k highest target values and returns the maximum.  When k
     exceeds the number of available targets the function falls back to all
     available targets.  Use alongside `top_k_mean` to distinguish between
-    campaigns that find one very good candidate versus many good ones.
+    experiments that find one very good candidate versus many good ones.
 
     Args:
         _means: Array of shape (b,). Unused (for API consistency with registry).
@@ -648,44 +642,6 @@ def top_k_max(
     k_eff = min(k, len(targets))
     top_k = np.partition(targets, -k_eff)[-k_eff:]
     return {f"top_{k_eff}_max": float(top_k.max())}
-
-
-def auc_top_k(
-    round_values: Float[np.ndarray, " n_rounds"],
-    best_value: float,
-) -> dict[str, float]:
-    """Compute the normalised area under the top-k mean curve.
-
-    Integrates the per-round top-k mean values using the trapezoidal rule,
-    then normalises the result so that a perfect campaign (one that always
-    achieves `best_value`) scores 1.0.  Lower values indicate that high-
-    performing candidates were found later in the campaign.  Use as the
-    primary leaderboard ranking metric for sample efficiency.
-
-    Args:
-        round_values: Array of shape (n_rounds,).  Per-round top-k mean, where
-            entry `i` is the top-k mean of all candidates acquired by round
-            `i` (inclusive).
-        best_value: The global best oracle label in the dataset.  Must be
-            strictly positive.  Used to normalise the AUC to [0, 1].
-
-    Returns:
-        Dictionary with key `auc_top_k` mapping to the normalised AUC.
-
-    Raises:
-        ValueError: If `round_values` has fewer than 2 entries or
-            `best_value` is not strictly positive (non-zero).
-    """
-    if len(round_values) < 2:
-        raise ValueError(f"auc_top_k requires at least 2 rounds, got {len(round_values)}")
-    if best_value <= 0.0:
-        raise ValueError(
-            f"best_value must be strictly positive (non-zero) to normalise the AUC, "
-            f"got {best_value}"
-        )
-    n = len(round_values)
-    auc = float(_np_trapz(round_values / best_value, dx=1.0 / (n - 1)))
-    return {"auc_top_k": auc}
 
 
 @register_no_variance_required
@@ -748,46 +704,6 @@ def nll_gaussian(
     safe_vars = np.maximum(variances, eps)
     nll = 0.5 * np.mean(np.log(2 * np.pi * safe_vars) + (targets - means) ** 2 / safe_vars)
     return {"nll": float(nll)}
-
-
-def calibration_curve(
-    means: Float[np.ndarray, " b"],
-    variances: Float[np.ndarray, " b"],
-    targets: Float[np.ndarray, " b"],
-    n_grid_points: int = 100,
-) -> tuple[Float[np.ndarray, " n_grid_points"], Float[np.ndarray, " n_grid_points"]]:
-    """Return the expected and observed coverage arrays for a reliability diagram.
-
-    For each confidence level α in a uniform grid from 0 to 1, computes the
-    observed fraction of targets that fall within the α-level prediction
-    interval.  Plotting observed coverage against expected coverage yields the
-    reliability diagram; perfect calibration lies on the diagonal.
-
-    This function exposes the raw arrays used internally by
-    `expected_calibration_error`, enabling callers to render the diagram
-    without re-computing the coverage sweep.
-
-    Args:
-        means: Array of shape (b,). Mean predictions.
-        variances: Array of shape (b,). Predicted variances.
-        targets: Array of shape (b,). True labels.
-        n_grid_points: Number of confidence levels to evaluate.
-            Defaults to 100.
-
-    Returns:
-        A tuple `(expected_coverage, observed_coverage)` where each array
-        has shape (n_grid_points,) and values in [0, 1].
-    """
-    check_inputs(means, targets)
-    check_variance_validity(variances, targets)
-    grid = np.linspace(0, 1, n_grid_points)
-    observed = np.zeros(n_grid_points)
-    std_devs = np.sqrt(variances)
-    for i, alpha in enumerate(grid):
-        n_stds = norm.ppf(1 - (1 - alpha) / 2)
-        half_width = n_stds * std_devs
-        observed[i] = ((targets >= means - half_width) & (targets <= means + half_width)).mean()
-    return grid, observed
 
 
 @register_requires_variance

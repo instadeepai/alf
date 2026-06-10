@@ -364,14 +364,16 @@ the dataset's `problem_type`.
 **Regression — Uncertainty Quantification (UQ) Metrics** (variance required):
 - **Residual Spearman**: Spearman correlation between absolute residuals and predicted variances
 - **Residual Pearson**: Pearson correlation between absolute residuals and standard deviations
+- **NLL Gaussian** (`nll_gaussian`): Mean negative log-likelihood under a Gaussian predictive distribution
 
-**Regression — Benchmarking Metrics** (no variance required, `utils/metrics/regression.py`):
+**Regression — Active Learning Progress Metrics** (no variance required, `utils/metrics/regression.py`):
 - **Top-K Mean** (`top_k_mean`): Mean oracle label of the top-k acquired candidates per round
 - **Top-K Max** (`top_k_max`): Maximum oracle label of the top-k acquired candidates per round
 - **Hit Rate** (`hit_rate`): Fraction of acquired candidates whose label meets a threshold
-- **AUC Top-K** (`auc_top_k`): Normalised area under the top-k mean curve — primary sample-efficiency ranking metric
+
+**Summary Metrics** (standalone, not in registry, `utils/metrics/summary.py`):
+- **AUC Top-K** (`auc_top_k`): Normalised area under the top-k mean curve across rounds — primary sample-efficiency ranking metric
 - **Calibration Curve** (`calibration_curve`): Expected vs observed coverage arrays for reliability diagrams
-- **NLL Gaussian** (`nll_gaussian`): Mean negative log-likelihood under a Gaussian predictive distribution
 
 **Diversity Metrics** (`utils/metrics/diversity.py`):
 - **Intra-Batch Diversity** (`intra_batch_diversity`): Average pairwise dissimilarity within an acquired batch (edit distance for sequences, cosine distance for embeddings/tabular)

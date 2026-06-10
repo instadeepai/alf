@@ -18,3 +18,4 @@ exported from the top-level ``alf_core.utils.metrics`` namespace.
    Classification <classification/index>
    Diversity <diversity/index>
    Regression <regression/index>
+   Summary <summary/index>

@@ -18,8 +18,6 @@ import numpy as np
 import pytest
 from alf_core.utils.metrics.base import regression_metric_registry
 from alf_core.utils.metrics.regression import (
-    auc_top_k,
-    calibration_curve,
     coverage,
     expected_calibration_error,
     hit_rate,
@@ -39,6 +37,7 @@ from alf_core.utils.metrics.regression import (
     top_k_mean,
     width,
 )
+from alf_core.utils.metrics.summary import auc_top_k, calibration_curve
 
 
 class TestMse:

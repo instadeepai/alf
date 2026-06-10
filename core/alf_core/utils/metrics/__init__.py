@@ -38,8 +38,6 @@ from alf_core.utils.metrics.classification import (
 )
 from alf_core.utils.metrics.diversity import intra_batch_diversity
 from alf_core.utils.metrics.regression import (
-    auc_top_k,
-    calibration_curve,
     coverage,
     expected_calibration_error,
     hit_rate,
@@ -62,3 +60,4 @@ from alf_core.utils.metrics.regression import (
     top_k_mean,
     width,
 )
+from alf_core.utils.metrics.summary import auc_top_k, calibration_curve

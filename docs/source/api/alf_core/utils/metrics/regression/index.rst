@@ -13,10 +13,6 @@ Calibration and UQ metrics (variance required): expected calibration error, rank
 coverage, rank coverage, interval width, rank width, residual Spearman, residual Pearson,
 NLL (Gaussian), UCB regret, and UCB regret sweep.
 
-Campaign-level metrics (standalone, not in registry): ``auc_top_k`` for normalised
-area-under-the-top-k-mean-curve sample efficiency scoring, and ``calibration_curve``
-for generating reliability diagram arrays.
-
 .. automodule:: alf_core.utils.metrics.regression
    :members:
    :show-inheritance:
