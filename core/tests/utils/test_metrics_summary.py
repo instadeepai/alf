@@ -16,7 +16,7 @@
 
 import numpy as np
 import pytest
-from alf_core.utils.metrics.summary import auc_top_k, calibration_curve
+from alf_core.utils.metrics import auc_top_k, calibration_curve
 
 
 class TestAucTopK:

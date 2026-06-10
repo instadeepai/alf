@@ -16,8 +16,7 @@
 
 import numpy as np
 import pytest
-from alf_core.utils.metrics.base import regression_metric_registry
-from alf_core.utils.metrics.regression import (
+from alf_core.utils.metrics import (
     coverage,
     expected_calibration_error,
     hit_rate,
@@ -28,6 +27,7 @@ from alf_core.utils.metrics.regression import (
     rank_coverage,
     rank_expected_calibration_error,
     rank_width,
+    regression_metric_registry,
     regret_ucb_alpha,
     regret_ucb_alpha_sweep,
     residual_pearson,

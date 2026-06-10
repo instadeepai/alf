@@ -244,73 +244,6 @@ def pairwise_xent(
 
 
 @register_requires_variance
-def expected_calibration_error(
-    means: Float[np.ndarray, " b"],
-    variances: Float[np.ndarray, " b"],
-    targets: Float[np.ndarray, " b"],
-    n_grid_points: int = 100,
-) -> dict[str, float]:
-    """Compute Expected Calibration Error (ECE).
-
-    For each confidence level alpha in a grid from 0 to 1:
-    - Find alpha% confidence intervals for all predictions
-    - Count percentage of targets that fall within the confidence intervals
-    - ECE = area between x=y line and the observed coverage curve
-
-    Lower ECE values indicate better calibration.
-
-    Args:
-        means: Array of shape (b,). Mean predictions.
-        variances: Array of shape (b,). Predicted variances.
-        targets: Array of shape (b,). True labels.
-        n_grid_points: Number of grid points for confidence level discretization.
-            Defaults to 100.
-
-    Returns:
-        Dictionary with key "ece" mapping to the ECE value.
-    """
-    grid = np.linspace(0, 1, n_grid_points)
-    perc = np.zeros(n_grid_points)
-    for i, cdf_cutoff in enumerate(grid):
-        num_stds = norm.ppf(1 - ((1 - cdf_cutoff) / 2))
-        perc[i] = (
-            (targets >= means - num_stds * np.sqrt(variances))
-            & (targets <= means + num_stds * np.sqrt(variances))
-        ).mean()
-    ece = np.sum(np.abs(perc - grid)) * (1 / n_grid_points)
-    return {"ece": ece}
-
-
-@register_requires_variance
-def rank_expected_calibration_error(
-    means: Float[np.ndarray, " b"],
-    variances: Float[np.ndarray, " b"],
-    targets: Float[np.ndarray, " b"],
-) -> dict[str, float]:
-    """Compute Expected Calibration Error (ECE) in rank space.
-
-    Computes ECE using Monte Carlo ranking to estimate rank distributions,
-    then applies the standard ECE computation in rank space.
-
-    Lower ECE values indicate better calibration.
-
-    Args:
-        means: Array of shape (b,). Mean predictions.
-        variances: Array of shape (b,). Predicted variances.
-        targets: Array of shape (b,). True labels.
-
-    Returns:
-        Dictionary with key "rank_ece" mapping to the ECE value.
-    """
-    mean_rank, rank_variances = monte_carlo_ranking(means, variances, seed=42)
-    target_ranks = (-targets).argsort().argsort() + 1
-
-    ece = expected_calibration_error(mean_rank, rank_variances, target_ranks)["ece"]
-
-    return {"rank_ece": ece}
-
-
-@register_requires_variance
 def width(
     _: Float[np.ndarray, " b"],
     variances: Float[np.ndarray, " b"],
@@ -686,9 +619,9 @@ def nll_gaussian(
         NLL = 0.5 * mean(log(2π) + log(σ²_i) + (y_i - μ_i)² / σ²_i)
 
     Lower values indicate that the model places high probability mass on the
-    true targets.  Use together with `expected_calibration_error` to
+    true targets. Use together with `expected_calibration_error` to
     characterise both sharpness and calibration of the surrogate's uncertainty
-    estimates.  Variances are clipped to a small positive value before
+    estimates. Variances are clipped to a small positive value before
     computing the logarithm to guard against numerical instability.
 
     Args:

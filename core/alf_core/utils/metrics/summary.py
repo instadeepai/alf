@@ -22,9 +22,7 @@ in the registry.
 import warnings
 
 import numpy as np
-from alf_core.utils.metrics.base import check_inputs, check_variance_validity
 from jaxtyping import Float
-from scipy.stats import norm
 
 
 def auc_top_k(
@@ -79,46 +77,3 @@ def auc_top_k(
     dx = 1.0 / (n - 1)
     auc = float(np.clip(np.sum((normalised[:-1] + normalised[1:]) / 2) * dx, 0.0, 1.0))
     return {"auc_top_k": auc}
-
-
-def calibration_curve(
-    means: Float[np.ndarray, " b"],
-    variances: Float[np.ndarray, " b"],
-    targets: Float[np.ndarray, " b"],
-    n_grid_points: int = 100,
-) -> tuple[Float[np.ndarray, " n_grid_points"], Float[np.ndarray, " n_grid_points"]]:
-    """Return the expected and observed coverage arrays for a reliability diagram.
-
-    For each confidence level α in a uniform grid from 0 to 1, computes the
-    observed fraction of targets that fall within the α-level prediction
-    interval.  Plotting observed coverage against expected coverage yields the
-    reliability diagram; perfect calibration lies on the diagonal.
-
-    This function enables callers to render the diagram without re-computing
-    the coverage sweep.
-
-    Args:
-        means: Array of shape (b,). Mean predictions.
-        variances: Array of shape (b,). Predicted variances.
-        targets: Array of shape (b,). True labels.
-        n_grid_points: Number of confidence levels to evaluate.
-            Defaults to 100.
-
-    Returns:
-        A tuple `(expected_coverage, observed_coverage)` where each array
-        has shape (n_grid_points,) and values in [0, 1].
-    """
-    check_inputs(means, targets)
-    check_variance_validity(variances, targets)
-    grid = np.linspace(0, 1, n_grid_points)
-    observed = np.zeros(n_grid_points)
-    std_devs = np.sqrt(variances)
-    for i, alpha in enumerate(grid):
-        n_stds = norm.ppf(1 - (1 - alpha) / 2)
-        with np.errstate(invalid="ignore"):
-            half_width = n_stds * std_devs
-        # inf * 0 = nan for zero-variance predictions; replace with inf so they
-        # are always counted as covered (an infinite interval covers everything).
-        half_width = np.where(np.isnan(half_width), np.inf, half_width)
-        observed[i] = ((targets >= means - half_width) & (targets <= means + half_width)).mean()
-    return grid, observed

@@ -28,6 +28,11 @@ from alf_core.utils.metrics.base import (
     regression_metric_registry,
     require_min_samples,
 )
+from alf_core.utils.metrics.calibration import (
+    calibration_curve,
+    expected_calibration_error,
+    rank_expected_calibration_error,
+)
 from alf_core.utils.metrics.classification import (
     accuracy,
     auc_roc,
@@ -39,7 +44,6 @@ from alf_core.utils.metrics.classification import (
 from alf_core.utils.metrics.diversity import intra_batch_diversity
 from alf_core.utils.metrics.regression import (
     coverage,
-    expected_calibration_error,
     hit_rate,
     monte_carlo_ranking,
     mse,
@@ -47,7 +51,6 @@ from alf_core.utils.metrics.regression import (
     pairwise_xent,
     pearson,
     rank_coverage,
-    rank_expected_calibration_error,
     rank_width,
     register_no_variance_required,
     register_requires_variance,
@@ -60,4 +63,4 @@ from alf_core.utils.metrics.regression import (
     top_k_mean,
     width,
 )
-from alf_core.utils.metrics.summary import auc_top_k, calibration_curve
+from alf_core.utils.metrics.summary import auc_top_k
