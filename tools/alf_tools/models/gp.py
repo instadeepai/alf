@@ -147,6 +147,7 @@ class GPTrainConfig(BaseTrainConfig):
     early_stopping_delta: float = 1e-4
 
 
+# TODO: Might not need this.
 @dataclass
 class FeaturizerConfig:
     """Configuration for sequence featurization.
