@@ -250,7 +250,7 @@ Before submitting, ensure:
 
 ## Writing Documentation
 
-ALF's docs are built with Sphinx and organized using the [Diátaxis](https://diataxis.fr/) model
+ALF's docs are built with Sphinx and organised using the [Diátaxis](https://diataxis.fr/) model
 into four sections under `docs/source/`: **explanation/**, **tutorials/**, **how-to/**, and
 **reference/**. Add new narrative pages to the section that matches the reader's intent.
 

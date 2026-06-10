@@ -1,6 +1,6 @@
 # ALF
 
-**ALF** is an active learning framework for iterative optimization of biological and chemical
+**ALF** is an active learning framework for iterative optimisation of biological and chemical
 design targets. It provides modular components for candidate search, surrogate modelling, and
 acquisition, enabling efficient discovery across expensive, high-dimensional search spaces such
 as protein sequences and small molecules.
