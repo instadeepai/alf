@@ -32,6 +32,33 @@ esmfold = [
 ]
 guacamol = ["rdkit>=2022.9.0"]
 
+# Entry points expose alf-tools/alf-core components to alf-benchmark's registry by name.
+# Providers reference plain classes only; no import of alf_benchmark is required here.
+[project.entry-points."alf.models"]
+cnn = "alf_tools.models.cnn:CNNModel"
+gp = "alf_tools.models.gp:GPModel"
+mlp = "alf_tools.models.mlp:MLPModel"
+esm2 = "alf_tools.models.esm2:ESM2Model"
+chemprop = "alf_tools.models.chemprop:ChempropModel"
+esmfold = "alf_tools.models.esmfold:ESMFoldModel"
+
+[project.entry-points."alf.datasets"]
+gfp = "alf_tools.datasets.gfp:GFP"
+flip = "alf_tools.datasets.flip:FLIP"
+proteingym = "alf_tools.datasets.proteingym:ProteinGym"
+guacamol = "alf_tools.datasets.guacamol.guacamol_dataset:GuacaMol"
+
+[project.entry-points."alf.acquisition_functions"]
+greedy = "alf_tools.optimizer.acquisition_functions.greedy:Greedy"
+ucb = "alf_tools.optimizer.acquisition_functions.ucb:UCB"
+ei = "alf_tools.optimizer.acquisition_functions.expected_improvement:ExpectedImprovement"
+thompson = "alf_tools.optimizer.acquisition_functions.thompson_sampling:ThompsonSampling"
+coreset = "alf_tools.optimizer.acquisition_functions.core_set:CoreSet"
+
+[project.entry-points."alf.searches"]
+dataset_search = "alf_core.optimizer.search:DatasetSearch"
+single_mutant = "alf_tools.optimizer.search.single_mutant_search:SingleMutantSearch"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["alf_tools*"]

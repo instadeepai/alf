@@ -8,6 +8,7 @@ dependencies = [
     "alf_core",
     "alf_tools",
     "alf_tutorials",
+    "alf_benchmark",
 ]
 
 # Path sources for local packages
@@ -15,6 +16,7 @@ dependencies = [
 alf_core = { path = "core", editable = true }
 alf_tools = { path = "tools", editable = true }
 alf_tutorials = { path = "tutorials", editable = true }
+alf_benchmark = { path = "benchmark", editable = true }
 
 # Pyright/Pylance configuration for type checking and imports
 # This is needed because the project uses editable installs (development mode)
@@ -26,14 +28,14 @@ venvPath = "."  # Virtual environment is in the root directory
 venv = ".venv"  # Name of the virtual environment folder
 pythonVersion = "3.12"  # Match the Python version used in the project
 # extraPaths: Additional directories to search for imports beyond site-packages
-extraPaths = ["core/alf_core", "tools/alf_tools", "tutorials"]
+extraPaths = ["core/alf_core", "tools/alf_tools", "tutorials", "benchmark/alf_benchmark"]
 # include: Directories that should be analyzed for type checking
-include = ["core", "tools", "tutorials"]
+include = ["core", "tools", "tutorials", "benchmark"]
 
 # Execution environment configuration for the entire workspace
 [[tool.pyright.executionEnvironments]]
 root = "."
-extraPaths = ["core", "tools", "tutorials"]
+extraPaths = ["core", "tools", "tutorials", "benchmark"]
 
 [dependency-groups]
 dev = [

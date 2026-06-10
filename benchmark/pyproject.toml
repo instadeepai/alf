@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alf_benchmark"
+version = "0.1.0"
+description = "Benchmarking layer for ALF: sweep, aggregate, and compare active-learning methods."
+readme = "README.md"
+requires-python = ">=3.12,<3.14.1"
+dependencies = [
+    "alf_tools",
+    "pydantic>=2.0",
+    "pandas>=1.3.0",
+    "pyarrow>=10.0.0",
+    "numpy>=1.21.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["alf_benchmark*"]
+
+[tool.uv.sources]
+alf_core = { path = "../core", editable = true }
+alf_tools = { path = "../tools", editable = true }
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
