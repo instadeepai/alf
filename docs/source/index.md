@@ -85,7 +85,7 @@ from alf_core import (
     Optimizer,
     Oracle,
     Surrogate,
-    TerminalTaskStateLogger,
+    TerminalStateLogger,
 )
 from alf_tools.datasets.gfp import GFP
 from alf_tools.models.cnn import CNNModel
@@ -102,7 +102,7 @@ task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
 state = task.setup(dataset=dataset, surrogate=surrogate)
 task.run(
     state=state,
-    task_state_loggers=[TerminalTaskStateLogger()],
+    state_loggers=[TerminalStateLogger()],
     optimizer=optimizer,
     oracle=oracle,
 )
