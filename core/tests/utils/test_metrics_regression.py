@@ -37,7 +37,6 @@ from alf_core.utils.metrics.regression import (
     top_k_mean,
     width,
 )
-from alf_core.utils.metrics.summary import auc_top_k, calibration_curve
 
 
 class TestMse:
@@ -505,46 +504,6 @@ class TestTopKMax:
         assert "top_k_max" in regression_metric_registry.get_metrics(requires_variance=False)
 
 
-class TestAucTopK:
-    """Tests for auc_top_k standalone function."""
-
-    def test_perfect_campaign_scores_one(self):
-        """A campaign that always achieves best_value scores 1.0."""
-        result = auc_top_k(np.array([1.0, 1.0, 1.0, 1.0]), best_value=1.0)
-        assert result["auc_top_k"] == pytest.approx(1.0)
-
-    def test_returns_auc_top_k_key(self):
-        """auc_top_k returns a dict with key 'auc_top_k'."""
-        result = auc_top_k(np.array([0.5, 0.7, 0.8]), best_value=1.0)
-        assert "auc_top_k" in result
-
-    def test_value_in_reasonable_range(self):
-        """AUC is non-negative for non-negative round values."""
-        result = auc_top_k(np.array([0.3, 0.5, 0.7, 0.9]), best_value=1.0)
-        assert result["auc_top_k"] >= 0.0
-
-    def test_early_campaign_scores_higher_than_late(self):
-        """A campaign that finds hits early scores higher AUC than one that finds them late."""
-        early_bloom = auc_top_k(np.array([0.9, 0.85, 0.8, 0.75]), best_value=1.0)
-        late_bloom = auc_top_k(np.array([0.1, 0.3, 0.7, 0.9]), best_value=1.0)
-        assert early_bloom["auc_top_k"] > late_bloom["auc_top_k"]
-
-    def test_single_round_raises(self):
-        """Fewer than 2 rounds raises ValueError."""
-        with pytest.raises(ValueError, match="at least 2 rounds"):
-            auc_top_k(np.array([0.9]), best_value=1.0)
-
-    def test_zero_best_value_raises(self):
-        """best_value of 0 raises ValueError."""
-        with pytest.raises(ValueError, match="non-zero"):
-            auc_top_k(np.array([0.5, 0.6]), best_value=0.0)
-
-    def test_negative_best_value_raises(self):
-        """Negative best_value raises ValueError."""
-        with pytest.raises(ValueError, match="non-zero"):
-            auc_top_k(np.array([0.5, 0.6]), best_value=-1.0)
-
-
 class TestHitRate:
     """Tests for hit_rate metric."""
 
@@ -623,57 +582,3 @@ class TestNllGaussian:
         assert "nll_gaussian" in regression_metric_registry.get_metrics(requires_variance=True)
 
 
-class TestCalibrationCurve:
-    """Tests for calibration_curve standalone helper."""
-
-    def test_returns_two_arrays(self):
-        """calibration_curve returns a tuple of two arrays."""
-        result = calibration_curve(
-            np.array([0.0, 1.0, 2.0]),
-            np.array([1.0, 1.0, 1.0]),
-            np.array([0.0, 1.0, 2.0]),
-        )
-        assert len(result) == 2
-        expected, observed = result
-        assert isinstance(expected, np.ndarray)
-        assert isinstance(observed, np.ndarray)
-
-    def test_arrays_same_length_as_grid(self):
-        """Both returned arrays match the requested n_grid_points."""
-        expected, observed = calibration_curve(
-            np.array([0.0, 1.0]),
-            np.array([1.0, 1.0]),
-            np.array([0.0, 1.0]),
-            n_grid_points=50,
-        )
-        assert len(expected) == 50
-        assert len(observed) == 50
-
-    def test_expected_is_uniform_grid(self):
-        """Expected coverage array is a uniform grid from 0 to 1."""
-        expected, _ = calibration_curve(
-            np.array([0.0, 1.0, 2.0]),
-            np.array([1.0, 1.0, 1.0]),
-            np.array([0.0, 1.0, 2.0]),
-        )
-        assert expected[0] == pytest.approx(0.0)
-        assert expected[-1] == pytest.approx(1.0)
-
-    def test_observed_values_in_range(self):
-        """Observed coverage values are in [0, 1]."""
-        _, observed = calibration_curve(
-            np.array([0.0, 1.0, 2.0]),
-            np.array([1.0, 1.0, 1.0]),
-            np.array([0.0, 1.0, 2.0]),
-        )
-        assert np.all(observed >= 0.0)
-        assert np.all(observed <= 1.0)
-
-    def test_well_calibrated_near_diagonal(self):
-        """A well-calibrated model produces observed coverage close to expected."""
-        rng = np.random.default_rng(42)
-        means = rng.standard_normal(500)
-        variances = np.ones(500)
-        targets = means + rng.standard_normal(500)
-        expected, observed = calibration_curve(means, variances, targets, n_grid_points=20)
-        assert np.mean(np.abs(observed - expected)) < 0.15

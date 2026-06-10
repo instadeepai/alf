@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Standalone summary metrics that operate across multiple rounds.
+"""Standalone metrics not registered in regression_metric_registry.
 
-Unlike the registered per-round metrics in ``regression.py``, these functions
-aggregate information over an entire active learning experiment and are not
-registered in ``regression_metric_registry``.
+Contains multi-round summary metrics (auc_top_k) and per-round diagnostic
+helpers (calibration_curve) that share the property of not being registered
+in the registry.
 """
+
+import warnings
 
 import numpy as np
 from alf_core.utils.metrics.base import check_inputs, check_variance_validity
@@ -42,10 +44,13 @@ def auc_top_k(
             entry `i` is the top-k mean of all candidates acquired by round
             `i` (inclusive).
         best_value: The global best oracle label in the dataset.  Must be
-            strictly positive.  Used to normalise the AUC to [0, 1].
+            strictly positive.  Used to normalise the AUC to [0, 1].  If any
+            entry in `round_values` exceeds `best_value`, a warning is issued
+            and the result is clamped to 1.0.
 
     Returns:
-        Dictionary with key `auc_top_k` mapping to the normalised AUC.
+        Dictionary with key `auc_top_k` mapping to the normalised AUC in
+        [0, 1].
 
     Raises:
         ValueError: If `round_values` has fewer than 2 entries or
@@ -60,8 +65,14 @@ def auc_top_k(
         )
     n = len(round_values)
     normalised = round_values / best_value
+    if np.any(normalised > 1.0):
+        warnings.warn(
+            "Some round_values exceed best_value; the normalised AUC will be clamped to 1.0. "
+            "Verify that best_value is the true global optimum.",
+            stacklevel=2,
+        )
     dx = 1.0 / (n - 1)
-    auc = float(np.sum((normalised[:-1] + normalised[1:]) / 2) * dx)
+    auc = float(np.clip(np.sum((normalised[:-1] + normalised[1:]) / 2) * dx, 0.0, 1.0))
     return {"auc_top_k": auc}
 
 
@@ -100,6 +111,10 @@ def calibration_curve(
     std_devs = np.sqrt(variances)
     for i, alpha in enumerate(grid):
         n_stds = norm.ppf(1 - (1 - alpha) / 2)
-        half_width = n_stds * std_devs
+        with np.errstate(invalid="ignore"):
+            half_width = n_stds * std_devs
+        # inf * 0 = nan for zero-variance predictions; replace with inf so they
+        # are always counted as covered (an infinite interval covers everything).
+        half_width = np.where(np.isnan(half_width), np.inf, half_width)
         observed[i] = ((targets >= means - half_width) & (targets <= means + half_width)).mean()
     return grid, observed
