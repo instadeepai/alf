@@ -64,6 +64,17 @@ class TestAucTopK:
             result = auc_top_k(np.array([1.2, 1.1, 1.05, 1.0]), best_value=1.0)
         assert result["auc_top_k"] == pytest.approx(1.0)
 
+    def test_nan_best_value_raises(self):
+        """best_value of NaN raises ValueError (NaN bypasses <= 0.0 guard)."""
+        with pytest.raises(ValueError, match="non-zero"):
+            auc_top_k(np.array([0.5, 0.6]), best_value=float("nan"))
+
+    def test_negative_round_values_warns_and_clamps_to_zero(self):
+        """Negative round_values emit a warning and the result is clamped to 0.0."""
+        with pytest.warns(UserWarning, match="negative"):
+            result = auc_top_k(np.array([-0.5, -0.3]), best_value=1.0)
+        assert result["auc_top_k"] == pytest.approx(0.0)
+
 
 class TestCalibrationCurve:
     """Tests for calibration_curve standalone helper."""

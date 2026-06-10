@@ -58,13 +58,18 @@ def auc_top_k(
     """
     if len(round_values) < 2:
         raise ValueError(f"auc_top_k requires at least 2 rounds, got {len(round_values)}")
-    if best_value <= 0.0:
+    if not (best_value > 0.0):
         raise ValueError(
             f"best_value must be strictly positive (non-zero) to normalise the AUC, "
             f"got {best_value}"
         )
     n = len(round_values)
     normalised = round_values / best_value
+    if np.any(normalised < 0.0):
+        warnings.warn(
+            "Some round_values are negative; the normalised AUC will be clamped to 0.0.",
+            stacklevel=2,
+        )
     if np.any(normalised > 1.0):
         warnings.warn(
             "Some round_values exceed best_value; the normalised AUC will be clamped to 1.0. "
@@ -89,9 +94,8 @@ def calibration_curve(
     interval.  Plotting observed coverage against expected coverage yields the
     reliability diagram; perfect calibration lies on the diagonal.
 
-    This function exposes the raw arrays used internally by
-    `expected_calibration_error`, enabling callers to render the diagram
-    without re-computing the coverage sweep.
+    This function enables callers to render the diagram without re-computing
+    the coverage sweep.
 
     Args:
         means: Array of shape (b,). Mean predictions.
