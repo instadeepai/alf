@@ -67,7 +67,7 @@ Run an active learning design experiment:
        Optimizer,
        Oracle,
        Surrogate,
-       TerminalTaskStateLogger,
+       TerminalStateLogger,
    )
    from alf_tools.datasets.gfp import GFP
    from alf_tools.models.cnn import CNNModel
@@ -84,7 +84,7 @@ Run an active learning design experiment:
    state = task.setup(dataset=dataset, surrogate=surrogate)
    task.run(
        state=state,
-       task_state_loggers=[TerminalTaskStateLogger()],
+       state_loggers=[TerminalStateLogger()],
        optimizer=optimizer,
        oracle=oracle,
    )
