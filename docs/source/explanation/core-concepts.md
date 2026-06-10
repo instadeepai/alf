@@ -63,7 +63,7 @@ ALF benchmark suite sweeps over; see [Why ALF?](why-alf.md).
 
 ## Putting it together
 
-The 15-line quickstart on the [home page](../index.rst) is precisely these objects wired up: a
+The 15-line quickstart on the [home page](../index.md) is precisely these objects wired up: a
 `GFP` dataset, a `CNNModel` inside a `Surrogate`, an `Optimizer` holding `Greedy` + `DatasetSearch`,
 an `Oracle` scoring against the dataset, run by a `DesignTask`. Once the mental model above is
 clear, that snippet reads as "compose the loop from parts."

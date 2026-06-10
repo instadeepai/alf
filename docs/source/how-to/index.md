@@ -3,9 +3,12 @@
 Task-oriented recipes that answer "how do I do X?": each one a short, focused guide for a
 single extension or workflow.
 
-Recipes land here as they are written: *Add your own model*, *Add a dataset*, *Add an
-acquisition function*, *Add a search*, and *Switch offline ↔ online*.
-
 ```{toctree}
 :maxdepth: 1
+
+add-a-model
+add-a-dataset
+add-an-acquisition-function
+add-a-search-function
+switch-offline-online
 ```

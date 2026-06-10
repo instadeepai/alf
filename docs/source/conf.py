@@ -37,6 +37,9 @@ extensions = [
 ]
 autosummary_generate = True
 
+# Enable colon-fence syntax so sphinx-design grid/card directives can be nested in MyST.
+myst_enable_extensions = ["colon_fence"]
+
 # Mock imports for modules that require external dependencies
 # This allows documentation to be built without installing heavy dependencies like PyRosetta
 autodoc_mock_imports = [
