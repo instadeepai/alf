@@ -87,6 +87,16 @@ class BoTorchGPModel(BaseModel):
     This model wraps BoTorch's SingleTaskGP, which is built on GPyTorch but provides
     better defaults and easier integration with BoTorch acquisition functions.
 
+    Use this model when you want native BoTorch acquisition function support (e.g.
+    ``BotorchAcquisitionFunction``).  It is a first-class BoTorch ``Model`` and is
+    passed directly — without the ``BoTorchModelAdapter`` shim — to BoTorch
+    acquisition functions.
+
+    Prefer :class:`~alf_tools.models.gp.GPModel` instead when you need flexible
+    sequence featurisation (one-hot, custom featurisers) or direct GPyTorch kernel
+    control; ``GPModel`` is a pure ALF ``BaseModel`` and must go through
+    ``BoTorchModelAdapter`` to work with BoTorch acquisition functions.
+
     Key Features:
     - Modern hyperparameter priors from Hvarfner et al. 2024
     - Automatic output standardisation (zero mean, unit variance)

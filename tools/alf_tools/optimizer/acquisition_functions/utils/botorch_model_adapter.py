@@ -27,7 +27,7 @@ from alf_tools.models.utils.botorch_utils import (
     predictions_to_posterior,
     tensor_to_candidates,
 )
-from botorch.models.model import Model
+from botorch.models.model import Model as BotorchModel
 from botorch.posteriors import Posterior
 from botorch.posteriors.gpytorch import GPyTorchPosterior
 from gpytorch.distributions import MultivariateNormal
@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from botorch.acquisition.objective import PosteriorTransform
 
 
-class BoTorchModelAdapter(Model):
+class BoTorchModelAdapter(BotorchModel):
     """Universal adapter for BoTorch acquisition functions compatibility.
 
     Accepts either a native BoTorch `Model` (direct pass-through to
@@ -51,8 +51,8 @@ class BoTorchModelAdapter(Model):
     models raises a `ValueError`.
 
     Args:
-        model: Either a BoTorch Model or an ALF BaseModel instance.
-            If BaseModel, it must provide prediction variances.
+        model: Either a BoTorch ``BotorchModel`` or an ALF ``BaseModel`` instance.
+            If ``BaseModel``, it must provide prediction variances.
 
     Raises:
         TypeError: If the model is neither a BoTorch Model nor ALF BaseModel.
@@ -60,7 +60,7 @@ class BoTorchModelAdapter(Model):
             (raised during `posterior()`).
     """
 
-    def __init__(self, model: Model | BaseModel):
+    def __init__(self, model: BotorchModel | BaseModel):
         """Initialize the adapter with a model.
 
         Args:
@@ -69,13 +69,13 @@ class BoTorchModelAdapter(Model):
         Raises:
             TypeError: If model is not a BoTorch Model or ALF BaseModel.
         """
-        if not isinstance(model, (Model, BaseModel)):
+        if not isinstance(model, (BotorchModel, BaseModel)):
             raise TypeError(
                 f"Model must be either a BoTorch Model or ALF BaseModel, got {type(model).__name__}"
             )
         super().__init__()
         self._wrapped_model = model
-        self._is_botorch_model = isinstance(model, Model)
+        self._is_botorch_model = isinstance(model, BotorchModel)
 
     def posterior(
         self,
@@ -179,27 +179,38 @@ class BoTorchModelAdapter(Model):
     def num_outputs(self) -> int:
         """The number of outputs of the model.
 
-        Raises:
-            NotImplementedError: If the model is a multi-output ALF BaseModel.
-
         Returns:
-            Number of outputs. For most models, this is 1 (single-output).
-            Multi-output models should override this.
+            Number of outputs for native BoTorch models.
+
+        Raises:
+            NotImplementedError: Always raised for ALF BaseModel instances.
+                Use a native BoTorch model (e.g. ``BoTorchGPModel``) to avoid
+                this; ALF BaseModels do not expose ``num_outputs``.
         """
         if self._is_botorch_model:
             return int(self._wrapped_model.num_outputs)  # type: ignore[union-attr, no-any-return]
-        return 1
+        raise NotImplementedError(
+            f"num_outputs is not supported for ALF BaseModel "
+            f"({type(self._wrapped_model).__name__}). "
+            "Use a native BoTorch model such as BoTorchGPModel instead."
+        )
 
     @property
     def batch_shape(self) -> torch.Size:
         """The batch shape of the model.
 
-        This is a batch shape from an I/O perspective, independent of the
-        internal representation of the model.
-
         Returns:
-            Batch shape. Empty for most models (no batching).
+            Batch shape for native BoTorch models.
+
+        Raises:
+            NotImplementedError: Always raised for ALF BaseModel instances.
+                Use a native BoTorch model (e.g. ``BoTorchGPModel``) to avoid
+                this; ALF BaseModels do not expose ``batch_shape``.
         """
         if self._is_botorch_model:
             return self._wrapped_model.batch_shape  # type: ignore[union-attr]
-        return torch.Size([])
+        raise NotImplementedError(
+            f"batch_shape is not supported for ALF BaseModel "
+            f"({type(self._wrapped_model).__name__}). "
+            "Use a native BoTorch model such as BoTorchGPModel instead."
+        )

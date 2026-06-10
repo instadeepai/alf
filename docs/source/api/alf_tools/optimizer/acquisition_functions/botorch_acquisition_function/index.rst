@@ -10,7 +10,12 @@ Configure via :class:`~alf_tools.optimizer.acquisition_functions.botorch_acquisi
 (specifying the ``name`` and any required ``kwargs``) and pass to
 :class:`~alf_tools.optimizer.acquisition_functions.botorch_acquisition_function.BotorchAcquisitionFunction`,
 which implements the ALF ``AcquisitionFunction`` interface.  Supported names are
-listed in :data:`~alf_tools.optimizer.acquisition_functions.botorch_acquisition_function.ACQUISITION_REGISTRY`.
+listed in :data:`~alf_tools.optimizer.acquisition_functions.botorch_acquisition_function.ACQUISITION_REGISTRY`:
+
+- ``expected_improvement``
+- ``upper_confidence_bound``
+- ``probability_of_improvement``
+- ``log_noisy_expected_improvement``
 
 .. automodule:: alf_tools.optimizer.acquisition_functions.botorch_acquisition_function
    :members:

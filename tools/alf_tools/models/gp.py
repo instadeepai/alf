@@ -22,7 +22,7 @@ from typing import Any, Callable, Literal, TypeAlias
 import gpytorch
 import numpy as np
 import torch
-from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Results
+from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, ProblemType, Results
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.model.base_model import BaseTrainConfig
@@ -30,7 +30,6 @@ from alf_core.model.normaliser import (
     InputNormaliser,
     OutputStandardiser,
 )
-from alf_core.utils.enums import ProblemType
 from jaxtyping import Float
 
 from alf_tools.models.utils import (
@@ -148,7 +147,6 @@ class GPTrainConfig(BaseTrainConfig):
     early_stopping_delta: float = 1e-4
 
 
-# TODO: Might not need this.
 @dataclass
 class FeaturizerConfig:
     """Configuration for sequence featurization.
