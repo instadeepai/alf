@@ -11,17 +11,14 @@ Active learning turns a fixed-budget search into a feedback loop. Each round has
 - **tell**: *reveal* the true labels for that batch and fold them back into what we know.
 
 ```text
-        ┌──────────────────────────────────────────────┐
-        │                                                │
-        ▼                                                │
-   ┌─────────┐   ask    ┌──────────────┐   batch   ┌────────────┐
-   │ Surrogate│ ───────▶ │ Acquisition  │ ────────▶ │   Oracle   │
-   │  (model) │          │  + Search    │           │ (true score)│
-   └─────────┘          └──────────────┘           └────────────┘
-        ▲                                                │
-        │                  tell (retrain)                │
-        └────────────────────────────────────────────────┘
-                     repeat for N rounds
+   ┌───────────┐   ask    ┌─────────────┐  batch   ┌──────────────┐
+   │ Surrogate │ ───────▶ │ Acquisition │ ───────▶ │    Oracle    │
+   │  (model)  │          │  + Search   │          │ (true score) │
+   └───────────┘          └─────────────┘          └──────────────┘
+        ▲                                                 │
+        │                 tell (retrain)                  │
+        └─────────────────────────────────────────────────┘
+                          repeat for N rounds
 ```
 
 Each turn of the loop, the `surrogate` is **retrained** on the growing set of labelled data,
