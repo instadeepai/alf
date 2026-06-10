@@ -33,6 +33,7 @@ extensions = [
     "sphinx.ext.autosummary",
     "myst_parser",
     "sphinx_autodoc_typehints",
+    "sphinx_design",
 ]
 autosummary_generate = True
 

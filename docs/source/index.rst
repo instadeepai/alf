@@ -110,6 +110,16 @@ Contents
 
 .. toctree::
    :maxdepth: 2
+   :caption: Documentation
+
+   explanation/index
+   tutorials/index
+   how-to/index
+   reference/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API Reference
 
    Core <api/alf_core/index>
    Tools <api/alf_tools/index>
