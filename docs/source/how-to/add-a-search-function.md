@@ -8,7 +8,7 @@ Subclass `BaseSearch` to control where candidates come from (e.g. enumerating a 
 
 ## Steps
 
-1. Subclass `BaseSearch` under `tools/alf_tools/optimizer/`.
+1. Subclass `BaseSearch` under `tools/alf_tools/optimizer/search/`.
 2. Implement `__call__` to return the candidate pool for the current round.
 3. Pair it with an acquisition function in an `Optimizer` and run a `Task`.
 4. Add tests and run the build / pre-commit checks.
