@@ -32,9 +32,10 @@ from alf_benchmark.registry import (
     register,
 )
 from alf_benchmark.results import BenchmarkResults
-from alf_benchmark.runner import BenchmarkRunner
+from alf_benchmark.runner import BenchmarkRunner, run_benchmark
 from alf_benchmark.schema import Manifest, read_manifest, write_manifest
 from alf_benchmark.seeding import seed_everything
+from alf_benchmark.yaml_loader import load_run_config
 
 __all__ = [
     "GROUPS",
@@ -53,8 +54,10 @@ __all__ = [
     "RunConfig",
     "TaskConfig",
     "default_registry",
+    "load_run_config",
     "read_manifest",
     "register",
+    "run_benchmark",
     "seed_everything",
     "write_manifest",
 ]

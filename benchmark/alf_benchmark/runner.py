@@ -30,6 +30,7 @@ from pathlib import Path
 
 from alf_core.utils.state_logger import FileStateLogger
 
+from alf_benchmark.config import RunConfig
 from alf_benchmark.method import BenchmarkMethod
 from alf_benchmark.problem import BenchmarkProblem, BenchmarkSuite
 from alf_benchmark.registry import Registry, default_registry
@@ -184,3 +185,23 @@ class BenchmarkRunner:
 
         write_manifest(rep_dir, manifest)
         return manifest
+
+
+def run_benchmark(run_config: RunConfig, registry: Registry | None = None) -> list[Manifest]:
+    """Run a benchmark from a :class:`RunConfig` (the YAML/CLI entry point).
+
+    Builds the suite and methods from the config and runs the sweep.
+
+    Args:
+        run_config: Validated run configuration (problems, methods, output dir).
+        registry: Registry used to build components (defaults to shared).
+
+    Returns:
+        The manifest for every replication, in sweep order.
+    """
+    suite = BenchmarkSuite.from_configs(
+        run_config.suite_name, run_config.suite_version, run_config.problems, registry
+    )
+    methods = [BenchmarkMethod(method, registry) for method in run_config.methods]
+    runner = BenchmarkRunner(registry=registry, deterministic=run_config.deterministic)
+    return runner.run(suite, methods, run_config.output_dir)

@@ -22,7 +22,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from alf_benchmark.registry import Registry
+from alf_benchmark.registry import Registry, default_registry
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions, State
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.model.base_model import BaseModel
@@ -164,3 +164,23 @@ def registry() -> Registry:
     reg.register("alf.acquisition_functions", "dummy_acq", DummyAcquisitionFunction)
     reg.register("alf.searches", "dataset_search", DatasetSearch)
     return reg
+
+
+@pytest.fixture
+def dummies_in_default_registry():
+    """Register the synthetic components in the shared registry, then clean up.
+
+    Yields:
+        The shared registry, so CLI paths that use it can resolve the dummies.
+    """
+    reg = default_registry()
+    entries = {
+        ("alf.datasets", "dummy"): DummyDataset,
+        ("alf.models", "dummy"): DummyModel,
+        ("alf.acquisition_functions", "dummy_acq"): DummyAcquisitionFunction,
+    }
+    for (group, name), component in entries.items():
+        reg.register(group, name, component)
+    yield reg
+    for group, name in entries:
+        reg.unregister(group, name)

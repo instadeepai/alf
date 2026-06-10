@@ -166,3 +166,51 @@ def test_entry_points_discovered_for_real_components():
     assert "gfp" in reg.names("alf.datasets")
     assert "ucb" in reg.names("alf.acquisition_functions")
     assert "dataset_search" in reg.names("alf.searches")
+
+
+class _ExternalModel:
+    """Stands in for a model defined in a third-party package."""
+
+    def __init__(self) -> None:
+        """No-op constructor."""
+
+
+class _FakeEntryPoint:
+    """Minimal stand-in for ``importlib.metadata.EntryPoint``."""
+
+    def __init__(self, name: str, component_cls: type) -> None:
+        """Store the name and the class its ``load`` returns.
+
+        Args:
+            name: Entry-point name.
+            component_cls: Class returned by :meth:`load`.
+        """
+        self.name = name
+        self._component_cls = component_cls
+
+    def load(self) -> type:
+        """Return the component class (as a real entry point would).
+
+        Returns:
+            The component class.
+        """
+        return self._component_cls
+
+
+def test_external_entry_point_discovered_and_built(monkeypatch):
+    """A component exposed by an external package's entry point is discovered and built.
+
+    The fake provider returns its class via ``EntryPoint.load`` without importing
+    ``alf_benchmark`` -- the adoption-lever property the registry promises.
+    """
+
+    def fake_entry_points(group):
+        if group == "alf.models":
+            return [_FakeEntryPoint("ext_model", _ExternalModel)]
+        return []
+
+    monkeypatch.setattr("alf_benchmark.registry.metadata.entry_points", fake_entry_points)
+    reg = Registry()
+    reg.discover()
+    assert "ext_model" in reg.names("alf.models")
+    assert isinstance(reg.build("alf.models", "ext_model"), _ExternalModel)

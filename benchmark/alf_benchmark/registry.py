@@ -164,6 +164,15 @@ class Registry:
         """
         self._entries[(group, name)] = RegistryEntry(group, name, lambda: component_cls)
 
+    def unregister(self, group: str, name: str) -> None:
+        """Remove a registered component if present (no error if absent).
+
+        Args:
+            group: Entry-point group (e.g. ``"alf.models"``).
+            name: Short name of the component to remove.
+        """
+        self._entries.pop((group, name), None)
+
     def discover(self) -> None:
         """Discover components from installed entry points.
 

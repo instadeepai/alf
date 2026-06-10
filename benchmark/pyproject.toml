@@ -16,7 +16,11 @@ dependencies = [
     "numpy>=1.21.0",
     "scipy>=1.9.0",
     "matplotlib>=3.7.0",
+    "pyyaml>=6.0",
 ]
+
+[project.scripts]
+alf-bench = "alf_benchmark.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

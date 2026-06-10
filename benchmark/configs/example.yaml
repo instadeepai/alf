@@ -1,0 +1,47 @@
+# Example alf-bench run config: a small offline GFP design sweep.
+# Run with:  alf-bench run benchmark/configs/example.yaml
+suite_name: example
+suite_version: "0.1.0"
+output_dir: runs/example
+deterministic: false
+
+problems:
+  - name: gfp_offline
+    primary_metric: optimizer/regret
+    seeds: [0, 1, 2]
+    dataset:
+      name: gfp
+      config:
+        name: gfp
+        modality: sequence
+        train_ratio: 0.4
+        validation_frac: 0.2
+        test_ratio: 0.2
+        problem_type: regression
+
+methods:
+  - name: cnn_greedy
+    family: design
+    surrogate:
+      name: cnn
+    acquisition:
+      name: greedy
+    search:
+      name: dataset_search
+    task:
+      num_acq_rounds: 5
+      acq_batch_size: 100
+
+  - name: cnn_ucb
+    family: design
+    surrogate:
+      name: cnn
+    acquisition:
+      name: ucb
+      config:
+        alpha: 2.0
+    search:
+      name: dataset_search
+    task:
+      num_acq_rounds: 5
+      acq_batch_size: 100

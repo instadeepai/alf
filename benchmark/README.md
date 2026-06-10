@@ -7,11 +7,11 @@ active-learning performance** (best-found, regret, recall, calibration **vs
 acquisition round**) — the gap that static benchmarks like ProteinGym and FLIP
 leave open.
 
-> **Status: Phase 2 (aggregation, statistics & plots).** Phases 1–2 deliver the
-> registry, config-as-code models, a resumable sweep runner (reusing the existing
-> ALF tasks unchanged), and analysis: mean ± bootstrap-CI aggregation, paired
-> significance tests, a leaderboard, and active-learning curve plots. A YAML + CLI
-> front end (Phase 3) and a versioned suite with reference results (Phase 4) follow.
+> **Status: Phase 3 (YAML + CLI).** Phases 1–3 deliver the registry,
+> config-as-code models, a resumable sweep runner (reusing the existing ALF tasks
+> unchanged), analysis (mean ± bootstrap-CI aggregation, paired significance tests,
+> a leaderboard, active-learning curve plots), and a declarative YAML + `alf-bench`
+> CLI front end. A versioned suite with reference results (Phase 4) follows.
 
 ## Concepts
 
@@ -100,6 +100,20 @@ regret against the fixed pool optimum, which the current schema does not log.
 Curves guard missing metrics: regret/recall require a `DatasetSearch` method, and
 calibration requires an uncertainty-capable model, so a metric only appears for the
 methods that produced it.
+
+## Command line (`alf-bench`)
+
+Run, aggregate, plot, and inspect without writing Python. A run is described by a
+YAML file that parses into the same validated config models (see
+[`configs/example.yaml`](configs/example.yaml)):
+
+```bash
+alf-bench run benchmark/configs/example.yaml   # sweep (problem x method x seed)
+alf-bench aggregate runs/example               # print the leaderboard
+alf-bench aggregate runs/example --output agg.csv
+alf-bench plot runs/example                    # save AL-curve figures
+alf-bench list                                 # show registered components
+```
 
 ## Registering your own component
 
