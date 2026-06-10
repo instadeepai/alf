@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for alf_core.utils.metrics.summary standalone functions."""
+"""Tests for alf_core.utils.metrics.aggregate standalone functions."""
 
 import numpy as np
 import pytest

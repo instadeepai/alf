@@ -19,6 +19,7 @@ sub-modules so that existing imports of `alf_core.utils.metrics` continue to
 work without change.
 """
 
+from alf_core.utils.metrics.aggregate import auc_top_k
 from alf_core.utils.metrics.base import (
     ClassificationMetricRegistry,
     RegressionMetricRegistry,
@@ -63,4 +64,3 @@ from alf_core.utils.metrics.regression import (
     top_k_mean,
     width,
 )
-from alf_core.utils.metrics.summary import auc_top_k
