@@ -100,9 +100,6 @@ class BaseTask(abc.ABC):
 
         Returns:
             Updated task state with evaluation metrics.
-
-        Raises:
-            AssertionError: If save_round_predictions is True but filename is empty.
         """
         if len(state.dataset.test_dataset) > 0:
             predictions = state.surrogate.predict(state.dataset.test_dataset.candidates)
