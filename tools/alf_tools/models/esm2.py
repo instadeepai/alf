@@ -78,30 +78,62 @@ class ESM2ModelConfig:
 class ESM2TrainConfig(BaseTrainConfig):
     """Configuration for ESM-2 training.
 
+    Set `mode` first — it determines the architecture and which other fields are active:
+
+    - 'linear_head': Frozen backbone + trainable linear head (supervised).
+      Active fields: loss_fn ('mse'/'cross_entropy'), output_dim.
+    - 'esm2_likelihoods': Base ESM-2 backbone, no linear head.
+      freeze_backbone=True  -> zero-shot PLL only; train() unavailable.
+      freeze_backbone=False -> MLM fine-tuning; loss_fn must be 'mlm'.
+      Active fields (when unfrozen): loss_fn ('mlm'), mask_probability, mask_splitting.
+
     Args:
-        freeze_backbone: Must be True. Unfrozen backbone training is not yet supported.
+        mode: Architecture mode. 'linear_head' adds a trainable head on top of a frozen
+            backbone. 'esm2_likelihoods' uses the base backbone directly; predict() always
+            returns PLL scores.
+        freeze_backbone: Whether to freeze ESM-2 backbone parameters.
+            For 'linear_head': must be True (unfrozen not yet supported).
+            For 'esm2_likelihoods': True = zero-shot PLL only; False = MLM fine-tuning.
+        loss_fn: Training objective. None = no training intended. 'mse' and 'cross_entropy'
+            are only for mode='linear_head'. 'mlm' is only for mode='esm2_likelihoods' +
+            freeze_backbone=False.
+        output_dim: Output dimension of the linear head. Only for mode='linear_head'.
+        mask_probability: Fraction of eligible tokens to mask per sequence.
+            Only active when mode='esm2_likelihoods' + freeze_backbone=False.
+        mask_splitting: (p_mask, p_random, p_unchanged) 3-way replacement probabilities.
+            Must sum to 1.0. Only active when mode='esm2_likelihoods' + freeze_backbone=False.
         learning_rate: Learning rate for the optimizer.
         optimizer_type: Which optimizer to use ('adam' or 'adamw').
         batch_size: Batch size for training.
-        batch_size_inference: Batch size for embed() and linear-head predict(). Has no effect on
-            zero-shot PLL scoring; use smaller call-site batches instead.
+        batch_size_inference: Batch size for embed() and linear-head predict().
             None defaults to batch_size.
         num_epochs: Number of epochs to train for.
         log_frequency: Record epoch metrics every N epochs.
         max_grad_norm: Maximum norm for gradient clipping. None disables clipping.
-        scoring_function: Scoring function to use. 'linear_head' (default) freezes the backbone
-            and trains a linear head via loss_fn. Pseudo log-likelihood 'pll' skips the head;
-            predict() returns per-sequence masked-marginal scores and train() raises
-            NotImplementedError.
-        loss_fn: Loss function for linear head training. 'mse' for regression;
-            'cross_entropy' for classification. Cross-entropy expects integer class labels in
-            [0, output_dim); float labels are truncated with a warning. Only used when
-            scoring_function='linear_head'.
-        output_dim: Output dimension of the linear head. 1 for regression; N for N-class
-            classification. Only used when scoring_function='linear_head'.
     """
 
+    # ── mode ──────────────────────────────────────────────────────────
+    mode: Literal["linear_head", "esm2_likelihoods"] = "linear_head"
+
+    # ── backbone freezing ─────────────────────────────────────────────
+    # linear_head:       True only (False not yet supported)
+    # esm2_likelihoods:  True = zero-shot PLL; False = MLM fine-tuning
     freeze_backbone: bool = True
+
+    # ── training objective ────────────────────────────────────────────
+    # None:                   no training (esm2_likelihoods + freeze_backbone=True)
+    # 'mse', 'cross_entropy': linear_head only
+    # 'mlm':                  esm2_likelihoods + freeze_backbone=False only
+    loss_fn: Literal["mse", "cross_entropy", "mlm"] | None = None
+
+    # ── linear_head only ──────────────────────────────────────────────
+    output_dim: int = 1
+
+    # ── esm2_likelihoods + freeze_backbone=False only ─────────────────
+    mask_probability: float = 0.15
+    mask_splitting: tuple[float, float, float] = (0.8, 0.1, 0.1)
+
+    # ── shared ────────────────────────────────────────────────────────
     learning_rate: float = 1e-4
     optimizer_type: Literal["adam", "adamw"] = "adamw"
     batch_size: int = 8
@@ -109,23 +141,19 @@ class ESM2TrainConfig(BaseTrainConfig):
     num_epochs: int = 10
     log_frequency: int = 1
     max_grad_norm: float | None = None
-    scoring_function: Literal["linear_head", "pll"] = "linear_head"
-    loss_fn: Literal["mse", "cross_entropy"] = "mse"
-    output_dim: int = 1
 
     def __post_init__(self) -> None:
-        """Post-initialization checks for ESM2TrainConfig.
+        """Validate ESM2TrainConfig fields.
 
         Raises:
-            NotImplementedError: If freeze_backbone=False.
-            ValueError: If num_epochs < 1.
-            ValueError: If optimizer_type is not 'adam' or 'adamw'.
-            ValueError: If loss_fn is not 'mse' or 'cross_entropy'.
-            ValueError: If scoring_function is not 'linear_head' or 'pll'.
+            ValueError: For invalid field combinations or out-of-range values.
+            NotImplementedError: If freeze_backbone=False with mode='linear_head'.
         """
-        if not self.freeze_backbone:
-            raise NotImplementedError(
-                "freeze_backbone=False is not yet supported. Set freeze_backbone=True."
+        import warnings
+
+        if self.mode not in ("linear_head", "esm2_likelihoods"):
+            raise ValueError(
+                f"mode must be 'linear_head' or 'esm2_likelihoods', got {self.mode!r}"
             )
         if self.num_epochs < 1:
             raise ValueError(f"num_epochs must be >= 1, got {self.num_epochs}")
@@ -133,12 +161,57 @@ class ESM2TrainConfig(BaseTrainConfig):
             raise ValueError(
                 f"optimizer_type must be 'adam' or 'adamw', got {self.optimizer_type!r}"
             )
-        if self.loss_fn not in ("mse", "cross_entropy"):
-            raise ValueError(f"loss_fn must be 'mse' or 'cross_entropy', got {self.loss_fn!r}")
-        if self.scoring_function not in ("linear_head", "pll"):
-            raise ValueError(
-                f"scoring_function must be 'linear_head' or 'pll', got {self.scoring_function!r}"
-            )
+
+        if self.mode == "linear_head":
+            if not self.freeze_backbone:
+                raise NotImplementedError(
+                    "freeze_backbone=False is not yet supported for mode='linear_head'. "
+                    "Set freeze_backbone=True."
+                )
+            if self.loss_fn == "mlm":
+                raise ValueError(
+                    "loss_fn='mlm' is only valid for mode='esm2_likelihoods' with "
+                    "freeze_backbone=False."
+                )
+
+        else:  # esm2_likelihoods
+            if self.freeze_backbone:
+                if self.loss_fn is not None:
+                    raise ValueError(
+                        "loss_fn cannot be set when freeze_backbone=True in "
+                        "mode='esm2_likelihoods'; the backbone is frozen and no training "
+                        "will occur."
+                    )
+                if self.mask_probability != 0.15:
+                    warnings.warn(
+                        "mask_probability has no effect: freeze_backbone=True means no "
+                        "training will occur.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+                if self.mask_splitting != (0.8, 0.1, 0.1):
+                    warnings.warn(
+                        "mask_splitting has no effect: freeze_backbone=True means no "
+                        "training will occur.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+            else:
+                if self.loss_fn != "mlm":
+                    raise ValueError(
+                        "ESM-2 base model can only be trained with an MLM loss; other losses "
+                        "are not implemented. Set loss_fn='mlm'."
+                    )
+                if not (0.0 < self.mask_probability < 1.0):
+                    raise ValueError(
+                        f"mask_probability must be in (0, 1), got {self.mask_probability}"
+                    )
+                p_sum = sum(self.mask_splitting)
+                if abs(p_sum - 1.0) > 1e-6:
+                    raise ValueError(
+                        f"mask_splitting must sum to 1.0, got {p_sum:.6f} "
+                        f"(values: {self.mask_splitting})"
+                    )
 
 
 class ESM2Model(BaseModel):
@@ -207,7 +280,7 @@ class ESM2Model(BaseModel):
         self._validate_esm_config()
 
         self._head: torch.nn.Linear | None = None
-        if self.train_config.scoring_function == "linear_head":
+        if self.train_config.mode == "linear_head":
             torch.manual_seed(self.model_config.seed)
             hidden_dim = self.esm_model.config.hidden_size
             self._head = torch.nn.Linear(hidden_dim, self.train_config.output_dim)
@@ -244,10 +317,10 @@ class ESM2Model(BaseModel):
             )
         if (
             self.model_config.pooling == "last_hidden_state"
-            and self.train_config.scoring_function == "linear_head"
+            and self.train_config.mode == "linear_head"
         ):
             raise ValueError(
-                "pooling='last_hidden_state' is not supported with scoring_function='linear_head'. "
+                "pooling='last_hidden_state' is not supported with mode='linear_head'. "
                 "The linear head requires a fixed-size embedding. "
                 "Use pooling='mean' or pooling='cls' instead."
             )
@@ -354,7 +427,7 @@ class ESM2Model(BaseModel):
 
         self.esm_model.eval()
 
-        if self.train_config.scoring_function == "linear_head":
+        if self.train_config.mode == "linear_head":
             head = self._require_head()
             head.eval()
             all_preds: list[torch.Tensor] = []
@@ -520,7 +593,7 @@ class ESM2Model(BaseModel):
             or (input_ids, attention_mask, targets) triples when scoring_function='linear_head'.
         """
         batch = self.featurise(data)
-        if self.train_config.scoring_function == "linear_head":
+        if self.train_config.mode == "linear_head":
             targets = torch.tensor(data.labels, dtype=torch.float32)
             if self.train_config.loss_fn == "cross_entropy":
                 labels_arr = np.asarray(data.labels)
@@ -755,30 +828,35 @@ class ESM2Model(BaseModel):
     def train(
         self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None
     ) -> None:
-        """Fine-tune the linear head using the configured loss function.
+        """Fine-tune ESM-2 using the configured mode and loss function.
 
-        When scoring_function='pll', train() raises NotImplementedError (predict uses
-        masked-marginal scoring). When scoring_function='linear_head', trains the linear head
-        on top of frozen embeddings.
+        When mode='esm2_likelihoods' and freeze_backbone=True, train() raises
+        NotImplementedError (zero-shot PLL only; nothing to train). When
+        mode='esm2_likelihoods' and freeze_backbone=False, fine-tunes the full
+        ESM-2 backbone via masked language modelling. When mode='linear_head',
+        trains the linear head on top of frozen embeddings.
 
         Args:
-            train_data: Training data containing sequences and labels.
+            train_data: Training data containing sequences and (for linear_head) labels.
             val_data: Optional validation data for monitoring training loss.
 
         Raises:
-            NotImplementedError: If scoring_function='pll'.
+            NotImplementedError: If mode='esm2_likelihoods' and freeze_backbone=True.
+            ValueError: If mode='linear_head' and loss_fn is None.
             AssertionError: If optimizer_type is invalid (unreachable if __post_init__ ran).
-            RuntimeError: If scoring_function='linear_head' but head is uninitialised.
+            RuntimeError: If mode='linear_head' but head is uninitialised.
         """
-        if self.train_config.scoring_function == "pll":
+        if self.train_config.mode == "esm2_likelihoods" and self.train_config.freeze_backbone:
             raise NotImplementedError(
-                "train() requires scoring_function='linear_head'. "
-                "Set scoring_function='linear_head' in ESM2TrainConfig to enable "
-                "training a linear head, "
-                "or use predict() for masked-marginal scoring without training. "
-                "Currently, training/fine-tuning the model with pseudo "
-                "log-likelihood scores is not implemented; use the 'linear_head' "
-                "for training."
+                "train() is not available when mode='esm2_likelihoods' and "
+                "freeze_backbone=True. The backbone is frozen and there is no linear head "
+                "to train. Set freeze_backbone=False and loss_fn='mlm' to enable MLM "
+                "fine-tuning, or call predict() directly for zero-shot PLL scoring."
+            )
+        if self.train_config.mode == "linear_head" and self.train_config.loss_fn is None:
+            raise ValueError(
+                "loss_fn must be set for mode='linear_head' training. "
+                "Choose 'mse' for regression or 'cross_entropy' for classification."
             )
 
         self._epoch_metrics = []
@@ -788,20 +866,26 @@ class ESM2Model(BaseModel):
             f"Fine-tuning ESM-2 ({self.model_config.model_id}) with {len(train_data)} sequences"
         )
 
-        self._require_head()
+        if self.train_config.mode == "linear_head":
+            self._require_head()
 
         train_loader = self._prepare_data_loader(train_data, shuffle=True)
         val_loader = None
         if val_data is not None and len(val_data) > 0:
             val_loader = self._prepare_data_loader(val_data, shuffle=False)
 
+        if self.train_config.mode == "linear_head":
+            params = self._require_head().parameters()
+        else:
+            params = self.esm_model.parameters()
+
         if self.train_config.optimizer_type == "adamw":
             optimizer: torch.optim.Optimizer = torch.optim.AdamW(
-                self._require_head().parameters(), lr=self.train_config.learning_rate
+                params, lr=self.train_config.learning_rate
             )
         elif self.train_config.optimizer_type == "adam":
             optimizer = torch.optim.Adam(
-                self._require_head().parameters(), lr=self.train_config.learning_rate
+                params, lr=self.train_config.learning_rate
             )
         else:
             raise AssertionError(
@@ -815,9 +899,18 @@ class ESM2Model(BaseModel):
         val_metrics: dict[str, float] = {}
 
         for epoch in range(self.train_config.num_epochs):
-            avg_train_loss, train_metrics = self._train_epoch_linear_head(train_loader, optimizer)
+            if self.train_config.mode == "linear_head":
+                avg_train_loss, train_metrics = self._train_epoch_linear_head(
+                    train_loader, optimizer
+                )
+                if val_loader is not None:
+                    avg_val_loss, val_metrics = self._validate_epoch_linear_head(val_loader)
+            else:  # esm2_likelihoods, freeze_backbone=False
+                avg_train_loss, train_metrics = self._train_epoch_mlm(train_loader, optimizer)
+                if val_loader is not None:
+                    avg_val_loss, val_metrics = self._validate_epoch_mlm(val_loader)
+
             if val_loader is not None:
-                avg_val_loss, val_metrics = self._validate_epoch_linear_head(val_loader)
                 self._record_epoch_metrics(
                     epoch, avg_train_loss, train_metrics, avg_val_loss, val_metrics
                 )

@@ -123,65 +123,115 @@ class TestConfigs:
     """Tests for ESM2ModelConfig and ESM2TrainConfig dataclasses."""
 
     def test_model_config_requires_model_id(self):
-        """Test that ESM2ModelConfig stores the model_id correctly."""
+        """ESM2ModelConfig stores the model_id correctly."""
         config = ESM2ModelConfig(model_id=MODEL_ID)
         assert config.model_id == MODEL_ID
 
     def test_model_config_defaults(self):
-        """Test that ESM2ModelConfig has the expected default values."""
+        """ESM2ModelConfig has expected default values."""
         config = ESM2ModelConfig(model_id=MODEL_ID)
         assert config.pooling == "mean"
         assert config.repr_layer == -1
 
     def test_train_config_defaults(self):
-        """Test that ESM2TrainConfig has the expected default values."""
+        """ESM2TrainConfig has expected default values."""
         config = ESM2TrainConfig()
+        assert config.mode == "linear_head"
         assert config.freeze_backbone is True
+        assert config.loss_fn is None
+        assert config.output_dim == 1
+        assert config.mask_probability == 0.15
+        assert config.mask_splitting == (0.8, 0.1, 0.1)
         assert config.learning_rate == 1e-4
         assert config.optimizer_type == "adamw"
         assert config.batch_size == 8
         assert config.num_epochs == 10
         assert config.log_frequency == 1
-        assert config.scoring_function == "linear_head"
-        assert config.loss_fn == "mse"
-        assert config.output_dim == 1
-        assert not hasattr(config, "mlp_loss")
-        assert not hasattr(config, "loss_type")
-        assert not hasattr(config, "mask_probability")
-        assert not hasattr(config, "mask_splitting")
 
-    def test_scoring_function_none_is_invalid(self):
-        """scoring_function=None must raise ValueError."""
-        with pytest.raises(ValueError, match="scoring_function must be"):
-            ESM2TrainConfig(scoring_function=None)
+    def test_mode_invalid_raises(self):
+        """mode with an unknown value raises ValueError."""
+        with pytest.raises(ValueError, match="mode must be"):
+            ESM2TrainConfig(mode="unknown")  # type: ignore[arg-type]
 
     def test_train_config_num_epochs_zero_raises(self):
-        """ESM2TrainConfig with num_epochs=0 must raise ValueError."""
+        """num_epochs=0 must raise ValueError."""
         with pytest.raises(ValueError, match="num_epochs must be >= 1"):
             ESM2TrainConfig(num_epochs=0)
 
-    def test_invalid_loss_fn_raises(self):
-        """Invalid loss_fn raises ValueError."""
-        with pytest.raises(ValueError, match="loss_fn must be"):
-            ESM2TrainConfig(loss_fn="mlm")
+    def test_loss_fn_mlm_with_linear_head_raises(self):
+        """loss_fn='mlm' with mode='linear_head' raises ValueError."""
+        with pytest.raises(ValueError, match="loss_fn='mlm' is only valid"):
+            ESM2TrainConfig(mode="linear_head", loss_fn="mlm")
 
-    def test_old_loss_fn_values_raise(self):
-        """Old loss_fn values 'log_likelihood' and 'linear_head' are no longer valid."""
-        with pytest.raises(ValueError, match="loss_fn must be"):
-            ESM2TrainConfig(loss_fn="linear_head")
+    def test_loss_fn_set_with_frozen_esm2_likelihoods_raises(self):
+        """loss_fn not None when mode='esm2_likelihoods' + freeze_backbone=True raises."""
+        with pytest.raises(ValueError, match="loss_fn cannot be set"):
+            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=True, loss_fn="mlm")
 
-    def test_freeze_backbone_false_raises_not_implemented(self):
-        """ESM2TrainConfig raises NotImplementedError when freeze_backbone=False."""
+    def test_loss_fn_mse_with_frozen_esm2_likelihoods_raises(self):
+        """loss_fn='mse' with mode='esm2_likelihoods' + freeze_backbone=True raises."""
+        with pytest.raises(ValueError, match="loss_fn cannot be set"):
+            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=True, loss_fn="mse")
+
+    def test_esm2_likelihoods_frozen_no_loss_fn_valid(self):
+        """mode='esm2_likelihoods' + freeze_backbone=True + loss_fn=None is valid."""
+        cfg = ESM2TrainConfig(mode="esm2_likelihoods")
+        assert cfg.mode == "esm2_likelihoods"
+        assert cfg.loss_fn is None
+
+    def test_esm2_likelihoods_unfrozen_mlm_valid(self):
+        """mode='esm2_likelihoods' + freeze_backbone=False + loss_fn='mlm' is valid."""
+        cfg = ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=False, loss_fn="mlm")
+        assert cfg.loss_fn == "mlm"
+
+    def test_esm2_likelihoods_unfrozen_non_mlm_loss_raises(self):
+        """mode='esm2_likelihoods' + freeze_backbone=False + loss_fn='mse' raises."""
+        with pytest.raises(ValueError, match="MLM loss"):
+            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=False, loss_fn="mse")
+
+    def test_esm2_likelihoods_unfrozen_cross_entropy_raises(self):
+        """mode='esm2_likelihoods' + freeze_backbone=False + loss_fn='cross_entropy' raises."""
+        with pytest.raises(ValueError, match="MLM loss"):
+            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=False, loss_fn="cross_entropy")
+
+    def test_esm2_likelihoods_unfrozen_none_loss_fn_raises(self):
+        """mode='esm2_likelihoods' + freeze_backbone=False + loss_fn=None raises."""
+        with pytest.raises(ValueError, match="MLM loss"):
+            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=False, loss_fn=None)
+
+    def test_mask_probability_out_of_range_raises(self):
+        """mask_probability outside (0, 1) raises ValueError."""
+        with pytest.raises(ValueError, match="mask_probability"):
+            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=False, loss_fn="mlm",
+                            mask_probability=0.0)
+
+    def test_mask_splitting_not_summing_to_one_raises(self):
+        """mask_splitting that does not sum to 1.0 raises ValueError."""
+        with pytest.raises(ValueError, match="mask_splitting"):
+            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=False, loss_fn="mlm",
+                            mask_splitting=(0.8, 0.1, 0.05))
+
+    def test_mask_probability_warning_when_frozen(self):
+        """Non-default mask_probability with freeze_backbone=True emits UserWarning."""
+        with pytest.warns(UserWarning, match="mask_probability"):
+            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=True, mask_probability=0.3)
+
+    def test_mask_splitting_warning_when_frozen(self):
+        """Non-default mask_splitting with freeze_backbone=True emits UserWarning."""
+        with pytest.warns(UserWarning, match="mask_splitting"):
+            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=True,
+                            mask_splitting=(0.7, 0.2, 0.1))
+
+    def test_freeze_backbone_false_raises_for_linear_head(self):
+        """freeze_backbone=False with mode='linear_head' raises NotImplementedError."""
         with pytest.raises(NotImplementedError):
-            ESM2TrainConfig(freeze_backbone=False)
+            ESM2TrainConfig(mode="linear_head", freeze_backbone=False)
 
-    def test_last_hidden_state_with_scoring_function_raises(self):
-        """last_hidden_state pooling is not compatible with scoring_function='linear_head'
-        — raises at init.
-        """
+    def test_last_hidden_state_with_linear_head_mode_raises(self):
+        """last_hidden_state pooling with mode='linear_head' raises at model init."""
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
-        train_cfg = ESM2TrainConfig(scoring_function="linear_head", batch_size=1)
-        with pytest.raises(ValueError, match="last_hidden_state.*scoring_function"):
+        train_cfg = ESM2TrainConfig(mode="linear_head", loss_fn="mse", batch_size=1)
+        with pytest.raises(ValueError, match="last_hidden_state.*mode"):
             ESM2Model(name="lhs_mlp", model_config=config, train_config=train_cfg, device="cpu")
 
     def test_invalid_pooling_raises(self):
@@ -190,9 +240,9 @@ class TestConfigs:
             ESM2ModelConfig(model_id=MODEL_ID, pooling="max")  # type: ignore[arg-type]
 
     def test_repr_layer_out_of_range_raises(self):
-        """ESM2Model raises ValueError when repr_layer is out of range for the model."""
+        """ESM2Model raises ValueError when repr_layer is out of range."""
         config = ESM2ModelConfig(model_id=MODEL_ID, repr_layer=999)
-        train_cfg = ESM2TrainConfig(freeze_backbone=True)
+        train_cfg = ESM2TrainConfig()
         with pytest.raises(ValueError, match="repr_layer.*out of range"):
             ESM2Model(name="bad_layer", model_config=config, train_config=train_cfg, device="cpu")
 
