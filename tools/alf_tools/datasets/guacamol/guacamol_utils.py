@@ -308,23 +308,26 @@ def _label_smiles(
     smiles_list: list[str],
     properties: list[GuacaMolPropertyName],
     target_property: GuacaMolPropertyName,
-    modality: Modality | str,
-) -> LabelledCandidates:
-    """Parse SMILES, compute properties, build LabelledCandidates.
+    modality: "Modality | str",
+) -> tuple[LabelledCandidates, np.ndarray]:
+    """Parse SMILES, compute properties, build LabelledCandidates and property matrix.
 
-    Invalid SMILES are skipped with a warning and excluded from the result.
+    Invalid SMILES are skipped with a warning and excluded from both outputs.
+    `Candidate.features` is always empty (`{}`); property values are returned
+    in the second element as a 2D array of shape `(N, len(properties))`.
 
     Args:
         smiles_list: Raw SMILES strings to process.
-        properties: Property names to compute via RDKit.
+        properties: Property names to compute via RDKit (determines matrix columns).
         target_property: The property name whose value becomes the label.
         modality: Modality to assign to each Candidate.
 
     Returns:
-        LabelledCandidates with 1D labels of shape (N,).
+        Tuple of (LabelledCandidates with 1D labels, property matrix of shape (N, P)).
     """
-    candidates = []
-    labels = []
+    candidates: list[Candidate] = []
+    labels: list[float] = []
+    prop_rows: list[list[float]] = []
     for smiles in smiles_list:
         mol = _mol_from_smiles(smiles)
         props = _compute_properties(smiles, properties)
@@ -332,9 +335,17 @@ def _label_smiles(
             logger.warning("Skipping invalid SMILES: %r", smiles)
             continue
         canonical = Chem.MolToSmiles(mol)
-        candidates.append(Candidate(data=canonical, modality=modality, features=dict(props)))
+        candidates.append(Candidate(data=canonical, modality=modality, features={}))
         labels.append(props[target_property])
-    return LabelledCandidates(candidates=candidates, labels=np.array(labels, dtype=float))
+        prop_rows.append([props[name] for name in properties])
+    p = len(properties)
+    prop_matrix = (
+        np.array(prop_rows, dtype=np.float64) if prop_rows else np.empty((0, p), dtype=np.float64)
+    )
+    return (
+        LabelledCandidates(candidates=candidates, labels=np.array(labels, dtype=float)),
+        prop_matrix,
+    )
 
 
 def _label_smiles_benchmark(

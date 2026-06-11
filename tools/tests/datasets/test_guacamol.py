@@ -26,7 +26,7 @@ import pytest
 pytest.importorskip("rdkit", reason="guacamol not installed; install alf_tools[guacamol]")
 
 import requests
-from alf_core import Candidate, Modality
+from alf_core import Candidate, LabelledCandidates, Modality
 from alf_tools.datasets.guacamol.guacamol_dataset import (
     GuacaMol,
     GuacaMolConfig,
@@ -81,6 +81,7 @@ from alf_tools.datasets.guacamol.guacamol_utils import (
     _canonical_smiles,  # noqa: PLC2701
     _compute_properties,  # noqa: PLC2701
     _download_file,  # noqa: PLC2701
+    _label_smiles,  # noqa: PLC2701
     _load_smiles_file,  # noqa: PLC2701
     download_guacamol,
 )
@@ -1535,3 +1536,49 @@ class TestGuacaMolBenchmarkTaskLoad:
         bad = Candidate(data="NOTSMILES!!!", modality=Modality.SEQUENCE)
         with pytest.raises(ValueError, match="invalid SMILES"):
             dataset.query([bad])
+
+
+class TestLabelSmiles:
+    """Tests for the updated _label_smiles return type."""
+
+    def test_returns_tuple_of_lc_and_matrix(self):
+        """_label_smiles returns (LabelledCandidates, np.ndarray)."""
+        result = _label_smiles(["c1ccccc1", "CCO"], ["TPSA", "MolWt"], "TPSA", Modality.SEQUENCE)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        lc, mat = result
+        assert isinstance(lc, LabelledCandidates)
+        assert isinstance(mat, np.ndarray)
+
+    def test_property_matrix_shape(self):
+        """Property matrix shape is (N_valid, len(properties))."""
+        lc, mat = _label_smiles(["c1ccccc1", "CCO"], ["TPSA", "MolWt"], "TPSA", Modality.SEQUENCE)
+        assert mat.shape == (2, 2)
+
+    def test_property_matrix_values_match_compute_properties(self):
+        """Matrix row values match _compute_properties for each SMILES."""
+        smiles = "c1ccccc1"
+        lc, mat = _label_smiles([smiles], ["TPSA", "MolWt"], "TPSA", Modality.SEQUENCE)
+        expected = _compute_properties(smiles, ["TPSA", "MolWt"])
+        assert mat[0, 0] == pytest.approx(expected["TPSA"])
+        assert mat[0, 1] == pytest.approx(expected["MolWt"])
+
+    def test_candidate_features_are_empty(self):
+        """Corpus candidates have empty features dicts."""
+        lc, mat = _label_smiles(["c1ccccc1", "CCO"], ["TPSA", "MolWt"], "TPSA", Modality.SEQUENCE)
+        for cand in lc.candidates:
+            assert cand.features == {}
+
+    def test_invalid_smiles_excluded_from_matrix(self):
+        """Invalid SMILES are excluded from both LabelledCandidates and the matrix."""
+        lc, mat = _label_smiles(
+            ["c1ccccc1", "NOTVALID", "CCO"], ["TPSA"], "TPSA", Modality.SEQUENCE
+        )
+        assert len(lc.candidates) == 2
+        assert mat.shape == (2, 1)
+
+    def test_empty_smiles_list_returns_empty_matrix(self):
+        """Empty input produces empty LabelledCandidates and (0, P) matrix."""
+        lc, mat = _label_smiles([], ["TPSA", "MolWt"], "TPSA", Modality.SEQUENCE)
+        assert len(lc.candidates) == 0
+        assert mat.shape == (0, 2)
