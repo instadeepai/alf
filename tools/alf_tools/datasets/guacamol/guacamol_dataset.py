@@ -144,7 +144,7 @@ class GuacaMol(BaseDataset):
         self._paper_splits: dict[str, LabelledCandidates] | None = None
         self._smiles_index: dict[str, float] = {}
         self._prop_matrix: np.ndarray = np.empty((0, 0), dtype=np.float64)
-        self._prop_cols: list[str] = []
+        self._prop_cols: list[GuacaMolPropertyName] = []
         super().__init__(config)
         self.setup()
 
@@ -201,7 +201,7 @@ class GuacaMol(BaseDataset):
         if self.config.max_molecules is not None:
             smiles_list = smiles_list[: self.config.max_molecules]
         target = cast(GuacaMolPropertyName, self.config.target_property)
-        properties = list(self.config.computed_properties or [target])
+        properties: list[GuacaMolPropertyName] = list(self.config.computed_properties or [target])
         lc, prop_matrix = _label_smiles(smiles_list, properties, target, self.modality)
         self._prop_matrix = prop_matrix
         self._prop_cols = properties
@@ -270,7 +270,7 @@ class GuacaMol(BaseDataset):
             Combined LabelledCandidates across all three paper splits.
         """
         target = cast(GuacaMolPropertyName, self.config.target_property)
-        properties = list(self.config.computed_properties or [target])
+        properties: list[GuacaMolPropertyName] = list(self.config.computed_properties or [target])
         split_files = {k: v for k, v in GUACAMOL_FILES.items() if k != "ALL"}
         tag_to_key = {"TRAIN": "train", "VALID": "validation", "TEST": "test"}
         if self.config.max_molecules is not None:

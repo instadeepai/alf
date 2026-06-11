@@ -943,9 +943,7 @@ class TestGuacaMolEdgeCases:
         dataset = GuacaMol(config)
         assert "MolWt" in dataset._prop_cols
         assert "MolLogP" in dataset._prop_cols
-        assert dataset._prop_matrix.shape == (
-            len(dataset._raw_dataset.candidates), 2
-        )
+        assert dataset._prop_matrix.shape == (len(dataset._raw_dataset.candidates), 2)
         mw_idx = dataset._prop_cols.index("MolWt")
         assert np.all(dataset._prop_matrix[:, mw_idx] > 0)
 
