@@ -54,7 +54,7 @@ class GuacaMolConfig(BaseDatasetConfig):
         target_property: Property or task name used as labels in LabelledCandidates.
         task_type: Always auto-derived from target_property in the model validator.
             Any value supplied at construction is silently overwritten. Do not set.
-        computed_properties: RDKit properties computed and stored in Candidate.features.
+        computed_properties: RDKit properties computed and stored in `GuacaMol._prop_matrix`.
             None defaults to computing only [target_property]. Pass
             `list(_ALL_PROPERTIES_ORDERED)` to compute all 10. Only applies when
             task_type == "property".
@@ -81,7 +81,8 @@ class GuacaMolConfig(BaseDatasetConfig):
         `MolLogP`, `TPSA`, `QED`) computed molecule-by-molecule via
         `PROPERTY_FNS`.  Molecules are loaded from the corpus and queried by
         canonical SMILES lookup; novel SMILES not in the corpus are scored on the fly.
-        Each `Candidate` carries the requested properties in its `features` dict.
+        Requested properties are stored in `GuacaMol._prop_matrix`; `Candidate.features`
+        is always `{}` for corpus molecules.
 
         `"benchmark_task"` — the label is a score in [0, 1] produced by one of the
         19 goal-directed scoring functions from Brown et al. (2019).  Scores combine
