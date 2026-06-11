@@ -8,7 +8,7 @@ ranking metric that accepts per-round aggregated values.  ``calibration_curve``:
 returns raw ``(expected_coverage, observed_coverage)`` arrays for plotting reliability
 diagrams; accepts per-candidate means, variances, and targets.
 
-.. automodule:: alf_core.utils.metrics.summary
+.. automodule:: alf_core.utils.metrics.aggregate
    :members:
    :show-inheritance:
    :undoc-members:

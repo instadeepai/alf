@@ -13,4 +13,3 @@ metrics for evaluating optimizer performance.
    Optimizer <optimizer/index>
    Acquisition Function <acquisition_function/index>
    Search <search/index>
-   Metrics <metrics/index>

@@ -14,8 +14,8 @@ exported from the top-level ``alf_core.utils.metrics`` namespace.
 .. toctree::
    :maxdepth: 1
 
+   Acquisition Batch <acquisition_batch/index>
    Base <base/index>
    Classification <classification/index>
-   Diversity <diversity/index>
    Regression <regression/index>
    Summary <summary/index>

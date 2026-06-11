@@ -233,6 +233,7 @@ The design task implements a multi-round active learning loop for optimizing seq
    - **Tell**: Retrain surrogate on updated data
    - **Evaluate**: Assess surrogate performance on test set
    - **Log**: Record metrics and save results
+3. **Campaign Summary**: Compute and log `auc_top_k` — the normalised area under the per-round top-k mean curve — as a single sample-efficiency score for the full experiment
 
 **Use Case**: Iteratively improve sequences by actively selecting and evaluating
 promising candidates.
@@ -371,12 +372,14 @@ the dataset's `problem_type`.
 - **Top-K Max** (`top_k_max`): Maximum oracle label of the top-k acquired candidates per round
 - **Hit Rate** (`hit_rate`): Fraction of acquired candidates whose label meets a threshold
 
-**Summary Metrics** (standalone, not in registry, `utils/metrics/summary.py`):
-- **AUC Top-K** (`auc_top_k`): Normalised area under the top-k mean curve across rounds — primary sample-efficiency ranking metric
-- **Calibration Curve** (`calibration_curve`): Expected vs observed coverage arrays for reliability diagrams
+**Summary Metrics** (standalone, not in registry, `utils/metrics/aggregate.py`):
+- **AUC Top-K** (`auc_top_k`): Normalised area under the top-k mean curve across rounds — primary sample-efficiency ranking metric, computed automatically by `DesignTask` at campaign end
+- **Calibration Curve** (`calibration_curve`): Expected vs observed coverage arrays for plotting reliability diagrams
 
-**Diversity Metrics** (`utils/metrics/diversity.py`):
-- **Intra-Batch Diversity** (`intra_batch_diversity`): Average pairwise dissimilarity within an acquired batch (edit distance for sequences, cosine distance for embeddings/tabular)
+**Acquisition Batch Metrics** (`utils/metrics/acquisition_batch.py`):
+- **Intra-Batch Diversity** (`intra_batch_diversity`): Average pairwise dissimilarity within an acquired batch (normalised Levenshtein distance for sequences, cosine distance for embeddings/tabular)
+- **Recall** (`compute_recall`): Fraction of acquired candidates in the top-percentile or top-N of the full candidate pool
+- **Regret** (`compute_regret`): Gap between the best possible label and the best acquired label
 
 **Regression — Acquisition Performance Metrics** (variance required):
 - **Regret UCB Alpha**: UCB acquisition regret comparing selected vs optimal candidates
