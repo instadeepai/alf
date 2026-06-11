@@ -684,6 +684,83 @@ class ESM2Model(BaseModel):
         else:
             return torch.nn.functional.cross_entropy(preds, targets.long())
 
+    def _mask_tokens(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """Apply random token masking for MLM.
+
+        Non-masked positions in labels are set to -100 so CrossEntropyLoss ignores them.
+        Special tokens (cls, eos, pad) are never masked.
+
+        Args:
+            input_ids: Token IDs of shape (batch, seq_len).
+
+        Raises:
+            ValueError: If the tokeniser does not have a mask token.
+
+        Returns:
+            Tuple of (masked_input_ids, labels), both of shape (batch, seq_len).
+        """
+        labels = input_ids.clone()
+
+        special_tokens_mask = self._special_tokens_mask(input_ids)
+        eligible = ~special_tokens_mask
+
+        prob_matrix = torch.full(
+            input_ids.shape, self.train_config.mask_probability, device=input_ids.device
+        )
+        prob_matrix.masked_fill_(special_tokens_mask, 0.0)
+        masked = torch.bernoulli(prob_matrix).bool()
+
+        rows_with_no_mask = ~masked.any(dim=1)
+        if rows_with_no_mask.any():
+            eligible_float = eligible[rows_with_no_mask].float()
+            if eligible_float.sum(dim=1).eq(0).any():
+                logger.warning(
+                    "One or more sequences consist entirely of special tokens. "
+                    "These rows will contribute zero loss. Check your data pipeline."
+                )
+                has_eligible = eligible_float.sum(dim=1) > 0
+                if has_eligible.any():
+                    picks = torch.multinomial(eligible_float[has_eligible], num_samples=1).squeeze(1)
+                    target_rows = rows_with_no_mask.nonzero(as_tuple=True)[0][has_eligible]
+                    masked[target_rows, picks] = True
+            else:
+                picks = torch.multinomial(eligible_float, num_samples=1).squeeze(1)
+                target_rows = rows_with_no_mask.nonzero(as_tuple=True)[0]
+                masked[target_rows, picks] = True
+
+        labels[~masked] = -100
+
+        masked_input_ids = input_ids.clone()
+        if self.tokeniser.mask_token_id is None:
+            raise ValueError(
+                "Tokeniser has no mask token. Cannot perform MLM masking. "
+                "Ensure the tokeniser is initialised with a [MASK] token."
+            )
+
+        masked_indices = masked.nonzero(as_tuple=False)
+        n_masked = masked_indices.shape[0]
+        p_mask, p_random, _ = self.train_config.mask_splitting
+        if n_masked > 0:
+            split = torch.rand(n_masked, device=input_ids.device)
+
+            replace_with_mask = split < p_mask
+            if replace_with_mask.any():
+                idx = masked_indices[replace_with_mask]
+                masked_input_ids[idx[:, 0], idx[:, 1]] = self.tokeniser.mask_token_id
+
+            replace_with_random = (split >= p_mask) & (split < (p_mask + p_random))
+            if replace_with_random.any():
+                idx = masked_indices[replace_with_random]
+                random_ids = torch.randint(
+                    low=0,
+                    high=self.tokeniser.vocab_size,
+                    size=(idx.shape[0],),
+                    device=input_ids.device,
+                )
+                masked_input_ids[idx[:, 0], idx[:, 1]] = random_ids
+
+        return masked_input_ids, labels
+
     def _train_epoch_mlm(
         self,
         train_loader: DataLoader,
