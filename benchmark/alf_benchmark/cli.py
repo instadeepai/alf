@@ -112,7 +112,10 @@ def _cmd_aggregate(args: argparse.Namespace) -> int:
         results.aggregate().to_csv(args.output, index=False)
         print(f"\nWrote aggregate table to {args.output}")
     if args.markdown:
-        Path(args.markdown).write_text(_leaderboard_markdown(board) + "\n", encoding="utf-8")
+        # _leaderboard_markdown already ends in a single newline; don't add another
+        # (a trailing blank line would be stripped by end-of-file-fixer, breaking
+        # idempotent regeneration via reproduce.sh).
+        Path(args.markdown).write_text(_leaderboard_markdown(board), encoding="utf-8")
         print(f"Wrote leaderboard to {args.markdown}")
     return 0
 
