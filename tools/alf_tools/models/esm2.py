@@ -219,8 +219,8 @@ class ESM2Model(BaseModel):
 
     Loads a pre-trained ESM-2 checkpoint from HuggingFace and exposes it as a
     BaseModel. predict() returns per-sequence masked-marginal scores
-    (scoring_function='pll') or passes embeddings through a trainable linear head
-    (scoring_function='linear_head'). embed() returns per-sequence embeddings.
+    (mode='esm2_likelihoods') or passes embeddings through a trainable linear head
+    (mode='linear_head'). embed() returns per-sequence embeddings.
     """
 
     _PLL_BATCH_THRESHOLD = 128  # Use batching for shorter sequences
@@ -333,7 +333,7 @@ class ESM2Model(BaseModel):
         """
         if self._head is None:
             raise RuntimeError(
-                "_head is None; model was not configured with scoring_function='linear_head'"
+                "_head is None; model was not configured with mode='linear_head'"
             )
         return self._head
 
@@ -393,12 +393,12 @@ class ESM2Model(BaseModel):
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Compute predictions for the given candidates.
 
-        When scoring_function='pll': computes pseudo-log-likelihood (PLL) by masking one
+        When mode='esm2_likelihoods': computes pseudo-log-likelihood (PLL) by masking one
         residue at a time and recording log P(token_i | all other tokens). Returns the
         mean PLL over residue positions per sequence (higher = more probable). Sequences
         with ≤_PLL_BATCH_THRESHOLD residues are scored in a single batched forward pass;
         longer sequences are scored position-by-position to bound memory usage.
-        When scoring_function='linear_head': embeds sequences through the frozen backbone and passes
+        When mode='linear_head': embeds sequences through the frozen backbone and passes
         them through the linear head. Returns regression values (output_dim=1) or
         argmax class indices (output_dim>1).
 
@@ -411,7 +411,7 @@ class ESM2Model(BaseModel):
         Raises:
             ValueError: If candidate_points is empty.
             ValueError: If any sequence has no scoreable residue positions.
-            RuntimeError: If scoring_function='linear_head' but the head is uninitialised
+            RuntimeError: If mode='linear_head' but the head is uninitialised
                 (should not happen if __init__ ran without error).
 
         Note:
@@ -585,12 +585,12 @@ class ESM2Model(BaseModel):
 
         Args:
             data: LabelledCandidates containing sequences and (for
-                scoring_function='linear_head') labels.
+                mode='linear_head') labels.
             shuffle: Whether to shuffle the dataset.
 
         Returns:
-            DataLoader yielding (input_ids, attention_mask) pairs when scoring_function='pll',
-            or (input_ids, attention_mask, targets) triples when scoring_function='linear_head'.
+            DataLoader yielding (input_ids, attention_mask) pairs when mode='esm2_likelihoods',
+            or (input_ids, attention_mask, targets) triples when mode='linear_head'.
         """
         batch = self.featurise(data)
         if self.train_config.mode == "linear_head":
@@ -749,7 +749,7 @@ class ESM2Model(BaseModel):
             Tuple of (average_loss, empty metrics_dict).
 
         Raises:
-            RuntimeError: If the model was not configured with scoring_function='linear_head'.
+            RuntimeError: If the model was not configured with mode='linear_head'.
             ValueError: If the DataLoader produces no batches.
         """
         head = self._require_head()
