@@ -162,6 +162,34 @@ class GuacaMol(BaseDataset):
             else {}
         )
 
+    def properties_dataframe(self) -> "pd.DataFrame":
+        """Computed properties aligned with `_raw_dataset.candidates` (row i ↔ candidate i).
+
+        Returns a DataFrame with one column per computed property plus a leading ``smiles``
+        column. Only meaningful for property-mode datasets; raises if the dataset has not
+        been loaded or no properties were computed.
+
+        Returns:
+            DataFrame of shape (N, P+1) with columns ``["smiles", *_prop_cols]``.
+
+        Raises:
+            ImportError: If pandas is not installed.
+            RuntimeError: If the dataset is not loaded or no properties were computed.
+        """
+        try:
+            import pandas as pd  # noqa: PLC0415
+        except ImportError as exc:
+            raise ImportError(
+                "pandas is required for properties_dataframe(); install it with: pip install pandas"
+            ) from exc
+        if self._raw_dataset is None or self._prop_matrix.size == 0:
+            raise RuntimeError(
+                "properties_dataframe() is only available after loading a property-mode dataset."
+            )
+        df = pd.DataFrame(self._prop_matrix, columns=self._prop_cols)
+        df.insert(0, "smiles", [c.data for c in self._raw_dataset.candidates])
+        return df
+
     def __repr__(self) -> str:
         """Return a string representation identifying dataset and target."""
         return (
@@ -209,7 +237,7 @@ class GuacaMol(BaseDataset):
         self._prop_cols = properties
         return lc
 
-    def _iter_paper_splits(self) -> "Iterator[tuple[str, list[str]]]":
+    def _iter_paper_splits(self) -> Iterator[tuple[str, list[str]]]:
         """Yield (split_key, smiles_list) for each paper split file in order.
 
         Handles download, file loading, max_molecules truncation, and the
