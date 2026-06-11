@@ -127,10 +127,16 @@ class InputNormaliser:
     Note:
         Min-max scaling is well suited for GP models, where the kernel computes
         distances between input points and benefits from inputs spanning the unit
-        cube [0, 1]. For deep neural networks (e.g. CNNModel), the Z-score
-        `InputStandardiser` is generally preferred as it zero-centres inputs and
-        avoids the gradient bias that arises from non-zero-centred activations.
+        cube [0, 1]. For deep neural networks (e.g. CNNModel), Z-score
+        standardisation (zero mean, unit variance) is generally preferred as it
+        zero-centres inputs and avoids the gradient bias that arises from
+        non-zero-centred activations.
     """
+
+    # TODO(#126): Add an InputStandardiser (Z-score) and expose a
+    # normalise_inputs_strategy: Literal["minmax", "zscore"] field in BaseTrainConfig
+    # so that GPTrainConfig and CNNTrainConfig can each default to the strategy best
+    # suited to their architecture.
 
     _MIN_RANGE: float = 1e-8
 
