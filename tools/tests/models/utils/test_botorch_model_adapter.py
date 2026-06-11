@@ -32,6 +32,7 @@ import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates, Modality
 from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel, BoTorchTrainConfig
+from alf_tools.models.gp import FeaturizerConfig, GPModel, GPTrainConfig
 from alf_tools.models.utils.botorch_utils import candidates_to_tensor
 from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
     BoTorchModelAdapter,
@@ -232,10 +233,13 @@ def test_num_outputs_botorch_model(botorch_gp_model):
 
 
 def test_num_outputs_alf_model(mock_alf_model_with_variances):
-    """Test num_outputs raises for ALF models (use BoTorchGPModel instead)."""
+    """Test num_outputs raises for ALF models without a `botorch_model`."""
     adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
 
-    with pytest.raises(NotImplementedError, match="num_outputs is not supported for ALF BaseModel"):
+    with pytest.raises(
+        NotImplementedError,
+        match="num_outputs is not supported for ALF BaseModel",
+    ):
         _ = adapter.num_outputs
 
 
@@ -247,10 +251,70 @@ def test_batch_shape_botorch_model(botorch_gp_model):
 
 
 def test_batch_shape_alf_model(mock_alf_model_with_variances):
-    """Test batch_shape raises for ALF models (use BoTorchGPModel instead)."""
+    """Test batch_shape raises for ALF models without a `botorch_model`."""
     adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
 
-    with pytest.raises(NotImplementedError, match="batch_shape is not supported for ALF BaseModel"):
+    with pytest.raises(
+        NotImplementedError,
+        match="batch_shape is not supported for ALF BaseModel",
+    ):
+        _ = adapter.batch_shape
+
+
+@pytest.fixture
+def trained_gp_model():
+    """Train a GPModel on a handful of 2-feature tabular candidates.
+
+    Returns:
+        A trained GPModel exposing a `botorch_model` property.
+    """
+    X_train = np.array([[0.1, 0.2], [0.4, 0.5], [0.7, 0.8], [0.3, 0.6]], dtype=np.float64)
+    y_train = np.array([1.0, 2.0, 1.5, 1.8])
+    candidates = [Candidate(data=x, modality=Modality.TABULAR) for x in X_train]
+    train_data = LabelledCandidates(candidates=candidates, labels=y_train)
+
+    model = GPModel(
+        train_config=GPTrainConfig(num_iterations=10),
+        featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+        device="cpu",
+    )
+    model.train(train_data)
+    return model
+
+
+def test_num_outputs_alf_model_with_botorch_model(trained_gp_model):
+    """num_outputs delegates to the wrapped ALF model's trained `botorch_model`."""
+    adapter = BoTorchModelAdapter(trained_gp_model)
+
+    assert adapter.num_outputs == 1
+
+
+def test_batch_shape_alf_model_with_botorch_model(trained_gp_model):
+    """batch_shape delegates to the wrapped ALF model's trained `botorch_model`."""
+    adapter = BoTorchModelAdapter(trained_gp_model)
+
+    assert adapter.batch_shape == torch.Size([])
+
+
+def test_num_outputs_untrained_gp_model_raises():
+    """num_outputs raises for an untrained GPModel (no `botorch_model` yet)."""
+    adapter = BoTorchModelAdapter(GPModel(device="cpu"))
+
+    with pytest.raises(
+        NotImplementedError,
+        match="num_outputs is not supported for ALF BaseModel",
+    ):
+        _ = adapter.num_outputs
+
+
+def test_batch_shape_untrained_gp_model_raises():
+    """batch_shape raises for an untrained GPModel (no `botorch_model` yet)."""
+    adapter = BoTorchModelAdapter(GPModel(device="cpu"))
+
+    with pytest.raises(
+        NotImplementedError,
+        match="batch_shape is not supported for ALF BaseModel",
+    ):
         _ = adapter.batch_shape
 
 

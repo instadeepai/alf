@@ -24,7 +24,9 @@ Fixtures are shared from tools/tests/conftest.py:
 import numpy as np
 import pytest
 import torch
-from alf_core import LabelledCandidates
+from alf_core import Candidate, LabelledCandidates, Modality
+from alf_tools.models.gp import FeaturizerConfig, GPModel, GPTrainConfig
+from alf_tools.models.utils.botorch_utils import candidates_to_tensor
 from alf_tools.optimizer.acquisition_functions.botorch_acquisition_function import (
     ACQUISITION_REGISTRY,
     BotorchAcquisitionConfig,
@@ -140,7 +142,8 @@ def test_botorch_acquisition_function_wraps_alf_model(
     """BotorchAcquisitionFunction raises NotImplementedError for ALF BaseModel.
 
     BoTorch acquisition functions call model.num_outputs during construction;
-    BoTorchModelAdapter raises for ALF models. Use BoTorchGPModel instead.
+    BoTorchModelAdapter raises for ALF models without a trained
+    `botorch_model`. Use a model exposing `botorch_model` (e.g. GPModel).
     """
     cfg = BotorchAcquisitionConfig(name="upper_confidence_bound", kwargs={"beta": 2.0})
     acq_fn = BotorchAcquisitionFunction(cfg)
@@ -148,3 +151,41 @@ def test_botorch_acquisition_function_wraps_alf_model(
 
     with pytest.raises(NotImplementedError, match="num_outputs is not supported for ALF BaseModel"):
         acq_fn(test_candidates_2d, state)
+
+
+def test_botorch_acquisition_function_qlognei_with_trained_gp_model():
+    """QLogNoisyExpectedImprovement works with a trained GPModel via the adapter.
+
+    A trained GPModel exposes `botorch_model`, so the adapter can provide
+    `num_outputs`/`batch_shape` and q-based acquisitions become usable.
+    """
+    X_train = np.array([[0.1, 0.2], [0.4, 0.5], [0.7, 0.8], [0.3, 0.6]], dtype=np.float64)
+    y_train = np.array([1.0, 2.0, 1.5, 1.8])
+    train_candidates = [Candidate(data=x, modality=Modality.TABULAR) for x in X_train]
+    train_data = LabelledCandidates(candidates=train_candidates, labels=y_train)
+
+    gp_model = GPModel(
+        train_config=GPTrainConfig(num_iterations=10),
+        featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+        device="cpu",
+    )
+    gp_model.train(train_data)
+
+    X_baseline = candidates_to_tensor(train_candidates)  # float64 by default
+    cfg = BotorchAcquisitionConfig(
+        name="log_noisy_expected_improvement", kwargs={"X_baseline": X_baseline}
+    )
+    acq_fn = BotorchAcquisitionFunction(cfg)
+    state = _MockState(gp_model)
+
+    search_candidates = [
+        Candidate(data=np.array([0.2, 0.3], dtype=np.float64), modality=Modality.TABULAR),
+        Candidate(data=np.array([0.5, 0.6], dtype=np.float64), modality=Modality.TABULAR),
+        Candidate(data=np.array([0.8, 0.1], dtype=np.float64), modality=Modality.TABULAR),
+    ]
+
+    result = acq_fn(search_candidates, state)
+
+    assert isinstance(result, LabelledCandidates)
+    assert len(result.labels) == len(search_candidates)
+    assert np.all(np.isfinite(result.labels))

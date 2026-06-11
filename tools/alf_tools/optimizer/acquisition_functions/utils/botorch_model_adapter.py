@@ -45,6 +45,13 @@ class BoTorchModelAdapter(BotorchModel):
     `posterior()`) or an ALF `BaseModel` (adapts `predict()` to BoTorch's
     `posterior()` interface). The adapter detects the model type automatically.
 
+    ALF models that expose a trained `botorch_model` attribute (e.g. `GPModel`)
+    additionally support q-based acquisitions such as
+    `qLogNoisyExpectedImprovement` — `num_outputs` and `batch_shape` are
+    delegated to the underlying BoTorch model. Pure `predict()`-only ALF models
+    cannot provide `num_outputs`/`batch_shape` and raise `NotImplementedError`
+    for those properties.
+
     Models that don't provide prediction variances (e.g., CNNModel, deterministic
     models) cannot be used with BoTorch acquisition functions. Expected Improvement
     and Upper Confidence Bound require uncertainty estimates; attempting to use such
@@ -175,24 +182,46 @@ class BoTorchModelAdapter(BotorchModel):
 
         return posterior
 
+    def _inner_botorch_model(self) -> BotorchModel | None:
+        """Return the wrapped ALF model's trained `botorch_model`, if available.
+
+        Returns:
+            The underlying BoTorch model when the wrapped ALF model exposes
+            a trained `botorch_model`; `None` when the attribute is absent,
+            raises `RuntimeError` (untrained model), or is not a BoTorch
+            `Model`.
+        """
+        try:
+            inner = getattr(self._wrapped_model, "botorch_model", None)
+        except RuntimeError:
+            return None
+        if isinstance(inner, BotorchModel):
+            return inner
+        return None
+
     @property
     def num_outputs(self) -> int:
         """The number of outputs of the model.
 
         Returns:
-            Number of outputs for native BoTorch models.
+            Number of outputs for native BoTorch models, or for ALF models
+            exposing a trained `botorch_model` (delegated to it).
 
         Raises:
-            NotImplementedError: Always raised for ALF BaseModel instances.
-                Use a native BoTorch model (e.g. ``BoTorchGPModel``) to avoid
-                this; ALF BaseModels do not expose ``num_outputs``.
+            NotImplementedError: For ALF BaseModel instances without a trained
+                `botorch_model`. Use a model exposing `botorch_model`
+                (e.g. `GPModel`) and train it first.
         """
         if self._is_botorch_model:
             return int(self._wrapped_model.num_outputs)  # type: ignore[union-attr, no-any-return]
+        inner = self._inner_botorch_model()
+        if inner is not None:
+            return int(inner.num_outputs)
         raise NotImplementedError(
             f"num_outputs is not supported for ALF BaseModel "
-            f"({type(self._wrapped_model).__name__}). "
-            "Use a native BoTorch model such as BoTorchGPModel instead."
+            f"({type(self._wrapped_model).__name__}) without a trained "
+            "botorch_model. Use a model exposing botorch_model, such as "
+            "GPModel, and train it first."
         )
 
     @property
@@ -200,17 +229,22 @@ class BoTorchModelAdapter(BotorchModel):
         """The batch shape of the model.
 
         Returns:
-            Batch shape for native BoTorch models.
+            Batch shape for native BoTorch models, or for ALF models
+            exposing a trained `botorch_model` (delegated to it).
 
         Raises:
-            NotImplementedError: Always raised for ALF BaseModel instances.
-                Use a native BoTorch model (e.g. ``BoTorchGPModel``) to avoid
-                this; ALF BaseModels do not expose ``batch_shape``.
+            NotImplementedError: For ALF BaseModel instances without a trained
+                `botorch_model`. Use a model exposing `botorch_model`
+                (e.g. `GPModel`) and train it first.
         """
         if self._is_botorch_model:
             return self._wrapped_model.batch_shape  # type: ignore[union-attr]
+        inner = self._inner_botorch_model()
+        if inner is not None:
+            return inner.batch_shape
         raise NotImplementedError(
             f"batch_shape is not supported for ALF BaseModel "
-            f"({type(self._wrapped_model).__name__}). "
-            "Use a native BoTorch model such as BoTorchGPModel instead."
+            f"({type(self._wrapped_model).__name__}) without a trained "
+            "botorch_model. Use a model exposing botorch_model, such as "
+            "GPModel, and train it first."
         )
