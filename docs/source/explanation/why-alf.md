@@ -45,7 +45,7 @@ keeps the narrative consistent across the library, the benchmark, and the paper.
 
 ## Who it's for
 
-- **Researchers** running real optimisation experiments who want a tested loop instead of glue code.
+- **Researchers** running real optimisation experiments who want a tested loop instead of re-implementing the ask/tell cycle themselves.
 - **Method developers** who want to drop in a new acquisition function or surrogate and measure it
   against baselines on equal footing.
 
