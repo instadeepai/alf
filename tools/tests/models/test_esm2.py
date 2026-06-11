@@ -752,6 +752,16 @@ class TestMLPHead:
         # Epochs logged: epoch 3 (index 2, (2+1)%3==0) and epoch 4 (index 3, last)
         assert len(model.get_epoch_metrics()) == 2
 
+    def test_train_raises_when_linear_head_loss_fn_none(self, sample_data):
+        """train() raises ValueError when mode='linear_head' and loss_fn=None (default)."""
+        config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
+        train_cfg = ESM2TrainConfig()  # default: mode='linear_head', loss_fn=None
+        model = ESM2Model(
+            name="no_loss_fn", model_config=config, train_config=train_cfg, device="cpu"
+        )
+        with pytest.raises(ValueError, match="loss_fn must be set"):
+            model.train(sample_data)
+
 
 class TestEmbedBatch:
     """Tests for ESM2Model._embed_batch()."""

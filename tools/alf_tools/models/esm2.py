@@ -674,11 +674,20 @@ class ESM2Model(BaseModel):
 
         Returns:
             Scalar loss tensor.
+
+        Raises:
+            AssertionError: If `loss_fn` is not 'mse' or 'cross_entropy' (should be unreachable
+                given `ESM2TrainConfig.__post_init__` validation).
         """
         if self.train_config.loss_fn == "mse":
             return torch.nn.functional.mse_loss(preds.squeeze(-1), targets)
-        else:
+        elif self.train_config.loss_fn == "cross_entropy":
             return torch.nn.functional.cross_entropy(preds, targets.long())
+        else:
+            raise AssertionError(
+                f"Unreachable: loss_fn={self.train_config.loss_fn!r} "
+                "should have been caught by ESM2TrainConfig.__post_init__"
+            )
 
     def _mask_tokens(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Apply random token masking for MLM.
