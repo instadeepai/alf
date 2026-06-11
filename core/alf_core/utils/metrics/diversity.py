@@ -18,11 +18,22 @@ These metrics operate on lists of :class:`~alf_core.dataclasses.candidate.Candid
 objects rather than on prediction arrays.
 """
 
-from difflib import SequenceMatcher
-
 import numpy as np
 from alf_core.dataclasses.candidate import Candidate, Modality
 from scipy.spatial.distance import pdist
+
+
+def _levenshtein(a: str, b: str) -> int:
+    """Compute Levenshtein edit distance between two strings."""
+    if len(a) < len(b):
+        a, b = b, a
+    prev = list(range(len(b) + 1))
+    for ch_a in a:
+        curr = [prev[0] + 1]
+        for j, ch_b in enumerate(b):
+            curr.append(min(prev[j + 1] + 1, curr[-1] + 1, prev[j] + (ch_a != ch_b)))
+        prev = curr
+    return prev[-1]
 
 
 def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
@@ -34,10 +45,10 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
 
     Dissimilarity is computed as follows depending on candidate modality:
 
-    - **SEQUENCE**: normalised edit distance derived from
-      :class:`difflib.SequenceMatcher`.  `dissimilarity = 1 - ratio`,
-      where `ratio` is 0 for completely different sequences and 1 for
-      identical ones.
+    - **SEQUENCE**: normalised Levenshtein distance.
+      `dissimilarity = levenshtein(a, b) / max(len(a), len(b))`,
+      yielding 0 for identical sequences and 1 when every character must
+      be substituted or the sequences differ by their full length.
     - **EMBEDDING** / **TABULAR**: cosine distance computed via
       :func:`scipy.spatial.distance.pdist`.  Candidates are flattened to 1-D
       feature vectors before comparison.
@@ -72,11 +83,13 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
     modality = candidates[0].modality
 
     if modality == Modality.SEQUENCE:
-        pairs = [
-            1.0 - SequenceMatcher(None, str(candidates[i].data), str(candidates[j].data)).ratio()
-            for i in range(len(candidates))
-            for j in range(i + 1, len(candidates))
-        ]
+        pairs = []
+        for i in range(len(candidates)):
+            for j in range(i + 1, len(candidates)):
+                a, b = str(candidates[i].data), str(candidates[j].data)
+                max_len = max(len(a), len(b))
+                dist = 0.0 if max_len == 0 else _levenshtein(a, b) / max_len
+                pairs.append(dist)
         return {"intra_batch_diversity": float(np.mean(pairs))}
 
     if modality in (Modality.EMBEDDING, Modality.TABULAR):
