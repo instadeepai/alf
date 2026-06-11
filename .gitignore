@@ -148,3 +148,8 @@ tools/pytest-tools.xml
 tools/coverage-tools.xml
 core/pytest-tools.xml
 core/coverage-tools.xml
+
+# Benchmark sweep outputs (regenerable via benchmark/reproduce.sh)
+runs/
+benchmark/coverage-benchmark.xml
+benchmark/pytest-benchmark.xml

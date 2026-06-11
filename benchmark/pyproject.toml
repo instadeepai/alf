@@ -26,6 +26,9 @@ alf-bench = "alf_benchmark.cli:main"
 where = ["."]
 include = ["alf_benchmark*"]
 
+[tool.setuptools.package-data]
+alf_benchmark = ["suites/*.yaml"]
+
 [tool.uv.sources]
 alf_core = { path = "../core", editable = true }
 alf_tools = { path = "../tools", editable = true }

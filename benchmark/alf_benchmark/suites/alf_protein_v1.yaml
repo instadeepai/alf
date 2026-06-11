@@ -1,0 +1,61 @@
+# alf-protein-v1 — a versioned, CPU-friendly active-learning benchmark suite.
+#
+# Frozen reference suite for offline protein design. The committed baseline uses
+# the bundled GFP dataset (no download, no GPU) so a fresh clone can reproduce the
+# headline leaderboard. Both methods use the Greedy acquisition (no uncertainty
+# model required) and differ only in the surrogate (CNN vs GP), so the comparison
+# isolates the surrogate. Heavier datasets (FLIP, ProteinGym) and uncertainty
+# methods (UCB/EI on GP) are a documented, optional extension tier.
+#
+# Reproduce:  bash benchmark/reproduce.sh
+suite_name: alf-protein-v1
+suite_version: "1.0.0"
+output_dir: runs/alf_protein_v1
+deterministic: true
+
+problems:
+  - name: gfp_offline
+    primary_metric: optimizer/regret
+    seeds: [0, 1, 2]
+    dataset:
+      name: gfp
+      config:
+        name: gfp
+        modality: sequence
+        # Small initial train split so the optimum is NOT handed to the model:
+        # acquisition (and thus surrogate quality) drives the regret curve.
+        train_ratio: 0.1
+        validation_frac: 0.2
+        test_ratio: 0.2
+        problem_type: regression
+
+methods:
+  - name: cnn_greedy
+    family: design
+    surrogate:
+      name: cnn
+      config:
+        train_config:
+          num_epochs: 5
+    acquisition:
+      name: greedy
+    search:
+      name: dataset_search
+    task:
+      num_acq_rounds: 3
+      acq_batch_size: 50
+
+  - name: gp_greedy
+    family: design
+    surrogate:
+      name: gp
+      config:
+        featurizer_config:
+          featurizer_type: one_hot
+    acquisition:
+      name: greedy
+    search:
+      name: dataset_search
+    task:
+      num_acq_rounds: 3
+      acq_batch_size: 50

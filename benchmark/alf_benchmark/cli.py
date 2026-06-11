@@ -27,6 +27,8 @@ import argparse
 import logging
 from pathlib import Path
 
+import pandas as pd
+
 from alf_benchmark.registry import GROUPS, default_registry
 from alf_benchmark.results import BenchmarkResults
 from alf_benchmark.runner import run_benchmark
@@ -55,11 +57,47 @@ def _cmd_run(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
-def _cmd_aggregate(args: argparse.Namespace) -> int:
-    """Print a leaderboard and optionally write the aggregate table.
+def _leaderboard_markdown(board: pd.DataFrame) -> str:
+    """Render a leaderboard frame as a Markdown document.
 
     Args:
-        args: Parsed arguments with ``dir`` and optional ``output``.
+        board: Leaderboard frame from :meth:`BenchmarkResults.leaderboard`.
+
+    Returns:
+        A Markdown string with one ranked table per problem.
+    """
+
+    def cell(value: str) -> str:
+        """Escape a value for use in a Markdown table cell.
+
+        Args:
+            value: Raw cell text.
+
+        Returns:
+            Text safe to place between table pipes.
+        """
+        return str(value).replace("|", "\\|").replace("\n", " ")
+
+    lines = ["# Leaderboard", ""]
+    for problem in board["problem"].unique():
+        rows = board[board["problem"] == problem].sort_values("rank")
+        metric = rows["metric"].iloc[0]
+        lines += [f"## {cell(problem)} — `{cell(metric)}`", ""]
+        lines += ["| rank | method | mean | 95% CI | seeds |", "|---|---|---|---|---|"]
+        for _, row in rows.iterrows():
+            lines.append(
+                f"| {int(row['rank'])} | {cell(row['method'])} | {row['mean']:.4f} | "
+                f"[{row['ci_low']:.4f}, {row['ci_high']:.4f}] | {int(row['n_seeds'])} |"
+            )
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _cmd_aggregate(args: argparse.Namespace) -> int:
+    """Print a leaderboard and optionally write the aggregate table / Markdown.
+
+    Args:
+        args: Parsed arguments with ``dir`` and optional ``output``/``markdown``.
 
     Returns:
         Exit code (always 0).
@@ -73,6 +111,9 @@ def _cmd_aggregate(args: argparse.Namespace) -> int:
     if args.output:
         results.aggregate().to_csv(args.output, index=False)
         print(f"\nWrote aggregate table to {args.output}")
+    if args.markdown:
+        Path(args.markdown).write_text(_leaderboard_markdown(board) + "\n", encoding="utf-8")
+        print(f"Wrote leaderboard to {args.markdown}")
     return 0
 
 
@@ -146,6 +187,9 @@ def build_parser() -> argparse.ArgumentParser:
     aggregate_parser.add_argument("dir", help="run output directory")
     aggregate_parser.add_argument(
         "--output", help="optional path to write the aggregate table as CSV"
+    )
+    aggregate_parser.add_argument(
+        "--markdown", help="optional path to write the leaderboard as Markdown"
     )
     aggregate_parser.set_defaults(func=_cmd_aggregate)
 

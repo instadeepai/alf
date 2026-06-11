@@ -68,9 +68,14 @@ def test_cli_run_aggregate_plot(dummies_in_default_registry, tmp_path, capsys):
     assert (rep_dir / "metrics.csv").exists()
     assert (rep_dir / "manifest.json").exists()
 
-    # aggregate
-    assert main(["aggregate", str(runs_dir)]) == 0
+    # aggregate (+ markdown leaderboard)
+    markdown = tmp_path / "LEADERBOARD.md"
+    assert main(["aggregate", str(runs_dir), "--markdown", str(markdown)]) == 0
     assert "m_dummy" in capsys.readouterr().out
+    assert markdown.exists()
+    text = markdown.read_text()
+    assert "# Leaderboard" in text
+    assert "m_dummy" in text
 
     # plot
     assert main(["plot", str(runs_dir)]) == 0

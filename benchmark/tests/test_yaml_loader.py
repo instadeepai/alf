@@ -21,6 +21,17 @@ from alf_benchmark.yaml_loader import load_run_config
 from pydantic import ValidationError
 
 _EXAMPLE = Path(__file__).resolve().parents[1] / "configs" / "example.yaml"
+_SUITE = Path(__file__).resolve().parents[1] / "alf_benchmark" / "suites" / "alf_protein_v1.yaml"
+
+
+def test_loads_reference_suite():
+    """The frozen alf-protein-v1 suite parses into a valid RunConfig."""
+    run = load_run_config(_SUITE)
+    assert run.suite_name == "alf-protein-v1"
+    assert run.suite_version == "1.0.0"
+    assert run.deterministic is True
+    assert len(run.problems) == 1
+    assert {m.name for m in run.methods} == {"cnn_greedy", "gp_greedy"}
 
 
 def test_loads_example_config():

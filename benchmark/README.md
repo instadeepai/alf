@@ -7,11 +7,12 @@ active-learning performance** (best-found, regret, recall, calibration **vs
 acquisition round**) — the gap that static benchmarks like ProteinGym and FLIP
 leave open.
 
-> **Status: Phase 3 (YAML + CLI).** Phases 1–3 deliver the registry,
-> config-as-code models, a resumable sweep runner (reusing the existing ALF tasks
-> unchanged), analysis (mean ± bootstrap-CI aggregation, paired significance tests,
-> a leaderboard, active-learning curve plots), and a declarative YAML + `alf-bench`
-> CLI front end. A versioned suite with reference results (Phase 4) follows.
+> **Status: Phase 4 (versioned suite + reference results).** All four phases are
+> in place: the registry and config-as-code models, a resumable sweep runner
+> (reusing the existing ALF tasks unchanged), analysis (mean ± bootstrap-CI
+> aggregation, paired significance tests, a leaderboard, active-learning curve
+> plots), a declarative YAML + `alf-bench` CLI, and a frozen, CPU-reproducible
+> suite (`alf-protein-v1`) with committed reference results and dataset cards.
 
 ## Concepts
 
@@ -114,6 +115,33 @@ alf-bench aggregate runs/example --output agg.csv
 alf-bench plot runs/example                    # save AL-curve figures
 alf-bench list                                 # show registered components
 ```
+
+Paths above are relative to the repo root; pass any path to your own YAML and
+output directory when running from elsewhere.
+
+## Reference suite: `alf-protein-v1`
+
+A frozen, versioned suite lives at
+[`alf_benchmark/suites/alf_protein_v1.yaml`](alf_benchmark/suites/alf_protein_v1.yaml).
+Its committed baseline is **CPU-friendly and offline** — the bundled GFP dataset,
+a CNN and a GP surrogate (both Greedy), three seeds — so a fresh clone can
+reproduce the headline leaderboard without a GPU, HF token, or download:
+
+```bash
+bash benchmark/reproduce.sh
+```
+
+This regenerates [`reference_results/LEADERBOARD.md`](reference_results/LEADERBOARD.md)
+and `reference_results/aggregate.csv`; the per-method mean regret should match the
+committed reference within its confidence interval. Per-dataset provenance,
+licences, split definitions, and known-leakage notes are in
+[`dataset_cards/`](dataset_cards/). Heavier datasets (FLIP, ProteinGym) and
+uncertainty-based methods (UCB/EI on a GP) are a documented, optional tier — see
+the dataset cards.
+
+A worked walkthrough — run the suite, then register your own model and try to beat
+the baseline — is in
+[`tutorials/benchmark/benchmark_tutorial.ipynb`](../tutorials/benchmark/benchmark_tutorial.ipynb).
 
 ## Registering your own component
 
