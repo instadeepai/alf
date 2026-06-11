@@ -534,6 +534,32 @@ class TestGuacaMolPaperSplits:
         assert len(dataset.train_dataset) > 0
         assert len(dataset.test_dataset) > 0
 
+    def test_paper_splits_prop_matrix_shape(self, tmp_path):
+        """_prop_matrix is set after paper-split load with shape (total_N, P)."""
+        _write_paper_files(tmp_path)
+        dataset = GuacaMol(_paper_config(data_dir=tmp_path, computed_properties=["TPSA", "MolWt"]))
+        total_n = len(dataset._raw_dataset.candidates)
+        assert dataset._prop_matrix.shape == (total_n, 2)
+        assert dataset._prop_cols == ["TPSA", "MolWt"]
+
+    def test_paper_splits_prop_matrix_row_count_matches_raw_dataset(self, tmp_path):
+        """Property matrix row count equals _raw_dataset length after paper splits."""
+        _write_paper_files(tmp_path)
+        dataset = GuacaMol(_paper_config(data_dir=tmp_path))
+        assert dataset._prop_matrix.shape[0] == len(dataset._raw_dataset.candidates)
+
+    def test_paper_split_corpus_candidates_have_empty_features(self, tmp_path):
+        """Paper-split corpus candidates store {} features (no dict overhead)."""
+        _write_paper_files(tmp_path)
+        dataset = GuacaMol(_paper_config(data_dir=tmp_path))
+        all_cands = (
+            dataset.train_dataset.candidates
+            + dataset.validation_dataset.candidates
+            + dataset.test_dataset.candidates
+        )
+        for cand in all_cands:
+            assert cand.features == {}
+
 
 class TestGuacaMolQuery:
     """Tests for GuacaMol.query(), including in-corpus lookup and on-the-fly RDKit labelling."""

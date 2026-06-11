@@ -263,17 +263,61 @@ class GuacaMol(BaseDataset):
 
         Stores the three splits in `self._paper_splits` keyed by
         `"train"`, `"validation"`, and `"test"`. Returns a combined
-        LabelledCandidates (without any split tag in features) for use as
-        `_raw_dataset` — this powers the SMILES lookup index in :meth:`query`.
+        LabelledCandidates (with empty Candidate.features) for use as
+        `_raw_dataset`. The property matrix is stored on `self._prop_matrix`.
 
         Returns:
             Combined LabelledCandidates across all three paper splits.
         """
         target = cast(GuacaMolPropertyName, self.config.target_property)
         properties = list(self.config.computed_properties or [target])
-        return self._load_paper_splits_with(
-            lambda smiles_list: _label_smiles(smiles_list, properties, target, self.modality)
+        split_files = {k: v for k, v in GUACAMOL_FILES.items() if k != "ALL"}
+        tag_to_key = {"TRAIN": "train", "VALID": "validation", "TEST": "test"}
+        if self.config.max_molecules is not None:
+            logger.warning(
+                "max_molecules=%d is applied per split file in paper mode — "
+                "total molecules may reach %d × 3.",
+                self.config.max_molecules,
+                self.config.max_molecules,
+            )
+        self._paper_splits = {}
+        split_lcs: list[LabelledCandidates] = []
+        split_matrices: list[np.ndarray] = []
+        for tag, entry_info in split_files.items():
+            filepath = _download_file(
+                entry_info["url"],
+                self.config.data_dir / entry_info["name"],
+                self.config.max_molecules,
+                sha256=entry_info.get("sha256"),
+            )
+            smiles_list = _load_smiles_file(filepath)
+            if self.config.max_molecules is not None:
+                smiles_list = smiles_list[: self.config.max_molecules]
+            split_lc, split_mat = _label_smiles(smiles_list, properties, target, self.modality)
+            logger.debug(
+                "Paper split '%s': %d SMILES → %d valid candidates",
+                tag,
+                len(smiles_list),
+                len(split_lc.candidates),
+            )
+            self._paper_splits[tag_to_key[tag]] = split_lc
+            split_lcs.append(split_lc)
+            split_matrices.append(split_mat)
+
+        p = len(properties)
+        all_labels = (
+            np.concatenate([lc.labels for lc in split_lcs])
+            if split_lcs
+            else np.array([], dtype=float)
         )
+        all_candidates = [c for lc in split_lcs for c in lc.candidates]
+        self._prop_matrix = (
+            np.concatenate(split_matrices, axis=0)
+            if split_matrices
+            else np.empty((0, p), dtype=np.float64)
+        )
+        self._prop_cols = properties
+        return LabelledCandidates(candidates=all_candidates, labels=all_labels)
 
     def _load_benchmark_task(self) -> LabelledCandidates:
         """Load corpus and score each valid SMILES using the benchmark task scorer.
