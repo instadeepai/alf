@@ -17,7 +17,7 @@
 import numpy as np
 import pytest
 from alf_core.dataclasses.candidate import Candidate, Modality
-from alf_core.utils.metrics.diversity import intra_batch_diversity
+from alf_core.utils.metrics.acquisition_batch import intra_batch_diversity
 
 
 def _seq(s: str) -> Candidate:

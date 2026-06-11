@@ -15,11 +15,14 @@
 import logging
 from typing import Any
 
+import numpy as np
 from alf_core.dataclasses import State
 from alf_core.dataclasses.round_metrics import RoundMetrics
 from alf_core.optimizer.optimizer import Optimizer
 from alf_core.oracle.oracle import Oracle
 from alf_core.tasks.base_task import BaseTask
+from alf_core.utils.enums import ProblemType
+from alf_core.utils.metrics.aggregate import auc_top_k
 from alf_core.utils.state_logger import StateLogger
 
 logger = logging.getLogger("alf-core")
@@ -93,6 +96,15 @@ class DesignTask(BaseTask):
         if len(state.dataset.train_dataset) > 0:
             state = self.run_initial_train_round(state, state_loggers)
 
+        if state.problem_type == ProblemType.REGRESSION:
+            round_metric_key = "surrogate/test_top_k_mean"
+            best_value = float(state.dataset._raw_dataset.labels.max())
+        else:
+            round_metric_key = "surrogate/test_accuracy"
+            best_value = 1.0
+
+        round_metric_values: list[float] = []
+
         for round_i in range(1, self.num_acq_rounds + 1):
             state.round_metrics = RoundMetrics(round=round_i)
             acquired_candidates, state = optimizer.ask(state)
@@ -100,7 +112,23 @@ class DesignTask(BaseTask):
             state.update(labelled_candidates)  # increments state.round to round_i + 1
             state = optimizer.tell(state=state)  # populates round_metrics.training_history
             state = self.evaluate(state=state)
+            val = state.round_metrics.metrics.get(round_metric_key)
+            if val is not None:
+                round_metric_values.append(float(val))
             for state_logger in state_loggers:
                 state_logger.log(state)
+
+        if len(round_metric_values) >= 2:
+            try:
+                campaign_metrics = auc_top_k(np.array(round_metric_values), best_value)
+            except ValueError:
+                campaign_metrics = {}
+            if campaign_metrics:
+                state.round_metrics = RoundMetrics(
+                    round=self.num_acq_rounds, metrics=campaign_metrics
+                )
+                state.round_predictions = None
+                for state_logger in state_loggers:
+                    state_logger.log(state, round_name="campaign_summary")
 
         return

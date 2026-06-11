@@ -42,7 +42,11 @@ from alf_core.utils.metrics.classification import (
     recall,
     register_classification_metric,
 )
-from alf_core.utils.metrics.diversity import intra_batch_diversity
+from alf_core.utils.metrics.acquisition_batch import (
+    compute_recall,
+    compute_regret,
+    intra_batch_diversity,
+)
 from alf_core.utils.metrics.regression import (
     coverage,
     hit_rate,
