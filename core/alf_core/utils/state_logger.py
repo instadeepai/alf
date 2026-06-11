@@ -41,9 +41,9 @@ class StateLogger(abc.ABC):
     Per-epoch metrics are available as `state.round_metrics.training_history`,
     a `list[SurrogateEpochMetrics]` populated by the surrogate's
     `get_epoch_metrics()` after each training round.  `SurrogateEpochMetrics`
-    carries standard CNN fields (`train_loss`, `val_loss`,
-    `train_spearman`, `val_spearman`, `train_mse`, `val_mse`) plus an
-    `extra` dict for model-specific metrics.  The list is empty when the
+    carries `epoch`, `train_loss`, and `val_loss`, plus an
+    `additional_metrics` dict for model-specific metrics (e.g. `train_spearman`,
+    `val_spearman`, `train_mse`, `val_mse`).  The list is empty when the
     surrogate does not override `get_epoch_metrics()`.
     """
 
@@ -71,9 +71,9 @@ class StateLogger(abc.ABC):
         This is a no-op by default. Override in a subclass to capture
         `SurrogateEpochMetrics` from `state.round_metrics.training_history`.
 
-        `SurrogateEpochMetrics` fields: `epoch`, `train_loss`, `val_loss`,
-        `train_spearman`, `val_spearman`, `train_mse`, `val_mse`, and
-        `extra` (a dict for model-specific metrics). Use
+        `SurrogateEpochMetrics` fields: `epoch`, `train_loss`, `val_loss`, and
+        `additional_metrics` (a dict for model-specific metrics such as
+        `train_spearman`, `val_spearman`, `train_mse`, `val_mse`). Use
         `epoch_metrics.to_metrics_dict()` to get a flat `dict[str, float]`
         with `None` fields omitted.
 
