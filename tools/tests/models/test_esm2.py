@@ -37,13 +37,12 @@ def model_config():
 
 @pytest.fixture(scope="session")
 def train_config():
-    """Create a frozen ESM2TrainConfig for testing.
+    """Zero-shot ESM2TrainConfig (esm2_likelihoods, frozen backbone).
 
     Returns:
-        An ESM2TrainConfig with freeze_backbone=True and scoring_function="pll",
-        for zero-shot PLL scoring mode.
+        An ESM2TrainConfig with mode='esm2_likelihoods' and freeze_backbone=True.
     """
-    return ESM2TrainConfig(freeze_backbone=True, scoring_function="pll")
+    return ESM2TrainConfig(mode="esm2_likelihoods")
 
 
 @pytest.fixture(scope="session")
@@ -63,11 +62,10 @@ def esm2_small_batch_model():
     """Frozen ESM-2 with batch_size=2 to exercise multi-batch predict.
 
     Returns:
-        An ESM2Model with batch_size=2, frozen backbone,
-        and scoring_function="pll", CPU.
+        An ESM2Model with batch_size=2, mode='esm2_likelihoods', frozen backbone, CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
-    train_cfg = ESM2TrainConfig(freeze_backbone=True, batch_size=2, scoring_function="pll")
+    train_cfg = ESM2TrainConfig(mode="esm2_likelihoods", batch_size=2)
     return ESM2Model(
         name="test_esm2_small_batch", model_config=config, train_config=train_cfg, device="cpu"
     )
@@ -78,11 +76,10 @@ def esm2_linear_head_model():
     """Frozen ESM-2 with linear head and default batch size for batching tests.
 
     Returns:
-        An ESM2Model with default batch_size, frozen backbone,
-        and scoring_function="linear_head", CPU.
+        An ESM2Model with mode='linear_head', loss_fn='mse', frozen backbone, CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
-    train_cfg = ESM2TrainConfig(freeze_backbone=True, scoring_function="linear_head")
+    train_cfg = ESM2TrainConfig(mode="linear_head", loss_fn="mse")
     return ESM2Model(
         name="test_esm2_linear_head", model_config=config, train_config=train_cfg, device="cpu"
     )
@@ -90,14 +87,13 @@ def esm2_linear_head_model():
 
 @pytest.fixture(scope="session")
 def esm2_linear_head_small_batch_model():
-    """Frozen ESM-2 with linear head and batch_size=2 to exercise multi-batch predict.
+    """Frozen ESM-2 with linear head and batch_size=2.
 
     Returns:
-        An ESM2Model with batch_size=2, frozen backbone,
-        and scoring_function="linear_head", CPU.
+        An ESM2Model with batch_size=2, mode='linear_head', loss_fn='mse', CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
-    train_cfg = ESM2TrainConfig(freeze_backbone=True, batch_size=2, scoring_function="linear_head")
+    train_cfg = ESM2TrainConfig(mode="linear_head", loss_fn="mse", batch_size=2)
     return ESM2Model(
         name="test_esm2_linear_head_small_batch",
         model_config=config,
@@ -372,21 +368,17 @@ class TestEmbed:
         hidden_dim = model.esm_model.config.hidden_size
         assert embeddings.shape == (len(sample_data), hidden_dim)
 
-    def test_embed_last_hidden_state_raises_with_scoring_linear_head(self, sample_data):
-        """last_hidden_state pooling is incompatible with scoring_function='linear_head' — raises
-        at init.
-        """
+    def test_embed_last_hidden_state_raises_with_mode_linear_head(self, sample_data):
+        """last_hidden_state pooling is incompatible with mode='linear_head' — raises at init."""
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
-        train_cfg = ESM2TrainConfig(
-            freeze_backbone=True, scoring_function="linear_head", batch_size=1
-        )
+        train_cfg = ESM2TrainConfig(mode="linear_head", loss_fn="mse", batch_size=1)
         with pytest.raises(ValueError, match="pooling='last_hidden_state' is not supported with"):
             ESM2Model(name="lhs_model", model_config=config, train_config=train_cfg, device="cpu")
 
     def test_embed_last_hidden_state_shape(self, sample_data):
         """embed() with last_hidden_state pooling returns shape (n_seqs, seq_len, hidden_dim)."""
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
-        train_cfg = ESM2TrainConfig(freeze_backbone=True, scoring_function="pll", batch_size=1)
+        train_cfg = ESM2TrainConfig(mode="esm2_likelihoods", batch_size=1)
         model = ESM2Model(
             name="lhs_model", model_config=config, train_config=train_cfg, device="cpu"
         )
@@ -449,23 +441,23 @@ class TestEmbed:
 
 @pytest.fixture(scope="module")
 def frozen_train_model():
-    """Module-scoped ESM-2 model with scoring_function=None for TestTrainFrozen.
+    """ESM-2 in zero-shot mode for TestTrainFrozen.
 
     Returns:
-        An ESM2Model with freeze_backbone=True and scoring_function="pll" on CPU.
+        An ESM2Model with mode='esm2_likelihoods', freeze_backbone=True, CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
-    train_cfg = ESM2TrainConfig(freeze_backbone=True, scoring_function="pll")
+    train_cfg = ESM2TrainConfig(mode="esm2_likelihoods")
     return ESM2Model(
         name="test_esm2_frozen_train", model_config=config, train_config=train_cfg, device="cpu"
     )
 
 
 class TestTrainFrozen:
-    """Tests for ESM2Model.train() when scoring_function=None."""
+    """Tests for ESM2Model.train() when mode='esm2_likelihoods' and freeze_backbone=True."""
 
-    def test_train_without_scoring_function_raises(self, frozen_train_model, sample_data):
-        """train() raises NotImplementedError when scoring_function=None."""
+    def test_train_frozen_esm2_likelihoods_raises(self, frozen_train_model, sample_data):
+        """train() raises NotImplementedError when backbone is frozen and there is no head."""
         with pytest.raises(NotImplementedError):
             frozen_train_model.train(sample_data)
 
@@ -486,11 +478,11 @@ def esm2_mlp_model():
     implicit ordering dependencies from mutation via train() calls.
 
     Returns:
-        An ESM2Model with scoring_function='linear_head', loss_fn='mse', output_dim=1, CPU.
+        An ESM2Model with mode='linear_head', loss_fn='mse', output_dim=1, CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
     train_cfg = ESM2TrainConfig(
-        scoring_function="linear_head",
+        mode="linear_head",
         loss_fn="mse",
         output_dim=1,
         num_epochs=2,
@@ -511,12 +503,11 @@ def esm2_mlp_classification_model():
     implicit ordering dependencies from mutation via train() calls.
 
     Returns:
-        An ESM2Model with scoring_function='linear_head', loss_fn='cross_entropy',
-        output_dim=2, CPU.
+        An ESM2Model with mode='linear_head', loss_fn='cross_entropy', output_dim=2, CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
     train_cfg = ESM2TrainConfig(
-        scoring_function="linear_head",
+        mode="linear_head",
         loss_fn="cross_entropy",
         output_dim=2,
         num_epochs=2,
@@ -530,7 +521,7 @@ def esm2_mlp_classification_model():
 
 
 class TestMLPHead:
-    """Tests for ESM2Model with scoring_function='linear_head'."""
+    """Tests for ESM2Model with mode='linear_head'."""
 
     def test_head_is_linear_layer(self, esm2_mlp_model):
         """MLP head should be a torch.nn.Linear module."""
@@ -554,8 +545,8 @@ class TestMLPHead:
         model_device = next(esm2_mlp_model.esm_model.parameters()).device
         assert head_device == model_device
 
-    def test_no_head_when_scoring_function_none(self, esm2_model):
-        """_head should be None when scoring_function=None."""
+    def test_no_head_in_esm2_likelihoods_mode(self, esm2_model):
+        """_head is None when mode='esm2_likelihoods'."""
         assert esm2_model._head is None
 
     def test_classification_head_output_dim(self, esm2_mlp_classification_model):
@@ -563,31 +554,27 @@ class TestMLPHead:
         assert esm2_mlp_classification_model._head.out_features == 2
 
     def test_prepare_data_loader_yields_labels_in_mlp_mode(self, esm2_mlp_model, sample_data):
-        """DataLoader in scoring_function='linear_head' mode yields
-        (input_ids, attention_mask, targets) triples.
-        """
+        """DataLoader in mode='linear_head' yields (input_ids, attention_mask, targets) triples."""
         loader = esm2_mlp_model._prepare_data_loader(sample_data)
         batch = next(iter(loader))
         assert len(batch) == 3  # input_ids, attention_mask, targets
         _, _, targets = batch
         assert targets.dtype == torch.float32
 
-    def test_prepare_data_loader_no_labels_without_scoring_function(self, esm2_model, sample_data):
-        """DataLoader with scoring_function=None yields (input_ids, attention_mask) pairs."""
+    def test_prepare_data_loader_no_labels_in_esm2_likelihoods_mode(self, esm2_model, sample_data):
+        """DataLoader with mode='esm2_likelihoods' yields (input_ids, attention_mask) pairs."""
         loader = esm2_model._prepare_data_loader(sample_data)
         batch = next(iter(loader))
         assert len(batch) == 2
 
     def test_mlp_train_updates_head_weights(self, esm2_mlp_model, sample_data):
-        """train() in scoring_function='linear_head' mode updates the linear head parameters."""
+        """train() in mode='linear_head' updates the linear head parameters."""
         initial_weight = esm2_mlp_model._head.weight.clone()
         esm2_mlp_model.train(sample_data)
         assert not torch.equal(initial_weight, esm2_mlp_model._head.weight)
 
     def test_mlp_train_does_not_update_backbone(self, esm2_mlp_model, sample_data):
-        """train() in scoring_function='linear_head' mode must not change
-        any ESM-2 backbone parameters.
-        """
+        """train() in mode='linear_head' must not change any ESM-2 backbone parameters."""
         initial_params = {
             name: param.clone() for name, param in esm2_mlp_model.esm_model.named_parameters()
         }
@@ -596,9 +583,7 @@ class TestMLPHead:
             assert torch.equal(initial_params[name], param), f"Backbone param {name} changed"
 
     def test_mlp_train_records_epoch_metrics(self, esm2_mlp_model, sample_data):
-        """train() in scoring_function='linear_head' mode records one
-        SurrogateEpochMetrics per epoch.
-        """
+        """train() in mode='linear_head' records one SurrogateEpochMetrics per epoch."""
         esm2_mlp_model.train(sample_data)
         metrics = esm2_mlp_model.get_epoch_metrics()
         # Relies on log_frequency=1 in the fixture so every epoch is logged.
@@ -650,22 +635,18 @@ class TestMLPHead:
             assert "train_log_likelihood" not in m.additional_metrics
 
     def test_mlp_predict_shape(self, esm2_mlp_model, sample_data):
-        """predict() in scoring_function='linear_head' mode returns means
-        of shape (n_candidates,).
-        """
+        """predict() in mode='linear_head' returns means of shape (n_candidates,)."""
         predictions = esm2_mlp_model.predict(sample_data.candidates)
         assert predictions.means.ndim == 1
         assert predictions.means.shape == (len(sample_data),)
 
     def test_mlp_predict_variances_none(self, esm2_mlp_model, sample_data):
-        """predict() in scoring_function='linear_head' mode returns Predictions
-        with variances=None.
-        """
+        """predict() in mode='linear_head' returns Predictions with variances=None."""
         predictions = esm2_mlp_model.predict(sample_data.candidates)
         assert predictions.variances is None
 
     def test_mlp_predict_finite(self, esm2_mlp_model, sample_data):
-        """predict() in scoring_function='linear_head' mode returns finite values."""
+        """predict() in mode='linear_head' returns finite values."""
         predictions = esm2_mlp_model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
 
@@ -702,7 +683,8 @@ class TestMLPHead:
         """train() with optimizer_type='adam' completes and updates head weights."""
         config = ESM2ModelConfig(model_id=MODEL_ID)
         train_cfg = ESM2TrainConfig(
-            scoring_function="linear_head",
+            mode="linear_head",
+            loss_fn="mse",
             optimizer_type="adam",
             num_epochs=1,
             batch_size=2,
@@ -718,7 +700,8 @@ class TestMLPHead:
         """train() with max_grad_norm set completes without error."""
         config = ESM2ModelConfig(model_id=MODEL_ID)
         train_cfg = ESM2TrainConfig(
-            scoring_function="linear_head",
+            mode="linear_head",
+            loss_fn="mse",
             num_epochs=1,
             batch_size=2,
             max_grad_norm=1.0,
@@ -734,8 +717,8 @@ class TestMLPHead:
         """predict() with batch_size_inference != batch_size produces correct shape."""
         config = ESM2ModelConfig(model_id=MODEL_ID)
         train_cfg = ESM2TrainConfig(
-            freeze_backbone=True,
-            scoring_function="linear_head",
+            mode="linear_head",
+            loss_fn="mse",
             batch_size=8,
             batch_size_inference=1,
         )
@@ -750,7 +733,8 @@ class TestMLPHead:
         """log_frequency > 1 skips intermediate epochs but always records the final one."""
         config = ESM2ModelConfig(model_id=MODEL_ID)
         train_cfg = ESM2TrainConfig(
-            scoring_function="linear_head",
+            mode="linear_head",
+            loss_fn="mse",
             num_epochs=4,
             batch_size=2,
             log_frequency=3,
@@ -797,8 +781,8 @@ class TestSeed:
     """Tests for ESM2ModelConfig.seed reproducibility of the linear head."""
 
     def test_same_seed_produces_identical_head_weights(self):
-        """Two linear-head models created with the same seed have identical head weights."""
-        train_cfg = ESM2TrainConfig(freeze_backbone=True, scoring_function="linear_head")
+        """Two linear-head models with the same seed have identical head weights."""
+        train_cfg = ESM2TrainConfig(mode="linear_head", loss_fn="mse")
         model_a = ESM2Model(
             name="seed_same_a",
             model_config=ESM2ModelConfig(model_id=MODEL_ID, seed=7),
@@ -815,8 +799,8 @@ class TestSeed:
         assert torch.equal(model_a._head.bias, model_b._head.bias)
 
     def test_different_seeds_produce_different_head_weights(self):
-        """Two linear-head models created with different seeds have different head weights."""
-        train_cfg = ESM2TrainConfig(freeze_backbone=True, scoring_function="linear_head")
+        """Two linear-head models with different seeds have different head weights."""
+        train_cfg = ESM2TrainConfig(mode="linear_head", loss_fn="mse")
         model_a = ESM2Model(
             name="seed_diff_a",
             model_config=ESM2ModelConfig(model_id=MODEL_ID, seed=0),
