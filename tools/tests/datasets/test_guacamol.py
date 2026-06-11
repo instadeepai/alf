@@ -839,16 +839,16 @@ class TestGuacaMolWithFixtures:
         assert isinstance(candidate.data, str)
         assert len(candidate.data) > 0
 
-    def test_computed_properties_none_stores_only_target_property_in_features(self, tmp_path):
-        """computed_properties=None stores only the target_property in candidate features."""
+    def test_computed_properties_none_uses_only_target_property_in_matrix(self, tmp_path):
+        """computed_properties=None -> _prop_matrix has 1 column (the target property)."""
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
         config = _base_config(data_dir=tmp_path, computed_properties=None)
         dataset = GuacaMol(config)
         assert dataset._raw_dataset is not None
+        assert dataset._prop_cols == ["TPSA"]
+        assert dataset._prop_matrix.shape[1] == 1
         for cand in dataset._raw_dataset.candidates:
-            assert "TPSA" in cand.features
-            # Only the target property is computed when computed_properties is None
-            assert len(cand.features) == 1
+            assert cand.features == {}
 
     def test_empty_smiles_file_produces_empty_dataset(self, tmp_path):
         """An empty fixture file results in a dataset with zero candidates."""
@@ -932,8 +932,8 @@ class TestGuacaMolEdgeCases:
         with pytest.raises(ValueError, match="invalid SMILES"):
             dataset.query([bad])
 
-    def test_computed_properties_stored_as_candidate_features(self, tmp_path):
-        """Each Candidate must carry exactly the requested computed_properties as features."""
+    def test_computed_properties_stored_in_prop_matrix(self, tmp_path):
+        """Requested computed_properties appear as columns in _prop_matrix."""
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
         config = _base_config(
             data_dir=tmp_path,
@@ -941,19 +941,13 @@ class TestGuacaMolEdgeCases:
             computed_properties=["MolWt", "MolLogP"],
         )
         dataset = GuacaMol(config)
-        all_splits = [
-            dataset.train_dataset,
-            dataset.validation_dataset,
-            dataset.test_dataset,
-            dataset.candidate_pool,
-        ]
-        for split in all_splits:
-            for candidate in split.candidates:
-                assert candidate.features is not None
-                assert "MolWt" in candidate.features
-                assert "MolLogP" in candidate.features
-                assert isinstance(candidate.features["MolWt"], float)
-                assert isinstance(candidate.features["MolLogP"], float)
+        assert "MolWt" in dataset._prop_cols
+        assert "MolLogP" in dataset._prop_cols
+        assert dataset._prop_matrix.shape == (
+            len(dataset._raw_dataset.candidates), 2
+        )
+        mw_idx = dataset._prop_cols.index("MolWt")
+        assert np.all(dataset._prop_matrix[:, mw_idx] > 0)
 
 
 class TestDownloadGuacaMol:
