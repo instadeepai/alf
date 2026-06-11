@@ -35,8 +35,13 @@ def compute_recall(
 
     Returns:
         Dictionary containing:
-        - "optimizer/top_percentile_recall": Recall at top_percentile threshold
-        - "optimizer/top_n_recall": Recall at top_n threshold
+        - "optimizer/top_{top_percentile * 100:.0f}pc_recall": Recall at the
+          top_percentile threshold
+        - "optimizer/top_{top_n}_recall": Recall at the top_n threshold
+
+        Rank counts are clamped to [1, pool size]; the key names always reflect
+        the nominal top_percentile/top_n arguments, so for pools smaller than
+        top_n the "top_{top_n}_recall" value is computed over the whole pool.
     """
     init_candidate_pool = init_candidate_pool.sort(ascending=False)
     pool_size = len(init_candidate_pool)

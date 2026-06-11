@@ -29,13 +29,19 @@ def _labelled(labels: list[float]) -> LabelledCandidates:
 class TestComputeRecall:
     """Tests for compute_recall, including small-pool edge cases."""
 
-    def test_top_n_larger_than_pool_does_not_raise(self):
-        """top_n exceeding the pool size is clamped instead of raising IndexError."""
+    def test_top_n_larger_than_pool_is_clamped_to_pool_size(self):
+        """top_n exceeding the pool size is clamped instead of raising IndexError.
+
+        The key keeps the nominal top_n name, but the recall is computed over the
+        whole pool: the threshold is the worst label (1.0) and the denominator is 5.
+        """
         pool = _labelled([1.0, 2.0, 3.0, 4.0, 5.0])
         acquired = _labelled([5.0, 4.0])
         result = compute_recall(pool, acquired, top_percentile=0.4, top_n=100)
-        for value in result.values():
-            assert 0.0 <= value <= 1.0
+        # top 40% -> 2 candidates (>= 4.0); both acquired -> 2/2 = 1.0
+        assert result["optimizer/top_40pc_recall"] == pytest.approx(1.0)
+        # top_n clamped to 5 -> threshold 1.0; 2 acquired >= 1.0 -> 2/5
+        assert result["optimizer/top_100_recall"] == pytest.approx(0.4)
 
     def test_small_percentile_uses_correct_threshold(self):
         """A percentile that rounds the rank count to zero is clamped to 1, so the

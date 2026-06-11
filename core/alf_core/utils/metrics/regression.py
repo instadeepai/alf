@@ -627,8 +627,9 @@ def regret_ucb_alpha_sweep(
     if alpha is None:
         alpha = [0.1, 0.3, 0.5, 1.0]
 
-    # Normalize alpha to a list
-    if isinstance(alpha, float):
+    # Normalize alpha to a list. Accept ints as well as floats, matching the
+    # numeric tower implied by the `float` type hint (e.g. alpha=1).
+    if isinstance(alpha, (int, float)):
         alpha_list = [alpha]
     elif isinstance(alpha, list):
         if len(alpha) == 0:
@@ -644,5 +645,5 @@ def regret_ucb_alpha_sweep(
         # with the standalone regret_ucb_alpha metric.
         regret_alpha = regret_ucb_alpha(means, variances, targets, a, num_acquisitions)
         if regret_alpha:
-            regret_alpha_list[f"regret_ucb_sweep_{a:.2f}"] = regret_alpha[f"regret_ucb_{a:.2f}"]
+            regret_alpha_list[f"regret_ucb_sweep_{a:.2f}"] = next(iter(regret_alpha.values()))
     return regret_alpha_list
