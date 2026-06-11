@@ -155,7 +155,7 @@ class BoTorchModelAdapter(BotorchModel):
                 f"deterministic models) cannot be used with BoTorch "
                 f"acquisition functions like Expected Improvement or Upper "
                 f"Confidence Bound. Consider using a Gaussian Process model "
-                f"(e.g., BoTorchGPModel) or another probabilistic model "
+                f"(e.g., GPModel) or another probabilistic model "
                 f"that provides uncertainty estimates."
             )
 

@@ -164,6 +164,11 @@ class TestGPModel:
         metrics = gp_model.get_training_summary_metrics()
         assert "final_mll" in metrics
 
+    def test_sample_raises_not_implemented_error(self, gp_model):
+        """sample() raises NotImplementedError for the discriminative GP."""
+        with pytest.raises(NotImplementedError, match="not implemented"):
+            gp_model.sample()
+
     def test_predict_before_train_raises_error(self, gp_model):
         """Test that predicting before train raises an error."""
         candidates = [Candidate(data="ACDEFGHIKLMNPQRSTVWY", modality="sequence")]
@@ -853,3 +858,17 @@ class TestGPBoTorchBackbone:
         assert np.all(predictions.variances >= 0)
         for param in model.botorch_model.parameters():
             assert param.dtype == torch.float32
+
+
+class TestGPModelViaSurrogate:
+    """Test GPModel accessed through the Surrogate wrapper."""
+
+    def test_surrogate_predict_returns_finite_results(self, trained_surrogate, branin_dataset):
+        """Predictions from a trained Surrogate have finite means and non-negative variances."""
+        predictions = trained_surrogate.predict(branin_dataset.test_dataset.candidates)
+
+        assert predictions.means is not None
+        assert predictions.variances is not None
+        assert predictions.means.shape == (len(branin_dataset.test_dataset.candidates),)
+        assert np.all(np.isfinite(predictions.means))
+        assert np.all(predictions.variances >= 0)

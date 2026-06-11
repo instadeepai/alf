@@ -32,8 +32,7 @@ import numpy as np
 import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates, Modality
-from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel, BoTorchTrainConfig
-from alf_tools.models.gp import GPModel
+from alf_tools.models.gp import FeaturizerConfig, GPModel, GPTrainConfig
 from alf_tools.models.utils.botorch_utils import candidates_to_tensor
 from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
     BoTorchModelAdapter,
@@ -386,15 +385,19 @@ def test_adapter_deterministic_predictions(mock_alf_model_with_variances):
 # =============================================================================
 
 
-def test_adapter_integration_with_real_botorch_gp_model():
-    """Integration smoke test: real BoTorchGPModel -> BoTorchModelAdapter -> posterior()."""
-    # Train a real BoTorchGPModel on tiny data
+def test_adapter_integration_with_real_gp_model():
+    """Integration smoke test: real GPModel -> BoTorchModelAdapter -> posterior()."""
+    # Train a real GPModel on tiny data
     X_train = np.array([[0.1, 0.2], [0.4, 0.5], [0.7, 0.8], [0.3, 0.6]], dtype=np.float32)
     y_train = np.array([1.0, 2.0, 1.5, 1.8])
     candidates = [Candidate(data=x, modality=Modality.TABULAR) for x in X_train]
     train_data = LabelledCandidates(candidates=candidates, labels=y_train)
 
-    gp_model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=10, optimizer="scipy"))
+    gp_model = GPModel(
+        featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+        train_config=GPTrainConfig(num_iterations=10, optimizer_type="scipy"),
+        device="cpu",
+    )
     gp_model.train(train_data)
 
     # Wrap in adapter
