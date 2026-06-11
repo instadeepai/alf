@@ -17,6 +17,7 @@
 Fixtures are shared from tools/tests/conftest.py:
 - mock_alf_model_with_variances
 - botorch_gp_model
+- trained_gp_model
 - test_tensor_2d
 - test_candidates_2d
 """
@@ -25,7 +26,6 @@ import numpy as np
 import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates, Modality
-from alf_tools.models.gp import FeaturizerConfig, GPModel, GPTrainConfig
 from alf_tools.models.utils.botorch_utils import candidates_to_tensor
 from alf_tools.optimizer.acquisition_functions.botorch_acquisition_function import (
     ACQUISITION_REGISTRY,
@@ -153,35 +153,29 @@ def test_botorch_acquisition_function_wraps_alf_model(
         acq_fn(test_candidates_2d, state)
 
 
-def test_botorch_acquisition_function_qlognei_with_trained_gp_model():
+def test_botorch_acquisition_function_qlognei_with_trained_gp_model(trained_gp_model):
     """QLogNoisyExpectedImprovement works with a trained GPModel via the adapter.
 
     A trained GPModel exposes `botorch_model`, so the adapter can provide
-    `num_outputs`/`batch_shape` and q-based acquisitions become usable.
+    `num_outputs`/`batch_shape` and q-based acquisitions become usable. Note
+    that the adapter's `posterior()` routes through `predict()` and yields a
+    diagonal posterior, so qLogNEI is evaluated under a per-point independence
+    approximation (baseline-candidate correlations are zero), not with the
+    exact joint covariance.
     """
-    X_train = np.array([[0.1, 0.2], [0.4, 0.5], [0.7, 0.8], [0.3, 0.6]], dtype=np.float64)
-    y_train = np.array([1.0, 2.0, 1.5, 1.8])
-    train_candidates = [Candidate(data=x, modality=Modality.TABULAR) for x in X_train]
-    train_data = LabelledCandidates(candidates=train_candidates, labels=y_train)
-
-    gp_model = GPModel(
-        train_config=GPTrainConfig(num_iterations=10),
-        featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
-        device="cpu",
-    )
-    gp_model.train(train_data)
-
-    X_baseline = candidates_to_tensor(train_candidates)  # float64 by default
+    X_baseline = candidates_to_tensor(trained_gp_model.train_candidates)  # float64 by default
     cfg = BotorchAcquisitionConfig(
         name="log_noisy_expected_improvement", kwargs={"X_baseline": X_baseline}
     )
     acq_fn = BotorchAcquisitionFunction(cfg)
-    state = _MockState(gp_model)
+    state = _MockState(trained_gp_model.model)
 
+    # Clearly distinct candidates: the best training point and a far-away point,
+    # so the acquisition scores are reliably non-identical.
     search_candidates = [
-        Candidate(data=np.array([0.2, 0.3], dtype=np.float64), modality=Modality.TABULAR),
+        Candidate(data=np.array([0.4, 0.5], dtype=np.float64), modality=Modality.TABULAR),
         Candidate(data=np.array([0.5, 0.6], dtype=np.float64), modality=Modality.TABULAR),
-        Candidate(data=np.array([0.8, 0.1], dtype=np.float64), modality=Modality.TABULAR),
+        Candidate(data=np.array([0.95, 0.05], dtype=np.float64), modality=Modality.TABULAR),
     ]
 
     result = acq_fn(search_candidates, state)
@@ -189,3 +183,6 @@ def test_botorch_acquisition_function_qlognei_with_trained_gp_model():
     assert isinstance(result, LabelledCandidates)
     assert len(result.labels) == len(search_candidates)
     assert np.all(np.isfinite(result.labels))
+    # Scores must carry signal beyond log-space guarantees: distinct candidates
+    # should not all receive identical acquisition values.
+    assert len(np.unique(result.labels)) > 1

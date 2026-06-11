@@ -36,6 +36,7 @@ from alf_core import (
 )
 from alf_core.model.base_model import BaseModel
 from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel, BoTorchTrainConfig
+from alf_tools.models.gp import FeaturizerConfig, GPModel, GPTrainConfig
 from botorch.models import SingleTaskGP
 
 
@@ -268,6 +269,42 @@ def botorch_gp_model(simple_train_data):
     """
     train_X, train_Y = simple_train_data
     return SingleTaskGP(train_X.double(), train_Y.double())
+
+
+# =============================================================================
+# ALF GP Model Fixtures
+# =============================================================================
+
+
+@dataclass
+class _TrainedGPModel:
+    """Container for a trained GPModel and the candidates it was trained on."""
+
+    model: GPModel
+    train_candidates: list[Candidate]
+
+
+@pytest.fixture
+def trained_gp_model():
+    """Train a GPModel on a handful of 2-feature tabular candidates.
+
+    Returns:
+        _TrainedGPModel with `model` (a trained GPModel exposing a
+        `botorch_model` property) and `train_candidates` (the training
+        candidates, e.g. for building an `X_baseline`).
+    """
+    X_train = np.array([[0.1, 0.2], [0.4, 0.5], [0.7, 0.8], [0.3, 0.6]], dtype=np.float64)
+    y_train = np.array([1.0, 2.0, 1.5, 1.8])
+    candidates = [Candidate(data=x, modality=Modality.TABULAR) for x in X_train]
+    train_data = LabelledCandidates(candidates=candidates, labels=y_train)
+
+    model = GPModel(
+        train_config=GPTrainConfig(num_iterations=10),
+        featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+        device="cpu",
+    )
+    model.train(train_data)
+    return _TrainedGPModel(model=model, train_candidates=candidates)
 
 
 # =============================================================================

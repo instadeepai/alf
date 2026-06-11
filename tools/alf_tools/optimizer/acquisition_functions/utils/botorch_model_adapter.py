@@ -48,9 +48,13 @@ class BoTorchModelAdapter(BotorchModel):
     ALF models that expose a trained `botorch_model` attribute (e.g. `GPModel`)
     additionally support q-based acquisitions such as
     `qLogNoisyExpectedImprovement` — `num_outputs` and `batch_shape` are
-    delegated to the underlying BoTorch model. Pure `predict()`-only ALF models
-    cannot provide `num_outputs`/`batch_shape` and raise `NotImplementedError`
-    for those properties.
+    delegated to the underlying BoTorch model. Note that `posterior()` for ALF
+    models always routes through `predict()`, which yields a diagonal
+    (per-point independent) posterior. q-based acquisitions are therefore
+    evaluated under a per-point independence approximation — baseline-candidate
+    correlations are zero — rather than with the exact joint covariance. Pure
+    `predict()`-only ALF models cannot provide `num_outputs`/`batch_shape` and
+    raise `NotImplementedError` for those properties.
 
     Models that don't provide prediction variances (e.g., CNNModel, deterministic
     models) cannot be used with BoTorch acquisition functions. Expected Improvement
@@ -187,9 +191,9 @@ class BoTorchModelAdapter(BotorchModel):
 
         Returns:
             The underlying BoTorch model when the wrapped ALF model exposes
-            a trained `botorch_model`; `None` when the attribute is absent,
-            raises `RuntimeError` (untrained model), or is not a BoTorch
-            `Model`.
+            a trained `botorch_model`. Returns `None` when the attribute is
+            absent, raises `RuntimeError` on access (untrained model), or
+            does not hold a BoTorch `Model`.
         """
         try:
             inner = getattr(self._wrapped_model, "botorch_model", None)
