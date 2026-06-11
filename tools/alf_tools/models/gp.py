@@ -920,10 +920,15 @@ class GPModel(BaseModel):
         Returns:
             Dictionary of training metrics including:
             - final_mll: Final marginal log likelihood
-            - noise: Learned noise parameter
-            - lengthscale: Learned lengthscale(s)
-            - outputscale: Learned output scale
-            - training_iterations: Number of iterations completed
+            - final_loss: Final optimisation loss
+            - num_iterations: Number of optimisation iterations completed
+            - final_train_*: Metrics on the training set (e.g. final_train_mse,
+              final_train_spearman)
+            - final_val_*: Metrics on the validation set, present only if
+              validation data was provided
+
+            Learned hyperparameters (noise, lengthscale, outputscale) are
+            available separately via :meth:`get_hyperparameters`.
         """
         return self.training_metrics
 
