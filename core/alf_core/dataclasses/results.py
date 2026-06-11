@@ -65,11 +65,12 @@ class Results:
         metrics: dict[str, Union[float, int, np.number]] = {}
 
         if self.problem_type == ProblemType.REGRESSION:
-            metrics_dict = (
-                regression_metric_registry.get_metrics(requires_variance=False)
-                if self.predictions.variances is None
-                else regression_metric_registry.get_metrics(requires_variance=True)
-            )
+            # Always compute the variance-independent metrics (e.g. MSE, Spearman,
+            # Pearson). When the surrogate also provides variances, additionally
+            # compute the variance-dependent metrics (e.g. calibration, regret).
+            metrics_dict = dict(regression_metric_registry.get_metrics(requires_variance=False))
+            if self.predictions.variances is not None:
+                metrics_dict.update(regression_metric_registry.get_metrics(requires_variance=True))
             for _, metric_fn in metrics_dict.items():
                 metric_update = metric_fn(
                     self.predictions.means, self.predictions.variances, self.targets
