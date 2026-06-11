@@ -641,8 +641,7 @@ def regret_ucb_alpha_sweep(
 
     for a in alpha_list:
         # Namespace the sweep keys (regret_ucb_sweep_{alpha}) so they do not collide
-        # with the standalone regret_ucb_alpha metric, which emits regret_ucb_{alpha}.
-        # regret_ucb_alpha returns {} when the dataset is too small to score.
+        # with the standalone regret_ucb_alpha metric.
         regret_alpha = regret_ucb_alpha(means, variances, targets, a, num_acquisitions)
         if regret_alpha:
             regret_alpha_list[f"regret_ucb_sweep_{a:.2f}"] = regret_alpha[f"regret_ucb_{a:.2f}"]
