@@ -19,6 +19,11 @@ sub-modules so that existing imports of `alf_core.utils.metrics` continue to
 work without change.
 """
 
+from alf_core.utils.metrics.acquisition_batch import (
+    compute_recall,
+    compute_regret,
+    intra_batch_diversity,
+)
 from alf_core.utils.metrics.aggregate import auc_top_k
 from alf_core.utils.metrics.base import (
     ClassificationMetricRegistry,
@@ -41,11 +46,6 @@ from alf_core.utils.metrics.classification import (
     precision,
     recall,
     register_classification_metric,
-)
-from alf_core.utils.metrics.acquisition_batch import (
-    compute_recall,
-    compute_regret,
-    intra_batch_diversity,
 )
 from alf_core.utils.metrics.regression import (
     coverage,
