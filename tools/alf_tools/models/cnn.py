@@ -103,6 +103,10 @@ class CNNTrainConfig(BaseTrainConfig):
 
     batch_size: int = 32
     num_epochs: int = 50
+    # normalise_inputs_strategy is intentionally left at the inherited None default:
+    # z-score standardisation distorts one-hot sequence inputs (constant positions
+    # become dead channels at train time but active at test time). For non-one-hot,
+    # continuous-feature inputs, "zscore" is the recommended choice — set it explicitly.
 
 
 class SequenceCNN(nn.Module):
