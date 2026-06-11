@@ -790,6 +790,7 @@ class ESM2Model(BaseModel):
             batch_ids = input_ids.to(self.device)
             batch_mask = attention_mask.to(self.device)
 
+            optimizer.zero_grad()
             masked_ids, labels = self._mask_tokens(batch_ids)
             logits = self.esm_model(
                 input_ids=masked_ids, attention_mask=batch_mask
@@ -806,7 +807,6 @@ class ESM2Model(BaseModel):
                     "Check your data or reduce the learning rate."
                 )
 
-            optimizer.zero_grad()
             loss.backward()
             if self.train_config.max_grad_norm is not None:
                 torch.nn.utils.clip_grad_norm_(
@@ -828,6 +828,7 @@ class ESM2Model(BaseModel):
         logits_cat = torch.cat(all_logits, dim=0)
         labels_cat = torch.cat(all_labels, dim=0)
         token_accuracy = float((logits_cat.argmax(dim=-1) == labels_cat).float().mean().item())
+        self.esm_model.eval()
         return avg_loss, {"perplexity": float(np.exp(avg_loss)), "token_accuracy": token_accuracy}
 
     def _validate_epoch_mlm(self, val_loader: DataLoader) -> tuple[float, dict[str, float]]:
