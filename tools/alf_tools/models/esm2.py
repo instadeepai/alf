@@ -688,7 +688,7 @@ class ESM2Model(BaseModel):
         """Apply random token masking for MLM.
 
         Non-masked positions in labels are set to -100 so CrossEntropyLoss ignores them.
-        Special tokens (cls, eos, pad) are never masked.
+        Special tokens (cls, eos, pad, unk) are never masked.
 
         Args:
             input_ids: Token IDs of shape (batch, seq_len).
@@ -699,6 +699,12 @@ class ESM2Model(BaseModel):
         Returns:
             Tuple of (masked_input_ids, labels), both of shape (batch, seq_len).
         """
+        if self.tokeniser.mask_token_id is None:
+            raise ValueError(
+                "Tokeniser has no mask token. Cannot perform MLM masking. "
+                "Ensure the tokeniser is initialised with a [MASK] token."
+            )
+
         labels = input_ids.clone()
 
         special_tokens_mask = self._special_tokens_mask(input_ids)
@@ -731,11 +737,6 @@ class ESM2Model(BaseModel):
         labels[~masked] = -100
 
         masked_input_ids = input_ids.clone()
-        if self.tokeniser.mask_token_id is None:
-            raise ValueError(
-                "Tokeniser has no mask token. Cannot perform MLM masking. "
-                "Ensure the tokeniser is initialised with a [MASK] token."
-            )
 
         masked_indices = masked.nonzero(as_tuple=False)
         n_masked = masked_indices.shape[0]
@@ -751,6 +752,7 @@ class ESM2Model(BaseModel):
             replace_with_random = (split >= p_mask) & (split < (p_mask + p_random))
             if replace_with_random.any():
                 idx = masked_indices[replace_with_random]
+                # Samples from full vocab including special tokens, matching vanilla BERT.
                 random_ids = torch.randint(
                     low=0,
                     high=self.tokeniser.vocab_size,

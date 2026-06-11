@@ -791,47 +791,70 @@ def esm2_likelihoods_model():
     )
 
 
+@pytest.fixture(scope="module")
+def esm2_mlm_config_model():
+    """Module-scoped ESM-2 in MLM training mode for _mask_tokens tests.
+
+    Returns:
+        An ESM2Model with mode='esm2_likelihoods', freeze_backbone=False,
+        loss_fn='mlm', CPU.
+    """
+    config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
+    train_cfg = ESM2TrainConfig(
+        mode="esm2_likelihoods",
+        freeze_backbone=False,
+        loss_fn="mlm",
+        mask_probability=0.15,
+    )
+    return ESM2Model(
+        name="test_esm2_mlm_config", model_config=config, train_config=train_cfg, device="cpu"
+    )
+
+
 class TestMaskTokens:
     """Unit tests for ESM2Model._mask_tokens()."""
 
-    def test_output_shapes_match_input(self, esm2_likelihoods_model):
+    def test_output_shapes_match_input(self, esm2_mlm_config_model):
         """_mask_tokens returns two tensors with the same shape as input_ids."""
         input_ids = torch.randint(4, 20, (3, 12))
-        masked_ids, labels = esm2_likelihoods_model._mask_tokens(input_ids)
+        masked_ids, labels = esm2_mlm_config_model._mask_tokens(input_ids)
         assert masked_ids.shape == input_ids.shape
         assert labels.shape == input_ids.shape
 
-    def test_special_tokens_never_masked(self, esm2_likelihoods_model):
+    def test_special_tokens_never_masked(self, esm2_mlm_config_model):
         """CLS and EOS tokens are never in the set of masked positions."""
-        tok = esm2_likelihoods_model.tokeniser
+        tok = esm2_mlm_config_model.tokeniser
         seq = torch.randint(4, 20, (1, 14))
         seq[0, 0] = tok.cls_token_id
         seq[0, -1] = tok.eos_token_id
-        _, labels = esm2_likelihoods_model._mask_tokens(seq)
+        _, labels = esm2_mlm_config_model._mask_tokens(seq)
         assert labels[0, 0].item() == -100, "CLS position must not be masked"
         assert labels[0, -1].item() == -100, "EOS position must not be masked"
 
-    def test_at_least_one_token_masked_per_row(self, esm2_likelihoods_model):
+    def test_at_least_one_token_masked_per_row(self, esm2_mlm_config_model):
         """Every row contains at least one masked position (NaN guard)."""
-        torch.manual_seed(0)
-        input_ids = torch.randint(4, 20, (10, 15))
-        _, labels = esm2_likelihoods_model._mask_tokens(input_ids)
+        generator = torch.Generator()
+        generator.manual_seed(0)
+        input_ids = torch.randint(4, 20, (10, 15), generator=generator)
+        _, labels = esm2_mlm_config_model._mask_tokens(input_ids)
         for i in range(10):
             assert (labels[i] != -100).any(), f"Row {i} has no masked tokens"
 
-    def test_unmasked_positions_have_label_minus_100(self, esm2_likelihoods_model):
-        """Positions with label -100 retain their original token in masked_ids."""
+    def test_unmasked_positions_have_label_minus_100(self, esm2_mlm_config_model):
+        """Positions not selected for masking have label -100 in the output."""
         input_ids = torch.randint(4, 20, (4, 12))
-        masked_ids, labels = esm2_likelihoods_model._mask_tokens(input_ids)
+        masked_ids, labels = esm2_mlm_config_model._mask_tokens(input_ids)
+        # Unmasked positions: label == -100 and token unchanged
         unmasked = labels == -100
+        assert unmasked.any(), "Expected some unmasked positions"
         assert torch.equal(masked_ids[unmasked], input_ids[unmasked])
 
-    def test_80_10_10_split_approximately_holds(self, esm2_likelihoods_model):
+    def test_80_10_10_split_approximately_holds(self, esm2_mlm_config_model):
         """The 80/10/10 replacement split is approximately respected over a large batch."""
         torch.manual_seed(42)
         input_ids = torch.randint(4, 20, (300, 25))
-        masked_ids, labels = esm2_likelihoods_model._mask_tokens(input_ids)
-        mask_id = esm2_likelihoods_model.tokeniser.mask_token_id
+        masked_ids, labels = esm2_mlm_config_model._mask_tokens(input_ids)
+        mask_id = esm2_mlm_config_model.tokeniser.mask_token_id
 
         active = labels != -100
         n_masked = active.sum().item()
