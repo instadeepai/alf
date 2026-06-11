@@ -277,7 +277,19 @@ class GPModel(BaseModel):
     """Gaussian Process model for sequence fitness prediction.
 
     Uses BoTorch's `SingleTaskGP` backbone for efficient GP inference with
-    flexible featurization, kernel selection, and uncertainty quantification.
+    flexible featurisation, kernel selection, and uncertainty quantification.
+
+    Inputs are featurised via the configurable featuriser (one-hot, custom, or
+    precomputed) and optionally passed through an external `InputNormaliser` and
+    `OutputStandardiser` fitted at train time. The likelihood and kernel priors
+    are configured through `GPModelConfig`, while fitting is controlled by
+    `GPTrainConfig`, which exposes three optimiser options ('adam', 'lbfgs', and
+    the robust `fit_gpytorch_mll`-based 'scipy') and defaults to float64.
+
+    `predict()` returns the noise-inclusive predictive mean and variance. The
+    trained backbone is exposed via the `botorch_model` property for use with
+    native BoTorch acquisition functions; its `posterior(X)` gives the noise-free
+    latent posterior.
     """
 
     def __init__(
