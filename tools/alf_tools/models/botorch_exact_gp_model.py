@@ -287,8 +287,12 @@ class BoTorchGPModel(BaseModel):
             )
 
         # Build kernel from model_config
-        ls_prior = build_from_target(self.model_config.lengthscale_prior)
-        ls_constraint = build_from_target(self.model_config.lengthscale_constraint)
+        ls_prior = build_from_target(
+            self.model_config.lengthscale_prior, expected_base=gpytorch.priors.Prior
+        )
+        ls_constraint = build_from_target(
+            self.model_config.lengthscale_constraint, expected_base=gpytorch.constraints.Interval
+        )
         ard_num_dims = self.train_X.shape[-1] if self.model_config.ard else None
 
         if (

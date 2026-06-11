@@ -30,6 +30,9 @@ from alf_core.model.normaliser import (
     InputNormaliser,
     OutputStandardiser,
 )
+from botorch.fit import fit_gpytorch_mll
+from botorch.models import SingleTaskGP
+from botorch.optim.fit import fit_gpytorch_mll_scipy
 from jaxtyping import Float
 
 from alf_tools.models.utils import (
@@ -40,6 +43,7 @@ from alf_tools.models.utils import (
     one_hot_encode,
     transform_data,
 )
+from alf_tools.models.utils.botorch_utils import candidates_to_tensor
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 logger = logging.getLogger("alf-tools")
@@ -66,6 +70,10 @@ class GPModelConfig:
             `_target_` dict. Defaults to `None` (no constraint).
         outputscale_prior: Prior for the kernel output scale, as a `_target_` dict.
             Defaults to `None`.
+        noise_prior: Prior for the likelihood noise, as a `_target_` dict.
+            Defaults to LogNormal(-4.0, 1.0), matching `SingleTaskGP`'s default
+            likelihood noise prior (Hvarfner et al. 2024). Set to `None` for a
+            prior-free likelihood.
         noise_constraint: Constraint on the likelihood noise, as a `_target_` dict.
             Defaults to `None` (a GreaterThan(1e-4) fallback is applied internally).
         build_kernel_fn: Optional custom function to build the kernel. If provided,
@@ -86,6 +94,13 @@ class GPModelConfig:
     )
     lengthscale_constraint: dict | None = None
     outputscale_prior: dict | None = None
+    noise_prior: dict | None = field(
+        default_factory=lambda: {
+            "_target_": "gpytorch.priors.LogNormalPrior",
+            "loc": -4.0,
+            "scale": 1.0,
+        }
+    )
     noise_constraint: dict | None = None
     build_kernel_fn: Callable[..., gpytorch.kernels.Kernel] | None = None
 
@@ -100,6 +115,7 @@ class GPModelConfig:
             "lengthscale_prior",
             "lengthscale_constraint",
             "outputscale_prior",
+            "noise_prior",
             "noise_constraint",
         ):
             val = getattr(self, attr)
@@ -129,20 +145,30 @@ class GPTrainConfig(BaseTrainConfig):
             minimum value to avoid division by zero, but standardisation may
             not be meaningful.
         num_iterations: Number of optimisation iterations.
-        optimizer_type: Type of optimizer to use ('adam' or 'lbfgs').
+        optimizer_type: Type of optimizer to use ('adam', 'lbfgs' or 'scipy').
+            'scipy' fits via BoTorch's `fit_gpytorch_mll` with scipy L-BFGS-B.
+        max_attempts: Maximum fitting attempts on numerical failure. Only used
+            when `optimizer_type='scipy'`.
+        dtype: Working dtype for features, labels, and the GP, as a string
+            (e.g. 'float32', 'float64'). Defaults to 'float64'.
         early_stopping_patience: Number of iterations without improvement
-            before stopping. If None, no early stopping is used.
+            before stopping. If None, no early stopping is used. Only used
+            for 'adam' and 'lbfgs'.
         early_stopping_delta: Minimum change in loss to qualify as an
-            improvement.
+            improvement. Only used for 'adam' and 'lbfgs'.
         learning_rate: Inherited from BaseTrainConfig. Default overridden to 0.01.
         log_frequency: Inherited from BaseTrainConfig. Default: 10.
+        label_dtype: Inherited from BaseTrainConfig. `None` falls back to
+            `dtype`.
     """
 
     normalise_inputs: bool = True  # override BaseTrainConfig default
     standardise_outputs: bool = True  # override BaseTrainConfig default
     learning_rate: float = 0.01  # override BaseTrainConfig default
     num_iterations: int = 100
-    optimizer_type: Literal["adam", "lbfgs"] = "adam"
+    optimizer_type: Literal["adam", "lbfgs", "scipy"] = "adam"
+    max_attempts: int = 5
+    dtype: str = "float64"
     early_stopping_patience: int | None = None
     early_stopping_delta: float = 1e-4
 
@@ -172,159 +198,84 @@ class FeaturizerConfig:
     flatten_one_hot: bool = True
 
 
-class ExactGPModel(gpytorch.models.ExactGP):
-    """GPyTorch ExactGP model for Gaussian Process regression.
+def _build_kernel(
+    kernel_type: KernelTypes,
+    input_dim: int,
+    ard: bool,
+    matern_nu: float,
+    lengthscale_prior: gpytorch.priors.Prior | None,
+    lengthscale_constraint: gpytorch.constraints.Constraint | None,
+    outputscale_prior: gpytorch.priors.Prior | None,
+    build_kernel_fn: Callable[..., gpytorch.kernels.Kernel] | None = None,
+) -> gpytorch.kernels.Kernel:
+    """Build the kernel based on configuration.
 
-    This wraps GPyTorch's ExactGP to provide a flexible GP implementation with
-    configurable kernels and mean functions.
+    Args:
+        kernel_type: Type of kernel to build.
+        input_dim: Dimensionality of input features.
+        ard: Whether to use ARD.
+        matern_nu: Smoothness for Matern kernel.
+        lengthscale_prior: Prior for lengthscale (already instantiated).
+        lengthscale_constraint: Constraint for lengthscale (already instantiated).
+        outputscale_prior: Prior for output scale (already instantiated).
+        build_kernel_fn: Custom kernel builder, required when
+            kernel_type='custom'. Returns the kernel as-is (no ScaleKernel
+            wrapping).
+
+    Returns:
+        Configured GPyTorch kernel.
+
+    Raises:
+        ValueError: If kernel_type is not supported, or if
+            kernel_type='custom' and build_kernel_fn is None.
     """
+    if kernel_type == "custom":
+        if build_kernel_fn is None:
+            raise ValueError("build_kernel_fn must be provided when kernel_type='custom'")
+        return build_kernel_fn()
 
-    def __init__(
-        self,
-        train_x: Float[torch.Tensor, "n_samples n_features"],
-        train_y: Float[torch.Tensor, "n_samples"],
-        likelihood: gpytorch.likelihoods.GaussianLikelihood,
-        kernel_type: KernelTypes = "rbf",
-        matern_nu: float = 2.5,
-        ard: bool = True,
-        mean_type: str = "constant",
-        lengthscale_prior: gpytorch.priors.Prior | None = None,
-        lengthscale_constraint: gpytorch.constraints.Constraint | None = None,
-        outputscale_prior: gpytorch.priors.Prior | None = None,
-        build_kernel_fn: Callable[..., gpytorch.kernels.Kernel] | None = None,
-    ):
-        """Initialize the ExactGP model.
+    ard_num_dims = input_dim if ard else None
 
-        Args:
-            train_x: Training features of shape (n_samples, n_features).
-            train_y: Training targets of shape (n_samples,).
-            likelihood: GPyTorch likelihood.
-            kernel_type: Type of kernel to use.
-            matern_nu: Smoothness parameter for Matern kernel.
-            ard: Whether to use Automatic Relevance Determination.
-            mean_type: Type of mean function.
-            lengthscale_prior: Prior for kernel lengthscale.
-            lengthscale_constraint: Constraint for kernel lengthscale.
-            outputscale_prior: Prior for kernel output scale.
-            build_kernel_fn: Optional custom function to build the kernel.
-                If provided, it will be used instead of the default kernel
-                construction logic. Should return a gpytorch.kernels.Kernel.
+    if kernel_type == "rbf":
+        base_kernel = gpytorch.kernels.RBFKernel(
+            ard_num_dims=ard_num_dims,
+            lengthscale_prior=lengthscale_prior,
+            lengthscale_constraint=lengthscale_constraint,
+        )
+    elif kernel_type == "matern":
+        base_kernel = gpytorch.kernels.MaternKernel(
+            nu=matern_nu,
+            ard_num_dims=ard_num_dims,
+            lengthscale_prior=lengthscale_prior,
+            lengthscale_constraint=lengthscale_constraint,
+        )
+    elif kernel_type == "linear":
+        base_kernel = gpytorch.kernels.LinearKernel(ard_num_dims=ard_num_dims)
+    elif kernel_type == "polynomial":
+        base_kernel = gpytorch.kernels.PolynomialKernel(power=2, ard_num_dims=ard_num_dims)
+    elif kernel_type == "rbf_linear":
+        rbf_kernel = gpytorch.kernels.RBFKernel(
+            ard_num_dims=ard_num_dims,
+            lengthscale_prior=lengthscale_prior,
+            lengthscale_constraint=lengthscale_constraint,
+        )
+        linear_kernel = gpytorch.kernels.LinearKernel(ard_num_dims=ard_num_dims)
+        base_kernel = rbf_kernel + linear_kernel
+    else:
+        raise ValueError(
+            f"Unsupported kernel_type: {kernel_type}. "
+            f"Supported types: 'rbf', 'matern', 'linear', 'polynomial', 'rbf_linear', 'custom'"
+        )
 
-        Raises:
-            ValueError: If mean_type is not one of the supported types.
-        """
-        super().__init__(train_x, train_y, likelihood)
-
-        # Initialize mean module
-        if mean_type == "constant":
-            self.mean_module = gpytorch.means.ConstantMean()
-        elif mean_type == "zero":
-            self.mean_module = gpytorch.means.ZeroMean()
-        else:
-            raise ValueError(f"Unknown mean_type: {mean_type}")
-
-        # Initialize covariance module (kernel)
-        if kernel_type == "custom":
-            if build_kernel_fn is None:
-                raise ValueError("build_kernel_fn must be provided when kernel_type='custom'")
-            self.covar_module = build_kernel_fn()
-        else:
-            self.covar_module = self._build_kernel(
-                kernel_type=kernel_type,
-                input_dim=train_x.shape[-1],
-                ard=ard,
-                matern_nu=matern_nu,
-                lengthscale_prior=lengthscale_prior,
-                lengthscale_constraint=lengthscale_constraint,
-                outputscale_prior=outputscale_prior,
-            )
-
-    def _build_kernel(
-        self,
-        kernel_type: str,
-        input_dim: int,
-        ard: bool,
-        matern_nu: float,
-        lengthscale_prior: gpytorch.priors.Prior | None,
-        lengthscale_constraint: gpytorch.constraints.Constraint | None,
-        outputscale_prior: gpytorch.priors.Prior | None,
-    ) -> gpytorch.kernels.Kernel:
-        """Build the kernel based on configuration.
-
-        Args:
-            kernel_type: Type of kernel to build.
-            input_dim: Dimensionality of input features.
-            ard: Whether to use ARD.
-            matern_nu: Smoothness for Matern kernel.
-            lengthscale_prior: Prior for lengthscale (already instantiated).
-            lengthscale_constraint: Constraint for lengthscale (already instantiated).
-            outputscale_prior: Prior for output scale (already instantiated).
-
-        Returns:
-            Configured GPyTorch kernel.
-
-        Raises:
-            ValueError: If kernel_type is not supported.
-        """
-        ard_num_dims = input_dim if ard else None
-
-        if kernel_type == "rbf":
-            base_kernel = gpytorch.kernels.RBFKernel(
-                ard_num_dims=ard_num_dims,
-                lengthscale_prior=lengthscale_prior,
-                lengthscale_constraint=lengthscale_constraint,
-            )
-        elif kernel_type == "matern":
-            base_kernel = gpytorch.kernels.MaternKernel(
-                nu=matern_nu,
-                ard_num_dims=ard_num_dims,
-                lengthscale_prior=lengthscale_prior,
-                lengthscale_constraint=lengthscale_constraint,
-            )
-        elif kernel_type == "linear":
-            base_kernel = gpytorch.kernels.LinearKernel(ard_num_dims=ard_num_dims)
-        elif kernel_type == "polynomial":
-            base_kernel = gpytorch.kernels.PolynomialKernel(power=2, ard_num_dims=ard_num_dims)
-        elif kernel_type == "rbf_linear":
-            rbf_kernel = gpytorch.kernels.RBFKernel(
-                ard_num_dims=ard_num_dims,
-                lengthscale_prior=lengthscale_prior,
-                lengthscale_constraint=lengthscale_constraint,
-            )
-            linear_kernel = gpytorch.kernels.LinearKernel(ard_num_dims=ard_num_dims)
-            base_kernel = rbf_kernel + linear_kernel
-        else:
-            raise ValueError(
-                f"Unsupported kernel_type: {kernel_type}. "
-                f"Supported types: 'rbf', 'matern', 'linear', 'polynomial', 'rbf_linear'"
-            )
-
-        return gpytorch.kernels.ScaleKernel(base_kernel, outputscale_prior=outputscale_prior)
-
-    def forward(
-        self, x: Float[torch.Tensor, "n_samples n_features"]
-    ) -> gpytorch.distributions.MultivariateNormal:
-        """Forward pass through the GP.
-
-        Args:
-            x: Input features of shape (n_samples, n_features).
-
-        Returns:
-            Multivariate normal distribution representing the GP posterior.
-        """
-        mean_x = self.mean_module(x)
-        covar_x = self.covar_module(x)
-        return gpytorch.distributions.MultivariateNormal(mean_x, covar_x)
+    return gpytorch.kernels.ScaleKernel(base_kernel, outputscale_prior=outputscale_prior)
 
 
 class GPModel(BaseModel):
     """Gaussian Process model for sequence fitness prediction.
 
-    Uses GPyTorch for efficient GP inference with flexible featurization,
-    kernel selection, and uncertainty quantification.
+    Uses BoTorch's `SingleTaskGP` backbone for efficient GP inference with
+    flexible featurization, kernel selection, and uncertainty quantification.
     """
-
-    _default_label_dtype: torch.dtype = torch.float32
 
     def __init__(
         self,
@@ -344,12 +295,34 @@ class GPModel(BaseModel):
             featurizer_config: Configuration for sequence featurization.
             alphabet: Sequence alphabet to use for one-hot encoding.
             device: Device to use ('cuda', 'cpu', or None for auto-detect).
+
+        Raises:
+            ValueError: If train_config.dtype is not a valid torch dtype,
+                train_config.optimizer_type is not supported, or
+                train_config.max_attempts is less than 1.
         """
         # Use defaults if configs not provided
         self.model_config = model_config or GPModelConfig()
         self.train_config = train_config or GPTrainConfig()
         self.featurizer_config = featurizer_config or FeaturizerConfig()
         self.problem_type: ProblemType = ProblemType.REGRESSION
+
+        if self.train_config.optimizer_type not in ("adam", "lbfgs", "scipy"):
+            raise ValueError(
+                f"Unsupported optimizer_type: {self.train_config.optimizer_type!r}. "
+                f"Expected one of 'adam', 'lbfgs' or 'scipy'."
+            )
+        if self.train_config.max_attempts < 1:
+            raise ValueError(
+                f"max_attempts must be at least 1, got {self.train_config.max_attempts}"
+            )
+        resolved_dtype = getattr(torch, self.train_config.dtype, None)
+        if not isinstance(resolved_dtype, torch.dtype):
+            raise ValueError(
+                f"dtype {self.train_config.dtype!r} is not a valid torch dtype. "
+                f"Use 'float32', 'float64', etc."
+            )
+        self._dtype: torch.dtype = resolved_dtype
 
         self.alphabet = alphabet
         self.alphabet_size = len(alphabet)
@@ -358,8 +331,8 @@ class GPModel(BaseModel):
         # Device setup
         self.device = get_device(device)
 
-        # Model and likelihood initialized on first fit
-        self.gp_model: ExactGPModel | None = None
+        # Model and likelihood initialized on each fit
+        self.gp_model: SingleTaskGP | None = None
         self.likelihood: gpytorch.likelihoods.GaussianLikelihood | None = None
         self.feature_dim: int | None = None
 
@@ -408,6 +381,10 @@ class GPModel(BaseModel):
         Raises:
             ValueError: If input type is invalid or featurizer_type is unsupported.
         """
+        if self.featurizer_config.featurizer_type == "precomputed":
+            candidates = inputs.candidates if isinstance(inputs, LabelledCandidates) else inputs
+            return candidates_to_tensor(candidates, device=self.device, dtype=self._dtype)
+
         # Extract sequences from inputs
         sequences = extract_sequences_from_inputs(inputs)
 
@@ -418,54 +395,51 @@ class GPModel(BaseModel):
                 self.char_to_idx,
                 self.alphabet_size,
                 flatten=self.featurizer_config.flatten_one_hot,
-            )
+            ).to(self._dtype)
         elif self.featurizer_config.featurizer_type == "custom":
-            return self._apply_custom_featurizer(sequences)
-        elif self.featurizer_config.featurizer_type == "precomputed":
-            # For precomputed, sequences should already be tensors or arrays
-            if isinstance(sequences[0], (torch.Tensor, np.ndarray)):
-                if isinstance(sequences[0], np.ndarray):
-                    return torch.tensor(np.stack(sequences), dtype=torch.float32)
-                return torch.stack(sequences)
-            else:
-                raise ValueError(
-                    f"For featurizer_type='precomputed', Candidate.data must be torch.Tensor or "
-                    f"np.ndarray, got {type(sequences[0]).__name__}. "
-                    f"Wrap your data in a np.ndarray or torch.Tensor when creating Candidates, "
-                    f"or switch to featurizer_type='one_hot'."
-                )
+            return self._apply_custom_featurizer(sequences).to(self._dtype)
         else:
             raise ValueError(
                 f"Unsupported featurizer_type: {self.featurizer_config.featurizer_type}"
             )
 
     def _initialize_likelihood(self) -> gpytorch.likelihoods.GaussianLikelihood:
-        """Initialize the Gaussian likelihood with noise constraints.
+        """Initialize the Gaussian likelihood with noise prior and constraint.
 
         Returns:
             Configured Gaussian likelihood.
         """
-        noise_constraint = build_from_target(self.model_config.noise_constraint)
+        noise_constraint = build_from_target(
+            self.model_config.noise_constraint, expected_base=gpytorch.constraints.Interval
+        )
         if noise_constraint is None:
             noise_constraint = gpytorch.constraints.GreaterThan(1e-4)
-        return gpytorch.likelihoods.GaussianLikelihood(noise_constraint=noise_constraint)
+        return gpytorch.likelihoods.GaussianLikelihood(
+            noise_prior=build_from_target(
+                self.model_config.noise_prior, expected_base=gpytorch.priors.Prior
+            ),
+            noise_constraint=noise_constraint,
+        )
 
     def _initialize_gp_model(
         self,
         train_x: Float[torch.Tensor, "n_samples n_features"],
         train_y: Float[torch.Tensor, "n_samples"],
-    ) -> ExactGPModel:
-        """Initialize the GP model with training data.
+    ) -> SingleTaskGP:
+        """Initialize the BoTorch `SingleTaskGP` with training data.
 
         Args:
-            train_x: Training features of shape (n_samples, n_features).
-            train_y: Training targets of shape (n_samples,).
+            train_x: Training features of shape (n_samples, n_features),
+                already normalised.
+            train_y: Training targets of shape (n_samples,), already
+                standardised.
 
         Returns:
-            Initialized ExactGPModel.
+            Initialized SingleTaskGP.
 
         Raises:
             RuntimeError: If likelihood has not been initialized before calling this method.
+            ValueError: If mean_type is not one of the supported types.
         """
         if self.likelihood is None:
             raise RuntimeError(
@@ -473,21 +447,42 @@ class GPModel(BaseModel):
                 "must be called before _initialize_gp_model()"
             )
 
-        gp_model = ExactGPModel(
-            train_x=train_x,
-            train_y=train_y,
-            likelihood=self.likelihood,
+        if self.model_config.mean_type == "constant":
+            mean_module = gpytorch.means.ConstantMean()
+        elif self.model_config.mean_type == "zero":
+            mean_module = gpytorch.means.ZeroMean()
+        else:
+            raise ValueError(f"Unknown mean_type: {self.model_config.mean_type}")
+
+        covar_module = _build_kernel(
             kernel_type=self.model_config.kernel_type,
-            matern_nu=self.model_config.matern_nu,
+            input_dim=train_x.shape[-1],
             ard=self.model_config.ard,
-            mean_type=self.model_config.mean_type,
-            lengthscale_prior=build_from_target(self.model_config.lengthscale_prior),
-            lengthscale_constraint=build_from_target(self.model_config.lengthscale_constraint),
-            outputscale_prior=build_from_target(self.model_config.outputscale_prior),
+            matern_nu=self.model_config.matern_nu,
+            lengthscale_prior=build_from_target(
+                self.model_config.lengthscale_prior, expected_base=gpytorch.priors.Prior
+            ),
+            lengthscale_constraint=build_from_target(
+                self.model_config.lengthscale_constraint,
+                expected_base=gpytorch.constraints.Interval,
+            ),
+            outputscale_prior=build_from_target(
+                self.model_config.outputscale_prior, expected_base=gpytorch.priors.Prior
+            ),
             build_kernel_fn=self.model_config.build_kernel_fn,
         )
 
-        return gp_model.to(self.device)
+        gp_model = SingleTaskGP(
+            train_X=train_x,
+            train_Y=train_y.unsqueeze(-1),
+            likelihood=self.likelihood,
+            covar_module=covar_module,
+            mean_module=mean_module,
+            outcome_transform=None,
+            input_transform=None,
+        )
+
+        return gp_model.to(device=self.device, dtype=self._dtype)
 
     def _optimize_hyperparameters(
         self,
@@ -524,6 +519,9 @@ class GPModel(BaseModel):
 
         # Use marginal log likelihood as loss
         mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.gp_model)
+
+        if self.train_config.optimizer_type == "scipy":
+            return self._fit_scipy(mll, train_x, train_y)
 
         # Setup optimizer
         if self.train_config.optimizer_type == "adam":
@@ -606,6 +604,67 @@ class GPModel(BaseModel):
 
         return metrics
 
+    def _fit_scipy(
+        self,
+        mll: gpytorch.mlls.ExactMarginalLogLikelihood,
+        train_x: Float[torch.Tensor, "n_samples n_features"],
+        train_y: Float[torch.Tensor, "n_samples"],
+    ) -> dict[str, float]:
+        """Fit the GP via BoTorch's `fit_gpytorch_mll` with scipy L-BFGS-B.
+
+        Records one `SurrogateEpochMetrics` entry per optimiser step. On a
+        retry (numerical failure within `max_attempts`) the step counter
+        restarts, so previously recorded entries are cleared to keep epoch
+        numbers strictly increasing.
+
+        Args:
+            mll: Marginal log likelihood objective to maximise.
+            train_x: Training features of shape (n_samples, n_features).
+            train_y: Training targets of shape (n_samples,).
+
+        Returns:
+            Dictionary of training metrics (`final_mll`, `final_loss`,
+            `num_iterations`).
+        """
+
+        def _record_step(parameters: dict[str, torch.Tensor], result: Any) -> None:
+            if self._epoch_metrics and result.step <= self._epoch_metrics[-1].epoch:
+                # A fitting retry restarted the step counter — drop the
+                # previous attempt's entries.
+                self._epoch_metrics.clear()
+            self._epoch_metrics.append(
+                SurrogateEpochMetrics(
+                    epoch=result.step,
+                    train_loss=result.fval,
+                    additional_metrics={"mll": -result.fval},
+                )
+            )
+
+        fit_gpytorch_mll(
+            mll,
+            optimizer=fit_gpytorch_mll_scipy,
+            optimizer_kwargs={
+                "options": {"maxiter": self.train_config.num_iterations},
+                "callback": _record_step,
+            },
+            max_attempts=self.train_config.max_attempts,
+        )
+
+        if self._epoch_metrics:
+            final_loss = self._epoch_metrics[-1].train_loss
+        else:
+            # scipy can converge before the first callback fires
+            mll.train()
+            with torch.no_grad():
+                loss = -mll(mll.model(train_x), train_y)
+                final_loss = loss.item()
+
+        return {
+            "final_mll": -final_loss,
+            "final_loss": final_loss,
+            "num_iterations": len(self._epoch_metrics),
+        }
+
     def _prepare_train_data(
         self,
         train_data: LabelledCandidates,
@@ -621,7 +680,7 @@ class GPModel(BaseModel):
         Returns:
             A tuple of training features and targets as tensors on the current device.
         """
-        label_dtype = self.train_config.label_dtype or self._default_label_dtype
+        label_dtype = self.train_config.label_dtype or self._dtype
         train_x, train_y, self._input_normaliser, self._output_standardiser = transform_data(
             self.featurise(train_data),
             train_data.labels,
@@ -629,6 +688,7 @@ class GPModel(BaseModel):
             self.train_config.standardise_outputs,
             label_dtype,
             self.device,
+            feature_dtype=self._dtype,
         )
         return train_x, train_y
 
@@ -658,6 +718,9 @@ class GPModel(BaseModel):
             train_data: Training data containing sequences and oracle values.
             val_data: Validation data (used for monitoring, not for training).
 
+        Raises:
+            RuntimeError: If GP fitting produces a NaN/Inf loss.
+
         Note:
             For exact GPs, all training data is used for predictions. Validation
             data is only used for logging validation metrics during training.
@@ -673,20 +736,59 @@ class GPModel(BaseModel):
         # Store training data for later predictions
         self.train_x = train_x
         self.train_y = train_y
+        self.feature_dim = train_x.shape[-1]
 
-        # Initialize likelihood if first time
-        if self.likelihood is None:
+        if (
+            self.model_config.ard
+            and self.model_config.lengthscale_prior is not None
+            and self.model_config.lengthscale_prior.get("_target_")
+            == "gpytorch.priors.LogNormalPrior"
+            and abs(self.model_config.lengthscale_prior.get("loc", 0) - math.sqrt(2)) < 1e-9
+        ):
+            logger.warning(
+                "ARD is enabled with the default LogNormal prior (loc=sqrt(2)). "
+                "Consider setting loc=sqrt(2) + log(d)*0.5 for dimension-aware Hvarfner "
+                "priors, where d is the input dimensionality (%d).",
+                train_x.shape[-1],
+            )
+
+        if self.model_config.ard and self.model_config.lengthscale_prior is None:
+            logger.warning(
+                "ARD is enabled with no lengthscale prior. "
+                "Consider setting a dimension-aware prior such as "
+                "LogNormal(loc=sqrt(2) + log(d)*0.5, scale=sqrt(3)) "
+                "where d is the input dimensionality (%d).",
+                train_x.shape[-1],
+            )
+
+        try:
+            # Re-initialise the likelihood on every fit so priors/constraints
+            # are fresh per training run
             self.likelihood = self._initialize_likelihood().to(self.device)
 
-        # Initialize or reinitialize GP model
-        self.feature_dim = train_x.shape[-1]
-        self.gp_model = self._initialize_gp_model(train_x, train_y)
+            # Initialize or reinitialize GP model
+            self.gp_model = self._initialize_gp_model(train_x, train_y)
 
-        total_params = sum(p.numel() for p in self.gp_model.parameters())
-        logger.info(f"GP initialized with {total_params:,} parameters")
+            total_params = sum(p.numel() for p in self.gp_model.parameters())
+            logger.info(f"GP initialized with {total_params:,} parameters")
 
-        # Optimize hyperparameters
-        train_metrics = self._optimize_hyperparameters(train_x, train_y)
+            # Optimize hyperparameters
+            train_metrics = self._optimize_hyperparameters(train_x, train_y)
+
+            if not math.isfinite(train_metrics["final_loss"]):
+                raise RuntimeError(
+                    f"GP fitting produced NaN/Inf loss ({train_metrics['final_loss']}). "
+                    "The model could not be trained on this data."
+                )
+        except Exception as e:
+            self.gp_model = None
+            self.likelihood = None
+            self.train_x = None
+            self.train_y = None
+            self._input_normaliser = None
+            self._output_standardiser = None
+            logger.error(f"Error training GP model: {e}")
+            raise
 
         # Store training metrics
         self.training_metrics = train_metrics
@@ -695,9 +797,9 @@ class GPModel(BaseModel):
         self.gp_model.eval()
         self.likelihood.eval()
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
-            train_preds = self.likelihood(self.gp_model(train_x))
-            train_means = train_preds.mean.cpu().numpy()
-            train_vars = train_preds.variance.cpu().numpy()
+            train_posterior = self.gp_model.posterior(train_x, observation_noise=True)
+            train_means = train_posterior.mean.squeeze(-1).cpu().numpy()
+            train_vars = train_posterior.variance.squeeze(-1).cpu().numpy()
 
         if self._output_standardiser is not None:
             train_means, train_vars = self._output_standardiser.inverse_transform(
@@ -732,6 +834,10 @@ class GPModel(BaseModel):
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Make predictions with uncertainty quantification.
 
+        Returns the noise-inclusive predictive variance (latent variance plus
+        likelihood noise). The noise-free latent posterior is available via
+        `botorch_model.posterior(X)`.
+
         Args:
             candidate_points: List of candidates to predict fitness for.
 
@@ -740,7 +846,8 @@ class GPModel(BaseModel):
 
         Raises:
             RuntimeError: If the model is not trained.
-            ValueError: If the input is invalid.
+            ValueError: If the input is invalid, not 2-D after featurisation,
+                or its feature dimension does not match the training data.
         """
         if self.gp_model is None or self.likelihood is None:
             raise RuntimeError("Model not trained. Call train() first.")
@@ -750,23 +857,44 @@ class GPModel(BaseModel):
         self.likelihood.eval()
 
         # Featurize input
-        test_x_np = self.featurise(candidate_points).cpu().numpy()
+        test_x = self.featurise(candidate_points)
+        if test_x.ndim != 2:
+            raise ValueError(f"Expected 2D input tensor, got shape {test_x.shape}")
+        if self.train_x is not None and test_x.shape[1] != self.train_x.shape[1]:
+            raise ValueError(
+                f"Input dimension mismatch: expected {self.train_x.shape[1]}, got {test_x.shape[1]}"
+            )
+        test_x_np = test_x.cpu().numpy()
 
         # Apply input normalization if fitted
         if self._input_normaliser is not None:
             test_x_np = self._input_normaliser.transform(test_x_np)
-        test_x = torch.tensor(test_x_np, dtype=torch.float32).to(self.device)
+        test_x = torch.tensor(test_x_np, dtype=self._dtype).to(self.device)
 
         # Make predictions with fast predictive variance computation
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
-            predictions = self.likelihood(self.gp_model(test_x))
-            means = predictions.mean.cpu().numpy()
-            variances = predictions.variance.cpu().numpy()
+            posterior = self.gp_model.posterior(test_x, observation_noise=True)
+            means = posterior.mean.squeeze(-1).cpu().numpy()
+            variances = posterior.variance.squeeze(-1).cpu().numpy()
 
         if self._output_standardiser is not None:
             means, variances = self._output_standardiser.inverse_transform(means, variances)
 
         return Predictions(means=means, variances=variances)
+
+    @property
+    def botorch_model(self) -> SingleTaskGP:
+        """Get the underlying BoTorch model.
+
+        Returns:
+            Trained BoTorch SingleTaskGP model.
+
+        Raises:
+            RuntimeError: If the model has not been trained yet.
+        """
+        if self.gp_model is None:
+            raise RuntimeError("Model must be trained before getting the underlying BoTorch model")
+        return self.gp_model
 
     def sample(self, *args: Any, **kwargs: Any) -> list[Candidate]:
         """Sample candidate points from the GP posterior.

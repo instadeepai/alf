@@ -27,6 +27,7 @@ def transform_data(
     standardise_outputs: bool,
     label_dtype: TorchDtype,
     device: torch.device,
+    feature_dtype: TorchDtype = torch.float32,
 ) -> tuple[torch.Tensor, torch.Tensor, InputNormaliser | None, OutputStandardiser | None]:
     """Apply input normalisation and output standardisation to training data.
 
@@ -37,6 +38,7 @@ def transform_data(
         standardise_outputs: Whether to apply Z-score standardisation to output labels.
         label_dtype: Data type for the output labels.
         device: Device to move tensors to.
+        feature_dtype: Data type for the input features. Defaults to float32.
 
     Returns:
         Transformed training features, training labels, and the fitted normalisers.
@@ -49,9 +51,9 @@ def transform_data(
         input_normaliser = InputNormaliser()
         input_normaliser.fit(train_x_np)
         train_x_np = input_normaliser.transform(train_x_np)
-        train_x = torch.tensor(train_x_np, dtype=torch.float32).to(device)
+        train_x = torch.tensor(train_x_np, dtype=feature_dtype).to(device)
     else:
-        train_x = train_x.to(device)
+        train_x = train_x.to(device=device, dtype=feature_dtype)
 
     if standardise_outputs:
         output_standardiser = OutputStandardiser()
