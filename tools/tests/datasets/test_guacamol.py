@@ -356,17 +356,56 @@ class TestGuacaMolSingleFileLoad:
         assert len(dataset._raw_dataset.labels) == 5
 
     def test_candidate_features_contain_computed_properties(self, tmp_path):
-        """Each candidate's features dict includes all requested computed properties."""
+        """Computed properties are stored in _prop_matrix, not Candidate.features."""
         config = _base_config(
             data_dir=tmp_path, max_molecules=3, computed_properties=["TPSA", "MolWt"]
         )
         with patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
             dataset = GuacaMol(config)
         assert dataset._raw_dataset is not None
+        assert "TPSA" in dataset._prop_cols
+        assert "MolWt" in dataset._prop_cols
+        assert dataset._prop_matrix.shape[1] == 2
+
+    def test_prop_matrix_shape_matches_candidates(self, tmp_path):
+        """_prop_matrix shape is (N, P) where N = corpus size and P = len(computed_properties)."""
+        config = _base_config(
+            data_dir=tmp_path, max_molecules=5, computed_properties=["TPSA", "MolWt"]
+        )
+        with patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
+            dataset = GuacaMol(config)
+        assert hasattr(dataset, "_prop_matrix")
+        assert dataset._prop_matrix is not None
+        n = len(dataset._raw_dataset.candidates)
+        assert dataset._prop_matrix.shape == (n, 2)
+
+    def test_prop_cols_match_computed_properties(self, tmp_path):
+        """_prop_cols lists the computed property names in the same order as config."""
+        config = _base_config(
+            data_dir=tmp_path, max_molecules=5, computed_properties=["TPSA", "MolWt"]
+        )
+        with patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
+            dataset = GuacaMol(config)
+        assert dataset._prop_cols == ["TPSA", "MolWt"]
+
+    def test_prop_matrix_values_are_finite(self, tmp_path):
+        """All property matrix values are finite floats."""
+        config = _base_config(
+            data_dir=tmp_path, max_molecules=5, computed_properties=["TPSA", "MolWt"]
+        )
+        with patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
+            dataset = GuacaMol(config)
+        assert np.all(np.isfinite(dataset._prop_matrix))
+
+    def test_corpus_candidate_features_are_empty(self, tmp_path):
+        """Corpus candidates no longer store features dicts — features is {}."""
+        config = _base_config(
+            data_dir=tmp_path, max_molecules=5, computed_properties=["TPSA", "MolWt"]
+        )
+        with patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
+            dataset = GuacaMol(config)
         for cand in dataset._raw_dataset.candidates:
-            if cand.features is not None:
-                assert "TPSA" in cand.features
-                assert "MolWt" in cand.features
+            assert cand.features == {}
 
     def test_invalid_smiles_are_skipped_and_not_in_dataset(self, tmp_path):
         """Invalid SMILES strings are silently skipped and excluded from candidates."""

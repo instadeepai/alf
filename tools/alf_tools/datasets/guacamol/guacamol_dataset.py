@@ -143,6 +143,8 @@ class GuacaMol(BaseDataset):
         """
         self._paper_splits: dict[str, LabelledCandidates] | None = None
         self._smiles_index: dict[str, float] = {}
+        self._prop_matrix: np.ndarray = np.empty((0, 0), dtype=np.float64)
+        self._prop_cols: list[str] = []
         super().__init__(config)
         self.setup()
 
@@ -200,7 +202,10 @@ class GuacaMol(BaseDataset):
             smiles_list = smiles_list[: self.config.max_molecules]
         target = cast(GuacaMolPropertyName, self.config.target_property)
         properties = list(self.config.computed_properties or [target])
-        return _label_smiles(smiles_list, properties, target, self.modality)
+        lc, prop_matrix = _label_smiles(smiles_list, properties, target, self.modality)
+        self._prop_matrix = prop_matrix
+        self._prop_cols = properties
+        return lc
 
     def _load_paper_splits_with(
         self, label_fn: Callable[[list[str]], LabelledCandidates]
