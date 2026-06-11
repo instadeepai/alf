@@ -24,7 +24,11 @@ from scipy.spatial.distance import pdist
 
 
 def _levenshtein(a: str, b: str) -> int:
-    """Compute Levenshtein edit distance between two strings."""
+    """Compute Levenshtein edit distance between two strings.
+
+    Returns:
+        int: The Levenshtein distance between the two strings.
+    """
     if len(a) < len(b):
         a, b = b, a
     prev = list(range(len(b) + 1))
