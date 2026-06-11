@@ -496,7 +496,8 @@ def regret_ucb_alpha(
     # The computation would break or return nonsensical results
     if len(means) < 2:
         warnings.warn(
-            f"Dataset size ({len(means)}) is too small to compute UCB regret. Returning NaN.",
+            f"Dataset size ({len(means)}) is too small to compute UCB regret. "
+            "Skipping this metric.",
             stacklevel=2,
         )
         return {}
@@ -662,8 +663,9 @@ def regret_ucb_alpha_sweep(
         num_acquisitions: Number of candidates to acquire. Defaults to 100.
 
     Returns:
-        Dictionary mapping "regret_ucb_{alpha:.2f}" to regret value for each
-        alpha value.
+        Dictionary mapping "regret_ucb_sweep_{alpha:.2f}" to the regret value for
+        each alpha value. The "sweep" namespace avoids colliding with the
+        standalone regret_ucb_alpha metric, which emits "regret_ucb_{alpha:.2f}".
 
     Raises:
         ValueError: If alpha is an empty list.
@@ -677,10 +679,11 @@ def regret_ucb_alpha_sweep(
     # as a default argument is dangerous in python as the default is only
     # initiated once.
     if alpha is None:
-        alpha = [0.1, 0.3, 0.5, 1]
+        alpha = [0.1, 0.3, 0.5, 1.0]
 
-    # Normalize alpha to a list
-    if isinstance(alpha, float):
+    # Normalize alpha to a list. Accept ints as well as floats, matching the
+    # numeric tower implied by the `float` type hint (e.g. alpha=1).
+    if isinstance(alpha, (int, float)):
         alpha_list = [alpha]
     elif isinstance(alpha, list):
         if len(alpha) == 0:
@@ -692,8 +695,9 @@ def regret_ucb_alpha_sweep(
     regret_alpha_list = {}
 
     for a in alpha_list:
-        # Compute UCB values
+        # Namespace the sweep keys (regret_ucb_sweep_{alpha}) so they do not collide
+        # with the standalone regret_ucb_alpha metric.
         regret_alpha = regret_ucb_alpha(means, variances, targets, a, num_acquisitions)
-
-        regret_alpha_list.update(regret_alpha)
+        if regret_alpha:
+            regret_alpha_list[f"regret_ucb_sweep_{a:.2f}"] = next(iter(regret_alpha.values()))
     return regret_alpha_list

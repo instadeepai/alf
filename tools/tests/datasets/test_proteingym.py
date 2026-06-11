@@ -12,10 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unittest.mock import patch
+
 import numpy as np
+import pandas as pd
 import pytest
 from alf_core import Modality
 from alf_tools.datasets.proteingym import ProteinGym, ProteinGymConfig
+from pydantic import ValidationError
 
 
 @pytest.fixture
@@ -187,4 +191,119 @@ class TestProteinGymDataset:
         )
         assert np.isclose(test_mean, -1.221083), (
             f"Test dataset mean should be ~-1.221083, got {test_mean}"
+        )
+
+
+def _synthetic_singles_dataframe(n: int = 20) -> pd.DataFrame:
+    """Build a synthetic ProteinGym "singles" CSV table with distinct fold columns.
+
+    The contiguous and random fold assignments are deliberately different so a
+    test can confirm the contiguous fold column (not another) is the one used.
+    """
+    return pd.DataFrame({
+        "mutated_sequence": ["MKL" + "A" * (i + 1) for i in range(n)],
+        "DMS_score": [float(i) for i in range(n)],
+        "mutant": [f"A{i}G" for i in range(n)],
+        "fold_random_5": [(i + 2) % 5 for i in range(n)],
+        "fold_modulo_5": [(i + 1) % 5 for i in range(n)],
+        "fold_contiguous_5": [i % 5 for i in range(n)],
+    })
+
+
+class TestProteinGymCrossValidationConfig:
+    """Validation of the cross-validation configuration."""
+
+    def _base_kwargs(self, **overrides):
+        kwargs = dict(
+            name="proteingym",
+            modality="sequence",
+            seed=0,
+            train_ratio=0.5,
+            validation_frac=0.0,
+            test_ratio=0.5,
+            split_type="random",
+            problem_type="regression",
+            dms_name="X",
+            dms_type="singles",
+        )
+        kwargs.update(overrides)
+        return kwargs
+
+    def test_missing_type_raises(self):
+        """cross_validation=True without a type raises a clear error."""
+        with pytest.raises(ValidationError, match="cross_validation_type"):
+            ProteinGymConfig(**self._base_kwargs(cross_validation=True, cross_validation_fold=0))
+
+    def test_missing_fold_raises(self):
+        """cross_validation=True without a fold raises a clear error."""
+        with pytest.raises(ValidationError, match="cross_validation_fold"):
+            ProteinGymConfig(
+                **self._base_kwargs(cross_validation=True, cross_validation_type="contiguous")
+            )
+
+    @pytest.mark.parametrize("cv_type", ["modulo", "contiguous"])
+    def test_multiples_only_supports_random(self, cv_type):
+        """dms_type='multiples' rejects non-random folds (only random is available)."""
+        with pytest.raises(ValidationError, match="only provides 'random'"):
+            ProteinGymConfig(
+                **self._base_kwargs(
+                    dms_type="multiples",
+                    cross_validation=True,
+                    cross_validation_type=cv_type,
+                    cross_validation_fold=0,
+                )
+            )
+
+    def test_singles_contiguous_config_is_valid(self):
+        """A singles + contiguous CV config validates without error."""
+        config = ProteinGymConfig(
+            **self._base_kwargs(
+                cross_validation=True,
+                cross_validation_type="contiguous",
+                cross_validation_fold=0,
+            )
+        )
+        assert config.cross_validation_type == "contiguous"
+
+
+class TestProteinGymContiguousSplit:
+    """The contiguous cross-validation split uses the contiguous fold column."""
+
+    def test_contiguous_split_selects_correct_fold(self, monkeypatch):
+        """Regression test: contiguous CV previously raised KeyError because
+        load_dataset stored the fold under "fold_contiguous_id" while the split
+        looked up "contiguous_fold_id". This drives the real load_dataset (over a
+        synthetic CSV) so the held-out split must come from the contiguous fold.
+        """
+        monkeypatch.setenv("HF_TOKEN", "test-token")
+        fold = 1
+        config = ProteinGymConfig(
+            name="proteingym",
+            modality="sequence",
+            seed=0,
+            train_ratio=0.5,
+            validation_frac=0.0,
+            test_ratio=0.5,
+            split_type="random",
+            problem_type="regression",
+            dms_name="X",
+            dms_type="singles",
+            cross_validation=True,
+            cross_validation_type="contiguous",
+            cross_validation_fold=fold,
+        )
+        df = _synthetic_singles_dataframe(n=20)
+
+        with (
+            patch("alf_tools.datasets.proteingym.hf_hub_download"),
+            patch("alf_tools.datasets.proteingym.pd.read_csv", return_value=df),
+        ):
+            dataset = ProteinGym(config)
+
+        held_out = dataset.test_dataset.candidates + dataset.candidate_pool.candidates
+        assert len(held_out) > 0
+        assert all(c.features["contiguous_fold_id"] == fold for c in held_out)
+        assert all(
+            c.features["contiguous_fold_id"] != fold
+            for c in dataset.train_dataset.candidates + dataset.validation_dataset.candidates
         )
