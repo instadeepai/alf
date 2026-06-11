@@ -429,10 +429,15 @@ class TestCNNLabelDtype:
 class TestCNNNormalisation:
     """Tests for CNNModel input normalisation and output standardisation."""
 
+    def test_cnn_train_config_default_standardises_inputs(self) -> None:
+        """CNNTrainConfig must default normalise_inputs_strategy to 'zscore'."""
+        config = CNNTrainConfig()
+        assert config.normalise_inputs_strategy == "zscore"
+
     def test_input_normalisation_enabled(self, sample_data, val_data):
-        """normalise_inputs=True must run without error."""
+        """A 'zscore' strategy (the CNN default) must run without error."""
         model = CNNModel(
-            train_config=CNNTrainConfig(num_epochs=2, normalise_inputs=True),
+            train_config=CNNTrainConfig(num_epochs=2, normalise_inputs_strategy="zscore"),
             device="cpu",
         )
         model.setup(_make_dataset(sample_data.labels, ProblemType.REGRESSION))
@@ -444,9 +449,9 @@ class TestCNNNormalisation:
         assert np.all(np.isfinite(predictions.means))
 
     def test_input_normalisation_disabled(self, sample_data, val_data):
-        """normalise_inputs=False (the default) leaves _input_normaliser as None."""
+        """A None strategy leaves _input_normaliser as None."""
         model = CNNModel(
-            train_config=CNNTrainConfig(num_epochs=2, normalise_inputs=False),
+            train_config=CNNTrainConfig(num_epochs=2, normalise_inputs_strategy=None),
             device="cpu",
         )
         model.setup(_make_dataset(sample_data.labels, ProblemType.REGRESSION))

@@ -27,6 +27,7 @@ from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.model.base_model import BaseTrainConfig
 from alf_core.model.normaliser import (
     InputNormaliser,
+    InputStandardiser,
     OutputStandardiser,
 )
 from alf_core.utils.enums import ProblemType
@@ -83,14 +84,14 @@ class GPModelConfig:
 class GPTrainConfig(BaseTrainConfig):
     """Configuration for Gaussian Process training.
 
-    Overrides `normalise_inputs` to `True` because GP kernels measure
-    distances between inputs; scaling continuous features to [0, 1]
+    Overrides `normalise_inputs_strategy` to `minmax` because GP kernels
+    measure distances between inputs; scaling continuous features to [0, 1]
     improves marginal log-likelihood optimisation.
 
     Args:
-        normalise_inputs: Whether to apply min-max normalisation to input
-            features before training. Defaults to True; GP kernels measure
-            distances so scaling continuous features to [0, 1] improves MLL.
+        normalise_inputs_strategy: Which input normalisation to apply before
+            training. Defaults to `minmax`; GP kernels measure distances so
+            scaling continuous features to [0, 1] improves MLL.
         standardise_outputs: Whether to apply Z-score standardisation to
             output labels before training. Defaults to True; standardisation
             can improve training. For constant labels, std is clamped to a
@@ -106,7 +107,9 @@ class GPTrainConfig(BaseTrainConfig):
         log_frequency: Inherited from BaseTrainConfig. Default: 10.
     """
 
-    normalise_inputs: bool = True  # override BaseTrainConfig default
+    normalise_inputs_strategy: Literal["minmax", "zscore"] | None = (
+        "minmax"  # override BaseTrainConfig default
+    )
     standardise_outputs: bool = True  # override BaseTrainConfig default
     learning_rate: float = 0.01  # override BaseTrainConfig default
     num_iterations: int = 100
@@ -341,7 +344,7 @@ class GPModel(BaseModel):
         self.train_y: Float[torch.Tensor, "n_samples"] | None = None
 
         # Normalisers — fitted on each train() call, used at predict() time
-        self._input_normaliser: InputNormaliser | None = None
+        self._input_normaliser: InputNormaliser | InputStandardiser | None = None
         self._output_standardiser: OutputStandardiser | None = None
 
         # Track metrics
@@ -602,7 +605,7 @@ class GPModel(BaseModel):
         train_x, train_y, self._input_normaliser, self._output_standardiser = transform_data(
             self.featurise(train_data),
             train_data.labels,
-            self.train_config.normalise_inputs,
+            self.train_config.normalise_inputs_strategy,
             self.train_config.standardise_outputs,
             label_dtype,
             self.device,

@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any, Literal, Union
 
 import numpy as np
 import torch
@@ -26,6 +26,7 @@ from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.model.base_model import BaseModel, BaseTrainConfig
 from alf_core.model.normaliser import (
     InputNormaliser,
+    InputStandardiser,
     OutputStandardiser,
 )
 from alf_core.utils.enums import ProblemType
@@ -91,7 +92,9 @@ class CNNTrainConfig(BaseTrainConfig):
         num_epochs: Number of epochs to train for.
         learning_rate: Inherited from BaseTrainConfig. Default: 1e-3.
         log_frequency: Inherited from BaseTrainConfig. Default: 10.
-        normalise_inputs: Inherited from BaseTrainConfig. Default: False.
+        normalise_inputs_strategy: Overrides the BaseTrainConfig default to
+            `zscore`; deep neural networks generally prefer Z-score
+            standardisation, which zero-centres inputs.
         standardise_outputs: Inherited from BaseTrainConfig. Default: False.
         label_dtype: Inherited from BaseTrainConfig. None uses the model
             default (float32 for CNN regression). Override to force a dtype.
@@ -99,6 +102,9 @@ class CNNTrainConfig(BaseTrainConfig):
 
     batch_size: int = 32
     num_epochs: int = 50
+    normalise_inputs_strategy: Literal["minmax", "zscore"] | None = (
+        "zscore"  # override BaseTrainConfig default
+    )
 
 
 class SequenceCNN(nn.Module):
@@ -224,7 +230,7 @@ class CNNModel(BaseModel):
         self.seq_length: int | None = None
 
         # Input normaliser — fitted on each train() call, applied at predict() time
-        self._input_normaliser: InputNormaliser | None = None
+        self._input_normaliser: InputNormaliser | InputStandardiser | None = None
         self._output_standardiser: OutputStandardiser | None = None
 
         # Track metrics
@@ -325,7 +331,7 @@ class CNNModel(BaseModel):
         train_x, train_y, self._input_normaliser, self._output_standardiser = transform_data(
             self.featurise(train_data),
             train_data.labels,
-            self.train_config.normalise_inputs,
+            self.train_config.normalise_inputs_strategy,
             self.train_config.standardise_outputs,
             label_dtype,
             self.device,

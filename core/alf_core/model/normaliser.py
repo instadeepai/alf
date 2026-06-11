@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from typing import Literal
 
 import numpy as np
 from jaxtyping import Float
@@ -126,15 +127,9 @@ class InputNormaliser:
     Note:
         Min-max scaling is well suited for GP models, where the kernel computes
         distances between input points and benefits from inputs spanning the unit
-        cube [0, 1]. For deep neural networks (e.g. CNNModel), Z-score
-        standardisation (zero mean, unit variance) is generally preferred as it
-        zero-centres inputs and avoids the gradient bias that arises from
-        non-zero-centred activations.
-
-    TODO: Add an InputStandardiser (Z-score) and expose a
-        normalise_inputs_strategy: Literal["minmax", "zscore"] field in
-        BaseTrainConfig so that GPTrainConfig and CNNTrainConfig can each default
-        to the strategy best suited to their architecture.
+        cube [0, 1]. For deep neural networks (e.g. CNNModel), the Z-score
+        `InputStandardiser` is generally preferred as it zero-centres inputs and
+        avoids the gradient bias that arises from non-zero-centred activations.
     """
 
     _MIN_RANGE: float = 1e-8
@@ -183,3 +178,144 @@ class InputNormaliser:
         if not self.is_fitted:
             raise RuntimeError("InputNormaliser must be fitted before calling transform.")
         return (X - self._min) / self._range
+
+    def inverse_transform(
+        self,
+        X: Float[np.ndarray, "n_samples ..."],
+    ) -> Float[np.ndarray, "n_samples ..."]:
+        """Map normalised features in [0, 1] back to the original scale.
+
+        Args:
+            X: Normalised feature tensor, shape (n_samples, ...), matching the
+               dimensionality of the data passed to fit().
+
+        Returns:
+            Feature tensor in the original scale, same shape as input.
+
+        Raises:
+            RuntimeError: If called before fit().
+        """
+        if not self.is_fitted:
+            raise RuntimeError("InputNormaliser must be fitted before calling inverse_transform.")
+        return X * self._range + self._min
+
+
+class InputStandardiser:
+    """Standardises input features to zero mean and unit variance (Z-score).
+
+    Fit on training features, then apply transform at both train and predict time.
+    Each feature dimension is standardised independently.
+
+    Supports both 2-D inputs (n_samples, n_features) and higher-dimensional inputs
+    such as the CNN's 3-D one-hot tensors (n_samples, alphabet_size, seq_len).
+    Statistics are always computed over the batch dimension (dim=0).
+
+    Edge case: if a feature has near-zero standard deviation (constant column), the
+    std is clamped to _MIN_STD to avoid division by zero, and a warning is logged.
+
+    Note:
+        Z-score standardisation is generally preferred for deep neural networks
+        (e.g. CNNModel) as it zero-centres inputs and avoids the gradient bias that
+        arises from non-zero-centred activations. For GP models, the min-max
+        `InputNormaliser` is usually preferred, since the kernel computes distances
+        between input points and benefits from inputs spanning the unit cube [0, 1].
+    """
+
+    _MIN_STD: float = 1e-8
+
+    def __init__(self) -> None:
+        """Initialize with no fitted parameters."""
+        self._mean: np.ndarray | None = None
+        self._std: np.ndarray | None = None
+
+    @property
+    def is_fitted(self) -> bool:
+        """Check if fit() has been called and mean/std are available."""
+        return self._mean is not None and self._std is not None
+
+    def fit(
+        self,
+        X: Float[np.ndarray, "n_samples ..."],
+    ) -> None:
+        """Compute per-feature mean and std from training features.
+
+        Args:
+            X: Training feature tensor, shape (n_samples, ...).
+               Statistics are computed over the batch dimension (dim=0),
+               so each feature position gets its own mean/std.
+        """
+        self._mean = np.mean(X, axis=0)
+        raw_std = np.std(X, axis=0)
+        self._std = raw_std.clip(min=self._MIN_STD)
+        if np.any(raw_std < self._MIN_STD):
+            logger.warning(
+                "InputStandardiser: %d feature(s) have near-zero std (< %.2e). "
+                "Clamping to %.2e. Standardisation may not be meaningful for those features.",
+                int(np.sum(raw_std < self._MIN_STD)),
+                self._MIN_STD,
+                self._MIN_STD,
+            )
+
+    def transform(
+        self,
+        X: Float[np.ndarray, "n_samples ..."],
+    ) -> Float[np.ndarray, "n_samples ..."]:
+        """Standardise features to zero mean, unit variance.
+
+        Args:
+            X: Feature tensor, shape (n_samples, ...), matching the dimensionality
+               of the data passed to fit().
+
+        Returns:
+            Standardised feature tensor, same shape as input.
+
+        Raises:
+            RuntimeError: If called before fit().
+        """
+        if not self.is_fitted:
+            raise RuntimeError("InputStandardiser must be fitted before calling transform.")
+        return (X - self._mean) / self._std
+
+    def inverse_transform(
+        self,
+        X: Float[np.ndarray, "n_samples ..."],
+    ) -> Float[np.ndarray, "n_samples ..."]:
+        """Map standardised features back to the original scale.
+
+        Args:
+            X: Standardised feature tensor, shape (n_samples, ...), matching the
+               dimensionality of the data passed to fit().
+
+        Returns:
+            Feature tensor in the original scale, same shape as input.
+
+        Raises:
+            RuntimeError: If called before fit().
+        """
+        if not self.is_fitted:
+            raise RuntimeError("InputStandardiser must be fitted before calling inverse_transform.")
+        return X * self._std + self._mean
+
+
+def make_input_transform(
+    strategy: Literal["minmax", "zscore"],
+) -> InputNormaliser | InputStandardiser:
+    """Construct an unfitted input transform for the given strategy.
+
+    Args:
+        strategy: `minmax` for `InputNormaliser` (scaling to [0, 1]) or `zscore`
+            for `InputStandardiser` (zero mean, unit variance).
+
+    Returns:
+        An unfitted `InputNormaliser` or `InputStandardiser`.
+
+    Raises:
+        ValueError: If `strategy` is not one of `minmax` or `zscore`.
+    """
+    if strategy == "minmax":
+        return InputNormaliser()
+    if strategy == "zscore":
+        return InputStandardiser()
+    raise ValueError(
+        f"Unknown input normalisation strategy: {strategy!r}. Expected 'minmax' or 'zscore'."
+    )

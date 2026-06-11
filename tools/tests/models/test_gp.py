@@ -402,14 +402,14 @@ class TestGPNormalisation:
     """Tests for GPModel input normalisation and output standardisation."""
 
     def test_gp_train_config_default_normalises_inputs(self) -> None:
-        """GPTrainConfig must default normalise_inputs to True."""
+        """GPTrainConfig must default normalise_inputs_strategy to 'minmax'."""
         config = GPTrainConfig()
-        assert config.normalise_inputs is True
+        assert config.normalise_inputs_strategy == "minmax"
 
     def test_input_normalisation_enabled(self, sample_data, sample_val_data):
-        """normalise_inputs=True must run without error; predictions in original label scale."""
+        """A 'minmax' strategy must run without error; predictions in original label scale."""
         model = GPModel(
-            train_config=GPTrainConfig(num_iterations=5, normalise_inputs=True),
+            train_config=GPTrainConfig(num_iterations=5, normalise_inputs_strategy="minmax"),
             featurizer_config=FeaturizerConfig(featurizer_type="one_hot"),
             device="cpu",
         )
@@ -422,9 +422,9 @@ class TestGPNormalisation:
         assert np.all(predictions.variances >= 0)
 
     def test_input_normalisation_disabled(self, sample_data, sample_val_data):
-        """normalise_inputs=False leaves _input_normaliser as None and predict still works."""
+        """A None strategy leaves _input_normaliser as None and predict still works."""
         model = GPModel(
-            train_config=GPTrainConfig(num_iterations=5, normalise_inputs=False),
+            train_config=GPTrainConfig(num_iterations=5, normalise_inputs_strategy=None),
             featurizer_config=FeaturizerConfig(featurizer_type="one_hot"),
             device="cpu",
         )
