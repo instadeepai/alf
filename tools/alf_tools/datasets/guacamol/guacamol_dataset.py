@@ -14,6 +14,7 @@
 
 import copy
 import logging
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Callable, Literal, cast, get_args
 
@@ -208,6 +209,39 @@ class GuacaMol(BaseDataset):
         self._prop_cols = properties
         return lc
 
+    def _iter_paper_splits(self) -> "Iterator[tuple[str, list[str]]]":
+        """Yield (split_key, smiles_list) for each paper split file in order.
+
+        Handles download, file loading, max_molecules truncation, and the
+        max_molecules warning. Callers are responsible for labelling each batch.
+
+        Yields:
+            Tuple of (split_key, smiles_list) where split_key is one of
+            `"train"`, `"validation"`, `"test"`.
+        """
+        split_files = {k: v for k, v in GUACAMOL_FILES.items() if k != "ALL"}
+        tag_to_key = {"TRAIN": "train", "VALID": "validation", "TEST": "test"}
+        unknown = set(split_files) - tag_to_key.keys()
+        assert not unknown, f"Unexpected GUACAMOL_FILES keys: {unknown}"
+        if self.config.max_molecules is not None:
+            logger.warning(
+                "max_molecules=%d is applied per split file in paper mode — "
+                "total molecules may reach %d × 3.",
+                self.config.max_molecules,
+                self.config.max_molecules,
+            )
+        for tag, entry_info in split_files.items():
+            filepath = _download_file(
+                entry_info["url"],
+                self.config.data_dir / entry_info["name"],
+                self.config.max_molecules,
+                sha256=entry_info.get("sha256"),
+            )
+            smiles_list = _load_smiles_file(filepath)
+            if self.config.max_molecules is not None:
+                smiles_list = smiles_list[: self.config.max_molecules]
+            yield tag_to_key[tag], smiles_list
+
     def _load_paper_splits_with(
         self, label_fn: Callable[[list[str]], LabelledCandidates]
     ) -> LabelledCandidates:
@@ -223,38 +257,21 @@ class GuacaMol(BaseDataset):
         Returns:
             Combined LabelledCandidates across all three paper splits.
         """
-        split_files = {k: v for k, v in GUACAMOL_FILES.items() if k != "ALL"}
-        tag_to_key = {"TRAIN": "train", "VALID": "validation", "TEST": "test"}
-        if self.config.max_molecules is not None:
-            logger.warning(
-                "max_molecules=%d is applied per split file in paper mode — "
-                "total molecules may reach %d × 3.",
-                self.config.max_molecules,
-                self.config.max_molecules,
-            )
-        self._paper_splits = {}
+        paper_splits: dict[str, LabelledCandidates] = {}
         all_candidates: list[Candidate] = []
         all_labels: list[float] = []
-        for tag, entry_info in split_files.items():
-            filepath = _download_file(
-                entry_info["url"],
-                self.config.data_dir / entry_info["name"],
-                self.config.max_molecules,
-                sha256=entry_info.get("sha256"),
-            )
-            smiles_list = _load_smiles_file(filepath)
-            if self.config.max_molecules is not None:
-                smiles_list = smiles_list[: self.config.max_molecules]
+        for key, smiles_list in self._iter_paper_splits():
             split_lc = label_fn(smiles_list)
             logger.debug(
                 "Paper split '%s': %d SMILES → %d valid candidates",
-                tag,
+                key,
                 len(smiles_list),
                 len(split_lc.candidates),
             )
-            self._paper_splits[tag_to_key[tag]] = split_lc
+            paper_splits[key] = split_lc
             all_candidates.extend(split_lc.candidates)
             all_labels.extend(split_lc.labels.tolist())
+        self._paper_splits = paper_splits
         return LabelledCandidates(
             candidates=all_candidates, labels=np.array(all_labels, dtype=float)
         )
@@ -272,39 +289,21 @@ class GuacaMol(BaseDataset):
         """
         target = cast(GuacaMolPropertyName, self.config.target_property)
         properties: list[GuacaMolPropertyName] = list(self.config.computed_properties or [target])
-        split_files = {k: v for k, v in GUACAMOL_FILES.items() if k != "ALL"}
-        tag_to_key = {"TRAIN": "train", "VALID": "validation", "TEST": "test"}
-        if self.config.max_molecules is not None:
-            logger.warning(
-                "max_molecules=%d is applied per split file in paper mode — "
-                "total molecules may reach %d × 3.",
-                self.config.max_molecules,
-                self.config.max_molecules,
-            )
-        self._paper_splits = {}
+        paper_splits: dict[str, LabelledCandidates] = {}
         split_lcs: list[LabelledCandidates] = []
         split_matrices: list[np.ndarray] = []
-        for tag, entry_info in split_files.items():
-            filepath = _download_file(
-                entry_info["url"],
-                self.config.data_dir / entry_info["name"],
-                self.config.max_molecules,
-                sha256=entry_info.get("sha256"),
-            )
-            smiles_list = _load_smiles_file(filepath)
-            if self.config.max_molecules is not None:
-                smiles_list = smiles_list[: self.config.max_molecules]
+        for key, smiles_list in self._iter_paper_splits():
             split_lc, split_mat = _label_smiles(smiles_list, properties, target, self.modality)
             logger.debug(
                 "Paper split '%s': %d SMILES → %d valid candidates",
-                tag,
+                key,
                 len(smiles_list),
                 len(split_lc.candidates),
             )
-            self._paper_splits[tag_to_key[tag]] = split_lc
+            paper_splits[key] = split_lc
             split_lcs.append(split_lc)
             split_matrices.append(split_mat)
-
+        self._paper_splits = paper_splits
         p = len(properties)
         all_labels = (
             np.concatenate([lc.labels for lc in split_lcs])

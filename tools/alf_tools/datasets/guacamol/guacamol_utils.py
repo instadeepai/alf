@@ -308,7 +308,7 @@ def _label_smiles(
     smiles_list: list[str],
     properties: list[GuacaMolPropertyName],
     target_property: GuacaMolPropertyName,
-    modality: "Modality | str",
+    modality: Modality | str,
 ) -> tuple[LabelledCandidates, np.ndarray]:
     """Parse SMILES, compute properties, build LabelledCandidates and property matrix.
 
@@ -325,9 +325,11 @@ def _label_smiles(
     Returns:
         Tuple of (LabelledCandidates with 1D labels, property matrix of shape (N, P)).
     """
+    p = len(properties)
+    prop_matrix = np.empty((len(smiles_list), p), dtype=np.float64)
     candidates: list[Candidate] = []
     labels: list[float] = []
-    prop_rows: list[list[float]] = []
+    row = 0
     for smiles in smiles_list:
         mol = _mol_from_smiles(smiles)
         props = _compute_properties(smiles, properties)
@@ -335,16 +337,13 @@ def _label_smiles(
             logger.warning("Skipping invalid SMILES: %r", smiles)
             continue
         canonical = Chem.MolToSmiles(mol)
+        prop_matrix[row] = [props[name] for name in properties]
         candidates.append(Candidate(data=canonical, modality=modality, features={}))
         labels.append(props[target_property])
-        prop_rows.append([props[name] for name in properties])
-    p = len(properties)
-    prop_matrix = (
-        np.array(prop_rows, dtype=np.float64) if prop_rows else np.empty((0, p), dtype=np.float64)
-    )
+        row += 1
     return (
         LabelledCandidates(candidates=candidates, labels=np.array(labels, dtype=float)),
-        prop_matrix,
+        prop_matrix[:row],
     )
 
 

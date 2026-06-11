@@ -586,6 +586,17 @@ class TestGuacaMolQuery:
         expected = _compute_properties("c1ccncc1", ["TPSA"])["TPSA"]
         assert result.labels[0] == pytest.approx(expected, rel=1e-6)
 
+    def test_query_novel_smiles_populates_features_when_empty(self, tmp_path):
+        """Novel candidate with empty features gets computed properties in returned Candidate."""
+        dataset = self._loaded_dataset(tmp_path)
+        novel = Candidate(data="c1ccncc1", modality=Modality.SEQUENCE)  # pyridine, not in corpus
+        result = dataset.query([novel])
+        assert len(result) == 1
+        returned = result.candidates[0]
+        assert isinstance(returned.features, dict)
+        assert "TPSA" in returned.features
+        assert isinstance(returned.features["TPSA"], float)
+
     def test_query_mixed_known_and_novel_returns_both(self, tmp_path):
         """Querying a mix of corpus and novel candidates returns labels for all."""
         dataset = self._loaded_dataset(tmp_path)
@@ -1560,6 +1571,14 @@ class TestGuacaMolBenchmarkTaskLoad:
         assert dataset._raw_dataset is not None
         for cand in dataset._raw_dataset.candidates:
             assert cand.features == {}
+
+    def test_benchmark_task_prop_matrix_is_empty_sentinel(self, tmp_path):
+        """benchmark_task path does not set _prop_matrix — sentinel default (0, 0) is preserved."""
+        (tmp_path / FILENAME_ALL).write_text("c1ccccc1\nCCO\n")
+        config = _base_config(data_dir=tmp_path, target_property="celecoxib_rediscovery")
+        dataset = GuacaMol(config)
+        assert dataset._prop_matrix.shape == (0, 0)
+        assert dataset._prop_cols == []
 
     def test_query_scores_celecoxib_near_one(self, tmp_path):
         """Querying celecoxib against celecoxib_rediscovery should score near 1.0."""
