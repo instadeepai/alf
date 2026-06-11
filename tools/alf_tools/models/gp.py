@@ -32,6 +32,7 @@ from alf_core.model.normaliser import (
 )
 from botorch.fit import fit_gpytorch_mll
 from botorch.models import SingleTaskGP
+from botorch.optim.core import OptimizationResult
 from botorch.optim.fit import fit_gpytorch_mll_scipy
 from jaxtyping import Float
 
@@ -158,8 +159,10 @@ class GPTrainConfig(BaseTrainConfig):
             improvement. Only used for 'adam' and 'lbfgs'.
         learning_rate: Inherited from BaseTrainConfig. Default overridden to 0.01.
         log_frequency: Inherited from BaseTrainConfig. Default: 10.
-        label_dtype: Inherited from BaseTrainConfig. `None` falls back to
-            `dtype`.
+        label_dtype: Inherited from BaseTrainConfig. `None` (the default)
+            falls back to `dtype`. If set, it must match `dtype` —
+            `SingleTaskGP` requires features and labels to share one dtype,
+            so a mismatch raises ValueError at model construction.
     """
 
     normalise_inputs: bool = True  # override BaseTrainConfig default
@@ -297,9 +300,11 @@ class GPModel(BaseModel):
             device: Device to use ('cuda', 'cpu', or None for auto-detect).
 
         Raises:
-            ValueError: If train_config.dtype is not a valid torch dtype,
-                train_config.optimizer_type is not supported, or
-                train_config.max_attempts is less than 1.
+            ValueError: If train_config.dtype is not a valid floating-point
+                torch dtype, train_config.optimizer_type is not supported,
+                train_config.max_attempts is less than 1, or
+                train_config.label_dtype is set and differs from
+                train_config.dtype.
         """
         # Use defaults if configs not provided
         self.model_config = model_config or GPModelConfig()
@@ -317,12 +322,22 @@ class GPModel(BaseModel):
                 f"max_attempts must be at least 1, got {self.train_config.max_attempts}"
             )
         resolved_dtype = getattr(torch, self.train_config.dtype, None)
-        if not isinstance(resolved_dtype, torch.dtype):
+        if not isinstance(resolved_dtype, torch.dtype) or not resolved_dtype.is_floating_point:
             raise ValueError(
-                f"dtype {self.train_config.dtype!r} is not a valid torch dtype. "
-                f"Use 'float32', 'float64', etc."
+                f"dtype {self.train_config.dtype!r} is not a valid floating-point "
+                f"torch dtype. Use 'float32', 'float64', etc."
             )
         self._dtype: torch.dtype = resolved_dtype
+        if (
+            self.train_config.label_dtype is not None
+            and self.train_config.label_dtype != resolved_dtype
+        ):
+            raise ValueError(
+                f"label_dtype ({self.train_config.label_dtype}) must match "
+                f"GPTrainConfig.dtype ({resolved_dtype}) for GPModel: SingleTaskGP "
+                f"requires features and labels to share one dtype. Leave label_dtype "
+                f"as None to fall back to dtype."
+            )
 
         self.alphabet = alphabet
         self.alphabet_size = len(alphabet)
@@ -500,7 +515,6 @@ class GPModel(BaseModel):
 
         Raises:
             RuntimeError: If GP model or likelihood is not initialized.
-            ValueError: If optimizer_type in train_config is not supported.
         """
         if self.gp_model is None or self.likelihood is None:
             uninit = [
@@ -528,17 +542,12 @@ class GPModel(BaseModel):
             optimizer = torch.optim.Adam(
                 self.gp_model.parameters(), lr=self.train_config.learning_rate
             )
-        elif self.train_config.optimizer_type == "lbfgs":
+        else:  # lbfgs — optimizer_type is validated in __init__, scipy dispatched above
             optimizer = torch.optim.LBFGS(
                 self.gp_model.parameters(),
                 lr=self.train_config.learning_rate,
                 max_iter=20,
                 line_search_fn="strong_wolfe",
-            )
-        else:
-            raise ValueError(
-                f"Unsupported optimizer_type: {self.train_config.optimizer_type!r}. "
-                f"Expected one of 'adam' or 'lbfgs'."
             )
 
         # Training loop
@@ -624,10 +633,11 @@ class GPModel(BaseModel):
 
         Returns:
             Dictionary of training metrics (`final_mll`, `final_loss`,
-            `num_iterations`).
+            `num_iterations`). `final_loss` and `final_mll` come from an
+            exact evaluation of the fitted mll, not the callback history.
         """
 
-        def _record_step(parameters: dict[str, torch.Tensor], result: Any) -> None:
+        def _record_step(parameters: dict[str, torch.Tensor], result: OptimizationResult) -> None:
             if self._epoch_metrics and result.step <= self._epoch_metrics[-1].epoch:
                 # A fitting retry restarted the step counter — drop the
                 # previous attempt's entries.
@@ -650,14 +660,13 @@ class GPModel(BaseModel):
             max_attempts=self.train_config.max_attempts,
         )
 
-        if self._epoch_metrics:
-            final_loss = self._epoch_metrics[-1].train_loss
-        else:
-            # scipy can converge before the first callback fires
-            mll.train()
-            with torch.no_grad():
-                loss = -mll(mll.model(train_x), train_y)
-                final_loss = loss.item()
+        # Always evaluate the fitted mll exactly — callback entries may be
+        # stale (e.g. from a failed attempt) or absent if scipy converged
+        # before the first callback fired.
+        mll.train()
+        with torch.no_grad():
+            loss = -mll(mll.model(train_x), train_y)
+            final_loss = loss.item()
 
         return {
             "final_mll": -final_loss,
@@ -707,6 +716,39 @@ class GPModel(BaseModel):
                 f"GPModel only supports REGRESSION, got {dataset.config.problem_type!r}."
             )
 
+    def _warn_ard_lengthscale_prior(self, input_dim: int) -> None:
+        """Warn when ARD is enabled without a dimension-aware lengthscale prior.
+
+        Skipped when `input_dim == 1`: the recommended Hvarfner loc of
+        `sqrt(2) + log(d)*0.5` equals the default `sqrt(2)` for d=1, so the
+        warning would be a false positive.
+
+        Args:
+            input_dim: Dimensionality of the training features.
+        """
+        if not self.model_config.ard or input_dim == 1:
+            return
+
+        prior = self.model_config.lengthscale_prior
+        if prior is None:
+            logger.warning(
+                "ARD is enabled with no lengthscale prior. "
+                "Consider setting a dimension-aware prior such as "
+                "LogNormal(loc=sqrt(2) + log(d)*0.5, scale=sqrt(3)) "
+                "where d is the input dimensionality (%d).",
+                input_dim,
+            )
+        elif (
+            prior.get("_target_") == "gpytorch.priors.LogNormalPrior"
+            and abs(prior.get("loc", 0) - math.sqrt(2)) < 1e-9
+        ):
+            logger.warning(
+                "ARD is enabled with the default LogNormal prior (loc=sqrt(2)). "
+                "Consider setting loc=sqrt(2) + log(d)*0.5 for dimension-aware Hvarfner "
+                "priors, where d is the input dimensionality (%d).",
+                input_dim,
+            )
+
     def train(
         self,
         train_data: LabelledCandidates,
@@ -738,28 +780,7 @@ class GPModel(BaseModel):
         self.train_y = train_y
         self.feature_dim = train_x.shape[-1]
 
-        if (
-            self.model_config.ard
-            and self.model_config.lengthscale_prior is not None
-            and self.model_config.lengthscale_prior.get("_target_")
-            == "gpytorch.priors.LogNormalPrior"
-            and abs(self.model_config.lengthscale_prior.get("loc", 0) - math.sqrt(2)) < 1e-9
-        ):
-            logger.warning(
-                "ARD is enabled with the default LogNormal prior (loc=sqrt(2)). "
-                "Consider setting loc=sqrt(2) + log(d)*0.5 for dimension-aware Hvarfner "
-                "priors, where d is the input dimensionality (%d).",
-                train_x.shape[-1],
-            )
-
-        if self.model_config.ard and self.model_config.lengthscale_prior is None:
-            logger.warning(
-                "ARD is enabled with no lengthscale prior. "
-                "Consider setting a dimension-aware prior such as "
-                "LogNormal(loc=sqrt(2) + log(d)*0.5, scale=sqrt(3)) "
-                "where d is the input dimensionality (%d).",
-                train_x.shape[-1],
-            )
+        self._warn_ard_lengthscale_prior(train_x.shape[-1])
 
         try:
             # Re-initialise the likelihood on every fit so priors/constraints
@@ -785,8 +806,11 @@ class GPModel(BaseModel):
             self.likelihood = None
             self.train_x = None
             self.train_y = None
+            self.feature_dim = None
             self._input_normaliser = None
             self._output_standardiser = None
+            self.training_metrics = {}
+            self._epoch_metrics = []
             logger.error(f"Error training GP model: {e}")
             raise
 

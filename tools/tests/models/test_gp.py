@@ -717,8 +717,29 @@ class TestGPBoTorchBackbone:
 
     def test_invalid_dtype_raises(self):
         """An unknown dtype string raises ValueError at construction."""
-        with pytest.raises(ValueError, match="not a valid torch dtype"):
+        with pytest.raises(ValueError, match="not a valid floating-point torch dtype"):
             GPModel(train_config=GPTrainConfig(dtype="not_a_dtype"), device="cpu")
+
+    def test_non_floating_dtype_raises(self):
+        """A valid but non-floating-point dtype raises ValueError at construction."""
+        with pytest.raises(ValueError, match="not a valid floating-point torch dtype"):
+            GPModel(train_config=GPTrainConfig(dtype="int64"), device="cpu")
+
+    def test_label_dtype_mismatch_raises(self):
+        """A label_dtype differing from dtype raises ValueError at construction."""
+        with pytest.raises(ValueError, match="label_dtype .* must match GPTrainConfig.dtype"):
+            GPModel(
+                train_config=GPTrainConfig(label_dtype=torch.float32, dtype="float64"),
+                device="cpu",
+            )
+
+    def test_label_dtype_matching_dtype_accepted(self):
+        """A label_dtype equal to the resolved dtype is accepted."""
+        model = GPModel(
+            train_config=GPTrainConfig(label_dtype=torch.float64, dtype="float64"),
+            device="cpu",
+        )
+        assert model._dtype == torch.float64
 
     def test_nan_loss_raises_and_resets_state(
         self, precomputed_gp_model, tabular_data, monkeypatch
@@ -740,8 +761,11 @@ class TestGPBoTorchBackbone:
         assert precomputed_gp_model.likelihood is None
         assert precomputed_gp_model.train_x is None
         assert precomputed_gp_model.train_y is None
+        assert precomputed_gp_model.feature_dim is None
         assert precomputed_gp_model._input_normaliser is None
         assert precomputed_gp_model._output_standardiser is None
+        assert precomputed_gp_model.training_metrics == {}
+        assert precomputed_gp_model._epoch_metrics == []
 
     def test_botorch_model_property(self, precomputed_gp_model, tabular_data):
         """botorch_model raises before train and returns SingleTaskGP after."""
@@ -813,3 +837,19 @@ class TestGPBoTorchBackbone:
         precomputed_gp_model.train(tabular_data, None)
         for param in precomputed_gp_model.botorch_model.parameters():
             assert param.dtype == torch.float64
+
+    def test_float32_end_to_end(self, tabular_data):
+        """dtype='float32' trains, predicts, and keeps parameters in float32."""
+        model = GPModel(
+            model_config=GPModelConfig(kernel_type="rbf", ard=False),
+            train_config=GPTrainConfig(num_iterations=10, dtype="float32"),
+            featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+            device="cpu",
+        )
+        model.train(tabular_data, None)
+        predictions = model.predict(tabular_data.candidates)
+        assert predictions.means.shape == (len(tabular_data),)
+        assert np.all(np.isfinite(predictions.means))
+        assert np.all(predictions.variances >= 0)
+        for param in model.botorch_model.parameters():
+            assert param.dtype == torch.float32

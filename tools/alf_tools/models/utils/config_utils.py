@@ -43,7 +43,8 @@ def build_from_target(
     Raises:
         ValueError: If `_target_` is missing, not fully qualified, not in
             the allowed module list, names a private attribute (leading
-            underscore), does not resolve to a class, does not subclass
+            underscore), does not exist in the module, does not resolve to
+            a class, does not subclass
             `expected_base`, or if the constructor rejects the provided
             kwargs.
 
@@ -86,7 +87,7 @@ def build_from_target(
             f"build_from_target: _target_ '{target}' names a private attribute "
             f"(leading underscore), which is not permitted."
         )
-    cls = getattr(importlib.import_module(module_path), cls_name)
+    cls = getattr(importlib.import_module(module_path), cls_name, None)
 
     if expected_base is None:
         expected_base = (gpytorch.priors.Prior, gpytorch.constraints.Interval)

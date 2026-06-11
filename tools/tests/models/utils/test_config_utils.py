@@ -79,9 +79,9 @@ def test_build_from_target_does_not_mutate_input():
 
 
 def test_build_from_target_invalid_target_raises():
-    """Tests that an invalid _target_ value raises an AttributeError."""
-    cfg = {"_target_": "gpytorch.priors.NonExistentPrior"}
-    with pytest.raises(AttributeError):
+    """Tests that a nonexistent class name in an allowed module raises ValueError."""
+    cfg = {"_target_": "gpytorch.priors.NoSuchPrior"}
+    with pytest.raises(ValueError, match="does not resolve to a subclass"):
         build_from_target(cfg)
 
 
