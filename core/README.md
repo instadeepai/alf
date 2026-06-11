@@ -228,8 +228,7 @@ These are controlled via `BaseTrainConfig` fields (see section 2):
 
 Concrete model configs may override these defaults; for example, `GPTrainConfig` sets
 `normalise_inputs_strategy="minmax"` and `standardise_outputs=True` because GP kernels operate in
-distance space and benefit from standardised targets, while `CNNTrainConfig` defaults to
-`normalise_inputs_strategy="zscore"`.
+distance space and benefit from standardised targets.
 
 ## Task Types
 

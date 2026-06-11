@@ -429,13 +429,13 @@ class TestCNNLabelDtype:
 class TestCNNNormalisation:
     """Tests for CNNModel input normalisation and output standardisation."""
 
-    def test_cnn_train_config_default_standardises_inputs(self) -> None:
-        """CNNTrainConfig must default normalise_inputs_strategy to 'zscore'."""
+    def test_cnn_train_config_default_no_input_normalisation(self) -> None:
+        """CNNTrainConfig must default normalise_inputs_strategy to None."""
         config = CNNTrainConfig()
-        assert config.normalise_inputs_strategy == "zscore"
+        assert config.normalise_inputs_strategy is None
 
     def test_input_normalisation_enabled(self, sample_data, val_data):
-        """A 'zscore' strategy (the CNN default) must run without error."""
+        """An explicit 'zscore' strategy must run without error."""
         model = CNNModel(
             train_config=CNNTrainConfig(num_epochs=2, normalise_inputs_strategy="zscore"),
             device="cpu",

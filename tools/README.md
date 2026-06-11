@@ -130,7 +130,7 @@ configs (see `alf_core.model.base_model.BaseTrainConfig`).
 
 | Model | `normalise_inputs_strategy` default | `standardise_outputs` default |
 |-------|-------------------------------------|-------------------------------|
-| `CNNModel` | `"zscore"` | `False` |
+| `CNNModel` | `None` | `False` |
 | `GPModel` | `"minmax"` | `True` |
 | `ESM2Model` | `None` | `False` |
 | `ChempropModel` | `None` | `False` |
@@ -142,9 +142,10 @@ configs (see `alf_core.model.base_model.BaseTrainConfig`).
   log-likelihood optimisation. Predictions are inverse-transformed back to the original label
   scale before being returned, so **all metrics are computed on the original label scale**.
 
-**`CNNTrainConfig`** defaults to `normalise_inputs_strategy="zscore"`: deep neural networks
-generally prefer Z-score standardisation, which zero-centres inputs and avoids the gradient bias
-that arises from non-zero-centred activations.
+The `"zscore"` strategy (`InputStandardiser`) zero-centres continuous features and is generally
+preferred for deep neural networks. It is **not** enabled by default for `CNNModel`, whose one-hot
+sequence inputs are degraded by standardisation; set `normalise_inputs_strategy="zscore"` explicitly
+when feeding a CNN continuous features.
 
 To disable input normalisation for a GP, pass an explicit config:
 

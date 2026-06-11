@@ -14,7 +14,7 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Literal, Union
+from typing import Any, Union
 
 import numpy as np
 import torch
@@ -92,9 +92,10 @@ class CNNTrainConfig(BaseTrainConfig):
         num_epochs: Number of epochs to train for.
         learning_rate: Inherited from BaseTrainConfig. Default: 1e-3.
         log_frequency: Inherited from BaseTrainConfig. Default: 10.
-        normalise_inputs_strategy: Overrides the BaseTrainConfig default to
-            `zscore`; deep neural networks generally prefer Z-score
-            standardisation, which zero-centres inputs.
+        normalise_inputs_strategy: Inherited from BaseTrainConfig. Default: None
+            (no input normalisation). Z-score standardisation is a poor fit for
+            the one-hot sequence inputs CNNModel uses, so it is left disabled by
+            default; set explicitly to opt in for continuous-feature inputs.
         standardise_outputs: Inherited from BaseTrainConfig. Default: False.
         label_dtype: Inherited from BaseTrainConfig. None uses the model
             default (float32 for CNN regression). Override to force a dtype.
@@ -102,9 +103,6 @@ class CNNTrainConfig(BaseTrainConfig):
 
     batch_size: int = 32
     num_epochs: int = 50
-    normalise_inputs_strategy: Literal["minmax", "zscore"] | None = (
-        "zscore"  # override BaseTrainConfig default
-    )
 
 
 class SequenceCNN(nn.Module):

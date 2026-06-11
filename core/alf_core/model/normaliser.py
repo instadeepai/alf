@@ -210,8 +210,11 @@ class InputStandardiser:
     such as the CNN's 3-D one-hot tensors (n_samples, alphabet_size, seq_len).
     Statistics are always computed over the batch dimension (dim=0).
 
-    Edge case: if a feature has near-zero standard deviation (constant column), the
-    std is clamped to _MIN_STD to avoid division by zero, and a warning is logged.
+    Edge case: if a feature has near-zero standard deviation (constant column), its
+    scale is set to 1.0 (rather than a tiny epsilon), and a warning is logged. The
+    column is therefore only mean-centred, so unseen non-constant values at predict
+    time (e.g. a one-hot position never varied in training) stay bounded instead of
+    being amplified by division by a near-zero std.
 
     Note:
         Z-score standardisation is generally preferred for deep neural networks
@@ -246,13 +249,15 @@ class InputStandardiser:
         """
         self._mean = np.mean(X, axis=0)
         raw_std = np.std(X, axis=0)
-        self._std = raw_std.clip(min=self._MIN_STD)
-        if np.any(raw_std < self._MIN_STD):
+        # Constant features get a scale of 1.0 so they are only mean-centred,
+        # keeping unseen non-constant values bounded at predict time.
+        near_zero = raw_std < self._MIN_STD
+        self._std = np.where(near_zero, 1.0, raw_std)
+        if np.any(near_zero):
             logger.warning(
                 "InputStandardiser: %d feature(s) have near-zero std (< %.2e). "
-                "Clamping to %.2e. Standardisation may not be meaningful for those features.",
-                int(np.sum(raw_std < self._MIN_STD)),
-                self._MIN_STD,
+                "Setting their scale to 1.0; those features are only mean-centred.",
+                int(np.sum(near_zero)),
                 self._MIN_STD,
             )
 
