@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+import warnings
 from dataclasses import dataclass
 from typing import Any, Iterator, Literal
 
@@ -149,8 +150,6 @@ class ESM2TrainConfig(BaseTrainConfig):
             ValueError: For invalid field combinations or out-of-range values.
             NotImplementedError: If freeze_backbone=False with mode='linear_head'.
         """
-        import warnings
-
         if self.mode not in ("linear_head", "esm2_likelihoods"):
             raise ValueError(
                 f"mode must be 'linear_head' or 'esm2_likelihoods', got {self.mode!r}"
@@ -187,14 +186,14 @@ class ESM2TrainConfig(BaseTrainConfig):
                         "mask_probability has no effect: freeze_backbone=True means no "
                         "training will occur.",
                         UserWarning,
-                        stacklevel=2,
+                        stacklevel=3,
                     )
                 if self.mask_splitting != (0.8, 0.1, 0.1):
                     warnings.warn(
                         "mask_splitting has no effect: freeze_backbone=True means no "
                         "training will occur.",
                         UserWarning,
-                        stacklevel=2,
+                        stacklevel=3,
                     )
             else:
                 if self.loss_fn != "mlm":
@@ -685,6 +684,33 @@ class ESM2Model(BaseModel):
         else:
             return torch.nn.functional.cross_entropy(preds, targets.long())
 
+    def _train_epoch_mlm(
+        self,
+        train_loader: DataLoader,
+        optimizer: optim.Optimizer,
+    ) -> tuple[float, dict[str, float]]:
+        """Train the full ESM-2 backbone for one epoch via masked language modelling.
+
+        Args:
+            train_loader: DataLoader yielding (input_ids, attention_mask) pairs.
+            optimizer: Optimizer over esm_model.parameters().
+
+        Returns:
+            Tuple of (avg_loss, {"perplexity": float, "token_accuracy": float}).
+        """
+        raise NotImplementedError("MLM training loop not yet implemented.")
+
+    def _validate_epoch_mlm(self, val_loader: DataLoader) -> tuple[float, dict[str, float]]:
+        """Validate the MLM model for one epoch.
+
+        Args:
+            val_loader: DataLoader yielding (input_ids, attention_mask) pairs.
+
+        Returns:
+            Tuple of (avg_loss, {"perplexity": float, "token_accuracy": float}).
+        """
+        raise NotImplementedError("MLM validation loop not yet implemented.")
+
     def _train_epoch_linear_head(
         self,
         train_loader: DataLoader,
@@ -865,9 +891,6 @@ class ESM2Model(BaseModel):
         logger.info(
             f"Fine-tuning ESM-2 ({self.model_config.model_id}) with {len(train_data)} sequences"
         )
-
-        if self.train_config.mode == "linear_head":
-            self._require_head()
 
         train_loader = self._prepare_data_loader(train_data, shuffle=True)
         val_loader = None
