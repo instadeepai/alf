@@ -145,7 +145,7 @@ class TestConfigs:
         assert config.log_frequency == 1
 
     def test_mode_invalid_raises(self):
-        """mode with an unknown value raises ValueError."""
+        """Mode with an unknown value raises ValueError."""
         with pytest.raises(ValueError, match="mode must be"):
             ESM2TrainConfig(mode="unknown")  # type: ignore[arg-type]
 
@@ -198,14 +198,19 @@ class TestConfigs:
     def test_mask_probability_out_of_range_raises(self):
         """mask_probability outside (0, 1) raises ValueError."""
         with pytest.raises(ValueError, match="mask_probability"):
-            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=False, loss_fn="mlm",
-                            mask_probability=0.0)
+            ESM2TrainConfig(
+                mode="esm2_likelihoods", freeze_backbone=False, loss_fn="mlm", mask_probability=0.0
+            )
 
     def test_mask_splitting_not_summing_to_one_raises(self):
         """mask_splitting that does not sum to 1.0 raises ValueError."""
         with pytest.raises(ValueError, match="mask_splitting"):
-            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=False, loss_fn="mlm",
-                            mask_splitting=(0.8, 0.1, 0.05))
+            ESM2TrainConfig(
+                mode="esm2_likelihoods",
+                freeze_backbone=False,
+                loss_fn="mlm",
+                mask_splitting=(0.8, 0.1, 0.05),
+            )
 
     def test_mask_probability_warning_when_frozen(self):
         """Non-default mask_probability with freeze_backbone=True emits UserWarning."""
@@ -215,8 +220,9 @@ class TestConfigs:
     def test_mask_splitting_warning_when_frozen(self):
         """Non-default mask_splitting with freeze_backbone=True emits UserWarning."""
         with pytest.warns(UserWarning, match="mask_splitting"):
-            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=True,
-                            mask_splitting=(0.7, 0.2, 0.1))
+            ESM2TrainConfig(
+                mode="esm2_likelihoods", freeze_backbone=True, mask_splitting=(0.7, 0.2, 0.1)
+            )
 
     def test_freeze_backbone_false_raises_for_linear_head(self):
         """freeze_backbone=False with mode='linear_head' raises NotImplementedError."""
@@ -786,9 +792,7 @@ def esm2_likelihoods_model():
     """
     config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
     train_cfg = ESM2TrainConfig(mode="esm2_likelihoods")
-    return ESM2Model(
-        name="test_esm2_ll", model_config=config, train_config=train_cfg, device="cpu"
-    )
+    return ESM2Model(name="test_esm2_ll", model_config=config, train_config=train_cfg, device="cpu")
 
 
 @pytest.fixture(scope="module")
@@ -869,9 +873,7 @@ class TestMaskTokens:
         assert 0.70 < frac_mask_token < 0.90, (
             f"Expected ~80% [MASK] replacements, got {frac_mask_token:.2f}"
         )
-        assert 0.05 < frac_unchanged < 0.20, (
-            f"Expected ~10% unchanged, got {frac_unchanged:.2f}"
-        )
+        assert 0.05 < frac_unchanged < 0.20, f"Expected ~10% unchanged, got {frac_unchanged:.2f}"
 
 
 class TestSeed:
@@ -955,7 +957,7 @@ class TestMLMTrain:
         assert esm2_mlm_train_model._head is None
 
     def test_train_raises_when_backbone_frozen(self, sample_data):
-        """train() raises NotImplementedError when mode='esm2_likelihoods' + freeze_backbone=True."""
+        """train() raises NotImplementedError for esm2_likelihoods with freeze_backbone=True."""
         config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
         train_cfg = ESM2TrainConfig(mode="esm2_likelihoods")
         model = ESM2Model(
@@ -968,9 +970,7 @@ class TestMLMTrain:
         """predict() with mode='esm2_likelihoods' + freeze_backbone=True returns finite PLL."""
         config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
         train_cfg = ESM2TrainConfig(mode="esm2_likelihoods")
-        model = ESM2Model(
-            name="zs_pll", model_config=config, train_config=train_cfg, device="cpu"
-        )
+        model = ESM2Model(name="zs_pll", model_config=config, train_config=train_cfg, device="cpu")
         preds = model.predict([Candidate(data="ACGT", modality="sequence")])
         assert np.all(np.isfinite(preds.means))
         assert preds.means.shape == (1,)
@@ -984,9 +984,7 @@ class TestMLMTrain:
             for n, p in esm2_mlm_train_model.esm_model.named_parameters()
         ), "No backbone parameters changed after MLM training"
 
-    def test_mlm_predict_returns_finite_pll_after_training(
-        self, esm2_mlm_train_model, sample_data
-    ):
+    def test_mlm_predict_returns_finite_pll_after_training(self, esm2_mlm_train_model, sample_data):
         """predict() returns finite PLL scores after MLM fine-tuning."""
         esm2_mlm_train_model.train(sample_data)
         preds = esm2_mlm_train_model.predict(sample_data.candidates)

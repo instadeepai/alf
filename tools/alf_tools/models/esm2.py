@@ -151,9 +151,7 @@ class ESM2TrainConfig(BaseTrainConfig):
             NotImplementedError: If freeze_backbone=False with mode='linear_head'.
         """
         if self.mode not in ("linear_head", "esm2_likelihoods"):
-            raise ValueError(
-                f"mode must be 'linear_head' or 'esm2_likelihoods', got {self.mode!r}"
-            )
+            raise ValueError(f"mode must be 'linear_head' or 'esm2_likelihoods', got {self.mode!r}")
         if self.num_epochs < 1:
             raise ValueError(f"num_epochs must be >= 1, got {self.num_epochs}")
         if self.optimizer_type not in ("adam", "adamw"):
@@ -331,9 +329,7 @@ class ESM2Model(BaseModel):
             RuntimeError: If the head has not been initialised.
         """
         if self._head is None:
-            raise RuntimeError(
-                "_head is None; model was not configured with mode='linear_head'"
-            )
+            raise RuntimeError("_head is None; model was not configured with mode='linear_head'")
         return self._head
 
     def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> dict[str, torch.Tensor]:
@@ -467,13 +463,13 @@ class ESM2Model(BaseModel):
             all_attention_mask: Tensor of shape (n_candidates, seq_len) with 1
                 for non-padding tokens.
 
-        Raises:
-            ValueError: If any sequence has no scoreable residue positions
-                (e.g. all special tokens).
-
         Returns:
             Predictions: means is a float32 numpy array of per-sequence PLL
                 scores (average log-likelihood per residue).
+
+        Raises:
+            ValueError: If any sequence has no scoreable residue positions
+                (e.g. all special tokens).
         """
         n_candidates = all_input_ids.shape[0]
 
@@ -693,11 +689,11 @@ class ESM2Model(BaseModel):
         Args:
             input_ids: Token IDs of shape (batch, seq_len).
 
-        Raises:
-            ValueError: If the tokeniser does not have a mask token.
-
         Returns:
             Tuple of (masked_input_ids, labels), both of shape (batch, seq_len).
+
+        Raises:
+            ValueError: If the tokeniser does not have a mask token.
         """
         if self.tokeniser.mask_token_id is None:
             raise ValueError(
@@ -726,7 +722,9 @@ class ESM2Model(BaseModel):
                 )
                 has_eligible = eligible_float.sum(dim=1) > 0
                 if has_eligible.any():
-                    picks = torch.multinomial(eligible_float[has_eligible], num_samples=1).squeeze(1)
+                    picks = torch.multinomial(eligible_float[has_eligible], num_samples=1).squeeze(
+                        1
+                    )
                     target_rows = rows_with_no_mask.nonzero(as_tuple=True)[0][has_eligible]
                     masked[target_rows, picks] = True
             else:
@@ -854,9 +852,7 @@ class ESM2Model(BaseModel):
                 batch_mask = attention_mask.to(self.device)
 
                 masked_ids, labels = self._mask_tokens(batch_ids)
-                logits = self.esm_model(
-                    input_ids=masked_ids, attention_mask=batch_mask
-                ).logits
+                logits = self.esm_model(input_ids=masked_ids, attention_mask=batch_mask).logits
 
                 vocab_size = logits.shape[-1]
                 loss = torch.nn.functional.cross_entropy(
@@ -1075,9 +1071,7 @@ class ESM2Model(BaseModel):
                 params, lr=self.train_config.learning_rate
             )
         elif self.train_config.optimizer_type == "adam":
-            optimizer = torch.optim.Adam(
-                params, lr=self.train_config.learning_rate
-            )
+            optimizer = torch.optim.Adam(params, lr=self.train_config.learning_rate)
         else:
             raise AssertionError(
                 f"Unreachable: optimizer_type={self.train_config.optimizer_type!r} "
