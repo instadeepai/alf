@@ -40,7 +40,7 @@ def train_config():
     """Zero-shot ESM2TrainConfig (esm2_likelihoods, frozen backbone).
 
     Returns:
-        An ESM2TrainConfig with mode='esm2_likelihoods' and freeze_backbone=True.
+        An ESM2TrainConfig with mode='esm2_likelihoods' (freeze_backbone defaults to True).
     """
     return ESM2TrainConfig(mode="esm2_likelihoods")
 
@@ -294,7 +294,7 @@ class TestPredict:
     def test_last_hidden_state_batch_size_gt_1_raises(self):
         """last_hidden_state pooling with batch_size > 1 must raise ValueError at init."""
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
-        train_cfg = ESM2TrainConfig(freeze_backbone=True, batch_size=2)
+        train_cfg = ESM2TrainConfig(mode="esm2_likelihoods", batch_size=2)
         with pytest.raises(ValueError, match="pooling='last_hidden_state' requires batch_size=1"):
             ESM2Model(name="lhs_bad", model_config=config, train_config=train_cfg, device="cpu")
 
@@ -444,7 +444,7 @@ def frozen_train_model():
     """ESM-2 in zero-shot mode for TestTrainFrozen.
 
     Returns:
-        An ESM2Model with mode='esm2_likelihoods', freeze_backbone=True, CPU.
+        An ESM2Model with mode='esm2_likelihoods' (freeze_backbone defaults to True), CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
     train_cfg = ESM2TrainConfig(mode="esm2_likelihoods")
