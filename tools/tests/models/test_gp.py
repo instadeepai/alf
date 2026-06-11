@@ -414,22 +414,22 @@ class TestGPNormalisation:
             device="cpu",
         )
         model.train(sample_data, val_data=sample_val_data)
-        assert model._input_normaliser is not None
-        assert model._input_normaliser.is_fitted
+        assert model._input_transform is not None
+        assert model._input_transform.is_fitted
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
         assert np.all(predictions.variances >= 0)
 
     def test_input_normalisation_disabled(self, sample_data, sample_val_data):
-        """A None strategy leaves _input_normaliser as None and predict still works."""
+        """A None strategy leaves _input_transform as None and predict still works."""
         model = GPModel(
             train_config=GPTrainConfig(num_iterations=5, normalise_inputs_strategy=None),
             featurizer_config=FeaturizerConfig(featurizer_type="one_hot"),
             device="cpu",
         )
         model.train(sample_data, val_data=sample_val_data)
-        assert model._input_normaliser is None
+        assert model._input_transform is None
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))

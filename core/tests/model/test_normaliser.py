@@ -199,11 +199,14 @@ class TestInputStandardiser:
         np.testing.assert_allclose(X_recovered, X, rtol=1e-5)
 
     def test_constant_feature_does_not_divide_by_zero(self):
-        """A zero-variance feature column clamps std to _MIN_STD, keeping transforms finite."""
+        """A zero-variance feature column has its scale set to 1.0, keeping transforms finite."""
         X = np.array([[3.0, 1.0], [3.0, 2.0], [3.0, 3.0]])
         s = InputStandardiser()
         s.fit(X)
-        assert np.all(s._std >= s._MIN_STD)
+        # Constant column (index 0) has its scale set to 1.0, not divided by a near-zero std.
+        np.testing.assert_allclose(s._std[0], 1.0)
+        # Non-constant column (index 1) keeps its actual std.
+        np.testing.assert_allclose(s._std[1], np.std(X[:, 1]))
         X_t = s.transform(X)
         assert np.all(np.isfinite(X_t))
         # Constant feature is centred to 0 by mean subtraction.

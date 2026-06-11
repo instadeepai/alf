@@ -344,7 +344,7 @@ class GPModel(BaseModel):
         self.train_y: Float[torch.Tensor, "n_samples"] | None = None
 
         # Normalisers — fitted on each train() call, used at predict() time
-        self._input_normaliser: InputNormaliser | InputStandardiser | None = None
+        self._input_transform: InputNormaliser | InputStandardiser | None = None
         self._output_standardiser: OutputStandardiser | None = None
 
         # Track metrics
@@ -602,7 +602,7 @@ class GPModel(BaseModel):
             A tuple of training features and targets as tensors on the current device.
         """
         label_dtype = self.train_config.label_dtype or self._default_label_dtype
-        train_x, train_y, self._input_normaliser, self._output_standardiser = transform_data(
+        train_x, train_y, self._input_transform, self._output_standardiser = transform_data(
             self.featurise(train_data),
             train_data.labels,
             self.train_config.normalise_inputs_strategy,
@@ -733,8 +733,8 @@ class GPModel(BaseModel):
         test_x_np = self.featurise(candidate_points).cpu().numpy()
 
         # Apply input normalization if fitted
-        if self._input_normaliser is not None:
-            test_x_np = self._input_normaliser.transform(test_x_np)
+        if self._input_transform is not None:
+            test_x_np = self._input_transform.transform(test_x_np)
         test_x = torch.tensor(test_x_np, dtype=torch.float32).to(self.device)
 
         # Make predictions with fast predictive variance computation

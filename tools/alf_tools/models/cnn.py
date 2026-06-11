@@ -232,7 +232,7 @@ class CNNModel(BaseModel):
         self.seq_length: int | None = None
 
         # Input normaliser — fitted on each train() call, applied at predict() time
-        self._input_normaliser: InputNormaliser | InputStandardiser | None = None
+        self._input_transform: InputNormaliser | InputStandardiser | None = None
         self._output_standardiser: OutputStandardiser | None = None
 
         # Track metrics
@@ -330,7 +330,7 @@ class CNNModel(BaseModel):
                 f"standardise_outputs=True is not supported for {problem_type} — "
                 "standardisation only applies to regression targets."
             )
-        train_x, train_y, self._input_normaliser, self._output_standardiser = transform_data(
+        train_x, train_y, self._input_transform, self._output_standardiser = transform_data(
             self.featurise(train_data),
             train_data.labels,
             self.train_config.normalise_inputs_strategy,
@@ -349,8 +349,8 @@ class CNNModel(BaseModel):
         val_loader = None
         if val_data is not None and len(val_data) > 0:
             val_x_tensor = self.featurise(val_data)
-            if self._input_normaliser is not None:
-                val_x_np = self._input_normaliser.transform(np.array(val_x_tensor.cpu()))
+            if self._input_transform is not None:
+                val_x_np = self._input_transform.transform(np.array(val_x_tensor.cpu()))
                 val_x = torch.tensor(val_x_np, dtype=train_x.dtype).to(self.device)
             else:
                 val_x = val_x_tensor.to(dtype=train_x.dtype).to(self.device)
@@ -638,9 +638,9 @@ class CNNModel(BaseModel):
         self.model.eval()
         x = self.featurise(candidate_points)
 
-        if self._input_normaliser is not None:
+        if self._input_transform is not None:
             x_np = x.cpu().numpy()
-            x_np = self._input_normaliser.transform(x_np)
+            x_np = self._input_transform.transform(x_np)
             x = torch.tensor(x_np, dtype=x.dtype).to(self.device)
         else:
             x = x.to(self.device)

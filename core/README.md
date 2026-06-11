@@ -204,7 +204,9 @@ All are fitted exclusively on training data and applied consistently at predict 
 **`InputStandardiser`** — Z-score standardisation of input features to zero mean and unit variance:
 - Statistics (per-feature mean and std) are computed over the batch dimension, so each feature
   dimension is standardised independently. Supports the same 2-D and higher-dimensional inputs.
-- Edge case: a feature with near-zero std is clamped to `_MIN_STD = 1e-8` to avoid division by zero.
+- Edge case: a feature with near-zero std (< `_MIN_STD = 1e-8`) has its scale set to `1.0`, so the
+  column is only mean-centred. This keeps unseen non-constant values bounded at predict time instead
+  of being amplified by division by a near-zero std.
 - Generally preferred for deep neural networks (e.g. `CNNModel`): zero-centring inputs avoids the
   gradient bias that arises from non-zero-centred activations.
 
