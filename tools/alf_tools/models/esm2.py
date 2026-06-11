@@ -776,8 +776,59 @@ class ESM2Model(BaseModel):
 
         Returns:
             Tuple of (avg_loss, {"perplexity": float, "token_accuracy": float}).
+
+        Raises:
+            RuntimeError: If the loss becomes NaN or infinite.
+            ValueError: If the DataLoader produces no batches.
         """
-        raise NotImplementedError("MLM training loop not yet implemented.")
+        self.esm_model.train()
+        epoch_losses: list[float] = []
+        all_logits: list[torch.Tensor] = []
+        all_labels: list[torch.Tensor] = []
+
+        for input_ids, attention_mask in train_loader:
+            batch_ids = input_ids.to(self.device)
+            batch_mask = attention_mask.to(self.device)
+
+            masked_ids, labels = self._mask_tokens(batch_ids)
+            logits = self.esm_model(
+                input_ids=masked_ids, attention_mask=batch_mask
+            ).logits  # (B, L, vocab)
+
+            vocab_size = logits.shape[-1]
+            loss = torch.nn.functional.cross_entropy(
+                logits.view(-1, vocab_size), labels.view(-1), ignore_index=-100
+            )
+
+            if not torch.isfinite(loss):
+                raise RuntimeError(
+                    f"MLM training loss is {loss.item():.6g}. "
+                    "Check your data or reduce the learning rate."
+                )
+
+            optimizer.zero_grad()
+            loss.backward()
+            if self.train_config.max_grad_norm is not None:
+                torch.nn.utils.clip_grad_norm_(
+                    self.esm_model.parameters(), self.train_config.max_grad_norm
+                )
+            optimizer.step()
+            epoch_losses.append(loss.item())
+
+            active = labels.view(-1) != -100
+            all_logits.append(logits.view(-1, vocab_size)[active].detach().cpu())
+            all_labels.append(labels.view(-1)[active].detach().cpu())
+
+        if not epoch_losses:
+            raise ValueError(
+                "MLM training DataLoader produced no batches. Ensure train_data is non-empty."
+            )
+
+        avg_loss = float(np.mean(epoch_losses))
+        logits_cat = torch.cat(all_logits, dim=0)
+        labels_cat = torch.cat(all_labels, dim=0)
+        token_accuracy = float((logits_cat.argmax(dim=-1) == labels_cat).float().mean().item())
+        return avg_loss, {"perplexity": float(np.exp(avg_loss)), "token_accuracy": token_accuracy}
 
     def _validate_epoch_mlm(self, val_loader: DataLoader) -> tuple[float, dict[str, float]]:
         """Validate the MLM model for one epoch.
@@ -787,8 +838,45 @@ class ESM2Model(BaseModel):
 
         Returns:
             Tuple of (avg_loss, {"perplexity": float, "token_accuracy": float}).
+
+        Raises:
+            ValueError: If the DataLoader produces no batches.
         """
-        raise NotImplementedError("MLM validation loop not yet implemented.")
+        self.esm_model.eval()
+        val_losses: list[float] = []
+        all_logits: list[torch.Tensor] = []
+        all_labels: list[torch.Tensor] = []
+
+        with torch.no_grad():
+            for input_ids, attention_mask in val_loader:
+                batch_ids = input_ids.to(self.device)
+                batch_mask = attention_mask.to(self.device)
+
+                masked_ids, labels = self._mask_tokens(batch_ids)
+                logits = self.esm_model(
+                    input_ids=masked_ids, attention_mask=batch_mask
+                ).logits
+
+                vocab_size = logits.shape[-1]
+                loss = torch.nn.functional.cross_entropy(
+                    logits.view(-1, vocab_size), labels.view(-1), ignore_index=-100
+                )
+                val_losses.append(loss.item())
+
+                active = labels.view(-1) != -100
+                all_logits.append(logits.view(-1, vocab_size)[active].cpu())
+                all_labels.append(labels.view(-1)[active].cpu())
+
+        if not val_losses:
+            raise ValueError(
+                "MLM validation DataLoader produced no batches. Ensure val_data is non-empty."
+            )
+
+        avg_loss = float(np.mean(val_losses))
+        logits_cat = torch.cat(all_logits, dim=0)
+        labels_cat = torch.cat(all_labels, dim=0)
+        token_accuracy = float((logits_cat.argmax(dim=-1) == labels_cat).float().mean().item())
+        return avg_loss, {"perplexity": float(np.exp(avg_loss)), "token_accuracy": token_accuracy}
 
     def _train_epoch_linear_head(
         self,

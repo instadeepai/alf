@@ -920,3 +920,96 @@ class TestSample:
         """sample() always raises NotImplementedError."""
         with pytest.raises(NotImplementedError):
             esm2_model.sample()
+
+
+@pytest.fixture
+def esm2_mlm_train_model():
+    """Function-scoped ESM-2 with unfrozen backbone for MLM training tests.
+
+    Function-scoped so each test gets a fresh, untrained model.
+
+    Returns:
+        An ESM2Model with mode='esm2_likelihoods', freeze_backbone=False,
+        loss_fn='mlm', 1 epoch, batch_size=2, CPU.
+    """
+    config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
+    train_cfg = ESM2TrainConfig(
+        mode="esm2_likelihoods",
+        freeze_backbone=False,
+        loss_fn="mlm",
+        num_epochs=1,
+        batch_size=2,
+        learning_rate=1e-4,
+        log_frequency=1,
+    )
+    return ESM2Model(
+        name="test_mlm_train", model_config=config, train_config=train_cfg, device="cpu"
+    )
+
+
+class TestMLMTrain:
+    """Integration tests for MLM fine-tuning via mode='esm2_likelihoods' + freeze_backbone=False."""
+
+    def test_head_is_none_in_esm2_likelihoods_mode(self, esm2_mlm_train_model):
+        """_head is None when mode='esm2_likelihoods'."""
+        assert esm2_mlm_train_model._head is None
+
+    def test_train_raises_when_backbone_frozen(self, sample_data):
+        """train() raises NotImplementedError when mode='esm2_likelihoods' + freeze_backbone=True."""
+        config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
+        train_cfg = ESM2TrainConfig(mode="esm2_likelihoods")
+        model = ESM2Model(
+            name="frozen_pll", model_config=config, train_config=train_cfg, device="cpu"
+        )
+        with pytest.raises(NotImplementedError, match="backbone is frozen"):
+            model.train(sample_data)
+
+    def test_zero_shot_predict_returns_finite_pll(self):
+        """predict() with mode='esm2_likelihoods' + freeze_backbone=True returns finite PLL."""
+        config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
+        train_cfg = ESM2TrainConfig(mode="esm2_likelihoods")
+        model = ESM2Model(
+            name="zs_pll", model_config=config, train_config=train_cfg, device="cpu"
+        )
+        preds = model.predict([Candidate(data="ACGT", modality="sequence")])
+        assert np.all(np.isfinite(preds.means))
+        assert preds.means.shape == (1,)
+
+    def test_mlm_train_updates_backbone_weights(self, esm2_mlm_train_model, sample_data):
+        """train() with mode='esm2_likelihoods' + freeze_backbone=False changes backbone params."""
+        initial = {n: p.clone() for n, p in esm2_mlm_train_model.esm_model.named_parameters()}
+        esm2_mlm_train_model.train(sample_data)
+        assert any(
+            not torch.equal(initial[n], p)
+            for n, p in esm2_mlm_train_model.esm_model.named_parameters()
+        ), "No backbone parameters changed after MLM training"
+
+    def test_mlm_predict_returns_finite_pll_after_training(
+        self, esm2_mlm_train_model, sample_data
+    ):
+        """predict() returns finite PLL scores after MLM fine-tuning."""
+        esm2_mlm_train_model.train(sample_data)
+        preds = esm2_mlm_train_model.predict(sample_data.candidates)
+        assert np.all(np.isfinite(preds.means))
+        assert preds.means.shape == (len(sample_data),)
+
+    def test_mlm_epoch_metrics_contain_perplexity_and_token_accuracy(
+        self, esm2_mlm_train_model, sample_data
+    ):
+        """Epoch metrics after MLM training include perplexity and token_accuracy."""
+        esm2_mlm_train_model.train(sample_data)
+        metrics = esm2_mlm_train_model.get_epoch_metrics()
+        assert len(metrics) == 1
+        assert "train_perplexity" in metrics[0].additional_metrics
+        assert "train_token_accuracy" in metrics[0].additional_metrics
+        assert np.isfinite(metrics[0].additional_metrics["train_perplexity"])
+        assert np.isfinite(metrics[0].additional_metrics["train_token_accuracy"])
+
+    def test_mlm_train_with_val_data_records_val_loss(self, esm2_mlm_train_model, sample_data):
+        """val_loss is present in summary metrics when val_data is provided."""
+        val_candidates = [Candidate(data="ACDEFGHIKL", modality="sequence")]
+        val_data = LabelledCandidates(val_candidates, np.array([0.0]))
+        esm2_mlm_train_model.train(sample_data, val_data=val_data)
+        summary = esm2_mlm_train_model.get_training_summary_metrics()
+        assert "final_val_loss" in summary
+        assert np.isfinite(summary["final_val_loss"])
