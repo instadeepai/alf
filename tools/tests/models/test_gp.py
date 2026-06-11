@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import math
 
 import gpytorch
@@ -656,6 +657,49 @@ class TestGPModelPriorWiring:
             base_kernel.raw_lengthscale_constraint,
             gpytorch.constraints.GreaterThan,
         )
+
+    def test_ard_warning_with_default_prior(self, tabular_data, caplog):
+        """Test that enabling ARD with the default LogNormalPrior triggers
+        a warning about Hvarfner priors.
+        """
+        model = GPModel(
+            model_config=GPModelConfig(ard=True),
+            train_config=self._train_cfg,
+            featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+            device="cpu",
+        )
+        with caplog.at_level(logging.WARNING, logger="alf-tools"):
+            model.train(tabular_data)
+        assert "ARD is enabled" in caplog.text
+        assert "Hvarfner" in caplog.text
+
+    def test_ard_warning_with_no_prior(self, tabular_data, caplog):
+        """Test that enabling ARD with lengthscale_prior=None triggers a
+        warning about the missing prior.
+        """
+        model = GPModel(
+            model_config=GPModelConfig(ard=True, lengthscale_prior=None),
+            train_config=self._train_cfg,
+            featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+            device="cpu",
+        )
+        with caplog.at_level(logging.WARNING, logger="alf-tools"):
+            model.train(tabular_data)
+        assert "ARD is enabled" in caplog.text
+        assert "no lengthscale prior" in caplog.text
+
+    def test_no_ard_warning_for_one_dimensional_inputs(self, sample_sinusoidal_data, caplog):
+        """Test that no ARD warning is logged for 1-D inputs, where the
+        default prior already matches the Hvarfner recommendation.
+        """
+        model = GPModel(
+            model_config=GPModelConfig(ard=True),
+            train_config=self._train_cfg,
+            featurizer_config=self._feat_cfg,
+        )
+        with caplog.at_level(logging.WARNING, logger="alf-tools"):
+            model.train(sample_sinusoidal_data)
+        assert "ARD is enabled" not in caplog.text
 
 
 @pytest.fixture
