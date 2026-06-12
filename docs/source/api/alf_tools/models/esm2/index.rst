@@ -2,28 +2,35 @@ ESM2 Model
 ==========
 
 A protein language model surrogate using `ESM-2 <https://huggingface.co/docs/transformers/model_doc/esm>`_
-as the backbone. Accepts amino acid sequences as inputs and supports two operating modes,
-controlled by ``ESM2TrainConfig.scoring_function``:
+as the backbone. Accepts amino acid sequences as inputs and supports three operating modes,
+selected via ``ESM2TrainConfig.mode`` together with ``freeze_backbone``:
 
-- **scoring_function='linear_head'** (default): the ESM-2 backbone is frozen and a trainable linear head
-  is stacked on top of pooled sequence embeddings. The head is configured via ``loss_fn`` and
-  ``output_dim`` in ``ESM2TrainConfig``:
+- **mode='linear_head'** (default): the ESM-2 backbone is frozen and a trainable linear head
+  is stacked on top of pooled sequence embeddings. Requires ``freeze_backbone=True``. The head
+  is configured via ``loss_fn`` and ``output_dim``:
 
-  - ``loss_fn='mse'`` *(default)*: mean-squared-error regression. Set ``output_dim=1``.
+  - ``loss_fn='mse'``: mean-squared-error regression. Set ``output_dim=1``.
     ``predict()`` returns raw scalar values.
   - ``loss_fn='cross_entropy'``: multi-class cross-entropy classification. Set ``output_dim=N``
     for N classes. Labels must be integers in ``[0, N)``; float labels are truncated to int
     with a warning. ``predict()`` returns the argmax class index as a float.
 
-  Call ``train()`` to fit the head on labelled data. Sequence embeddings can also be
-  extracted via ``embed()`` for use with downstream models.
-- **scoring_function='pll'**: ``predict()`` returns per-sequence pseudo-log-likelihood
-  (PLL) scores. Each non-special token is masked one at a time and the log-probability
-  of the correct residue at that position is accumulated; the final score is the mean
-  log-probability across all non-special positions. This is a pure zero-shot scorer —
-  ``train()`` raises ``NotImplementedError``.
-
-The ESM-2 backbone is **always frozen**; full backbone fine-tuning is not currently supported.
+  Call ``train()`` to fit the head on labelled data (``loss_fn`` must be set). Sequence
+  embeddings can also be extracted via ``embed()`` for use with downstream models.
+- **mode='esm2_likelihoods'** with ``freeze_backbone=True``: zero-shot scoring. ``predict()``
+  returns per-sequence pseudo-log-likelihood (PLL) scores — each non-special token is masked
+  one at a time and the log-probability of the correct residue at that position is accumulated,
+  and the final score is the mean log-probability across all non-special positions. Nothing is
+  trained, so ``train()`` raises ``NotImplementedError`` and ``loss_fn`` must be left ``None``.
+- **mode='esm2_likelihoods'** with ``freeze_backbone=False``: MLM fine-tuning. ``train()``
+  fine-tunes the **full ESM-2 backbone** via masked language modelling on the input sequences;
+  ``loss_fn`` must be ``'mlm'``. Masking is controlled by ``mask_probability`` (fraction of
+  eligible tokens masked per sequence) and ``mask_splitting`` (the ``(p_mask, p_random,
+  p_unchanged)`` 3-way replacement probabilities, which must sum to 1.0). Labels in
+  ``train_data`` are ignored, but ``LabelledCandidates`` still requires them — pass placeholder
+  values. After fine-tuning, ``predict()`` returns updated PLL scores. Training reports
+  ``perplexity`` and ``token_accuracy`` over masked positions; validation masking is seeded
+  from ``ESM2ModelConfig.seed`` so metrics are comparable across epochs.
 
 Key properties:
 
