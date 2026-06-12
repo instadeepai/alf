@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Callable, Literal, cast, get_args
 
 import numpy as np
+import pandas as pd
 from alf_core import (
     BaseDataset,
     BaseDatasetConfig,
@@ -162,7 +163,7 @@ class GuacaMol(BaseDataset):
             else {}
         )
 
-    def properties_dataframe(self) -> "pd.DataFrame":
+    def properties_dataframe(self) -> pd.DataFrame:
         """Computed properties aligned with `_raw_dataset.candidates` (row i ↔ candidate i).
 
         Returns a DataFrame with one column per computed property plus a leading ``smiles``
@@ -173,15 +174,8 @@ class GuacaMol(BaseDataset):
             DataFrame of shape (N, P+1) with columns ``["smiles", *_prop_cols]``.
 
         Raises:
-            ImportError: If pandas is not installed.
             RuntimeError: If the dataset is not loaded or no properties were computed.
         """
-        try:
-            import pandas as pd  # noqa: PLC0415
-        except ImportError as exc:
-            raise ImportError(
-                "pandas is required for properties_dataframe(); install it with: pip install pandas"
-            ) from exc
         if self._raw_dataset is None or self._prop_matrix.size == 0:
             raise RuntimeError(
                 "properties_dataframe() is only available after loading a property-mode dataset."
