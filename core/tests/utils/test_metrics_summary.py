@@ -16,7 +16,7 @@
 
 import numpy as np
 import pytest
-from alf_core.utils.metrics import auc_top_k, calibration_curve
+from alf_core.utils.metrics import auc_top_k, calibration_curve, compute_aggregate_metrics
 
 
 class TestAucTopK:
@@ -74,6 +74,19 @@ class TestAucTopK:
         with pytest.warns(UserWarning, match="negative"):
             result = auc_top_k(np.array([-0.5, -0.3]), best_value=1.0)
         assert result["auc_top_k"] == pytest.approx(0.0)
+
+
+class TestComputeAggregateMetrics:
+    """Tests for the compute_aggregate_metrics entry point."""
+
+    def test_runs_all_aggregate_metrics(self):
+        """compute_aggregate_metrics merges the results of every aggregate metric."""
+        result = compute_aggregate_metrics(np.array([0.5, 0.7, 0.8]), best_value=1.0)
+        assert result == auc_top_k(np.array([0.5, 0.7, 0.8]), best_value=1.0)
+
+    def test_skips_metrics_that_cannot_be_computed(self):
+        """Metrics raising ValueError (e.g. too few rounds) are skipped, not raised."""
+        assert compute_aggregate_metrics(np.array([0.9]), best_value=1.0) == {}
 
 
 class TestCalibrationCurve:

@@ -22,7 +22,7 @@ from alf_core.optimizer.optimizer import Optimizer
 from alf_core.oracle.oracle import Oracle
 from alf_core.tasks.base_task import BaseTask
 from alf_core.utils.enums import ProblemType
-from alf_core.utils.metrics.aggregate import auc_top_k
+from alf_core.utils.metrics.aggregate import compute_aggregate_metrics
 from alf_core.utils.metrics.regression import top_k_mean
 from alf_core.utils.state_logger import StateLogger
 
@@ -56,6 +56,7 @@ class DesignTask(BaseTask):
         logger.info("Running initial round of surrogate model fine-tuning on the train dataset ...")
         # Construct RoundMetrics before fit() so state is always typed, even on failure
         state.round_metrics = RoundMetrics(round=0)
+        state.metrics_history.append(state.round_metrics)
         epoch_metrics = state.surrogate.fit(
             train_data=state.dataset.train_dataset,
             val_data=state.dataset.validation_dataset,
@@ -84,12 +85,10 @@ class DesignTask(BaseTask):
 
         The loop continues for num_acq_rounds or until termination conditions are met.
 
-        After all rounds complete, computes the `auc_top_k` experiment summary
-        metric from a per-round sample-efficiency curve and logs it under the
-        round name `experiment_summary`. For regression the curve is the top-k
-        mean of all candidates acquired so far; for classification it is the
-        per-round `surrogate/test_accuracy`. The summary is skipped when fewer
-        than two rounds produced a valid value.
+        After all rounds complete, runs all aggregate metrics (see
+        `alf_core.utils.metrics.aggregate`) over a per-round sample-efficiency
+        curve and logs the result under the round name `experiment_summary`.
+        The summary is skipped when no aggregate metric could be computed.
 
         Args:
             state: Initial task state with dataset and surrogate.
@@ -104,45 +103,55 @@ class DesignTask(BaseTask):
         if len(state.dataset.train_dataset) > 0:
             state = self.run_initial_train_round(state, state_loggers)
 
-        is_regression = state.problem_type == ProblemType.REGRESSION
-        best_value = float(state.dataset.raw_dataset.labels.max()) if is_regression else 1.0
-
-        # Per-round sample-efficiency curve fed to auc_top_k. For regression this is
-        # the top-k mean of all candidates acquired so far (it should rise as good
-        # candidates accumulate); for classification it is the test-set accuracy.
-        round_metric_values: list[float] = []
-
         for round_i in range(1, self.num_acq_rounds + 1):
             state.round_metrics = RoundMetrics(round=round_i)
+            state.metrics_history.append(state.round_metrics)
             acquired_candidates, state = optimizer.ask(state)
             labelled_candidates, state = oracle.evaluate(acquired_candidates, state)
             state.update(labelled_candidates)  # increments state.round to round_i + 1
             state = optimizer.tell(state=state)  # populates round_metrics.training_history
             state = self.evaluate(state=state)
-            if is_regression:
-                acquired_labels = np.concatenate([c.labels for c in state.history])
-                # top_k_mean returns a single dynamically-keyed entry (e.g.
-                # "top_10_mean"); take its value for the AUC curve.
-                top_k = top_k_mean(acquired_labels, None, acquired_labels)
-                round_metric_values.append(float(next(iter(top_k.values()))))
-            else:
-                accuracy = state.round_metrics.metrics.get("surrogate/test_accuracy")
-                if accuracy is not None:
-                    round_metric_values.append(float(accuracy))
             for state_logger in state_loggers:
                 state_logger.log(state)
 
-        if len(round_metric_values) >= 2:
-            try:
-                experiment_metrics = auc_top_k(np.array(round_metric_values), best_value)
-            except ValueError:
-                experiment_metrics = {}
-            if experiment_metrics:
-                state.round_metrics = RoundMetrics(
-                    round=self.num_acq_rounds, metrics=experiment_metrics
-                )
-                state.round_predictions = None
-                for state_logger in state_loggers:
-                    state_logger.log(state, round_name="experiment_summary")
+        is_regression = state.problem_type == ProblemType.REGRESSION
+        best_value = float(state.dataset.raw_dataset.labels.max()) if is_regression else 1.0
+        experiment_metrics = compute_aggregate_metrics(
+            np.array(self._sample_efficiency_curve(state)), best_value
+        )
+        if experiment_metrics:
+            state.round_metrics = RoundMetrics(
+                round=self.num_acq_rounds, metrics=experiment_metrics
+            )
+            state.round_predictions = None
+            for state_logger in state_loggers:
+                state_logger.log(state, round_name="experiment_summary")
 
         return
+
+    def _sample_efficiency_curve(self, state: State) -> list[float]:
+        """Build the per-round sample-efficiency curve fed to the aggregate metrics.
+
+        For regression the curve is the top-k mean of all candidates acquired
+        up to each round (it should rise as good candidates accumulate); for
+        classification it is the per-round test-set accuracy.
+
+        Args:
+            state: Final task state after all acquisition rounds.
+
+        Returns:
+            One value per acquisition round that produced a valid value.
+        """
+        if state.problem_type == ProblemType.REGRESSION:
+            curve = []
+            for round_i in range(1, len(state.history) + 1):
+                labels = np.concatenate([c.labels for c in state.history[:round_i]])
+                # top_k_mean returns a single dynamically-keyed entry (e.g.
+                # "top_10_mean"); take its value for the curve.
+                curve.append(float(next(iter(top_k_mean(labels, None, labels).values()))))
+            return curve
+        return [
+            float(metrics.metrics["surrogate/test_accuracy"])
+            for metrics in state.metrics_history
+            if metrics.round > 0 and "surrogate/test_accuracy" in metrics.metrics
+        ]

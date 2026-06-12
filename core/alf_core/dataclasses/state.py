@@ -34,6 +34,7 @@ class State:
         history: List of LabelledCandidates acquired in each round.
         round_metrics: RoundMetrics instance holding scalar metrics and per-epoch
             training history for the current round.
+        metrics_history: RoundMetrics for every round run so far, in order.
         round_predictions: Predictions on the test set for the current round.
     """
 
@@ -43,6 +44,7 @@ class State:
     acq_batch_size: int = 0
     history: list = field(default_factory=list)
     round_metrics: RoundMetrics = field(default_factory=lambda: RoundMetrics(round=0))
+    metrics_history: list[RoundMetrics] = field(default_factory=list)
     round_predictions: Predictions | None = None
 
     @property

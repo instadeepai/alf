@@ -114,6 +114,10 @@ class TestDesignTask:
         # Test the end-of-experiment summary metric is emitted and well-formed
         self._assert_experiment_summary(metrics)
 
+        # State keeps one RoundMetrics per round: initial train round + 5 acquisition
+        # rounds. The experiment_summary entry is not part of the history.
+        assert [m.round for m in state.metrics_history] == [0, 1, 2, 3, 4, 5]
+
     def _assert_acquired_candidates_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert acquired candidates metrics."""
         for metric_name, expected_value in expected.items():

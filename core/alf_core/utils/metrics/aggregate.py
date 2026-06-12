@@ -77,3 +77,37 @@ def auc_top_k(
     dx = 1.0 / (n - 1)
     auc = float(np.clip(np.sum((normalised[:-1] + normalised[1:]) / 2) * dx, 0.0, 1.0))
     return {"auc_top_k": auc}
+
+
+_AGGREGATE_METRICS = (auc_top_k,)
+
+
+def compute_aggregate_metrics(
+    round_values: Float[np.ndarray, " n_rounds"],
+    best_value: float,
+) -> dict[str, float]:
+    """Run every aggregate metric over a per-round curve and merge the results.
+
+    Single entry point for end-of-experiment summary metrics: new aggregate
+    metrics only need to be added to `_AGGREGATE_METRICS` here, without
+    touching the calling task.  Metrics whose requirements are not met (e.g.
+    fewer than two rounds) raise ValueError internally and are skipped, so
+    the caller does not need to guard against partial failures.
+
+    Args:
+        round_values: Array of shape (n_rounds,) with one aggregated value
+            per round.
+        best_value: The global best oracle label in the dataset, used for
+            normalisation.
+
+    Returns:
+        Merged dictionary of all aggregate metrics that could be computed.
+        Empty when none could be computed.
+    """
+    metrics: dict[str, float] = {}
+    for metric_fn in _AGGREGATE_METRICS:
+        try:
+            metrics.update(metric_fn(round_values, best_value))
+        except ValueError:
+            continue
+    return metrics
