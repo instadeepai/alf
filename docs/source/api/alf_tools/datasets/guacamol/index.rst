@@ -8,32 +8,32 @@ modes: **property prediction** (RDKit physicochemical descriptors as regression 
 **benchmark tasks** (goal-directed scoring functions that evaluate molecular design quality).
 
 Data is downloaded automatically from `Figshare <https://figshare.com/projects/GuacaMol/62224>`_
-on first use and cached locally at ``~/.cache/alf/``.
+on first use and cached locally at `~/.cache/alf/`.
 
 **Supported physicochemical properties:**
 
 +------------------------+------------------------------------------------------+
 | Property               | Description                                          |
 +========================+======================================================+
-| ``BertzCT``            | Bertz complexity index                               |
+| `BertzCT`            | Bertz complexity index                               |
 +------------------------+------------------------------------------------------+
-| ``MolLogP``            | Wildman–Crippen partition coefficient (lipophilicity)|
+| `MolLogP`            | Wildman–Crippen partition coefficient (lipophilicity)|
 +------------------------+------------------------------------------------------+
-| ``MolWt``              | Molecular weight (Da)                                |
+| `MolWt`              | Molecular weight (Da)                                |
 +------------------------+------------------------------------------------------+
-| ``TPSA``               | Topological polar surface area (Å²)                  |
+| `TPSA`               | Topological polar surface area (Å²)                  |
 +------------------------+------------------------------------------------------+
-| ``NumHAcceptors``      | Number of hydrogen bond acceptors                    |
+| `NumHAcceptors`      | Number of hydrogen bond acceptors                    |
 +------------------------+------------------------------------------------------+
-| ``NumHDonors``         | Number of hydrogen bond donors                       |
+| `NumHDonors`         | Number of hydrogen bond donors                       |
 +------------------------+------------------------------------------------------+
-| ``NumRotatableBonds``  | Number of rotatable bonds                            |
+| `NumRotatableBonds`  | Number of rotatable bonds                            |
 +------------------------+------------------------------------------------------+
-| ``NumAliphaticRings``  | Number of aliphatic rings                            |
+| `NumAliphaticRings`  | Number of aliphatic rings                            |
 +------------------------+------------------------------------------------------+
-| ``NumAromaticRings``   | Number of aromatic rings                             |
+| `NumAromaticRings`   | Number of aromatic rings                             |
 +------------------------+------------------------------------------------------+
-| ``QED``                | Quantitative Estimate of Drug-likeness               |
+| `QED`                | Quantitative Estimate of Drug-likeness               |
 +------------------------+------------------------------------------------------+
 
 **Supported benchmark tasks:**
@@ -41,43 +41,43 @@ on first use and cached locally at ``~/.cache/alf/``.
 +-------------------------------------+---------------------------------------------+
 | Task                                | Category                                    |
 +=====================================+=============================================+
-| ``celecoxib_rediscovery``           | Rediscovery (ECFP4 Tanimoto)                |
+| `celecoxib_rediscovery`           | Rediscovery (ECFP4 Tanimoto)                |
 +-------------------------------------+---------------------------------------------+
-| ``troglitazone_rediscovery``        | Rediscovery (ECFP4 Tanimoto)                |
+| `troglitazone_rediscovery`        | Rediscovery (ECFP4 Tanimoto)                |
 +-------------------------------------+---------------------------------------------+
-| ``thiothixene_rediscovery``         | Rediscovery (ECFP4 Tanimoto)                |
+| `thiothixene_rediscovery`         | Rediscovery (ECFP4 Tanimoto)                |
 +-------------------------------------+---------------------------------------------+
-| ``aripiprazole_similarity``         | Similarity (FCFP4 Tanimoto, clipped ≤0.75) |
+| `aripiprazole_similarity`         | Similarity (FCFP4 Tanimoto, clipped ≤0.75) |
 +-------------------------------------+---------------------------------------------+
-| ``albuterol_similarity``            | Similarity (FCFP4 Tanimoto, clipped ≤0.75) |
+| `albuterol_similarity`            | Similarity (FCFP4 Tanimoto, clipped ≤0.75) |
 +-------------------------------------+---------------------------------------------+
-| ``mestranol_similarity``            | Similarity (atom-pair, clipped ≤0.75)       |
+| `mestranol_similarity`            | Similarity (atom-pair, clipped ≤0.75)       |
 +-------------------------------------+---------------------------------------------+
-| ``camphor_menthol_median``          | Median molecule (ECFP4)                     |
+| `camphor_menthol_median`          | Median molecule (ECFP4)                     |
 +-------------------------------------+---------------------------------------------+
-| ``tadalafil_sildenafil_median``     | Median molecule (ECFP6)                     |
+| `tadalafil_sildenafil_median`     | Median molecule (ECFP6)                     |
 +-------------------------------------+---------------------------------------------+
-| ``fexofenadine_mpo``                | Multi-property optimisation (MPO)           |
+| `fexofenadine_mpo`                | Multi-property optimisation (MPO)           |
 +-------------------------------------+---------------------------------------------+
-| ``osimertinib_mpo``                 | Multi-property optimisation (MPO)           |
+| `osimertinib_mpo`                 | Multi-property optimisation (MPO)           |
 +-------------------------------------+---------------------------------------------+
-| ``ranolazine_mpo``                  | Multi-property optimisation (MPO)           |
+| `ranolazine_mpo`                  | Multi-property optimisation (MPO)           |
 +-------------------------------------+---------------------------------------------+
-| ``perindopril_mpo``                 | Multi-property optimisation (MPO)           |
+| `perindopril_mpo`                 | Multi-property optimisation (MPO)           |
 +-------------------------------------+---------------------------------------------+
-| ``amlodipine_mpo``                  | Multi-property optimisation (MPO)           |
+| `amlodipine_mpo`                  | Multi-property optimisation (MPO)           |
 +-------------------------------------+---------------------------------------------+
-| ``sitagliptin_mpo``                 | Multi-property optimisation (MPO)           |
+| `sitagliptin_mpo`                 | Multi-property optimisation (MPO)           |
 +-------------------------------------+---------------------------------------------+
-| ``zaleplon_mpo``                    | Multi-property optimisation (MPO)           |
+| `zaleplon_mpo`                    | Multi-property optimisation (MPO)           |
 +-------------------------------------+---------------------------------------------+
-| ``c7h8n2o2_isomer``                 | Isomer generation (C7H8N2O2)                |
+| `c7h8n2o2_isomer`                 | Isomer generation (C7H8N2O2)                |
 +-------------------------------------+---------------------------------------------+
-| ``c9h10n2o2pf2cl_isomer``           | Isomer generation (C9H10N2O2PF2Cl)          |
+| `c9h10n2o2pf2cl_isomer`           | Isomer generation (C9H10N2O2PF2Cl)          |
 +-------------------------------------+---------------------------------------------+
-| ``aripiprazole_scaffold_hop``       | Scaffold hopping (PHCO + SMARTS gates)      |
+| `aripiprazole_scaffold_hop`       | Scaffold hopping (PHCO + SMARTS gates)      |
 +-------------------------------------+---------------------------------------------+
-| ``aripiprazole_decorator_hop``      | Decorator hopping (PHCO + SMARTS gates)     |
+| `aripiprazole_decorator_hop`      | Decorator hopping (PHCO + SMARTS gates)     |
 +-------------------------------------+---------------------------------------------+
 
 Benchmark task scores are computed on-the-fly via RDKit — no pre-labelled corpus is required.
@@ -87,19 +87,19 @@ All scores are in [0, 1], aggregated using geometric or arithmetic means of sub-
 **Split modes:**
 
 +------------------+---------------------------------------------------------------+
-| ``split_mode``   | Behaviour                                                     |
+| `split_mode`   | Behaviour                                                     |
 +==================+===============================================================+
-| ``"random"``     | Random train/validation/test/candidate_pool split of the      |
-|                  | combined corpus file (``guacamol_v1_all.smiles``).            |
+| `"random"`     | Random train/validation/test/candidate_pool split of the      |
+|                  | combined corpus file (`guacamol_v1_all.smiles`).            |
 +------------------+---------------------------------------------------------------+
-| ``"low_vs_high"``| Split by target property value: low-value molecules form the  |
+| `"low_vs_high"`| Split by target property value: low-value molecules form the  |
 |                  | train set; high-value molecules form the test set.            |
 +------------------+---------------------------------------------------------------+
-| ``"stratified"`` | Stratified split on target property quantiles.                |
+| `"stratified"` | Stratified split on target property quantiles.                |
 +------------------+---------------------------------------------------------------+
-| ``"paper"``      | Uses the original train/valid/test file boundaries from       |
+| `"paper"`      | Uses the original train/valid/test file boundaries from       |
 |                  | Brown et al. (2019), enabling direct comparison with published|
-|                  | results. ``candidate_pool`` is empty in this mode.            |
+|                  | results. `candidate_pool` is empty in this mode.            |
 +------------------+---------------------------------------------------------------+
 
 **Split mapping to ALF (non-paper modes):**
@@ -107,14 +107,14 @@ All scores are in [0, 1], aggregated using geometric or arithmetic means of sub-
 +-----------------------------+-------------------------------------------------------+
 | ALF split                   | Source                                                |
 +=============================+=======================================================+
-| ``train``                   | ``train_ratio`` fraction of the combined corpus       |
+| `train`                   | `train_ratio` fraction of the combined corpus       |
 +-----------------------------+-------------------------------------------------------+
-| ``validation``              | ``validation_frac`` of the train fraction             |
+| `validation`              | `validation_frac` of the train fraction             |
 +-----------------------------+-------------------------------------------------------+
-| ``test``                    | ``test_ratio`` fraction of the combined corpus        |
+| `test`                    | `test_ratio` fraction of the combined corpus        |
 +-----------------------------+-------------------------------------------------------+
-| ``candidate_pool``          | Remaining corpus after train + validation             |
-|                             | (capped at ``max_candidate_pool`` if set)             |
+| `candidate_pool`          | Remaining corpus after train + validation             |
+|                             | (capped at `max_candidate_pool` if set)             |
 +-----------------------------+-------------------------------------------------------+
 
 **Paper split sizes:**

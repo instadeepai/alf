@@ -1,7 +1,7 @@
 State Logger
 ============
 
-The ``state_logger`` module provides classes for logging and tracking the state of active learning
+The `state_logger` module provides classes for logging and tracking the state of active learning
 tasks during execution. Loggers can write task state to different backends (e.g., terminal output, files,
 databases) and are called at key points during task execution to record progress and results.
 

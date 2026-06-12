@@ -1,7 +1,7 @@
 ALF Tools
 =========
 
-The ``alf_tools`` package provides concrete implementations of datasets, models, and optimizer components
+The `alf_tools` package provides concrete implementations of datasets, models, and optimizer components
 for use with the ALF framework. This includes example datasets (GFP, ProteinGym), model implementations
 (CNN, PyRosetta), acquisition functions (UCB, EI, Thompson Sampling, Greedy), search strategies, and
 utility functions.
