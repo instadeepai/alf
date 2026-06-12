@@ -147,16 +147,36 @@ class TestPredictionsToDataFrame:
 
         # Verify DataFrame structure
         assert len(df) == 3
-        assert "sequence" in df.columns
+        assert "data" in df.columns
         assert "mean" in df.columns
         assert "variance" in df.columns
         assert "targets" in df.columns
 
         # Check values
-        np.testing.assert_array_equal(df["sequence"].values, ["seq1", "seq2", "seq3"])
+        np.testing.assert_array_equal(df["data"].values, ["seq1", "seq2", "seq3"])
         np.testing.assert_array_almost_equal(df["mean"].values, [1.0, 2.0, 3.0])
         np.testing.assert_array_almost_equal(df["variance"].values, [0.1, 0.2, 0.3])
         np.testing.assert_array_almost_equal(df["targets"].values, [1.1, 2.1, 3.1])
+
+    def test_to_dataframe_uses_data_column_for_non_sequence_modality(self):
+        """Candidate data is stored under a modality-agnostic 'data' column.
+
+        Regression test: the column was previously hardcoded to 'sequence',
+        which was misleading for non-sequence modalities (e.g. tabular).
+        """
+        means = np.array([1.0, 2.0])
+        predictions = Predictions(means=means)
+        candidates = [
+            Candidate(data=0.5, modality=Modality.TABULAR),
+            Candidate(data=0.7, modality=Modality.TABULAR),
+        ]
+        targets = np.array([0.4, 0.8])
+
+        df = predictions.to_dataframe(candidates, targets, problem_type=ProblemType.REGRESSION)
+
+        assert "data" in df.columns
+        assert "sequence" not in df.columns
+        np.testing.assert_array_almost_equal(df["data"].values, [0.5, 0.7])
 
     def test_to_dataframe_with_empirical_dist(self):
         """Test to_dataframe with empirical distribution."""
