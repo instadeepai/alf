@@ -131,6 +131,22 @@ All scores are in [0, 1], aggregated using geometric or arithmetic means of sub-
 | **Total**          | 1,384,729 |
 +--------------------+-----------+
 
+**Property storage:**
+
+Computed property values are stored in a single contiguous NumPy array on the dataset instance
+rather than in individual ``Candidate.features`` dicts. After loading, ``GuacaMol._prop_matrix``
+has shape ``(N, P)`` where *N* is the number of valid corpus molecules and *P* is the number of
+requested properties; ``GuacaMol._prop_cols`` lists the property names in the corresponding column
+order. ``Candidate.features`` is always ``{}`` for corpus molecules — accessing it will return an
+empty dict, not a ``KeyError``.
+
+Novel molecules queried via :meth:`~alf_tools.datasets.guacamol.GuacaMol.query` still receive a
+populated ``features`` dict in the returned candidate (properties are computed on-the-fly by
+RDKit), because they have no entry in ``_prop_matrix``.
+
+Benchmark-task datasets do not compute RDKit properties on load; ``_prop_matrix`` retains its
+empty sentinel shape of ``(0, 0)`` and ``_prop_cols`` is ``[]``.
+
 **Novel molecules:** For property targets, SMILES not present in the loaded corpus are labelled
 on-the-fly via RDKit in :meth:`~alf_tools.datasets.guacamol.GuacaMol.query`. This means
 generative models can propose entirely new molecules and receive valid labels without reloading
