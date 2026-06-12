@@ -1,5 +1,5 @@
 Design Task Metrics
-===============
+===================
 
 Standalone metrics for design tasks not registered in ``regression_metric_registry``.
 
