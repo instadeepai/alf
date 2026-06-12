@@ -56,6 +56,14 @@ class BoTorchModelAdapter(BotorchModel):
     `predict()`-only ALF models cannot provide `num_outputs`/`batch_shape` and
     raise `NotImplementedError` for those properties.
 
+    Because `predict()` has no notion of BoTorch's posterior options, the ALF
+    path also ignores the `observation_noise` flag: the returned posterior
+    always carries whatever variance `predict()` reports. For `GPModel` that is
+    the noise-inclusive predictive variance, so acquisitions see slightly
+    inflated uncertainty compared to the latent (noise-free) posterior they
+    request by default. `posterior_transform` and `output_indices` cannot be
+    honoured on this path and raise `NotImplementedError` if passed.
+
     Models that don't provide prediction variances (e.g., CNNModel, deterministic
     models) cannot be used with BoTorch acquisition functions. Expected Improvement
     and Upper Confidence Bound require uncertainty estimates; attempting to use such
@@ -101,16 +109,24 @@ class BoTorchModelAdapter(BotorchModel):
             X: Input tensor of shape (batch_size, q, d) or (batch_size, d)
                 where d is the input dimension and q is number of points.
             output_indices: Optional list of output indices for
-                multi-output models.
+                multi-output models. Not supported for ALF models.
             observation_noise: Whether to include observation noise in
                 predictions. Can be bool or Tensor for observed noise.
-            posterior_transform: Optional posterior transformation.
+                Ignored for ALF models — `predict()` decides the variance
+                semantics (noise-inclusive for `GPModel`).
+            posterior_transform: Optional posterior transformation. Not
+                supported for ALF models.
 
         Returns:
             Posterior distribution with mean and variance at input points.
 
         Raises:
             ValueError: If ALF BaseModel doesn't provide variances.
+            NotImplementedError: If `posterior_transform` or `output_indices`
+                is passed for an ALF BaseModel — `predict()`-based posteriors
+                cannot apply them, and ignoring them silently would corrupt
+                acquisition values (e.g. a minimisation transform would be
+                dropped).
         """
         # Case 1: Native BoTorch model - pass through directly
         if self._is_botorch_model:
@@ -122,6 +138,13 @@ class BoTorchModelAdapter(BotorchModel):
             )
 
         # Case 2: ALF BaseModel - adapt predict() to posterior()
+        if posterior_transform is not None or output_indices is not None:
+            raise NotImplementedError(
+                "posterior_transform and output_indices are not supported when "
+                "adapting an ALF BaseModel: posterior() routes through predict(), "
+                "which cannot apply them. Silently ignoring them would corrupt "
+                "acquisition values (e.g. a minimisation transform would be dropped)."
+            )
         # BoTorch passes either 2D (n, d) or 3D (batch, q, d) tensors
         # ALF models expect lists of candidates, so we need to flatten 3D inputs
         # then reshape the output posterior to match BoTorch's expectations

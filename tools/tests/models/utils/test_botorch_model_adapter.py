@@ -37,6 +37,7 @@ from alf_tools.models.utils.botorch_utils import candidates_to_tensor
 from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
     BoTorchModelAdapter,
 )
+from botorch.acquisition.objective import ScalarizedPosteriorTransform
 from botorch.posteriors import Posterior
 from botorch.posteriors.gpytorch import GPyTorchPosterior
 
@@ -187,6 +188,29 @@ def test_posterior_alf_model_without_variances_raises_error(
         match="BoTorch acquisition functions require uncertainty estimates",
     ):
         adapter.posterior(test_tensor_2d)
+
+
+def test_posterior_alf_model_rejects_posterior_transform(
+    mock_alf_model_with_variances, test_tensor_2d
+):
+    """Passing a posterior_transform for an ALF model raises NotImplementedError.
+
+    Silently dropping the transform would corrupt acquisition values (e.g. a
+    minimisation transform would be ignored), so the adapter must fail loudly.
+    """
+    adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
+
+    transform = ScalarizedPosteriorTransform(weights=torch.tensor([-1.0]))
+    with pytest.raises(NotImplementedError, match="posterior_transform"):
+        adapter.posterior(test_tensor_2d, posterior_transform=transform)
+
+
+def test_posterior_alf_model_rejects_output_indices(mock_alf_model_with_variances, test_tensor_2d):
+    """Passing output_indices for an ALF model raises NotImplementedError."""
+    adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
+
+    with pytest.raises(NotImplementedError, match="output_indices"):
+        adapter.posterior(test_tensor_2d, output_indices=[0])
 
 
 def test_posterior_alf_model_preserves_batch_structure(mock_alf_model_with_variances):

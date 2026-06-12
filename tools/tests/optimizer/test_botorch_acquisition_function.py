@@ -40,8 +40,8 @@ from alf_tools.optimizer.acquisition_functions.botorch_acquisition_function impo
 
 def test_botorch_acquisition_config_accepts_valid_name():
     """BotorchAcquisitionConfig does not raise for a registered acquisition name."""
-    cfg = BotorchAcquisitionConfig(name="expected_improvement", kwargs={"best_f": 0.0})
-    assert cfg.name == "expected_improvement"
+    cfg = BotorchAcquisitionConfig(name="log_expected_improvement", kwargs={"best_f": 0.0})
+    assert cfg.name == "log_expected_improvement"
     assert cfg.kwargs == {"best_f": 0.0}
 
 
@@ -57,9 +57,9 @@ def test_botorch_acquisition_config_rejects_unknown_name():
 
 
 def test_botorch_acquisition_config_rejects_missing_best_f():
-    """Missing best_f for expected_improvement raises ValueError."""
+    """Missing best_f for log_expected_improvement raises ValueError."""
     with pytest.raises(ValueError, match="Missing required kwargs"):
-        BotorchAcquisitionConfig(name="expected_improvement", kwargs={})
+        BotorchAcquisitionConfig(name="log_expected_improvement", kwargs={})
 
 
 def test_botorch_acquisition_config_rejects_missing_beta():
@@ -77,7 +77,7 @@ def test_botorch_acquisition_config_rejects_missing_x_baseline():
 def test_botorch_acquisition_config_accepts_all_required_kwargs():
     """All registered acquisition functions accept their required kwargs without error."""
     valid_kwargs = {
-        "expected_improvement": {"best_f": 0.0},
+        "log_expected_improvement": {"best_f": 0.0},
         "upper_confidence_bound": {"beta": 2.0},
         "probability_of_improvement": {"best_f": 0.0},
         "log_noisy_expected_improvement": {"X_baseline": torch.rand(3, 2)},
@@ -115,7 +115,7 @@ def test_botorch_acquisition_function_returns_labelled_candidates(
     botorch_gp_model, test_candidates_2d
 ):
     """BotorchAcquisitionFunction returns LabelledCandidates with one score per candidate."""
-    cfg = BotorchAcquisitionConfig(name="expected_improvement", kwargs={"best_f": 0.0})
+    cfg = BotorchAcquisitionConfig(name="log_expected_improvement", kwargs={"best_f": 0.0})
     acq_fn = BotorchAcquisitionFunction(cfg)
     state = _MockState(botorch_gp_model)
 
@@ -127,7 +127,7 @@ def test_botorch_acquisition_function_returns_labelled_candidates(
 
 def test_botorch_acquisition_function_scores_are_finite(botorch_gp_model, test_candidates_2d):
     """BotorchAcquisitionFunction produces finite scores."""
-    cfg = BotorchAcquisitionConfig(name="expected_improvement", kwargs={"best_f": 0.0})
+    cfg = BotorchAcquisitionConfig(name="log_expected_improvement", kwargs={"best_f": 0.0})
     acq_fn = BotorchAcquisitionFunction(cfg)
     state = _MockState(botorch_gp_model)
 

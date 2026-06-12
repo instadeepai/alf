@@ -92,6 +92,14 @@ def candidates_to_tensor(
             f"Failed to stack candidate data. Ensure all candidates have the same shape. Error: {e}"
         ) from e
 
+    if not np.issubdtype(X.dtype, np.number):
+        raise ValueError(
+            f"Candidate.data must be numeric (np.ndarray or torch.Tensor), got dtype "
+            f"{X.dtype}. Wrap your data in a numeric np.ndarray or torch.Tensor when "
+            f"creating Candidates, or use a featuriser (e.g. featurizer_type='one_hot') "
+            f"for sequence data."
+        )
+
     # Convert to tensor
     X_tensor = torch.from_numpy(X).to(dtype).to(device)
     return X_tensor

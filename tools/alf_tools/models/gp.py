@@ -823,7 +823,7 @@ class GPModel(BaseModel):
             self._output_standardiser = None
             self.training_metrics = {}
             self._epoch_metrics = []
-            logger.error(f"Error training GP model: {e}")
+            logger.error("Error training GP model: %s", e)
             raise
 
         # Store training metrics

@@ -21,7 +21,7 @@ either a native BoTorch `Model` or an ALF `BaseModel` — a
 is inserted automatically when needed.
 
 Usage::
-    cfg = BotorchAcquisitionConfig(name="expected_improvement", kwargs={"best_f": 0.5})
+    cfg = BotorchAcquisitionConfig(name="log_expected_improvement", kwargs={"best_f": 0.5})
     acq_fn = BotorchAcquisitionFunction(cfg)
     labelled = acq_fn(candidates, state)
 """
@@ -47,7 +47,7 @@ from botorch.acquisition.logei import qLogNoisyExpectedImprovement
 from botorch.models.model import Model as BotorchModel
 
 ACQUISITION_REGISTRY: dict[str, type[AcquisitionFunction]] = {
-    "expected_improvement": LogExpectedImprovement,
+    "log_expected_improvement": LogExpectedImprovement,
     "upper_confidence_bound": UpperConfidenceBound,
     "probability_of_improvement": ProbabilityOfImprovement,
     "log_noisy_expected_improvement": qLogNoisyExpectedImprovement,
@@ -55,6 +55,11 @@ ACQUISITION_REGISTRY: dict[str, type[AcquisitionFunction]] = {
 """Maps acquisition function names to their BoTorch acquisition classes.
 
 Keys correspond to the `name` field of :class:`BotorchAcquisitionConfig`.
+
+The `log_*` variants score in log-space: values are typically negative and
+higher (less negative) means more promising. Argmax selection matches the
+non-log acquisition, but absolute scores are not comparable to classic EI
+values (such as ALF's own `ExpectedImprovement`).
 """
 
 
@@ -66,7 +71,10 @@ class BotorchAcquisitionConfig:
         name: Name of the acquisition function.  Must be a key in
             :data:`ACQUISITION_REGISTRY`.
         kwargs: Keyword arguments forwarded to the acquisition constructor
-            (everything except `model`).
+            (everything except `model`). Some acquisitions require live
+            tensors (e.g. `X_baseline` for `log_noisy_expected_improvement`),
+            so unlike `GPModelConfig`'s `_target_` dicts this config is not
+            always YAML-serialisable — such kwargs must be built in Python.
 
     Raises:
         ValueError: If `name` is not a key in :data:`ACQUISITION_REGISTRY`.
@@ -113,6 +121,11 @@ class BotorchAcquisitionFunction(AlfAcquisitionFunction):
     If the surrogate model is an ALF `BaseModel` it is adapted via
     :class:`~alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter.BoTorchModelAdapter`
     before being passed to the BoTorch acquisition.
+
+    Candidates are converted to a float64 tensor before scoring. Native
+    BoTorch models trained in another dtype (e.g. float32) will raise a dtype
+    mismatch at call time; ALF models are unaffected, as the adapter routes
+    through `predict()`, which handles dtype internally.
 
     Args:
         cfg: Config specifying the acquisition function name and its keyword

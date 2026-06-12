@@ -75,6 +75,21 @@ def test_candidates_to_tensor_inconsistent_shapes():
         candidates_to_tensor(candidates)
 
 
+def test_candidates_to_tensor_non_numeric_data_raises():
+    """Test that non-numeric candidate data (e.g. sequence strings) raises ValueError.
+
+    Without this guard, string data would fall through np.asarray and die later
+    in torch.from_numpy with an opaque TypeError.
+    """
+    candidates = [
+        Candidate(data="ACDE", modality=Modality.SEQUENCE),
+        Candidate(data="GHIK", modality=Modality.SEQUENCE),
+    ]
+
+    with pytest.raises(ValueError, match="must be numeric"):
+        candidates_to_tensor(candidates)
+
+
 def test_candidates_to_tensor_device():
     """Test that device parameter works correctly."""
     candidates = [
