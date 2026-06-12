@@ -118,7 +118,7 @@ def proteingym_dataset_cv_multiples():
 
 
 @pytest.mark.skipif(
-    os.environ.get("HF_TOKEN") is None,
+    not os.environ.get("HF_TOKEN"),
     reason="HF_TOKEN not set; required for gated ProteinGym dataset access",
 )
 class TestProteinGymDataset:
