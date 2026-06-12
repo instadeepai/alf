@@ -35,7 +35,7 @@ from alf_core import AcquisitionFunction as AlfAcquisitionFunction
 from alf_core import Candidate, LabelledCandidates, State
 from alf_tools.models.utils.botorch_utils import candidates_to_tensor
 from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
-    BoTorchModelAdapter,
+    BotorchModelWrapper,
 )
 from botorch.acquisition import AcquisitionFunction
 from botorch.acquisition.analytic import (
@@ -165,7 +165,7 @@ class BotorchAcquisitionFunction(AlfAcquisitionFunction):
                 pass
         X = candidates_to_tensor(search_candidates, device=device)
 
-        adapted = model if isinstance(model, BotorchModel) else BoTorchModelAdapter(model)
+        adapted = model if isinstance(model, BotorchModel) else BotorchModelWrapper(model)
         botorch_acq = self._acq_cls(model=adapted, **self._cfg.kwargs)
 
         X_batched = X.unsqueeze(1) if X.dim() == 2 else X

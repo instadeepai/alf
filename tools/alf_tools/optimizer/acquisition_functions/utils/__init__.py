@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
-    BoTorchModelAdapter,
+    BotorchModelWrapper,
 )
 
-__all__ = ["BoTorchModelAdapter"]
+__all__ = ["BotorchModelWrapper"]

@@ -35,7 +35,7 @@ from alf_core import Candidate, LabelledCandidates, Modality
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPTrainConfig
 from alf_tools.models.utils.botorch_utils import candidates_to_tensor
 from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
-    BoTorchModelAdapter,
+    BotorchModelWrapper,
 )
 from botorch.acquisition.objective import ScalarizedPosteriorTransform
 from botorch.posteriors import Posterior
@@ -48,7 +48,7 @@ from botorch.posteriors.gpytorch import GPyTorchPosterior
 
 def test_adapter_init_with_botorch_model(botorch_gp_model):
     """Test initialization with a native BoTorch model."""
-    adapter = BoTorchModelAdapter(botorch_gp_model)
+    adapter = BotorchModelWrapper(botorch_gp_model)
 
     assert adapter._wrapped_model is botorch_gp_model
     assert adapter._is_botorch_model is True
@@ -56,7 +56,7 @@ def test_adapter_init_with_botorch_model(botorch_gp_model):
 
 def test_adapter_init_with_alf_model(mock_alf_model_with_variances):
     """Test initialization with an ALF BaseModel."""
-    adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
+    adapter = BotorchModelWrapper(mock_alf_model_with_variances)
 
     assert adapter._wrapped_model is mock_alf_model_with_variances
     assert adapter._is_botorch_model is False
@@ -67,13 +67,13 @@ def test_adapter_init_with_invalid_model():
     invalid_model = "not_a_model"
 
     with pytest.raises(TypeError, match="must be either a BoTorch Model or ALF BaseModel"):
-        BoTorchModelAdapter(invalid_model)
+        BotorchModelWrapper(invalid_model)
 
 
 def test_adapter_init_with_none():
     """Test that initialization fails with None."""
     with pytest.raises(TypeError, match="must be either a BoTorch Model or ALF BaseModel"):
-        BoTorchModelAdapter(None)
+        BotorchModelWrapper(None)
 
 
 # =============================================================================
@@ -83,7 +83,7 @@ def test_adapter_init_with_none():
 
 def test_posterior_botorch_model_2d(botorch_gp_model, test_tensor_2d):
     """Test posterior computation with native BoTorch model and 2D input."""
-    adapter = BoTorchModelAdapter(botorch_gp_model)
+    adapter = BotorchModelWrapper(botorch_gp_model)
 
     posterior = adapter.posterior(test_tensor_2d)
 
@@ -98,7 +98,7 @@ def test_posterior_botorch_model_2d(botorch_gp_model, test_tensor_2d):
 
 def test_posterior_botorch_model_3d(botorch_gp_model, test_tensor_3d):
     """Test posterior computation with native BoTorch model and 3D input."""
-    adapter = BoTorchModelAdapter(botorch_gp_model)
+    adapter = BotorchModelWrapper(botorch_gp_model)
 
     # 3D input: (batch_size=2, q=3, d=2)
     posterior = adapter.posterior(test_tensor_3d)
@@ -111,7 +111,7 @@ def test_posterior_botorch_model_3d(botorch_gp_model, test_tensor_3d):
 
 def test_posterior_botorch_model_passes_arguments(botorch_gp_model, test_tensor_2d):
     """Test that posterior arguments are passed through to BoTorch model."""
-    adapter = BoTorchModelAdapter(botorch_gp_model)
+    adapter = BotorchModelWrapper(botorch_gp_model)
 
     # Call with observation_noise parameter
     posterior_with_noise = adapter.posterior(test_tensor_2d, observation_noise=True)
@@ -128,7 +128,7 @@ def test_posterior_botorch_model_passes_arguments(botorch_gp_model, test_tensor_
 
 def test_posterior_alf_model_2d(mock_alf_model_with_variances, test_tensor_2d):
     """Test posterior computation with ALF model and 2D input."""
-    adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
+    adapter = BotorchModelWrapper(mock_alf_model_with_variances)
 
     posterior = adapter.posterior(test_tensor_2d)
 
@@ -152,7 +152,7 @@ def test_posterior_alf_model_2d(mock_alf_model_with_variances, test_tensor_2d):
 
 def test_posterior_alf_model_3d(mock_alf_model_with_variances, test_tensor_3d):
     """Test posterior computation with ALF model and 3D input."""
-    adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
+    adapter = BotorchModelWrapper(mock_alf_model_with_variances)
 
     # 3D input: (batch_size=2, q=3, d=2)
     posterior = adapter.posterior(test_tensor_3d)
@@ -177,7 +177,7 @@ def test_posterior_alf_model_without_variances_raises_error(
     mock_alf_model_without_variances, test_tensor_2d
 ):
     """Test that ALF model without variances raises informative error."""
-    adapter = BoTorchModelAdapter(mock_alf_model_without_variances)
+    adapter = BotorchModelWrapper(mock_alf_model_without_variances)
 
     with pytest.raises(ValueError, match="does not provide prediction variances"):
         adapter.posterior(test_tensor_2d)
@@ -198,7 +198,7 @@ def test_posterior_alf_model_rejects_posterior_transform(
     Silently dropping the transform would corrupt acquisition values (e.g. a
     minimisation transform would be ignored), so the adapter must fail loudly.
     """
-    adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
+    adapter = BotorchModelWrapper(mock_alf_model_with_variances)
 
     transform = ScalarizedPosteriorTransform(weights=torch.tensor([-1.0]))
     with pytest.raises(NotImplementedError, match="posterior_transform"):
@@ -207,7 +207,7 @@ def test_posterior_alf_model_rejects_posterior_transform(
 
 def test_posterior_alf_model_rejects_output_indices(mock_alf_model_with_variances, test_tensor_2d):
     """Passing output_indices for an ALF model raises NotImplementedError."""
-    adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
+    adapter = BotorchModelWrapper(mock_alf_model_with_variances)
 
     with pytest.raises(NotImplementedError, match="output_indices"):
         adapter.posterior(test_tensor_2d, output_indices=[0])
@@ -215,7 +215,7 @@ def test_posterior_alf_model_rejects_output_indices(mock_alf_model_with_variance
 
 def test_posterior_alf_model_preserves_batch_structure(mock_alf_model_with_variances):
     """Test that 3D reshaping preserves batch structure correctly."""
-    adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
+    adapter = BotorchModelWrapper(mock_alf_model_with_variances)
 
     # Create specific 3D tensor: batch_size=3, q=2, d=2
     X = torch.tensor(
@@ -251,14 +251,14 @@ def test_posterior_alf_model_preserves_batch_structure(mock_alf_model_with_varia
 
 def test_num_outputs_botorch_model(botorch_gp_model):
     """Test num_outputs property with BoTorch model."""
-    adapter = BoTorchModelAdapter(botorch_gp_model)
+    adapter = BotorchModelWrapper(botorch_gp_model)
 
     assert adapter.num_outputs == botorch_gp_model.num_outputs
 
 
 def test_num_outputs_alf_model(mock_alf_model_with_variances):
     """Test num_outputs raises for ALF models without a `botorch_model`."""
-    adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
+    adapter = BotorchModelWrapper(mock_alf_model_with_variances)
 
     with pytest.raises(
         NotImplementedError,
@@ -269,14 +269,14 @@ def test_num_outputs_alf_model(mock_alf_model_with_variances):
 
 def test_batch_shape_botorch_model(botorch_gp_model):
     """Test batch_shape property with BoTorch model."""
-    adapter = BoTorchModelAdapter(botorch_gp_model)
+    adapter = BotorchModelWrapper(botorch_gp_model)
 
     assert adapter.batch_shape == botorch_gp_model.batch_shape
 
 
 def test_batch_shape_alf_model(mock_alf_model_with_variances):
     """Test batch_shape raises for ALF models without a `botorch_model`."""
-    adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
+    adapter = BotorchModelWrapper(mock_alf_model_with_variances)
 
     with pytest.raises(
         NotImplementedError,
@@ -287,21 +287,21 @@ def test_batch_shape_alf_model(mock_alf_model_with_variances):
 
 def test_num_outputs_alf_model_with_botorch_model(trained_gp_model):
     """num_outputs delegates to the wrapped ALF model's trained `botorch_model`."""
-    adapter = BoTorchModelAdapter(trained_gp_model.model)
+    adapter = BotorchModelWrapper(trained_gp_model.model)
 
     assert adapter.num_outputs == 1
 
 
 def test_batch_shape_alf_model_with_botorch_model(trained_gp_model):
     """batch_shape delegates to the wrapped ALF model's trained `botorch_model`."""
-    adapter = BoTorchModelAdapter(trained_gp_model.model)
+    adapter = BotorchModelWrapper(trained_gp_model.model)
 
     assert adapter.batch_shape == torch.Size([])
 
 
 def test_num_outputs_untrained_gp_model_raises():
     """num_outputs raises for an untrained GPModel (no `botorch_model` yet)."""
-    adapter = BoTorchModelAdapter(GPModel(device="cpu"))
+    adapter = BotorchModelWrapper(GPModel(device="cpu"))
 
     with pytest.raises(
         NotImplementedError,
@@ -312,7 +312,7 @@ def test_num_outputs_untrained_gp_model_raises():
 
 def test_batch_shape_untrained_gp_model_raises():
     """batch_shape raises for an untrained GPModel (no `botorch_model` yet)."""
-    adapter = BoTorchModelAdapter(GPModel(device="cpu"))
+    adapter = BotorchModelWrapper(GPModel(device="cpu"))
 
     with pytest.raises(
         NotImplementedError,
@@ -328,7 +328,7 @@ def test_batch_shape_untrained_gp_model_raises():
 
 def test_adapter_with_candidates_conversion(mock_alf_model_with_variances, test_candidates_2d):
     """Test full workflow: candidates -> tensor -> posterior."""
-    adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
+    adapter = BotorchModelWrapper(mock_alf_model_with_variances)
 
     # Convert candidates to tensor
     X = candidates_to_tensor(test_candidates_2d)
@@ -342,7 +342,7 @@ def test_adapter_with_candidates_conversion(mock_alf_model_with_variances, test_
 
 def test_adapter_posterior_statistics(mock_alf_model_with_variances, test_tensor_2d):
     """Test that posterior statistics are computed correctly."""
-    adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
+    adapter = BotorchModelWrapper(mock_alf_model_with_variances)
 
     posterior = adapter.posterior(test_tensor_2d)
 
@@ -361,7 +361,7 @@ def test_adapter_posterior_statistics(mock_alf_model_with_variances, test_tensor
 
 def test_adapter_empty_posterior_transform(botorch_gp_model, test_tensor_2d):
     """Test that posterior_transform parameter is accepted (even if None)."""
-    adapter = BoTorchModelAdapter(botorch_gp_model)
+    adapter = BotorchModelWrapper(botorch_gp_model)
 
     # Should work with None posterior_transform
     posterior = adapter.posterior(test_tensor_2d, posterior_transform=None)
@@ -371,7 +371,7 @@ def test_adapter_empty_posterior_transform(botorch_gp_model, test_tensor_2d):
 
 def test_adapter_different_input_dimensions(mock_alf_model_with_variances):
     """Test adapter works with different input dimensions."""
-    adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
+    adapter = BotorchModelWrapper(mock_alf_model_with_variances)
 
     # Test with different numbers of points
     for n_points in [1, 5, 10, 20]:
@@ -382,7 +382,7 @@ def test_adapter_different_input_dimensions(mock_alf_model_with_variances):
 
 def test_adapter_with_single_point(mock_alf_model_with_variances):
     """Test adapter with a single point (edge case)."""
-    adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
+    adapter = BotorchModelWrapper(mock_alf_model_with_variances)
 
     X = torch.tensor([[0.5, 0.5]], dtype=torch.float32)
     posterior = adapter.posterior(X)
@@ -393,7 +393,7 @@ def test_adapter_with_single_point(mock_alf_model_with_variances):
 
 def test_adapter_deterministic_predictions(mock_alf_model_with_variances):
     """Test that same input gives same output (deterministic)."""
-    adapter = BoTorchModelAdapter(mock_alf_model_with_variances)
+    adapter = BotorchModelWrapper(mock_alf_model_with_variances)
 
     X = torch.tensor([[0.5, 0.5]], dtype=torch.float32)
 
@@ -425,7 +425,7 @@ def test_adapter_integration_with_real_gp_model():
     gp_model.train(train_data)
 
     # Wrap in adapter
-    adapter = BoTorchModelAdapter(gp_model)
+    adapter = BotorchModelWrapper(gp_model)
 
     # Call posterior with 2D input
     X_test = torch.tensor([[0.2, 0.3], [0.5, 0.6]], dtype=torch.float32)

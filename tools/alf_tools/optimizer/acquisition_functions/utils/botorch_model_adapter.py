@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     from botorch.acquisition.objective import PosteriorTransform
 
 
-class BoTorchModelAdapter(BotorchModel):
+class BotorchModelWrapper(BotorchModel):
     """Universal adapter for BoTorch acquisition functions compatibility.
 
     Accepts either a native BoTorch `Model` (direct pass-through to
