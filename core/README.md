@@ -373,7 +373,7 @@ the dataset's `problem_type`.
 - **Top-K Max** (`top_k_max`): Maximum oracle label of the top-k acquired candidates per round
 - **Hit Rate** (`hit_rate`): Fraction of acquired candidates whose label meets a threshold
 
-**Summary Metrics** (standalone, not in registry, `utils/metrics/aggregate.py`):
+**Design Task Metrics** (standalone, not in registry, `utils/metrics/aggregate.py`):
 - **AUC Top-K** (`auc_top_k`): Normalised area under the top-k mean curve across rounds — primary sample-efficiency ranking metric, computed automatically by `DesignTask` at campaign end
 
 **Acquisition Batch Metrics** (`utils/metrics/acquisition_batch.py`):

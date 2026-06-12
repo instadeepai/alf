@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Metrics for the acquired candidate batch.
+"""Metrics for the acquisition function on the acquired batch.
 
 Covers both within-batch diversity (how spread out the batch is) and
 pool-relative quality metrics (recall and regret against the full
