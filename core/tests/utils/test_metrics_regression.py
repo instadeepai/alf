@@ -14,6 +14,8 @@
 
 """Tests for regression metrics."""
 
+import warnings
+
 import numpy as np
 import pytest
 from alf_core.utils.metrics import (
@@ -128,6 +130,24 @@ class TestExpectedCalibrationError:
         assert "ece" in result
         assert result["ece"] >= 0.0
 
+    def test_zero_variance_exact_predictions_do_not_warn(self):
+        """Zero-variance exact predictions compute ECE without NaN warnings.
+
+        At the confidence-1.0 grid point `norm.ppf(1)` is inf, and inf * 0
+        variance previously produced NaN interval bounds (RuntimeWarning)
+        that mis-counted exact predictions as uncovered.
+        """
+        means = np.array([1.0, 2.0, 3.0])
+        variances = np.zeros(3)
+        targets = np.array([1.0, 2.0, 3.0])
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            result = expected_calibration_error(means, variances, targets)
+        # Exact predictions are covered at every confidence level, so the
+        # observed coverage is 1.0 everywhere and ECE is the area between
+        # the constant-1 curve and the diagonal (~0.5).
+        assert result["ece"] == pytest.approx(0.5, abs=0.02)
+
 
 class TestRegretUcbAlpha:
     """Tests for regret_ucb_alpha."""
@@ -141,10 +161,11 @@ class TestRegretUcbAlpha:
         assert result.get("regret_ucb_0.00", -1) == pytest.approx(0.0)
 
     def test_small_dataset_returns_empty(self):
-        """Dataset of size 1 returns empty dict."""
-        result = regret_ucb_alpha(
-            np.array([1.0]), np.array([0.1]), np.array([1.0]), num_acquisitions=1
-        )
+        """Dataset of size 1 warns and returns empty dict."""
+        with pytest.warns(UserWarning, match="too small"):
+            result = regret_ucb_alpha(
+                np.array([1.0]), np.array([0.1]), np.array([1.0]), num_acquisitions=1
+            )
         assert result == {}
 
     def test_returns_non_negative_regret(self):
@@ -239,7 +260,10 @@ class TestRegretUcbAlphaSweep:
         means = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
         variances = np.ones(5)
         targets = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
-        result = regret_ucb_alpha_sweep(means, variances, targets, alpha=0.5)
+        # The default num_acquisitions (100) exceeds the 5 items, triggering
+        # the documented fallback warning.
+        with pytest.warns(UserWarning, match="num_acquisitions"):
+            result = regret_ucb_alpha_sweep(means, variances, targets, alpha=0.5)
         assert len(result) > 0
 
     def test_int_alpha_works(self):

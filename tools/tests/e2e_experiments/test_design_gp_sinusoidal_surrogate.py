@@ -35,6 +35,17 @@ from alf_tools.models import FeaturizerConfig, GPModel, GPModelConfig, GPTrainCo
 from alf_tools.optimizer.acquisition_functions.ucb import UCB
 from scipy.stats import spearmanr
 
+# Expected warnings from running a small experiment end-to-end:
+# - the 25-item test split is below the default num_acquisitions (100), so the
+#   regret metrics fall back with a warning during evaluation;
+# - the oracle re-labels acquired candidates with its own noise, so acquired
+#   labels can exceed the raw dataset's best label and auc_top_k warns that
+#   the normalised AUC is clamped.
+pytestmark = [
+    pytest.mark.filterwarnings("ignore:num_acquisitions:UserWarning"),
+    pytest.mark.filterwarnings("ignore:Some round_values exceed best_value:UserWarning"),
+]
+
 # ---------------------------------------------------------------------------
 # Synthetic sinusoidal helpers
 # ---------------------------------------------------------------------------

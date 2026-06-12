@@ -32,8 +32,13 @@ from botorch.models import SingleTaskGP
 
 # Training on deliberately tiny datasets triggers the regret-metric fallback
 # warning (num_acquisitions > available items) from alf_core during the
-# train/validation metric computation in GPModel.train().
-pytestmark = pytest.mark.filterwarnings("ignore:num_acquisitions:UserWarning")
+# train/validation metric computation in GPModel.train(), and can produce
+# constant predictions or targets that make scipy's correlation metrics warn.
+pytestmark = pytest.mark.filterwarnings(
+    "ignore:num_acquisitions:UserWarning",
+    "ignore::scipy.stats.ConstantInputWarning",
+    "ignore::scipy.stats.NearConstantInputWarning",
+)
 
 
 @pytest.fixture

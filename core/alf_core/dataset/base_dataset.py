@@ -365,7 +365,8 @@ class BaseDataset(abc.ABC):
         metrics: dict[str, Union[float, int, np.number]] = {}
         for key, split in self.splits.items():
             metrics[f"num_{key}"] = len(split)
-            metrics[f"{key}_mean"] = np.mean(split.labels)
+            # np.mean on an empty split emits RuntimeWarnings; the value is NaN either way.
+            metrics[f"{key}_mean"] = np.mean(split.labels) if len(split) > 0 else float("nan")
         return metrics
 
     def save_splits(self, output_path: str | os.PathLike) -> None:

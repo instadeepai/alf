@@ -479,13 +479,14 @@ def regret_ucb_alpha(
     assert num_acquisitions > 0, "num_acquisitions should be positive"
     # Handle case where num_acquisitions > available items
     if num_acquisitions > len(means):
+        fallback_acquisitions = max(1, round(len(means) / 2))
         warnings.warn(
-            f"num_acquisitions ({num_acquisitions}) is greater than the number"
-            f"of available items ({len(means)}). Using round({len(means) / 2})"
+            f"num_acquisitions ({num_acquisitions}) is greater than the number "
+            f"of available items ({len(means)}). Using {fallback_acquisitions} "
             f"acquisitions instead.",
             stacklevel=2,
         )
-        num_acquisitions = max(1, round(len(means) / 2))
+        num_acquisitions = fallback_acquisitions
 
     # With 1 candidate:
     # UCB would select that 1 candidate (the only option)

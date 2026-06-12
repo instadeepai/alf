@@ -52,12 +52,14 @@ def expected_calibration_error(
     """
     grid = np.linspace(0, 1, n_grid_points)
     perc = np.zeros(n_grid_points)
+    stds = np.sqrt(variances)
     for i, cdf_cutoff in enumerate(grid):
         num_stds = norm.ppf(1 - ((1 - cdf_cutoff) / 2))
-        perc[i] = (
-            (targets >= means - num_stds * np.sqrt(variances))
-            & (targets <= means + num_stds * np.sqrt(variances))
-        ).mean()
+        # At cdf_cutoff=1, num_stds is inf and inf * 0 variance gives NaN;
+        # the limiting interval for a zero-variance prediction is [mean, mean].
+        with np.errstate(invalid="ignore"):
+            half_width = np.nan_to_num(num_stds * stds, nan=0.0)
+        perc[i] = ((targets >= means - half_width) & (targets <= means + half_width)).mean()
     ece = np.sum(np.abs(perc - grid)) * (1 / n_grid_points)
     return {"ece": ece}
 
