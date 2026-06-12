@@ -90,6 +90,10 @@ from rdkit import Chem as _Chem
 from rdkit import DataStructs as _DataStructs
 from rdkit.Chem import rdMolDescriptors as _rdMD
 
+# These custom marks are not registered in tools/pyproject.toml [tool.pytest.ini_options]
+# markers, so pytest emits a PytestUnknownMarkWarning when this module is collected.
+# They exist only to let `-m guacamol` / `-m rdkit` select or deselect these tests;
+# register them under markers if the warning needs to be silenced.
 pytestmark = [pytest.mark.guacamol, pytest.mark.rdkit]
 
 

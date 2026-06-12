@@ -16,6 +16,10 @@
 
 import pytest
 
+# PyRosetta is license-gated and is not a declared extra, so it is intentionally
+# not installed in CI (`uv sync --all-groups` cannot reach it). These tests are
+# therefore skipped in CI by design — run them locally with PyRosetta installed.
+# See issue #120.
 pytest.importorskip("pyrosetta")
 
 from alf_tools.models.pyrosetta import PyRosetta  # noqa: E402
