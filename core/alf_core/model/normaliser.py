@@ -133,11 +133,6 @@ class InputNormaliser:
         non-zero-centred activations.
     """
 
-    # TODO(#126): Add an InputStandardiser (Z-score) and expose a
-    # normalise_inputs_strategy: Literal["minmax", "zscore"] field in BaseTrainConfig
-    # so that GPTrainConfig and CNNTrainConfig can each default to the strategy best
-    # suited to their architecture.
-
     _MIN_RANGE: float = 1e-8
 
     def __init__(self) -> None:
