@@ -361,6 +361,7 @@ the dataset's `problem_type`.
 - **Rank Coverage**: Coverage computed in rank space
 - **Width**: Average confidence interval width normalized by dataset range
 - **Rank Width**: Width computed in rank space
+- **Calibration Curve** (`calibration_curve`, standalone, not in registry, `utils/metrics/calibration.py`): Expected vs observed coverage arrays for plotting reliability diagrams
 
 **Regression — Uncertainty Quantification (UQ) Metrics** (variance required):
 - **Residual Spearman**: Spearman correlation between absolute residuals and predicted variances
@@ -374,7 +375,6 @@ the dataset's `problem_type`.
 
 **Summary Metrics** (standalone, not in registry, `utils/metrics/aggregate.py`):
 - **AUC Top-K** (`auc_top_k`): Normalised area under the top-k mean curve across rounds — primary sample-efficiency ranking metric, computed automatically by `DesignTask` at campaign end
-- **Calibration Curve** (`calibration_curve`): Expected vs observed coverage arrays for plotting reliability diagrams
 
 **Acquisition Batch Metrics** (`utils/metrics/acquisition_batch.py`):
 - **Intra-Batch Diversity** (`intra_batch_diversity`): Average pairwise dissimilarity within an acquired batch (normalised Levenshtein distance for sequences, cosine distance for embeddings/tabular)

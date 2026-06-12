@@ -16,6 +16,7 @@ exported from the top-level ``alf_core.utils.metrics`` namespace.
 
    Acquisition Batch <acquisition_batch/index>
    Base <base/index>
+   Calibration <calibration/index>
    Classification <classification/index>
    Regression <regression/index>
-   Summary <summary/index>
+   Summary <aggregate/index>

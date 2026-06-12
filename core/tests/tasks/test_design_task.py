@@ -111,11 +111,15 @@ class TestDesignTask:
         # Test dataset metrics (last round)
         self._assert_dataset_metrics(metrics, expected_metrics["dataset"])
 
+        # Test the end-of-campaign summary metric is emitted and well-formed
+        self._assert_campaign_summary(metrics)
+
     def _assert_acquired_candidates_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert acquired candidates metrics."""
         for metric_name, expected_value in expected.items():
-            # Get the last round value (design tasks have multiple rounds)
-            actual_value = metrics[f"acquired_candidates/{metric_name}"].iloc[-1]
+            # Get the last populated round value; the trailing campaign_summary
+            # row only carries auc_top_k, leaving these columns NaN.
+            actual_value = metrics[f"acquired_candidates/{metric_name}"].dropna().iloc[-1]
             assert np.isclose(actual_value, expected_value, atol=1e-5), (
                 f"Acquired candidates metric {metric_name} mismatch: "
                 f"expected {expected_value}, got {actual_value}"
@@ -124,8 +128,8 @@ class TestDesignTask:
     def _assert_optimizer_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert optimizer metrics."""
         for metric_name, expected_value in expected.items():
-            # Get the last round value
-            actual_value = metrics[f"optimizer/{metric_name}"].iloc[-1]
+            # Get the last populated round value
+            actual_value = metrics[f"optimizer/{metric_name}"].dropna().iloc[-1]
             assert np.isclose(actual_value, expected_value, atol=1e-5), (
                 f"Optimizer metric {metric_name} mismatch: "
                 f"expected {expected_value}, got {actual_value}"
@@ -134,8 +138,8 @@ class TestDesignTask:
     def _assert_surrogate_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert surrogate model performance metrics."""
         for metric_name, expected_value in expected.items():
-            # Get the last round value
-            actual_value = metrics[f"surrogate/{metric_name}"].iloc[-1]
+            # Get the last populated round value
+            actual_value = metrics[f"surrogate/{metric_name}"].dropna().iloc[-1]
             assert np.isclose(actual_value, expected_value, atol=1e-5), (
                 f"Surrogate metric {metric_name} mismatch: "
                 f"expected {expected_value}, got {actual_value}"
@@ -144,9 +148,18 @@ class TestDesignTask:
     def _assert_dataset_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert dataset metrics."""
         for metric_name, expected_value in expected.items():
-            # Get the last round value
-            actual_value = metrics[f"dataset/{metric_name}"].iloc[-1]
+            # Get the last populated round value
+            actual_value = metrics[f"dataset/{metric_name}"].dropna().iloc[-1]
             assert np.isclose(actual_value, expected_value, atol=1e-5), (
                 f"Dataset metric {metric_name} mismatch: "
                 f"expected {expected_value}, got {actual_value}"
             )
+
+    def _assert_campaign_summary(self, metrics: pd.DataFrame):
+        """Assert the end-of-campaign auc_top_k summary metric is emitted and in range."""
+        assert "auc_top_k" in metrics.columns, (
+            "campaign_summary row with auc_top_k should be logged after all rounds"
+        )
+        auc = metrics["auc_top_k"].dropna()
+        assert len(auc) == 1, "auc_top_k should be logged exactly once, at campaign end"
+        assert 0.0 <= auc.iloc[-1] <= 1.0, f"auc_top_k out of range: {auc.iloc[-1]}"

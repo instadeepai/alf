@@ -14,9 +14,9 @@
 
 """Standalone metrics not registered in regression_metric_registry.
 
-Contains multi-round summary metrics (auc_top_k) and per-round diagnostic
-helpers (calibration_curve) that share the property of not being registered
-in the registry.
+Contains multi-round summary metrics (auc_top_k) that operate on per-round
+aggregates rather than per-candidate prediction arrays, and so are not
+registered in the registry.
 """
 
 import warnings
@@ -65,13 +65,13 @@ def auc_top_k(
     normalised = round_values / best_value
     if np.any(normalised < 0.0):
         warnings.warn(
-            "Some round_values are negative; the normalised AUC will be clamped to 0.0.",
+            "Some round_values are negative; they lower the AUC, which is clamped to [0.0, 1.0].",
             stacklevel=2,
         )
     if np.any(normalised > 1.0):
         warnings.warn(
-            "Some round_values exceed best_value; the normalised AUC will be clamped to 1.0. "
-            "Verify that best_value is the true global optimum.",
+            "Some round_values exceed best_value; the normalised AUC is clamped to "
+            "[0.0, 1.0]. Verify that best_value is the true global optimum.",
             stacklevel=2,
         )
     dx = 1.0 / (n - 1)

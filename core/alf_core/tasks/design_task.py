@@ -23,6 +23,7 @@ from alf_core.oracle.oracle import Oracle
 from alf_core.tasks.base_task import BaseTask
 from alf_core.utils.enums import ProblemType
 from alf_core.utils.metrics.aggregate import auc_top_k
+from alf_core.utils.metrics.regression import top_k_mean
 from alf_core.utils.state_logger import StateLogger
 
 logger = logging.getLogger("alf-core")
@@ -83,6 +84,13 @@ class DesignTask(BaseTask):
 
         The loop continues for num_acq_rounds or until termination conditions are met.
 
+        After all rounds complete, computes the `auc_top_k` campaign summary
+        metric from a per-round sample-efficiency curve and logs it under the
+        round name `campaign_summary`. For regression the curve is the top-k
+        mean of all candidates acquired so far; for classification it is the
+        per-round `surrogate/test_accuracy`. The summary is skipped when fewer
+        than two rounds produced a valid value.
+
         Args:
             state: Initial task state with dataset and surrogate.
             state_loggers: List of StateLogger for recording the state.
@@ -96,13 +104,12 @@ class DesignTask(BaseTask):
         if len(state.dataset.train_dataset) > 0:
             state = self.run_initial_train_round(state, state_loggers)
 
-        if state.problem_type == ProblemType.REGRESSION:
-            round_metric_key = "surrogate/test_top_k_mean"
-            best_value = float(state.dataset._raw_dataset.labels.max())
-        else:
-            round_metric_key = "surrogate/test_accuracy"
-            best_value = 1.0
+        is_regression = state.problem_type == ProblemType.REGRESSION
+        best_value = float(state.dataset.raw_dataset.labels.max()) if is_regression else 1.0
 
+        # Per-round sample-efficiency curve fed to auc_top_k. For regression this is
+        # the top-k mean of all candidates acquired so far (it should rise as good
+        # candidates accumulate); for classification it is the test-set accuracy.
         round_metric_values: list[float] = []
 
         for round_i in range(1, self.num_acq_rounds + 1):
@@ -112,9 +119,16 @@ class DesignTask(BaseTask):
             state.update(labelled_candidates)  # increments state.round to round_i + 1
             state = optimizer.tell(state=state)  # populates round_metrics.training_history
             state = self.evaluate(state=state)
-            val = state.round_metrics.metrics.get(round_metric_key)
-            if val is not None:
-                round_metric_values.append(float(val))
+            if is_regression:
+                acquired_labels = np.concatenate([c.labels for c in state.history])
+                # top_k_mean returns a single dynamically-keyed entry (e.g.
+                # "top_10_mean"); take its value for the AUC curve.
+                top_k = top_k_mean(acquired_labels, None, acquired_labels)
+                round_metric_values.append(float(next(iter(top_k.values()))))
+            else:
+                accuracy = state.round_metrics.metrics.get("surrogate/test_accuracy")
+                if accuracy is not None:
+                    round_metric_values.append(float(accuracy))
             for state_logger in state_loggers:
                 state_logger.log(state)
 

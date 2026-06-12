@@ -634,7 +634,7 @@ def nll_gaussian(
     Returns:
         Dictionary with key `nll` mapping to the mean NLL value.
     """
-    eps = np.finfo(float).tiny
+    eps = 1e-6
     safe_vars = np.maximum(variances, eps)
     nll = 0.5 * np.mean(np.log(2 * np.pi * safe_vars) + (targets - means) ** 2 / safe_vars)
     return {"nll": float(nll)}

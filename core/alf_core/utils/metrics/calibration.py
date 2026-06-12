@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Uncertainty calibration metrics for probabilistic regression predictions.
+
+Contains the registered calibration metrics (`expected_calibration_error`,
+`rank_expected_calibration_error`) and the standalone `calibration_curve`
+helper that returns the raw coverage arrays for plotting reliability diagrams.
+"""
+
 import numpy as np
 from alf_core.utils.metrics.base import check_inputs, check_variance_validity
 from alf_core.utils.metrics.regression import monte_carlo_ranking, register_requires_variance

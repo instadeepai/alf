@@ -187,6 +187,21 @@ class BaseDataset(abc.ABC):
         )
         return self.splits["candidate_pool"]
 
+    @property
+    def raw_dataset(self) -> LabelledCandidates:
+        """Get the full labelled dataset before splitting.
+
+        Returns:
+            The complete labelled dataset loaded by `load_dataset`.
+
+        Raises:
+            AssertionError: If the dataset has not been set up yet.
+        """
+        assert self._raw_dataset is not None, (
+            "_raw_dataset is None — call dataset.setup() before accessing raw_dataset"
+        )
+        return self._raw_dataset
+
     def __repr__(self) -> str:
         """Return a string representation of the dataset.
 
