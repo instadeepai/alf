@@ -16,7 +16,7 @@
 
 import numpy as np
 import pytest
-from alf_core.utils.metrics import auc_top_k, calibration_curve, compute_aggregate_metrics
+from alf_core.utils.metrics import auc_top_k, compute_aggregate_metrics
 
 
 class TestAucTopK:
@@ -87,67 +87,3 @@ class TestComputeAggregateMetrics:
     def test_skips_metrics_that_cannot_be_computed(self):
         """Metrics raising ValueError (e.g. too few rounds) are skipped, not raised."""
         assert compute_aggregate_metrics(np.array([0.9]), best_value=1.0) == {}
-
-
-class TestCalibrationCurve:
-    """Tests for calibration_curve standalone helper."""
-
-    def test_returns_two_arrays(self):
-        """calibration_curve returns a tuple of two arrays."""
-        result = calibration_curve(
-            np.array([0.0, 1.0, 2.0]),
-            np.array([1.0, 1.0, 1.0]),
-            np.array([0.0, 1.0, 2.0]),
-        )
-        assert len(result) == 2
-        expected, observed = result
-        assert isinstance(expected, np.ndarray)
-        assert isinstance(observed, np.ndarray)
-
-    def test_arrays_same_length_as_grid(self):
-        """Both returned arrays match the requested n_grid_points."""
-        expected, observed = calibration_curve(
-            np.array([0.0, 1.0]),
-            np.array([1.0, 1.0]),
-            np.array([0.0, 1.0]),
-            n_grid_points=50,
-        )
-        assert len(expected) == 50
-        assert len(observed) == 50
-
-    def test_expected_is_uniform_grid(self):
-        """Expected coverage array is a uniform grid from 0 to 1."""
-        expected, _ = calibration_curve(
-            np.array([0.0, 1.0, 2.0]),
-            np.array([1.0, 1.0, 1.0]),
-            np.array([0.0, 1.0, 2.0]),
-        )
-        assert expected[0] == pytest.approx(0.0)
-        assert expected[-1] == pytest.approx(1.0)
-
-    def test_observed_values_in_range(self):
-        """Observed coverage values are in [0, 1]."""
-        _, observed = calibration_curve(
-            np.array([0.0, 1.0, 2.0]),
-            np.array([1.0, 1.0, 1.0]),
-            np.array([0.0, 1.0, 2.0]),
-        )
-        assert np.all(observed >= 0.0)
-        assert np.all(observed <= 1.0)
-
-    def test_well_calibrated_near_diagonal(self):
-        """A well-calibrated model produces observed coverage close to expected."""
-        rng = np.random.default_rng(42)
-        means = rng.standard_normal(500)
-        variances = np.ones(500)
-        targets = means + rng.standard_normal(500)
-        expected, observed = calibration_curve(means, variances, targets, n_grid_points=20)
-        assert np.mean(np.abs(observed - expected)) < 0.15
-
-    def test_zero_variance_at_alpha_one_is_fully_covered(self):
-        """Zero-variance predictions are counted as covered at alpha=1 (not NaN-corrupted)."""
-        means = np.array([1.0, 2.0, 3.0])
-        variances = np.array([0.0, 0.0, 0.0])
-        targets = means
-        _, observed = calibration_curve(means, variances, targets, n_grid_points=10)
-        assert observed[-1] == pytest.approx(1.0)

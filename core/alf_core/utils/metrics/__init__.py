@@ -35,7 +35,6 @@ from alf_core.utils.metrics.base import (
     require_min_samples,
 )
 from alf_core.utils.metrics.calibration import (
-    calibration_curve,
     expected_calibration_error,
     rank_expected_calibration_error,
 )

@@ -361,7 +361,6 @@ the dataset's `problem_type`.
 - **Rank Coverage**: Coverage computed in rank space
 - **Width**: Average confidence interval width normalized by dataset range
 - **Rank Width**: Width computed in rank space
-- **Calibration Curve** (`calibration_curve`, standalone, not in registry, `utils/metrics/calibration.py`): Expected vs observed coverage arrays for plotting reliability diagrams
 
 **Regression — Uncertainty Quantification (UQ) Metrics** (variance required):
 - **Residual Spearman**: Spearman correlation between absolute residuals and predicted variances
