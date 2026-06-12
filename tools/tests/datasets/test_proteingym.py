@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from unittest.mock import patch
 
 import numpy as np
@@ -116,8 +117,17 @@ def proteingym_dataset_cv_multiples():
     return ProteinGym(config)
 
 
+@pytest.mark.integration
+@pytest.mark.skipif(
+    not os.environ.get("HF_TOKEN"),
+    reason="HF_TOKEN not set; required for gated ProteinGym dataset access",
+)
 class TestProteinGymDataset:
-    """Test class for ProteinGym dataset functionality."""
+    """Test class for ProteinGym dataset functionality.
+
+    These tests download the real gated ProteinGym dataset and are skipped when
+    `HF_TOKEN` is absent (e.g. local runs or forks without the secret).
+    """
 
     def test_dataset_initialization_singles(self, proteingym_dataset_singles):
         """Test that singles dataset initializes correctly."""
@@ -264,6 +274,42 @@ class TestProteinGymCrossValidationConfig:
             )
         )
         assert config.cross_validation_type == "contiguous"
+
+
+class TestProteinGymMissingToken:
+    """load_dataset rejects a missing or empty HF_TOKEN before any download."""
+
+    @staticmethod
+    def _config() -> ProteinGymConfig:
+        """A minimal singles config for exercising the token guard.
+
+        Returns:
+            A valid ProteinGym configuration.
+        """
+        return ProteinGymConfig(
+            name="proteingym",
+            modality="sequence",
+            seed=0,
+            train_ratio=0.5,
+            validation_frac=0.0,
+            test_ratio=0.5,
+            split_type="random",
+            problem_type="regression",
+            dms_name="X",
+            dms_type="singles",
+        )
+
+    def test_unset_token_raises(self, monkeypatch):
+        """An absent HF_TOKEN (None) raises ValueError before any download."""
+        monkeypatch.delenv("HF_TOKEN", raising=False)
+        with pytest.raises(ValueError, match="HF_TOKEN"):
+            ProteinGym(self._config())
+
+    def test_empty_token_raises(self, monkeypatch):
+        """An empty-string HF_TOKEN raises ValueError before any download."""
+        monkeypatch.setenv("HF_TOKEN", "")
+        with pytest.raises(ValueError, match="HF_TOKEN"):
+            ProteinGym(self._config())
 
 
 class TestProteinGymContiguousSplit:
