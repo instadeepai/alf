@@ -53,7 +53,9 @@ uv sync --extra esm2 --extra chemprop
   (`loss_fn='mse'`) or classification (`loss_fn='cross_entropy'`);
   `mode='esm2_likelihoods'` with frozen backbone performs zero-shot pseudo-log-likelihood (PLL)
   scoring with no training; `mode='esm2_likelihoods'` with `freeze_backbone=False, loss_fn='mlm'`
-  fine-tunes the full ESM-2 backbone on unlabelled sequences and then returns PLL scores.
+  fine-tunes the full ESM-2 backbone via MLM on the input sequences (labels are ignored, but
+  `train()` still takes `LabelledCandidates` — placeholder labels are fine) and then returns
+  PLL scores.
   Embeddings can be extracted via `embed()`. Requires the `[esm2]` optional extra:
   `pip install "alf-tools[esm2]"`
 - **ESMFoldModel** - ESMFold protein structure prediction oracle; returns a scalar confidence score per candidate. Use as `Oracle(scorer=ESMFoldModel(ESMFoldModelConfig(...)))`. Requires `transformers>=4.36.0` and `accelerate>=0.26.0`.

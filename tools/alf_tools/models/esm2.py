@@ -203,6 +203,11 @@ class ESM2TrainConfig(BaseTrainConfig):
                     raise ValueError(
                         f"mask_probability must be in (0, 1), got {self.mask_probability}"
                     )
+                if any(p < 0.0 for p in self.mask_splitting):
+                    raise ValueError(
+                        f"mask_splitting probabilities must be non-negative, got "
+                        f"{self.mask_splitting}"
+                    )
                 p_sum = sum(self.mask_splitting)
                 if abs(p_sum - 1.0) > 1e-6:
                     raise ValueError(
@@ -578,6 +583,11 @@ class ESM2Model(BaseModel):
     def _prepare_data_loader(self, data: LabelledCandidates, shuffle: bool = False) -> DataLoader:
         """Create a DataLoader for training or validation.
 
+        For mode='linear_head', the whole dataset is tokenised eagerly into a single
+        tensor (labels are required). For mode='esm2_likelihoods' (MLM), sequences are
+        tokenised lazily per batch via `_collate_mlm`, so memory scales with batch size
+        rather than corpus size and each batch is padded only to its own longest sequence.
+
         Args:
             data: LabelledCandidates containing sequences and (for
                 mode='linear_head') labels.
@@ -587,8 +597,8 @@ class ESM2Model(BaseModel):
             DataLoader yielding (input_ids, attention_mask) pairs when mode='esm2_likelihoods',
             or (input_ids, attention_mask, targets) triples when mode='linear_head'.
         """
-        batch = self.featurise(data)
         if self.train_config.mode == "linear_head":
+            batch = self.featurise(data)
             targets = torch.tensor(data.labels, dtype=torch.float32)
             if self.train_config.loss_fn == "cross_entropy":
                 labels_arr = np.asarray(data.labels)
@@ -599,9 +609,32 @@ class ESM2Model(BaseModel):
                         "Pass integer labels or switch to loss_fn='mse' for regression."
                     )
             dataset = TensorDataset(batch["input_ids"], batch["attention_mask"], targets)
-        else:
-            dataset = TensorDataset(batch["input_ids"], batch["attention_mask"])
-        return DataLoader(dataset, batch_size=self.train_config.batch_size, shuffle=shuffle)
+            return DataLoader(dataset, batch_size=self.train_config.batch_size, shuffle=shuffle)
+
+        return DataLoader(
+            list(data.data),
+            batch_size=self.train_config.batch_size,
+            shuffle=shuffle,
+            collate_fn=self._collate_mlm,
+        )
+
+    def _collate_mlm(self, sequences: list[str]) -> tuple[torch.Tensor, torch.Tensor]:
+        """Tokenise one batch of raw sequences for MLM, padding to the batch's longest sequence.
+
+        Args:
+            sequences: Amino-acid sequence strings for a single batch.
+
+        Returns:
+            Tuple of (input_ids, attention_mask) tensors of shape (batch, batch_max_len).
+        """
+        encoding = self.tokeniser(
+            sequences,
+            max_length=self.max_length,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+        )
+        return encoding["input_ids"], encoding["attention_mask"]
 
     def _special_tokens_mask(self, input_ids: torch.Tensor) -> torch.Tensor:
         """Return a boolean tensor True at positions occupied by CLS, EOS, PAD, or UNK tokens."""
@@ -689,7 +722,9 @@ class ESM2Model(BaseModel):
                 "should have been caught by ESM2TrainConfig.__post_init__"
             )
 
-    def _mask_tokens(self, input_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def _mask_tokens(
+        self, input_ids: torch.Tensor, generator: torch.Generator | None = None
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Apply random token masking for MLM.
 
         Non-masked positions in labels are set to -100 so CrossEntropyLoss ignores them.
@@ -697,6 +732,9 @@ class ESM2Model(BaseModel):
 
         Args:
             input_ids: Token IDs of shape (batch, seq_len).
+            generator: Optional torch.Generator for reproducible masking. Pass a seeded
+                generator (e.g. during validation) to keep the masking fixed across calls;
+                None uses the global RNG.
 
         Returns:
             Tuple of (masked_input_ids, labels), both of shape (batch, seq_len).
@@ -719,7 +757,7 @@ class ESM2Model(BaseModel):
             input_ids.shape, self.train_config.mask_probability, device=input_ids.device
         )
         prob_matrix.masked_fill_(special_tokens_mask, 0.0)
-        masked = torch.bernoulli(prob_matrix).bool()
+        masked = torch.bernoulli(prob_matrix, generator=generator).bool()
 
         rows_with_no_mask = ~masked.any(dim=1)
         if rows_with_no_mask.any():
@@ -731,13 +769,15 @@ class ESM2Model(BaseModel):
                 )
                 has_eligible = eligible_float.sum(dim=1) > 0
                 if has_eligible.any():
-                    picks = torch.multinomial(eligible_float[has_eligible], num_samples=1).squeeze(
-                        1
-                    )
+                    picks = torch.multinomial(
+                        eligible_float[has_eligible], num_samples=1, generator=generator
+                    ).squeeze(1)
                     target_rows = rows_with_no_mask.nonzero(as_tuple=True)[0][has_eligible]
                     masked[target_rows, picks] = True
             else:
-                picks = torch.multinomial(eligible_float, num_samples=1).squeeze(1)
+                picks = torch.multinomial(
+                    eligible_float, num_samples=1, generator=generator
+                ).squeeze(1)
                 target_rows = rows_with_no_mask.nonzero(as_tuple=True)[0]
                 masked[target_rows, picks] = True
 
@@ -749,7 +789,7 @@ class ESM2Model(BaseModel):
         n_masked = masked_indices.shape[0]
         p_mask, p_random, _ = self.train_config.mask_splitting
         if n_masked > 0:
-            split = torch.rand(n_masked, device=input_ids.device)
+            split = torch.rand(n_masked, device=input_ids.device, generator=generator)
 
             replace_with_mask = split < p_mask
             if replace_with_mask.any():
@@ -765,6 +805,7 @@ class ESM2Model(BaseModel):
                     high=self.tokeniser.vocab_size,
                     size=(idx.shape[0],),
                     device=input_ids.device,
+                    generator=generator,
                 )
                 masked_input_ids[idx[:, 0], idx[:, 1]] = random_ids
 
@@ -782,16 +823,17 @@ class ESM2Model(BaseModel):
             optimizer: Optimizer over esm_model.parameters().
 
         Returns:
-            Tuple of (avg_loss, {"perplexity": float, "token_accuracy": float}).
+            Tuple of (avg_loss, {"perplexity": float, "token_accuracy": float}). avg_loss is
+            the token-weighted mean cross-entropy over masked positions.
 
         Raises:
             RuntimeError: If the loss becomes NaN or infinite.
-            ValueError: If the DataLoader produces no batches.
+            ValueError: If the DataLoader yields no maskable positions.
         """
         self.esm_model.train()
-        epoch_losses: list[float] = []
-        all_logits: list[torch.Tensor] = []
-        all_labels: list[torch.Tensor] = []
+        total_loss = 0.0
+        n_correct = 0
+        n_total = 0
 
         for input_ids, attention_mask in train_loader:
             batch_ids = input_ids.to(self.device)
@@ -804,14 +846,15 @@ class ESM2Model(BaseModel):
             ).logits  # (B, L, vocab)
 
             vocab_size = logits.shape[-1]
-            loss = torch.nn.functional.cross_entropy(
-                logits.view(-1, vocab_size), labels.view(-1), ignore_index=-100
-            )
+            flat_logits = logits.view(-1, vocab_size)
+            flat_labels = labels.view(-1)
+            loss = torch.nn.functional.cross_entropy(flat_logits, flat_labels, ignore_index=-100)
 
             if not torch.isfinite(loss):
                 raise RuntimeError(
-                    f"MLM training loss is {loss.item():.6g}. "
-                    "Check your data or reduce the learning rate."
+                    f"MLM training loss is {loss.item():.6g}. This can happen when a batch has "
+                    "no maskable residue positions (all special tokens) or from an unstable "
+                    "learning rate. Check your data or reduce the learning rate."
                 )
 
             loss.backward()
@@ -820,21 +863,22 @@ class ESM2Model(BaseModel):
                     self.esm_model.parameters(), self.train_config.max_grad_norm
                 )
             optimizer.step()
-            epoch_losses.append(loss.item())
 
-            active = labels.view(-1) != -100
-            all_logits.append(logits.view(-1, vocab_size)[active].detach().cpu())
-            all_labels.append(labels.view(-1)[active].detach().cpu())
+            active = flat_labels != -100
+            n_active = int(active.sum().item())
+            total_loss += loss.item() * n_active
+            preds = flat_logits[active].argmax(dim=-1)
+            n_correct += int((preds == flat_labels[active]).sum().item())
+            n_total += n_active
 
-        if not epoch_losses:
+        if n_total == 0:
             raise ValueError(
-                "MLM training DataLoader produced no batches. Ensure train_data is non-empty."
+                "MLM training produced no maskable positions. Ensure train_data is non-empty "
+                "and contains residue (non-special) tokens."
             )
 
-        avg_loss = float(np.mean(epoch_losses))
-        logits_cat = torch.cat(all_logits, dim=0)
-        labels_cat = torch.cat(all_labels, dim=0)
-        token_accuracy = float((logits_cat.argmax(dim=-1) == labels_cat).float().mean().item())
+        avg_loss = total_loss / n_total
+        token_accuracy = n_correct / n_total
         self.esm_model.eval()
         return avg_loss, {"perplexity": float(np.exp(avg_loss)), "token_accuracy": token_accuracy}
 
@@ -845,43 +889,54 @@ class ESM2Model(BaseModel):
             val_loader: DataLoader yielding (input_ids, attention_mask) pairs.
 
         Returns:
-            Tuple of (avg_loss, {"perplexity": float, "token_accuracy": float}).
+            Tuple of (avg_loss, {"perplexity": float, "token_accuracy": float}). avg_loss is
+            the token-weighted mean cross-entropy over masked positions.
 
         Raises:
-            ValueError: If the DataLoader produces no batches.
+            ValueError: If the DataLoader yields no maskable positions.
+
+        Note:
+            Validation masking is seeded from `ESM2ModelConfig.seed` so the same positions
+            are masked every epoch, making val metrics comparable across epochs rather than
+            fluctuating with the random masking draw.
         """
         self.esm_model.eval()
-        val_losses: list[float] = []
-        all_logits: list[torch.Tensor] = []
-        all_labels: list[torch.Tensor] = []
+        generator = torch.Generator(device=self.device)
+        generator.manual_seed(self.model_config.seed)
+        total_loss = 0.0
+        n_correct = 0
+        n_total = 0
 
         with torch.no_grad():
             for input_ids, attention_mask in val_loader:
                 batch_ids = input_ids.to(self.device)
                 batch_mask = attention_mask.to(self.device)
 
-                masked_ids, labels = self._mask_tokens(batch_ids)
+                masked_ids, labels = self._mask_tokens(batch_ids, generator=generator)
                 logits = self.esm_model(input_ids=masked_ids, attention_mask=batch_mask).logits
 
                 vocab_size = logits.shape[-1]
+                flat_logits = logits.view(-1, vocab_size)
+                flat_labels = labels.view(-1)
                 loss = torch.nn.functional.cross_entropy(
-                    logits.view(-1, vocab_size), labels.view(-1), ignore_index=-100
+                    flat_logits, flat_labels, ignore_index=-100
                 )
-                val_losses.append(loss.item())
 
-                active = labels.view(-1) != -100
-                all_logits.append(logits.view(-1, vocab_size)[active].cpu())
-                all_labels.append(labels.view(-1)[active].cpu())
+                active = flat_labels != -100
+                n_active = int(active.sum().item())
+                total_loss += loss.item() * n_active
+                preds = flat_logits[active].argmax(dim=-1)
+                n_correct += int((preds == flat_labels[active]).sum().item())
+                n_total += n_active
 
-        if not val_losses:
+        if n_total == 0:
             raise ValueError(
-                "MLM validation DataLoader produced no batches. Ensure val_data is non-empty."
+                "MLM validation produced no maskable positions. Ensure val_data is non-empty "
+                "and contains residue (non-special) tokens."
             )
 
-        avg_loss = float(np.mean(val_losses))
-        logits_cat = torch.cat(all_logits, dim=0)
-        labels_cat = torch.cat(all_labels, dim=0)
-        token_accuracy = float((logits_cat.argmax(dim=-1) == labels_cat).float().mean().item())
+        avg_loss = total_loss / n_total
+        token_accuracy = n_correct / n_total
         return avg_loss, {"perplexity": float(np.exp(avg_loss)), "token_accuracy": token_accuracy}
 
     def _train_epoch_linear_head(
@@ -994,8 +1049,8 @@ class ESM2Model(BaseModel):
         is_last_epoch = epoch == self.train_config.num_epochs - 1
         if (epoch + 1) % self.train_config.log_frequency == 0 or is_last_epoch:
             additional: dict[str, float] = {}
-            # These keys are reserved for future training modes (e.g. full MLM fine-tuning).
-            # In linear head mode, train_metrics / val_metrics are always {}.
+            # MLM fine-tuning populates perplexity / token_accuracy; in linear head mode
+            # train_metrics / val_metrics are always {}.
             if (v := train_metrics.get("perplexity")) is not None:
                 additional["train_perplexity"] = float(v)
             if (v := train_metrics.get("token_accuracy")) is not None:
@@ -1037,6 +1092,8 @@ class ESM2Model(BaseModel):
 
         Args:
             train_data: Training data containing sequences and (for linear_head) labels.
+                MLM fine-tuning ignores labels, but LabelledCandidates still requires them —
+                pass placeholder values.
             val_data: Optional validation data for monitoring training loss.
 
         Raises:

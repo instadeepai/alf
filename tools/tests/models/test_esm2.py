@@ -212,6 +212,16 @@ class TestConfigs:
                 mask_splitting=(0.8, 0.1, 0.05),
             )
 
+    def test_mask_splitting_negative_value_raises(self):
+        """mask_splitting with a negative probability raises ValueError even if it sums to 1.0."""
+        with pytest.raises(ValueError, match="non-negative"):
+            ESM2TrainConfig(
+                mode="esm2_likelihoods",
+                freeze_backbone=False,
+                loss_fn="mlm",
+                mask_splitting=(1.2, -0.2, 0.0),
+            )
+
     def test_mask_probability_warning_when_frozen(self):
         """Non-default mask_probability with freeze_backbone=True emits UserWarning."""
         with pytest.warns(UserWarning, match="mask_probability"):
@@ -884,6 +894,21 @@ class TestMaskTokens:
             f"Expected ~80% [MASK] replacements, got {frac_mask_token:.2f}"
         )
         assert 0.05 < frac_unchanged < 0.20, f"Expected ~10% unchanged, got {frac_unchanged:.2f}"
+
+    def test_seeded_generator_is_deterministic(self, esm2_mlm_config_model):
+        """Passing the same seeded generator yields identical masking across calls."""
+        input_ids = torch.randint(4, 20, (5, 16))
+
+        gen_a = torch.Generator()
+        gen_a.manual_seed(123)
+        masked_a, labels_a = esm2_mlm_config_model._mask_tokens(input_ids, generator=gen_a)
+
+        gen_b = torch.Generator()
+        gen_b.manual_seed(123)
+        masked_b, labels_b = esm2_mlm_config_model._mask_tokens(input_ids, generator=gen_b)
+
+        assert torch.equal(masked_a, masked_b)
+        assert torch.equal(labels_a, labels_b)
 
 
 class TestSeed:
