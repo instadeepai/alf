@@ -40,9 +40,9 @@ The loop is the same; what differs is **where the labels come from**.
 | Mode | Oracle source | Use case |
 |------|---------------|----------|
 | **Offline** | A held-out dataset / pre-scored pool | Benchmarking and method development; fully reproducible, no external calls |
-| **Online** | A live scorer (a trained model, a simulator, or real experimental testing) | Driving a real campaign where labels are generated on demand — e.g. each label is a wet-lab assay or measurement |
+| **Online** | A live scorer (a trained model, a simulator, or real experimental testing) | Driving a real experiment where labels are generated on demand — e.g. each label is a wet-lab assay or measurement |
 
 In ALF both modes run through the *same* task and loop; you swap the `oracle`'s scorer. This
-is why a method validated offline can move to an online campaign without rewriting it.
+is why a method validated offline can move to an online experiment without rewriting it.
 
 → Next: [Core Concepts](core-concepts.md), the objects that make up the loop.

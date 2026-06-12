@@ -84,9 +84,9 @@ class DesignTask(BaseTask):
 
         The loop continues for num_acq_rounds or until termination conditions are met.
 
-        After all rounds complete, computes the `auc_top_k` campaign summary
+        After all rounds complete, computes the `auc_top_k` experiment summary
         metric from a per-round sample-efficiency curve and logs it under the
-        round name `campaign_summary`. For regression the curve is the top-k
+        round name `experiment_summary`. For regression the curve is the top-k
         mean of all candidates acquired so far; for classification it is the
         per-round `surrogate/test_accuracy`. The summary is skipped when fewer
         than two rounds produced a valid value.
@@ -134,15 +134,15 @@ class DesignTask(BaseTask):
 
         if len(round_metric_values) >= 2:
             try:
-                campaign_metrics = auc_top_k(np.array(round_metric_values), best_value)
+                experiment_metrics = auc_top_k(np.array(round_metric_values), best_value)
             except ValueError:
-                campaign_metrics = {}
-            if campaign_metrics:
+                experiment_metrics = {}
+            if experiment_metrics:
                 state.round_metrics = RoundMetrics(
-                    round=self.num_acq_rounds, metrics=campaign_metrics
+                    round=self.num_acq_rounds, metrics=experiment_metrics
                 )
                 state.round_predictions = None
                 for state_logger in state_loggers:
-                    state_logger.log(state, round_name="campaign_summary")
+                    state_logger.log(state, round_name="experiment_summary")
 
         return

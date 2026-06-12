@@ -233,7 +233,7 @@ The design task implements a multi-round active learning loop for optimizing seq
    - **Tell**: Retrain surrogate on updated data
    - **Evaluate**: Assess surrogate performance on test set
    - **Log**: Record metrics and save results
-3. **Campaign Summary**: Compute and log `auc_top_k` — the normalised area under the per-round top-k mean curve — as a single sample-efficiency score for the full experiment
+3. **Experiment Summary**: Compute and log `auc_top_k` — the normalised area under the per-round top-k mean curve — as a single sample-efficiency score for the full experiment
 
 **Use Case**: Iteratively improve sequences by actively selecting and evaluating
 promising candidates.
@@ -374,7 +374,7 @@ the dataset's `problem_type`.
 - **Hit Rate** (`hit_rate`): Fraction of acquired candidates whose label meets a threshold
 
 **Design Task Metrics** (standalone, not in registry, `utils/metrics/aggregate.py`):
-- **AUC Top-K** (`auc_top_k`): Normalised area under the top-k mean curve across rounds — primary sample-efficiency ranking metric, computed automatically by `DesignTask` at campaign end
+- **AUC Top-K** (`auc_top_k`): Normalised area under the top-k mean curve across rounds — primary sample-efficiency ranking metric, computed automatically by `DesignTask` at experiment end
 
 **Acquisition Batch Metrics** (`utils/metrics/acquisition_batch.py`):
 - **Intra-Batch Diversity** (`intra_batch_diversity`): Average pairwise dissimilarity within an acquired batch (normalised Levenshtein distance for sequences, cosine distance for embeddings/tabular)

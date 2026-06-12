@@ -16,7 +16,7 @@ Acquisition function
 
 Best-found
   The value of the best candidate discovered so far, tracked as a function of round. The headline
-  "are we winning?" curve for a design campaign (see `Task`).
+  "are we winning?" curve for a design experiment (see `Task`).
 
 Calibration
   How well a model's stated uncertainty matches its actual error. A well-calibrated
@@ -28,7 +28,7 @@ Candidate
   carrying features and a label. Represented by `Candidate` / `LabelledCandidates` in `alf_core`.
 
 Coverage
-  The fraction of the truly high-value region that a campaign has discovered. Distinguishes finding
+  The fraction of the truly high-value region that a experiment has discovered. Distinguishes finding
   *the* peak from finding *all* the good designs; related to `Recall`.
 
 Dataset
@@ -54,7 +54,7 @@ Offline
 
 Online
   A loop in which the `Oracle` obtains labels from a live scorer (a trained model or
-  simulator) on demand; the mode used to drive a real campaign. The loop is otherwise identical to
+  simulator) on demand; the mode used to drive a real experiment. The loop is otherwise identical to
   `Offline`.
 
 Optimizer
@@ -70,7 +70,7 @@ Precision
   alongside `Recall` for classification-style objectives.
 
 Recall
-  Of all the truly high-value candidates, the fraction the campaign has selected. Measures whether
+  Of all the truly high-value candidates, the fraction the experiment has selected. Measures whether
   the method is finding the good region, not just one point; see also `Coverage`.
 
 Regret

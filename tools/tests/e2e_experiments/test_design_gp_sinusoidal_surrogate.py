@@ -269,7 +269,7 @@ class TestDesignGPSinusoidalSurrogate:
 
         metrics = pd.read_csv(metrics_file)
 
-        # 5 rows: round 0 + 3 acquisition rounds + 1 trailing campaign_summary
+        # 5 rows: round 0 + 3 acquisition rounds + 1 trailing experiment_summary
         # row (carries only auc_top_k, leaving per-round columns NaN).
         assert len(metrics) == 5, f"Expected 5 rows, got {len(metrics)}"
 
@@ -289,7 +289,7 @@ class TestDesignGPSinusoidalSurrogate:
         # validation_frac=0.0 — all acquired candidates go to train.
         acq_batch_size = 5
         expected_num_train = [initial_num_train + i * acq_batch_size for i in range(4)]
-        # dropna() drops the trailing campaign_summary row (num_train is NaN there).
+        # dropna() drops the trailing experiment_summary row (num_train is NaN there).
         actual_num_train = metrics["dataset/num_train"].dropna().astype(int).tolist()
         assert actual_num_train == expected_num_train, (
             f"Expected num_train={expected_num_train}, got {actual_num_train}"
