@@ -816,7 +816,7 @@ class TestGPBoTorchBackbone:
         assert precomputed_gp_model.train_x is None
         assert precomputed_gp_model.train_y is None
         assert precomputed_gp_model.feature_dim is None
-        assert precomputed_gp_model._input_normaliser is None
+        assert precomputed_gp_model._input_transform is None
         assert precomputed_gp_model._output_standardiser is None
         assert precomputed_gp_model.training_metrics == {}
         assert precomputed_gp_model._epoch_metrics == []
@@ -854,7 +854,7 @@ class TestGPBoTorchBackbone:
 
         # Build the same normalised test tensor predict() uses internally
         test_x_np = precomputed_gp_model.featurise(tabular_data.candidates).cpu().numpy()
-        test_x_np = precomputed_gp_model._input_normaliser.transform(test_x_np)
+        test_x_np = precomputed_gp_model._input_transform.transform(test_x_np)
         test_x = torch.tensor(test_x_np, dtype=torch.float64)
 
         with torch.no_grad():

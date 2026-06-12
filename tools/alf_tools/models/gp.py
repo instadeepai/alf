@@ -753,7 +753,7 @@ class GPModel(BaseModel):
             self.train_x = None
             self.train_y = None
             self.feature_dim = None
-            self._input_normaliser = None
+            self._input_transform = None
             self._output_standardiser = None
             self.training_metrics = {}
             self._epoch_metrics = []
