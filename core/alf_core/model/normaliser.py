@@ -118,10 +118,10 @@ class InputNormaliser:
     such as the CNN's 3-D one-hot tensors (n_samples, alphabet_size, seq_len).
     Statistics are always computed over the batch dimension (dim=0).
 
-    Edge case: if a feature has zero range (constant column), the range is clamped
-    to _MIN_RANGE. A training value of 0 maps to 0.0; a non-zero test value (e.g. a
-    one-hot position never seen in training) maps to value / _MIN_RANGE, which can
-    be very large. For one-hot inputs, ensure the training set covers all amino acids
+    Edge case: if a feature has zero range (constant column), the range is set to
+    1.0 so the feature is only min-shifted (i.e., (X - min) == 0 for training).
+    This prevents unseen non-zero test values from being amplified by division by a
+    tiny epsilon. For one-hot inputs, ensure the training set covers all amino acids
     at all positions, or clip outputs after transform.
 
     Note:
@@ -158,7 +158,22 @@ class InputNormaliser:
         """
         x_min, x_max = (np.min(X, axis=0), np.max(X, axis=0))
         self._min = x_min
-        self._range = (x_max - x_min).clip(min=self._MIN_RANGE)
+
+        raw_range = x_max - x_min
+        near_zero = raw_range < self._MIN_RANGE
+
+        # Constant features get a range of 1.0 so they are only min-shifted
+        # (i.e. (X - min) == 0 for training), keeping unseen non-zero values
+        # bounded at predict time rather than being amplified by division by
+        # a tiny epsilon. Mirror the behaviour of `InputStandardiser.fit`.
+        self._range = np.where(near_zero, 1.0, raw_range)
+        if np.any(near_zero):
+            logger.warning(
+                "InputNormaliser: %d feature(s) have near-zero range (< %.2e). "
+                "Setting their range to 1.0; those features are only min-shifted.",
+                int(np.sum(near_zero)),
+                self._MIN_RANGE,
+            )
 
     def transform(
         self,
