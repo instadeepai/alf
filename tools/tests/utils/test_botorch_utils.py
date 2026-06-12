@@ -75,6 +75,21 @@ def test_candidates_to_tensor_inconsistent_shapes():
         candidates_to_tensor(candidates)
 
 
+def test_candidates_to_tensor_non_numeric_data_raises():
+    """Test that non-numeric candidate data (e.g. sequence strings) raises ValueError.
+
+    Without this guard, string data would fall through np.asarray and die later
+    in torch.from_numpy with an opaque TypeError.
+    """
+    candidates = [
+        Candidate(data="ACDE", modality=Modality.SEQUENCE),
+        Candidate(data="GHIK", modality=Modality.SEQUENCE),
+    ]
+
+    with pytest.raises(ValueError, match="must be numeric"):
+        candidates_to_tensor(candidates)
+
+
 def test_candidates_to_tensor_device():
     """Test that device parameter works correctly."""
     candidates = [
@@ -179,6 +194,19 @@ def test_predictions_to_posterior_without_variances():
     predictions = Predictions(means=np.array([1.0, 2.0, 3.0]), variances=None)
 
     with pytest.raises(ValueError, match="without variances"):
+        predictions_to_posterior(predictions)
+
+
+def test_predictions_to_posterior_negative_variances_raises_with_value():
+    """Significantly negative variances raise RuntimeError whose message includes
+    the offending minimum (regression: it was passed as a logging-style arg and
+    never interpolated, so the value never appeared in the message).
+    """
+    means = np.array([1.0, 2.0, 3.0])
+    variances = np.array([0.1, -0.5, 0.2])
+    predictions = Predictions(means=means, variances=variances)
+
+    with pytest.raises(RuntimeError, match="min=-0.5"):
         predictions_to_posterior(predictions)
 
 

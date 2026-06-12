@@ -15,7 +15,7 @@
 """Shared pytest fixtures for tools tests.
 
 This module provides fixtures needed by the data-conversion utility tests
-(test_botorch_utils.py) and GP model tests (test_botorch_exact_gp_model.py,
+(test_botorch_utils.py) and GP model tests (test_gp.py,
 test_botorch_model_adapter.py). Acquisition and dataset fixtures are added
 in later PRs.
 """
@@ -35,7 +35,7 @@ from alf_core import (
     Surrogate,
 )
 from alf_core.model.base_model import BaseModel
-from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel, BoTorchTrainConfig
+from alf_tools.models.gp import FeaturizerConfig, GPModel, GPTrainConfig
 from botorch.models import SingleTaskGP
 
 
@@ -271,6 +271,42 @@ def botorch_gp_model(simple_train_data):
 
 
 # =============================================================================
+# ALF GP Model Fixtures
+# =============================================================================
+
+
+@dataclass
+class _TrainedGPModel:
+    """Container for a trained GPModel and the candidates it was trained on."""
+
+    model: GPModel
+    train_candidates: list[Candidate]
+
+
+@pytest.fixture
+def trained_gp_model():
+    """Train a GPModel on a handful of 2-feature tabular candidates.
+
+    Returns:
+        _TrainedGPModel with `model` (a trained GPModel exposing a
+        `botorch_model` property) and `train_candidates` (the training
+        candidates, e.g. for building an `X_baseline`).
+    """
+    X_train = np.array([[0.1, 0.2], [0.4, 0.5], [0.7, 0.8], [0.3, 0.6]], dtype=np.float64)
+    y_train = np.array([1.0, 2.0, 1.5, 1.8])
+    candidates = [Candidate(data=x, modality=Modality.TABULAR) for x in X_train]
+    train_data = LabelledCandidates(candidates=candidates, labels=y_train)
+
+    model = GPModel(
+        train_config=GPTrainConfig(num_iterations=10),
+        featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+        device="cpu",
+    )
+    model.train(train_data)
+    return _TrainedGPModel(model=model, train_candidates=candidates)
+
+
+# =============================================================================
 # Dataset Fixtures
 # =============================================================================
 
@@ -348,9 +384,13 @@ def trained_surrogate(branin_dataset):
         branin_dataset: Fixture providing a Branin dataset.
 
     Returns:
-        Surrogate with trained BoTorchGPModel.
+        Surrogate with trained GPModel.
     """
-    gp_model = BoTorchGPModel(train_config=BoTorchTrainConfig(num_iterations=50, learning_rate=0.1))
+    gp_model = GPModel(
+        featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+        train_config=GPTrainConfig(num_iterations=50, learning_rate=0.1),
+        device="cpu",
+    )
     surrogate = Surrogate(model=gp_model)
     surrogate.fit(branin_dataset.train_dataset, branin_dataset.test_dataset)
     return surrogate

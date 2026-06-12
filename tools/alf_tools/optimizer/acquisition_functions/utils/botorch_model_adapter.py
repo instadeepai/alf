@@ -19,7 +19,6 @@ and ALF BaseModel instances to work seamlessly with BoTorch acquisition
 functions. This essentially wraps the ALF models to be used as BoTorch models
 """
 
-import warnings
 from typing import TYPE_CHECKING
 
 import torch
@@ -28,7 +27,7 @@ from alf_tools.models.utils.botorch_utils import (
     predictions_to_posterior,
     tensor_to_candidates,
 )
-from botorch.models.model import Model
+from botorch.models.model import Model as BotorchModel
 from botorch.posteriors import Posterior
 from botorch.posteriors.gpytorch import GPyTorchPosterior
 from gpytorch.distributions import MultivariateNormal
@@ -39,12 +38,31 @@ if TYPE_CHECKING:
     from botorch.acquisition.objective import PosteriorTransform
 
 
-class BoTorchModelAdapter(Model):
+class BotorchModelWrapper(BotorchModel):
     """Universal adapter for BoTorch acquisition functions compatibility.
 
     Accepts either a native BoTorch `Model` (direct pass-through to
     `posterior()`) or an ALF `BaseModel` (adapts `predict()` to BoTorch's
     `posterior()` interface). The adapter detects the model type automatically.
+
+    ALF models that expose a trained `botorch_model` attribute (e.g. `GPModel`)
+    additionally support q-based acquisitions such as
+    `qLogNoisyExpectedImprovement` — `num_outputs` and `batch_shape` are
+    delegated to the underlying BoTorch model. Note that `posterior()` for ALF
+    models always routes through `predict()`, which yields a diagonal
+    (per-point independent) posterior. q-based acquisitions are therefore
+    evaluated under a per-point independence approximation — baseline-candidate
+    correlations are zero — rather than with the exact joint covariance. Pure
+    `predict()`-only ALF models cannot provide `num_outputs`/`batch_shape` and
+    raise `NotImplementedError` for those properties.
+
+    Because `predict()` has no notion of BoTorch's posterior options, the ALF
+    path also ignores the `observation_noise` flag: the returned posterior
+    always carries whatever variance `predict()` reports. For `GPModel` that is
+    the noise-inclusive predictive variance, so acquisitions see slightly
+    inflated uncertainty compared to the latent (noise-free) posterior they
+    request by default. `posterior_transform` and `output_indices` cannot be
+    honoured on this path and raise `NotImplementedError` if passed.
 
     Models that don't provide prediction variances (e.g., CNNModel, deterministic
     models) cannot be used with BoTorch acquisition functions. Expected Improvement
@@ -52,8 +70,8 @@ class BoTorchModelAdapter(Model):
     models raises a `ValueError`.
 
     Args:
-        model: Either a BoTorch Model or an ALF BaseModel instance.
-            If BaseModel, it must provide prediction variances.
+        model: Either a BoTorch ``BotorchModel`` or an ALF ``BaseModel`` instance.
+            If ``BaseModel``, it must provide prediction variances.
 
     Raises:
         TypeError: If the model is neither a BoTorch Model nor ALF BaseModel.
@@ -61,7 +79,7 @@ class BoTorchModelAdapter(Model):
             (raised during `posterior()`).
     """
 
-    def __init__(self, model: Model | BaseModel):
+    def __init__(self, model: BotorchModel | BaseModel):
         """Initialize the adapter with a model.
 
         Args:
@@ -70,15 +88,13 @@ class BoTorchModelAdapter(Model):
         Raises:
             TypeError: If model is not a BoTorch Model or ALF BaseModel.
         """
-        super().__init__()
-        if not isinstance(model, (Model, BaseModel)):
+        if not isinstance(model, (BotorchModel, BaseModel)):
             raise TypeError(
                 f"Model must be either a BoTorch Model or ALF BaseModel, got {type(model).__name__}"
             )
+        super().__init__()
         self._wrapped_model = model
-        # Defensive pass-through: callers (e.g. _score_candidates) already skip wrapping
-        # native BoTorch models, but the adapter handles them correctly if one does arrive.
-        self._is_botorch_model = isinstance(model, Model)
+        self._is_botorch_model = isinstance(model, BotorchModel)
 
     def posterior(
         self,
@@ -93,16 +109,24 @@ class BoTorchModelAdapter(Model):
             X: Input tensor of shape (batch_size, q, d) or (batch_size, d)
                 where d is the input dimension and q is number of points.
             output_indices: Optional list of output indices for
-                multi-output models.
+                multi-output models. Not supported for ALF models.
             observation_noise: Whether to include observation noise in
                 predictions. Can be bool or Tensor for observed noise.
-            posterior_transform: Optional posterior transformation.
+                Ignored for ALF models — `predict()` decides the variance
+                semantics (noise-inclusive for `GPModel`).
+            posterior_transform: Optional posterior transformation. Not
+                supported for ALF models.
 
         Returns:
             Posterior distribution with mean and variance at input points.
 
         Raises:
             ValueError: If ALF BaseModel doesn't provide variances.
+            NotImplementedError: If `posterior_transform` or `output_indices`
+                is passed for an ALF BaseModel — `predict()`-based posteriors
+                cannot apply them, and ignoring them silently would corrupt
+                acquisition values (e.g. a minimisation transform would be
+                dropped).
         """
         # Case 1: Native BoTorch model - pass through directly
         if self._is_botorch_model:
@@ -114,22 +138,16 @@ class BoTorchModelAdapter(Model):
             )
 
         # Case 2: ALF BaseModel - adapt predict() to posterior()
+        if posterior_transform is not None or output_indices is not None:
+            raise NotImplementedError(
+                "posterior_transform and output_indices are not supported when "
+                "adapting an ALF BaseModel: posterior() routes through predict(), "
+                "which cannot apply them. Silently ignoring them would corrupt "
+                "acquisition values (e.g. a minimisation transform would be dropped)."
+            )
         # BoTorch passes either 2D (n, d) or 3D (batch, q, d) tensors
         # ALF models expect lists of candidates, so we need to flatten 3D inputs
         # then reshape the output posterior to match BoTorch's expectations
-
-        if output_indices is not None:
-            warnings.warn(
-                "output_indices is not supported for ALF BaseModel and will be ignored.",
-                UserWarning,
-                stacklevel=2,
-            )
-        if posterior_transform is not None:
-            warnings.warn(
-                "posterior_transform is not supported for ALF BaseModel and will be ignored.",
-                UserWarning,
-                stacklevel=2,
-            )
 
         # Save original shape for later reshaping
         if X.ndim == 3:
@@ -160,7 +178,7 @@ class BoTorchModelAdapter(Model):
                 f"deterministic models) cannot be used with BoTorch "
                 f"acquisition functions like Expected Improvement or Upper "
                 f"Confidence Bound. Consider using a Gaussian Process model "
-                f"(e.g., BoTorchGPModel) or another probabilistic model "
+                f"(e.g., GPModel) or another probabilistic model "
                 f"that provides uncertainty estimates."
             )
 
@@ -182,40 +200,78 @@ class BoTorchModelAdapter(Model):
                 )
 
             mean = posterior.mvn.mean.reshape(batch_size, q)
-            # Slice the diagonal directly (O(n)) rather than materialising the
-            # full dense matrix (O(n²)) before taking block sub-matrices.
-            diag = lazy_covar.diagonal().reshape(batch_size, q)
-            new_covar = DiagLinearOperator(diag)
-            mvn = MultivariateNormal(mean, new_covar)
+            # Read the stored diagonal directly — O(B*q) — instead of
+            # materialising the dense (B*q, B*q) covariance matrix.
+            diag_vals = lazy_covar.diagonal().reshape(batch_size, q)
+            mvn = MultivariateNormal(mean, DiagLinearOperator(diag_vals))
+
             posterior = GPyTorchPosterior(mvn)
 
         return posterior
+
+    def _inner_botorch_model(self) -> BotorchModel | None:
+        """Return the wrapped ALF model's trained `botorch_model`, if available.
+
+        Returns:
+            The underlying BoTorch model when the wrapped ALF model exposes
+            a trained `botorch_model`. Returns `None` when the attribute is
+            absent, raises `RuntimeError` on access (untrained model), or
+            does not hold a BoTorch `Model`.
+        """
+        try:
+            inner = getattr(self._wrapped_model, "botorch_model", None)
+        except RuntimeError:
+            return None
+        if isinstance(inner, BotorchModel):
+            return inner
+        return None
 
     @property
     def num_outputs(self) -> int:
         """The number of outputs of the model.
 
-        Raises:
-            NotImplementedError: If the model is a multi-output ALF BaseModel.
-
         Returns:
-            Number of outputs. For most models, this is 1 (single-output).
-            Multi-output models should override this.
+            Number of outputs for native BoTorch models, or for ALF models
+            exposing a trained `botorch_model` (delegated to it).
+
+        Raises:
+            NotImplementedError: For ALF BaseModel instances without a trained
+                `botorch_model`. Use a model exposing `botorch_model`
+                (e.g. `GPModel`) and train it first.
         """
         if self._is_botorch_model:
             return int(self._wrapped_model.num_outputs)  # type: ignore[union-attr, no-any-return]
-        return 1
+        inner = self._inner_botorch_model()
+        if inner is not None:
+            return int(inner.num_outputs)
+        raise NotImplementedError(
+            f"num_outputs is not supported for ALF BaseModel "
+            f"({type(self._wrapped_model).__name__}) without a trained "
+            "botorch_model. Use a model exposing botorch_model, such as "
+            "GPModel, and train it first."
+        )
 
     @property
     def batch_shape(self) -> torch.Size:
         """The batch shape of the model.
 
-        This is a batch shape from an I/O perspective, independent of the
-        internal representation of the model.
-
         Returns:
-            Batch shape. Empty for most models (no batching).
+            Batch shape for native BoTorch models, or for ALF models
+            exposing a trained `botorch_model` (delegated to it).
+
+        Raises:
+            NotImplementedError: For ALF BaseModel instances without a trained
+                `botorch_model`. Use a model exposing `botorch_model`
+                (e.g. `GPModel`) and train it first.
         """
         if self._is_botorch_model:
             return self._wrapped_model.batch_shape  # type: ignore[union-attr]
-        return torch.Size([])
+        inner = self._inner_botorch_model()
+        if inner is not None:
+            return inner.batch_shape
+        raise NotImplementedError(
+            f"batch_shape is not supported for ALF BaseModel "
+            f"({type(self._wrapped_model).__name__}) without a trained "
+            "botorch_model. Use a model exposing botorch_model, such as "
+            "GPModel, and train it first."
+        )

@@ -1,7 +1,7 @@
 ESM2 Model
 ==========
 
-A protein language model surrogate using `ESM-2 <https://huggingface.co/docs/transformers/model_doc/esm>`_
+A protein language model surrogate using ``ESM-2 <https://huggingface.co/docs/transformers/model_doc/esm>``_
 as the backbone. Accepts amino acid sequences as inputs and supports two operating modes,
 controlled by ``ESM2TrainConfig.scoring_function``:
 

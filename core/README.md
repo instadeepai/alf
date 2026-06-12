@@ -25,7 +25,7 @@ This README is organized into the following sections:
   candidate pool
 - **[8. State (`State`)](#8-state-state)** - Tracks the state of active
   learning tasks
-- **[9. Normalisation (`InputNormaliser`, `OutputStandardiser`)](#9-normalisation-inputnormaliser-outputstandardiser)**
+- **[9. Normalisation (`InputNormaliser`, `InputStandardiser`, `OutputStandardiser`)](#9-normalisation-inputnormaliser-inputstandardiser-outputstandardiser)**
   - Feature and label preprocessing
 
 ### Task Types
@@ -89,10 +89,11 @@ the framework. Models can serve multiple roles depending on the context:
 Concrete model implementations pair with a `BaseTrainConfig` dataclass that exposes normalisation
 flags alongside standard training hyperparameters:
 
-- `normalise_inputs: bool` — apply min-max input normalisation (default `False`)
+- `normalise_inputs_strategy: Literal["minmax", "zscore"] | None` — select the input normalisation
+  routine, or `None` to disable it (default `None`)
 - `standardise_outputs: bool` — apply Z-score output standardisation (default `False`)
 
-See [section 9](#9-normalisation-inputnormaliser-outputstandardiser) for full details on both
+See [section 9](#9-normalisation-inputnormaliser-inputstandardiser-outputstandardiser) for full details on both
 normalisation routines.
 
 **Implementation Notes:**
@@ -185,10 +186,10 @@ The `State` dataclass tracks the complete state of an active learning task:
 **Key Methods:**
 - `update()`: Adds newly acquired candidates to history, updates dataset splits, and increments the round counter
 
-### 9. Normalisation (`InputNormaliser`, `OutputStandardiser`)
+### 9. Normalisation (`InputNormaliser`, `InputStandardiser`, `OutputStandardiser`)
 
-ALF provides two preprocessing classes in `alf_core.model.normaliser` for feature and label scaling.
-Both are fitted exclusively on training data and applied consistently at predict time to avoid data leakage.
+ALF provides preprocessing classes in `alf_core.model.normaliser` for feature and label scaling.
+All are fitted exclusively on training data and applied consistently at predict time to avoid data leakage.
 
 **`InputNormaliser`** — min-max scaling of input features to [0, 1]:
 - Statistics (per-feature min and range) are computed over the batch dimension, so each feature
@@ -200,6 +201,18 @@ Both are fitted exclusively on training data and applied consistently at predict
 - Well suited for GP models, where kernels measure distances between inputs and benefit from inputs
   spanning the unit cube [0, 1].
 
+**`InputStandardiser`** — Z-score standardisation of input features to zero mean and unit variance:
+- Statistics (per-feature mean and std) are computed over the batch dimension, so each feature
+  dimension is standardised independently. Supports the same 2-D and higher-dimensional inputs.
+- Edge case: a feature with near-zero std (< `_MIN_STD = 1e-8`) has its scale set to `1.0`, so the
+  column is only mean-centred. This keeps unseen non-constant values bounded at predict time instead
+  of being amplified by division by a near-zero std.
+- Generally preferred for deep neural networks (e.g. `CNNModel`): zero-centring inputs avoids the
+  gradient bias that arises from non-zero-centred activations.
+
+Use `make_input_transform(strategy)` to construct the transform matching a config's
+`normalise_inputs_strategy` (`"minmax"` → `InputNormaliser`, `"zscore"` → `InputStandardiser`).
+
 **`OutputStandardiser`** — Z-score standardisation of output labels to zero mean and unit variance:
 - `inverse_transform(mean, var)` maps predictions back to the original label scale:
   `mean_orig = mean_std * std + mean_train`, `var_orig = var_std * std²`
@@ -208,15 +221,16 @@ Both are fitted exclusively on training data and applied consistently at predict
   (inverse-transformed) label scale.** Predictions returned by `predict()` are always in the
   original label space.
 
-Both are controlled via `BaseTrainConfig` flags (see section 2):
+These are controlled via `BaseTrainConfig` fields (see section 2):
 
-| Flag | Default | Effect |
-|------|---------|--------|
-| `normalise_inputs` | `False` | Apply `InputNormaliser` (min-max) to input features |
+| Field | Default | Effect |
+|-------|---------|--------|
+| `normalise_inputs_strategy` | `None` | `"minmax"` applies `InputNormaliser`, `"zscore"` applies `InputStandardiser`, `None` disables input normalisation |
 | `standardise_outputs` | `False` | Apply `OutputStandardiser` (Z-score) to output labels |
 
-Concrete model configs may override these defaults; for example, `GPTrainConfig` sets both to `True`
-because GP kernels operate in distance space and benefit from standardised targets.
+Concrete model configs may override these defaults; for example, `GPTrainConfig` sets
+`normalise_inputs_strategy="minmax"` and `standardise_outputs=True` because GP kernels operate in
+distance space and benefit from standardised targets.
 
 ## Task Types
 

@@ -15,32 +15,38 @@
 """Config instantiation utilities for configurations with _target_ keys."""
 
 import importlib
+import inspect
+
+import gpytorch
 
 _ALLOWED_MODULES = frozenset({"gpytorch.priors", "gpytorch.constraints"})
 
 
-def build_from_target(cfg: dict | object | None) -> object | None:
+def build_from_target(
+    cfg: dict | None,
+    expected_base: type | tuple[type, ...] | None = None,
+) -> object | None:
     """Instantiate a GPyTorch object from a _target_ config dict.
 
     Supports any GPyTorch prior or constraint. The dict must contain a
     `_target_` key with a fully-qualified class path; all other keys
     are passed as constructor kwargs.
-
-    Already-instantiated objects (e.g. a ``gpytorch.priors.Prior`` instance)
-    are passed through unchanged, which preserves backward compatibility with
-    code that constructs priors directly rather than via the ``_target_`` dict
-    format.
-
+    
     Args:
-        cfg: One of:
-            - A dict with `_target_` (e.g. `"gpytorch.priors.LogNormalPrior"`)
-              and any constructor kwargs.
-            - An already-instantiated GPyTorch prior or constraint object
-              (passed through unchanged).
-            - `None`, which returns `None`.
+        cfg: Dict with `_target_` (e.g. `"gpytorch.priors.LogNormalPrior"`)
+            and any constructor kwargs. `None` returns `None`.
+        expected_base: Base class (or tuple of base classes) the resolved
+            target must subclass. When `None`, the target is validated
+            against the union of `gpytorch.priors.Prior` and
+            `gpytorch.constraints.Interval`.
 
     Raises:
-        ValueError: If `_target_` is not in the allowed module list.
+        ValueError: If `_target_` is missing, not fully qualified, not in
+            the allowed module list, names a private attribute (leading
+            underscore), does not exist in the module, does not resolve to
+            a class, does not subclass
+            `expected_base`, or if the constructor rejects the provided
+            kwargs.
 
     Returns:
         Instantiated object, or `None` if `cfg` is `None`.
@@ -55,11 +61,18 @@ def build_from_target(cfg: dict | object | None) -> object | None:
     """
     if cfg is None:
         return None
-    if not isinstance(cfg, dict):
-        # Already instantiated — pass through for backward compatibility.
-        return cfg
     cfg = dict(cfg)  # don't mutate the caller's dict
-    target = cfg.pop("_target_")
+    target = cfg.pop("_target_", None)
+    if target is None:
+        raise ValueError(
+            "build_from_target: config dict must contain a '_target_' key "
+            f"(e.g. 'gpytorch.priors.LogNormalPrior'). Got keys: {sorted(cfg)}"
+        )
+    if "." not in target:
+        raise ValueError(
+            f"build_from_target: '_target_' must be a fully-qualified class path "
+            f"(e.g. 'gpytorch.priors.LogNormalPrior'), got {target!r}"
+        )
 
     module_path, cls_name = target.rsplit(".", 1)
     if module_path not in _ALLOWED_MODULES and not any(
@@ -69,5 +82,24 @@ def build_from_target(cfg: dict | object | None) -> object | None:
             f"build_from_target: _target_ '{target}' is not in the allowed module list. "
             f"Only gpytorch.priors.* and gpytorch.constraints.* are permitted."
         )
-    cls = getattr(importlib.import_module(module_path), cls_name)
-    return cls(**cfg)
+    if cls_name.startswith("_"):
+        raise ValueError(
+            f"build_from_target: _target_ '{target}' names a private attribute "
+            f"(leading underscore), which is not permitted."
+        )
+    cls = getattr(importlib.import_module(module_path), cls_name, None)
+
+    if expected_base is None:
+        expected_base = (gpytorch.priors.Prior, gpytorch.constraints.Interval)
+    if not inspect.isclass(cls) or not issubclass(cls, expected_base):
+        raise ValueError(
+            f"build_from_target: _target_ '{target}' does not resolve to a "
+            f"subclass of {expected_base!r}."
+        )
+
+    try:
+        return cls(**cfg)
+    except TypeError as e:
+        raise ValueError(
+            f"build_from_target: failed to instantiate '{target}' with kwargs {sorted(cfg)}: {e}"
+        ) from e

@@ -35,19 +35,30 @@ def compute_recall(
 
     Returns:
         Dictionary containing:
-        - "optimizer/top_percentile_recall": Recall at top_percentile threshold
-        - "optimizer/top_n_recall": Recall at top_n threshold
+        - "optimizer/top_{top_percentile * 100:.0f}pc_recall": Recall at the
+          top_percentile threshold
+        - "optimizer/top_{top_n}_recall": Recall at the top_n threshold
+
+        Rank counts are clamped to [1, pool size]; the key names always reflect
+        the nominal top_percentile/top_n arguments, so for pools smaller than
+        top_n the "top_{top_n}_recall" value is computed over the whole pool.
     """
     init_candidate_pool = init_candidate_pool.sort(ascending=False)
-    top_percentile_threshold = init_candidate_pool[
-        int(len(init_candidate_pool) * top_percentile) - 1
-    ][1]
-    top_n_threshold = init_candidate_pool[top_n - 1][1]
+    pool_size = len(init_candidate_pool)
 
-    top_percentile_recall = sum(acquired_candidates.labels >= top_percentile_threshold) / int(
-        len(init_candidate_pool) * top_percentile
+    # Clamp the rank thresholds so small pools don't produce a negative index
+    # (int(pool_size * top_percentile) can be 0) or an out-of-range index
+    # (top_n can exceed the pool size).
+    top_percentile_count = max(1, int(pool_size * top_percentile))
+    top_n_count = min(top_n, pool_size)
+
+    top_percentile_threshold = init_candidate_pool[top_percentile_count - 1][1]
+    top_n_threshold = init_candidate_pool[top_n_count - 1][1]
+
+    top_percentile_recall = (
+        sum(acquired_candidates.labels >= top_percentile_threshold) / top_percentile_count
     )
-    top_n_recall = sum(acquired_candidates.labels >= top_n_threshold) / top_n
+    top_n_recall = sum(acquired_candidates.labels >= top_n_threshold) / top_n_count
 
     # If there are candidates with the same label, e.g., the threshold label is Y and
     # there are more than top_percentile and/or top_n candidates with label equal to
