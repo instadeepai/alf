@@ -14,7 +14,12 @@
 
 import numpy as np
 import pytest
-from alf_core.model.normaliser import InputNormaliser, OutputStandardiser
+from alf_core.model.normaliser import (
+    InputNormaliser,
+    InputStandardiser,
+    OutputStandardiser,
+    make_input_transform,
+)
 
 
 class TestOutputStandardiser:
@@ -157,3 +162,105 @@ class TestInputNormaliser:
         X_t = n.transform(X)
         assert np.all(np.isfinite(X_t))
         assert X_t.shape == X.shape
+
+    def test_inverse_transform_round_trips(self):
+        """inverse_transform recovers the original features from normalised ones."""
+        X = np.array([[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]])
+        n = InputNormaliser()
+        n.fit(X)
+        X_recovered = n.inverse_transform(n.transform(X))
+        np.testing.assert_allclose(X_recovered, X, rtol=1e-5)
+
+    def test_inverse_transform_before_fit_raises(self):
+        """Calling inverse_transform before fit raises RuntimeError."""
+        n = InputNormaliser()
+        with pytest.raises(RuntimeError, match="fitted"):
+            n.inverse_transform(np.array([[0.0, 1.0]]))
+
+
+class TestInputStandardiser:
+    """Tests for InputStandardiser Z-score standardisation of input features."""
+
+    def test_transform_produces_zero_mean_unit_variance(self):
+        """Transformed features have zero mean and unit variance per dimension."""
+        X = np.array([[1.0, 10.0], [2.0, 20.0], [3.0, 30.0], [4.0, 40.0]])
+        s = InputStandardiser()
+        s.fit(X)
+        X_t = s.transform(X)
+        np.testing.assert_allclose(X_t.mean(axis=0), np.zeros(2), atol=1e-6)
+        np.testing.assert_allclose(X_t.std(axis=0), np.ones(2), atol=1e-6)
+
+    def test_inverse_transform_round_trips(self):
+        """inverse_transform recovers the original features from standardised ones."""
+        X = np.array([[1.0, 10.0], [2.0, 20.0], [3.0, 30.0], [4.0, 40.0]])
+        s = InputStandardiser()
+        s.fit(X)
+        X_recovered = s.inverse_transform(s.transform(X))
+        np.testing.assert_allclose(X_recovered, X, rtol=1e-5)
+
+    def test_constant_feature_does_not_divide_by_zero(self):
+        """A zero-variance feature column has its scale set to 1.0, keeping transforms finite."""
+        X = np.array([[3.0, 1.0], [3.0, 2.0], [3.0, 3.0]])
+        s = InputStandardiser()
+        s.fit(X)
+        # Constant column (index 0) has its scale set to 1.0, not divided by a near-zero std.
+        np.testing.assert_allclose(s._std[0], 1.0)
+        # Non-constant column (index 1) keeps its actual std.
+        np.testing.assert_allclose(s._std[1], np.std(X[:, 1]))
+        X_t = s.transform(X)
+        assert np.all(np.isfinite(X_t))
+        # Constant feature is centred to 0 by mean subtraction.
+        np.testing.assert_allclose(X_t[:, 0], np.zeros(3), atol=1e-6)
+
+    def test_single_sample(self):
+        """A single training sample is handled without errors (zero variance everywhere)."""
+        X = np.array([[1.0, 2.0, 3.0]])
+        s = InputStandardiser()
+        s.fit(X)
+        X_t = s.transform(X)
+        assert np.all(np.isfinite(X_t))
+
+    def test_transform_before_fit_raises(self):
+        """Calling transform before fit raises RuntimeError."""
+        s = InputStandardiser()
+        with pytest.raises(RuntimeError, match="fitted"):
+            s.transform(np.array([[1.0, 2.0]]))
+
+    def test_inverse_transform_before_fit_raises(self):
+        """Calling inverse_transform before fit raises RuntimeError."""
+        s = InputStandardiser()
+        with pytest.raises(RuntimeError, match="fitted"):
+            s.inverse_transform(np.array([[0.0, 1.0]]))
+
+    def test_is_fitted(self):
+        """is_fitted is False before fit() and True after."""
+        s = InputStandardiser()
+        assert not s.is_fitted
+        s.fit(np.array([[1.0, 2.0], [3.0, 4.0]]))
+        assert s.is_fitted
+
+    def test_fit_on_3d_tensor(self):
+        """InputStandardiser must handle CNN's 3D one-hot tensors (batch, alphabet, seq_len)."""
+        X = np.random.rand(8, 20, 10)  # (batch, alphabet_size, seq_len)
+        s = InputStandardiser()
+        s.fit(X)
+        X_t = s.transform(X)
+        assert np.all(np.isfinite(X_t))
+        assert X_t.shape == X.shape
+
+
+class TestMakeInputTransform:
+    """Tests for the make_input_transform factory."""
+
+    def test_minmax_returns_input_normaliser(self):
+        """The 'minmax' strategy returns an InputNormaliser."""
+        assert isinstance(make_input_transform("minmax"), InputNormaliser)
+
+    def test_zscore_returns_input_standardiser(self):
+        """The 'zscore' strategy returns an InputStandardiser."""
+        assert isinstance(make_input_transform("zscore"), InputStandardiser)
+
+    def test_unknown_strategy_raises_value_error(self):
+        """An unknown strategy raises ValueError."""
+        with pytest.raises(ValueError, match="Unknown input normalisation strategy"):
+            make_input_transform("invalid")

@@ -3,14 +3,14 @@ BoTorch Acquisition Functions
 
 Wraps BoTorch acquisition functions for use in the ALF active learning loop.
 Accepts either a native BoTorch ``Model`` or an ALF ``BaseModel``; a
-:class:`~alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter.BoTorchModelAdapter`
+:class:``~alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter.BoTorchModelAdapter``
 is inserted automatically when needed.
 
-Configure via :class:`~alf_tools.optimizer.acquisition_functions.botorch_acquisition_function.BotorchAcquisitionConfig`
+Configure via :class:``~alf_tools.optimizer.acquisition_functions.botorch_acquisition_function.BotorchAcquisitionConfig``
 (specifying the ``name`` and any required ``kwargs``) and pass to
-:class:`~alf_tools.optimizer.acquisition_functions.botorch_acquisition_function.BotorchAcquisitionFunction`,
+:class:``~alf_tools.optimizer.acquisition_functions.botorch_acquisition_function.BotorchAcquisitionFunction``,
 which implements the ALF ``AcquisitionFunction`` interface.  Supported names are
-listed in :data:`~alf_tools.optimizer.acquisition_functions.botorch_acquisition_function.ACQUISITION_REGISTRY`:
+listed in :data:``~alf_tools.optimizer.acquisition_functions.botorch_acquisition_function.ACQUISITION_REGISTRY``:
 
 - ``log_expected_improvement``
 - ``upper_confidence_bound``

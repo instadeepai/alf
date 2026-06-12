@@ -1,7 +1,7 @@
 Chemprop Model
 ==============
 
-A Message Passing Neural Network (MPNN) surrogate model using `Chemprop v2.x <https://chemprop.readthedocs.io/>`_
+A Message Passing Neural Network (MPNN) surrogate model using ``Chemprop v2.x <https://chemprop.readthedocs.io/>``_
 as the backbone. Accepts SMILES strings as inputs and returns scalar fitness predictions.
 
 The model uses bond-based message passing (``BondMessagePassing``), a configurable graph-level
