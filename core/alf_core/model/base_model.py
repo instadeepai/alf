@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal, Union
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
@@ -136,7 +136,7 @@ class BaseModel(abc.ABC):
         """
         return []
 
-    def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
+    def get_training_summary_metrics(self) -> dict[str, float | int | np.number]:
         """Get summary metrics from the most recent training run.
 
         Returns:
