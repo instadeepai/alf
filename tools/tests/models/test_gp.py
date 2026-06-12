@@ -12,17 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+import math
+
+import gpytorch
 import numpy as np
 import pytest
 import torch
 from alf_core import Candidate, LabelledCandidates
+from alf_core.dataclasses.candidate import Modality
 from alf_tools.models.gp import (
     FeaturizerConfig,
     GPModel,
     GPModelConfig,
     GPTrainConfig,
 )
-from alf_tools.models.utils import one_hot_encode
+from alf_tools.models.utils import build_from_target, one_hot_encode
+from botorch.models import SingleTaskGP
+
+# Training on deliberately tiny datasets triggers the regret-metric fallback
+# warning (num_acquisitions > available items) from alf_core during the
+# train/validation metric computation in GPModel.train().
+pytestmark = pytest.mark.filterwarnings("ignore:num_acquisitions:UserWarning")
 
 
 @pytest.fixture
@@ -110,7 +121,7 @@ def gp_model_sinusoidal():
     train_config = GPTrainConfig(num_iterations=10, log_frequency=5)
     featurizer_config = FeaturizerConfig(
         featurizer_type="custom",
-        custom_featurizer=lambda x: torch.tensor(x, dtype=torch.float32),
+        custom_featurizer=lambda x: torch.tensor(x, dtype=torch.float32).unsqueeze(-1),
     )
     return GPModel(
         name="test_gp_sinusoidal",
@@ -158,6 +169,11 @@ class TestGPModel:
 
         metrics = gp_model.get_training_summary_metrics()
         assert "final_mll" in metrics
+
+    def test_sample_raises_not_implemented_error(self, gp_model):
+        """sample() raises NotImplementedError for the discriminative GP."""
+        with pytest.raises(NotImplementedError, match="not implemented"):
+            gp_model.sample()
 
     def test_predict_before_train_raises_error(self, gp_model):
         """Test that predicting before train raises an error."""
@@ -497,3 +513,425 @@ class TestGPNormalisation:
             f"final_val_coverage_0.95={metrics['final_val_coverage_0.95']:.3f} — "
             "val metrics appear to be in standardised space, not original label scale"
         )
+
+
+class TestGPModelConfigDefaults:
+    """Tests for the updated GPModelConfig dict-based fields."""
+
+    def test_lengthscale_prior_defaults_to_lognormal_dict(self):
+        """Test that the default lengthscale_prior is a dict specifying a
+        LogNormalPrior with the expected parameters.
+        """
+        cfg = GPModelConfig()
+        assert isinstance(cfg.lengthscale_prior, dict)
+        assert cfg.lengthscale_prior["_target_"] == "gpytorch.priors.LogNormalPrior"
+        assert cfg.lengthscale_prior["loc"] == pytest.approx(math.sqrt(2))
+        assert cfg.lengthscale_prior["scale"] == pytest.approx(math.sqrt(3))
+
+    def test_lengthscale_constraint_defaults_to_none(self):
+        """Test that the default lengthscale_constraint is None, meaning no
+        constraint is applied to the lengthscale parameter.
+        """
+        cfg = GPModelConfig()
+        assert cfg.lengthscale_constraint is None
+
+    def test_outputscale_prior_defaults_to_none(self):
+        """Test that the default outputscale_prior is None, meaning no prior is
+        applied to the outputscale parameter.
+        """
+        cfg = GPModelConfig()
+        assert cfg.outputscale_prior is None
+
+    def test_noise_constraint_defaults_to_none(self):
+        """Test that the default noise_constraint is None, meaning no constraint
+        is applied to the noise parameter.
+        """
+        cfg = GPModelConfig()
+        assert cfg.noise_constraint is None
+
+    def test_custom_gamma_prior_accepted(self):
+        """Test that a custom GammaPrior configuration is accepted and stored
+        correctly in the config.
+        """
+        prior_cfg = {
+            "_target_": "gpytorch.priors.GammaPrior",
+            "concentration": 3.0,
+            "rate": 6.0,
+        }
+        cfg = GPModelConfig(lengthscale_prior=prior_cfg)
+        assert cfg.lengthscale_prior["_target_"] == "gpytorch.priors.GammaPrior"
+
+    def test_lengthscale_prior_can_be_set_to_none(self):
+        """Test that setting lengthscale_prior to None is accepted and results
+        in no prior being used.
+        """
+        cfg = GPModelConfig(lengthscale_prior=None)
+        assert cfg.lengthscale_prior is None
+
+    def test_build_from_target_works_with_default_prior(self):
+        """Test that the default lengthscale_prior dict can be successfully
+        built into a LogNormalPrior instance.
+        """
+        cfg = GPModelConfig()
+        prior = build_from_target(cfg.lengthscale_prior)
+        assert isinstance(prior, gpytorch.priors.LogNormalPrior)
+
+    def test_default_prior_dicts_are_independent(self):
+        """Each GPModelConfig() gets its own dict, not a shared reference."""
+        cfg1 = GPModelConfig()
+        cfg2 = GPModelConfig()
+        assert cfg1.lengthscale_prior is not cfg2.lengthscale_prior
+
+
+class TestGPModelPriorWiring:
+    """Integration tests: confirm prior and constraint reach the kernel."""
+
+    _train_cfg = GPTrainConfig(num_iterations=5, log_frequency=5)
+    _feat_cfg = FeaturizerConfig(
+        featurizer_type="custom",
+        custom_featurizer=lambda x: torch.tensor(x, dtype=torch.float32).unsqueeze(-1),
+    )
+
+    def test_default_lognormal_prior_is_registered(
+        self, sample_sinusoidal_data, val_sinusoidal_data
+    ):
+        """Test that the default LogNormalPrior is correctly registered on the kernel."""
+        model = GPModel(
+            model_config=GPModelConfig(),
+            train_config=self._train_cfg,
+            featurizer_config=self._feat_cfg,
+        )
+        model.train(sample_sinusoidal_data, val_sinusoidal_data)
+        base_kernel = model.gp_model.covar_module.base_kernel
+        # Prior should be registered on the base kernel
+        prior_names = {name for name, *_ in base_kernel.named_priors()}
+        assert "lengthscale_prior" in prior_names
+
+    def test_gamma_prior_is_registered(self, sample_sinusoidal_data, val_sinusoidal_data):
+        """Test that a custom GammaPrior is correctly registered on the kernel."""
+        cfg = GPModelConfig(
+            lengthscale_prior={
+                "_target_": "gpytorch.priors.GammaPrior",
+                "concentration": 3.0,
+                "rate": 6.0,
+            }
+        )
+        model = GPModel(
+            model_config=cfg,
+            train_config=self._train_cfg,
+            featurizer_config=self._feat_cfg,
+        )
+        model.train(sample_sinusoidal_data, val_sinusoidal_data)
+        base_kernel = model.gp_model.covar_module.base_kernel
+        named = {name: prior for name, _module, prior, *_ in base_kernel.named_priors()}
+        assert "lengthscale_prior" in named
+        assert isinstance(named["lengthscale_prior"], gpytorch.priors.GammaPrior)
+
+    def test_no_prior_when_lengthscale_prior_is_none(
+        self, sample_sinusoidal_data, val_sinusoidal_data
+    ):
+        """Test that setting lengthscale_prior to None results in no prior being registered."""
+        cfg = GPModelConfig(lengthscale_prior=None)
+        model = GPModel(
+            model_config=cfg,
+            train_config=self._train_cfg,
+            featurizer_config=self._feat_cfg,
+        )
+        model.train(sample_sinusoidal_data, val_sinusoidal_data)
+        base_kernel = model.gp_model.covar_module.base_kernel
+        prior_names = {name for name, *_ in base_kernel.named_priors()}
+        assert "lengthscale_prior" not in prior_names
+
+    def test_lengthscale_constraint_is_applied(self, sample_sinusoidal_data, val_sinusoidal_data):
+        """Test that a custom lengthscale constraint is correctly applied to the kernel."""
+        cfg = GPModelConfig(
+            lengthscale_constraint={
+                "_target_": "gpytorch.constraints.GreaterThan",
+                "lower_bound": 0.05,
+            }
+        )
+        model = GPModel(
+            model_config=cfg,
+            train_config=self._train_cfg,
+            featurizer_config=self._feat_cfg,
+        )
+        model.train(sample_sinusoidal_data, val_sinusoidal_data)
+        base_kernel = model.gp_model.covar_module.base_kernel
+        assert hasattr(base_kernel, "raw_lengthscale_constraint")
+        assert isinstance(
+            base_kernel.raw_lengthscale_constraint,
+            gpytorch.constraints.GreaterThan,
+        )
+
+    def test_ard_warning_with_default_prior(self, tabular_data, caplog):
+        """Test that enabling ARD with the default LogNormalPrior triggers
+        a warning about Hvarfner priors.
+        """
+        model = GPModel(
+            model_config=GPModelConfig(ard=True),
+            train_config=self._train_cfg,
+            featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+            device="cpu",
+        )
+        with caplog.at_level(logging.WARNING, logger="alf-tools"):
+            model.train(tabular_data)
+        assert "ARD is enabled" in caplog.text
+        assert "Hvarfner" in caplog.text
+
+    def test_ard_warning_with_no_prior(self, tabular_data, caplog):
+        """Test that enabling ARD with lengthscale_prior=None triggers a
+        warning about the missing prior.
+        """
+        model = GPModel(
+            model_config=GPModelConfig(ard=True, lengthscale_prior=None),
+            train_config=self._train_cfg,
+            featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+            device="cpu",
+        )
+        with caplog.at_level(logging.WARNING, logger="alf-tools"):
+            model.train(tabular_data)
+        assert "ARD is enabled" in caplog.text
+        assert "no lengthscale prior" in caplog.text
+
+    def test_no_ard_warning_for_one_dimensional_inputs(self, sample_sinusoidal_data, caplog):
+        """Test that no ARD warning is logged for 1-D inputs, where the
+        default prior already matches the Hvarfner recommendation.
+        """
+        model = GPModel(
+            model_config=GPModelConfig(ard=True),
+            train_config=self._train_cfg,
+            featurizer_config=self._feat_cfg,
+        )
+        with caplog.at_level(logging.WARNING, logger="alf-tools"):
+            model.train(sample_sinusoidal_data)
+        assert "ARD is enabled" not in caplog.text
+
+
+@pytest.fixture
+def tabular_data():
+    """Create tabular training data with precomputed numpy features.
+
+    Returns:
+        LabelledCandidates with 3-dimensional tabular candidates.
+    """
+    rng = np.random.default_rng(0)
+    X = rng.random((20, 3))
+    y = np.sin(X[:, 0]) + np.cos(X[:, 1]) + rng.standard_normal(20) * 0.05
+    candidates = [Candidate(data=x, modality=Modality.TABULAR) for x in X]
+    return LabelledCandidates(candidates, y)
+
+
+@pytest.fixture
+def precomputed_gp_model():
+    """Create a GPModel using precomputed features for fast testing.
+
+    Returns:
+        A GPModel.
+    """
+    return GPModel(
+        model_config=GPModelConfig(kernel_type="rbf", ard=False),
+        train_config=GPTrainConfig(num_iterations=10),
+        featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+        device="cpu",
+    )
+
+
+class TestGPBoTorchBackbone:
+    """Tests for the BoTorch SingleTaskGP backbone of GPModel."""
+
+    def test_scipy_optimizer_trains(self, tabular_data):
+        """optimizer_type='scipy' trains and records strictly increasing epochs."""
+        model = GPModel(
+            model_config=GPModelConfig(kernel_type="rbf", ard=False),
+            train_config=GPTrainConfig(optimizer_type="scipy", num_iterations=20),
+            featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+            device="cpu",
+        )
+        model.train(tabular_data, None)
+        assert model.gp_model is not None
+
+        epoch_metrics = model.get_epoch_metrics()
+        assert len(epoch_metrics) > 0
+        epochs = [m.epoch for m in epoch_metrics]
+        assert all(a < b for a, b in zip(epochs, epochs[1:]))
+
+        metrics = model.get_training_summary_metrics()
+        assert "final_mll" in metrics
+        assert "final_loss" in metrics
+
+    def test_invalid_optimizer_type_raises(self):
+        """An unsupported optimizer_type raises ValueError at construction."""
+        with pytest.raises(ValueError, match="Unsupported optimizer_type"):
+            GPModel(train_config=GPTrainConfig(optimizer_type="bogus"), device="cpu")
+
+    def test_invalid_max_attempts_raises(self):
+        """max_attempts < 1 raises ValueError at construction."""
+        with pytest.raises(ValueError, match="max_attempts"):
+            GPModel(train_config=GPTrainConfig(max_attempts=0), device="cpu")
+
+    def test_invalid_dtype_raises(self):
+        """An unknown dtype string raises ValueError at construction."""
+        with pytest.raises(ValueError, match="not a valid floating-point torch dtype"):
+            GPModel(train_config=GPTrainConfig(dtype="not_a_dtype"), device="cpu")
+
+    def test_non_floating_dtype_raises(self):
+        """A valid but non-floating-point dtype raises ValueError at construction."""
+        with pytest.raises(ValueError, match="not a valid floating-point torch dtype"):
+            GPModel(train_config=GPTrainConfig(dtype="int64"), device="cpu")
+
+    def test_label_dtype_mismatch_raises(self):
+        """A label_dtype differing from dtype raises ValueError at construction."""
+        with pytest.raises(ValueError, match="label_dtype .* must match GPTrainConfig.dtype"):
+            GPModel(
+                train_config=GPTrainConfig(label_dtype=torch.float32, dtype="float64"),
+                device="cpu",
+            )
+
+    def test_label_dtype_matching_dtype_accepted(self):
+        """A label_dtype equal to the resolved dtype is accepted."""
+        model = GPModel(
+            train_config=GPTrainConfig(label_dtype=torch.float64, dtype="float64"),
+            device="cpu",
+        )
+        assert model._dtype == torch.float64
+
+    def test_nan_loss_raises_and_resets_state(
+        self, precomputed_gp_model, tabular_data, monkeypatch
+    ):
+        """A non-finite final loss raises RuntimeError and resets model state."""
+
+        def fake_optimize(self, train_x, train_y):
+            return {
+                "final_mll": float("nan"),
+                "final_loss": float("nan"),
+                "num_iterations": 1,
+            }
+
+        monkeypatch.setattr(GPModel, "_optimize_hyperparameters", fake_optimize)
+        with pytest.raises(RuntimeError, match="NaN/Inf loss"):
+            precomputed_gp_model.train(tabular_data, None)
+
+        assert precomputed_gp_model.gp_model is None
+        assert precomputed_gp_model.likelihood is None
+        assert precomputed_gp_model.train_x is None
+        assert precomputed_gp_model.train_y is None
+        assert precomputed_gp_model.feature_dim is None
+        assert precomputed_gp_model._input_normaliser is None
+        assert precomputed_gp_model._output_standardiser is None
+        assert precomputed_gp_model.training_metrics == {}
+        assert precomputed_gp_model._epoch_metrics == []
+
+    def test_botorch_model_property(self, precomputed_gp_model, tabular_data):
+        """botorch_model raises before train and returns SingleTaskGP after."""
+        with pytest.raises(RuntimeError, match="must be trained"):
+            _ = precomputed_gp_model.botorch_model
+
+        precomputed_gp_model.train(tabular_data, None)
+        assert isinstance(precomputed_gp_model.botorch_model, SingleTaskGP)
+
+    def test_default_noise_prior_is_registered(self, precomputed_gp_model, tabular_data):
+        """The default noise_prior registers a prior on the likelihood."""
+        precomputed_gp_model.train(tabular_data, None)
+        prior_names = {name for name, *_ in precomputed_gp_model.likelihood.named_priors()}
+        assert any("noise_prior" in name for name in prior_names)
+
+    def test_noise_prior_none_gives_prior_free_likelihood(self, tabular_data):
+        """noise_prior=None produces a likelihood with no registered priors."""
+        model = GPModel(
+            model_config=GPModelConfig(kernel_type="rbf", ard=False, noise_prior=None),
+            train_config=GPTrainConfig(num_iterations=5),
+            featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+            device="cpu",
+        )
+        model.train(tabular_data, None)
+        prior_names = {name for name, *_ in model.likelihood.named_priors()}
+        assert not any("noise_prior" in name for name in prior_names)
+
+    def test_predict_variance_includes_noise(self, precomputed_gp_model, tabular_data):
+        """predict() variances exceed the noise-free latent posterior variances."""
+        precomputed_gp_model.train(tabular_data, None)
+        predictions = precomputed_gp_model.predict(tabular_data.candidates)
+
+        # Build the same normalised test tensor predict() uses internally
+        test_x_np = precomputed_gp_model.featurise(tabular_data.candidates).cpu().numpy()
+        test_x_np = precomputed_gp_model._input_normaliser.transform(test_x_np)
+        test_x = torch.tensor(test_x_np, dtype=torch.float64)
+
+        with torch.no_grad():
+            latent = precomputed_gp_model.botorch_model.posterior(test_x)
+            latent_means = latent.mean.squeeze(-1).cpu().numpy()
+            latent_vars = latent.variance.squeeze(-1).cpu().numpy()
+
+        # Apply the same inverse transform predict() applies
+        _, latent_vars = precomputed_gp_model._output_standardiser.inverse_transform(
+            latent_means, latent_vars
+        )
+        assert np.all(predictions.variances > latent_vars)
+
+    def test_predict_dimension_mismatch_raises(self, precomputed_gp_model, tabular_data):
+        """Predicting on candidates with the wrong feature dimension raises ValueError."""
+        precomputed_gp_model.train(tabular_data, None)
+        bad_candidates = [
+            Candidate(data=np.random.rand(4), modality=Modality.TABULAR) for _ in range(3)
+        ]
+        with pytest.raises(ValueError, match="Input dimension mismatch"):
+            precomputed_gp_model.predict(bad_candidates)
+
+    def test_tabular_precomputed_end_to_end(self, precomputed_gp_model, tabular_data):
+        """Tabular numpy candidates work end-to-end with featurizer_type='precomputed'."""
+        precomputed_gp_model.train(tabular_data, None)
+        predictions = precomputed_gp_model.predict(tabular_data.candidates)
+        assert predictions.means.shape == (len(tabular_data),)
+        assert predictions.variances.shape == (len(tabular_data),)
+        assert np.all(np.isfinite(predictions.means))
+        assert np.all(predictions.variances >= 0)
+
+    def test_default_dtype_is_float64(self, precomputed_gp_model, tabular_data):
+        """The trained botorch_model parameters default to float64."""
+        precomputed_gp_model.train(tabular_data, None)
+        for param in precomputed_gp_model.botorch_model.parameters():
+            assert param.dtype == torch.float64
+
+    @pytest.mark.filterwarnings("ignore::botorch.exceptions.InputDataWarning")
+    def test_float32_end_to_end(self, tabular_data):
+        """dtype='float32' trains, predicts, and keeps parameters in float32.
+
+        BoTorch's float64 recommendation (InputDataWarning) is expected here
+        since float32 is the explicit point of this test.
+        """
+        model = GPModel(
+            model_config=GPModelConfig(kernel_type="rbf", ard=False),
+            train_config=GPTrainConfig(num_iterations=10, dtype="float32"),
+            featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+            device="cpu",
+        )
+        model.train(tabular_data, None)
+        predictions = model.predict(tabular_data.candidates)
+        assert predictions.means.shape == (len(tabular_data),)
+        assert np.all(np.isfinite(predictions.means))
+        assert np.all(predictions.variances >= 0)
+        for param in model.botorch_model.parameters():
+            assert param.dtype == torch.float32
+
+
+class TestGPModelViaSurrogate:
+    """Test GPModel accessed through the Surrogate wrapper."""
+
+    @pytest.mark.filterwarnings(
+        "ignore:invalid value encountered in multiply"
+        ":RuntimeWarning:alf_core.utils.metrics.regression"
+    )
+    def test_surrogate_predict_returns_finite_results(self, trained_surrogate, branin_dataset):
+        """Predictions from a trained Surrogate have finite means and non-negative variances.
+
+        The rank-space ECE metric computed during fitting hits `inf * sqrt(0)`
+        (NaN) at its final confidence-grid point when Monte-Carlo rank
+        variances are exactly zero, emitting an expected RuntimeWarning.
+        """
+        predictions = trained_surrogate.predict(branin_dataset.test_dataset.candidates)
+
+        assert predictions.means is not None
+        assert predictions.variances is not None
+        assert predictions.means.shape == (len(branin_dataset.test_dataset.candidates),)
+        assert np.all(np.isfinite(predictions.means))
+        assert np.all(predictions.variances >= 0)
