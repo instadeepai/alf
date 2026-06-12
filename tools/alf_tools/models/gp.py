@@ -22,13 +22,18 @@ from typing import Any, Callable, Literal, TypeAlias
 import gpytorch
 import numpy as np
 import torch
-from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, ProblemType, Results
-from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
-from alf_core.dataset.base_dataset import BaseDataset
-from alf_core.model.base_model import BaseTrainConfig
-from alf_core.model.normaliser import (
+from alf_core import (
+    BaseDataset,
+    BaseModel,
+    BaseTrainConfig,
+    Candidate,
     InputNormaliser,
+    LabelledCandidates,
     OutputStandardiser,
+    Predictions,
+    ProblemType,
+    Results,
+    SurrogateEpochMetrics,
 )
 from botorch.fit import fit_gpytorch_mll
 from botorch.models import SingleTaskGP
