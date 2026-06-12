@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 import math
 from dataclasses import dataclass, field
-from typing import Any, Callable, Literal, TypeAlias
+from typing import Any, Callable, Literal
 
 import gpytorch
 import numpy as np
@@ -49,12 +49,10 @@ from alf_tools.models.utils import (
     one_hot_encode,
     transform_data,
 )
-from alf_tools.models.utils.botorch_utils import candidates_to_tensor
+from alf_tools.models.utils.botorch_utils import KernelTypes, _build_kernel, candidates_to_tensor
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 logger = logging.getLogger("alf-tools")
-
-KernelTypes: TypeAlias = Literal["rbf", "matern", "linear", "polynomial", "rbf_linear", "custom"]
 
 
 @dataclass
@@ -204,78 +202,6 @@ class FeaturizerConfig:
         Callable[[list[str]], Float[torch.Tensor, "batch_size n_features"]] | None
     ) = None
     flatten_one_hot: bool = True
-
-
-def _build_kernel(
-    kernel_type: KernelTypes,
-    input_dim: int,
-    ard: bool,
-    matern_nu: float,
-    lengthscale_prior: gpytorch.priors.Prior | None,
-    lengthscale_constraint: gpytorch.constraints.Constraint | None,
-    outputscale_prior: gpytorch.priors.Prior | None,
-    build_kernel_fn: Callable[..., gpytorch.kernels.Kernel] | None = None,
-) -> gpytorch.kernels.Kernel:
-    """Build the kernel based on configuration.
-
-    Args:
-        kernel_type: Type of kernel to build.
-        input_dim: Dimensionality of input features.
-        ard: Whether to use ARD.
-        matern_nu: Smoothness for Matern kernel.
-        lengthscale_prior: Prior for lengthscale (already instantiated).
-        lengthscale_constraint: Constraint for lengthscale (already instantiated).
-        outputscale_prior: Prior for output scale (already instantiated).
-        build_kernel_fn: Custom kernel builder, required when
-            kernel_type='custom'. Returns the kernel as-is (no ScaleKernel
-            wrapping).
-
-    Returns:
-        Configured GPyTorch kernel.
-
-    Raises:
-        ValueError: If kernel_type is not supported, or if
-            kernel_type='custom' and build_kernel_fn is None.
-    """
-    if kernel_type == "custom":
-        if build_kernel_fn is None:
-            raise ValueError("build_kernel_fn must be provided when kernel_type='custom'")
-        return build_kernel_fn()
-
-    ard_num_dims = input_dim if ard else None
-
-    if kernel_type == "rbf":
-        base_kernel = gpytorch.kernels.RBFKernel(
-            ard_num_dims=ard_num_dims,
-            lengthscale_prior=lengthscale_prior,
-            lengthscale_constraint=lengthscale_constraint,
-        )
-    elif kernel_type == "matern":
-        base_kernel = gpytorch.kernels.MaternKernel(
-            nu=matern_nu,
-            ard_num_dims=ard_num_dims,
-            lengthscale_prior=lengthscale_prior,
-            lengthscale_constraint=lengthscale_constraint,
-        )
-    elif kernel_type == "linear":
-        base_kernel = gpytorch.kernels.LinearKernel(ard_num_dims=ard_num_dims)
-    elif kernel_type == "polynomial":
-        base_kernel = gpytorch.kernels.PolynomialKernel(power=2, ard_num_dims=ard_num_dims)
-    elif kernel_type == "rbf_linear":
-        rbf_kernel = gpytorch.kernels.RBFKernel(
-            ard_num_dims=ard_num_dims,
-            lengthscale_prior=lengthscale_prior,
-            lengthscale_constraint=lengthscale_constraint,
-        )
-        linear_kernel = gpytorch.kernels.LinearKernel(ard_num_dims=ard_num_dims)
-        base_kernel = rbf_kernel + linear_kernel
-    else:
-        raise ValueError(
-            f"Unsupported kernel_type: {kernel_type}. "
-            f"Supported types: 'rbf', 'matern', 'linear', 'polynomial', 'rbf_linear', 'custom'"
-        )
-
-    return gpytorch.kernels.ScaleKernel(base_kernel, outputscale_prior=outputscale_prior)
 
 
 class GPModel(BaseModel):
