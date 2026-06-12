@@ -106,10 +106,10 @@ class ProteinGym(BaseDataset):
             Labeled candidates with ProteinGym data.
 
         Raises:
-            ValueError: If HF token is not set as environment variable.
+            ValueError: If the HF_TOKEN environment variable is unset or empty.
         """
         hf_token = os.environ.get("HF_TOKEN")
-        if hf_token is None or hf_token == "":
+        if not hf_token:
             raise ValueError(
                 "HF token must be set as environment variable; "
                 "HF_TOKEN environment variable is not set — export HF_TOKEN=<your_token> "
