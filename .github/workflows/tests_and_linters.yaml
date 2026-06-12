@@ -56,7 +56,11 @@ jobs:
           uses: astral-sh/setup-uv@v6
 
         - name: Sync dependencies
-          run: uv sync
+          # --all-groups installs every dependency-group, including the optional
+          # extras re-exposed as groups in the root pyproject (guacamol, esm2,
+          # esmfold, chemprop). New extras added as groups are picked up
+          # automatically without editing this workflow. See issue #120.
+          run: uv sync --all-groups
 
         - name: Run tests (core) 🧪
           run: |

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from unittest.mock import patch
 
 import numpy as np
@@ -116,8 +117,16 @@ def proteingym_dataset_cv_multiples():
     return ProteinGym(config)
 
 
+@pytest.mark.skipif(
+    os.environ.get("HF_TOKEN") is None,
+    reason="HF_TOKEN not set; required for gated ProteinGym dataset access",
+)
 class TestProteinGymDataset:
-    """Test class for ProteinGym dataset functionality."""
+    """Test class for ProteinGym dataset functionality.
+
+    These tests download the real gated ProteinGym dataset and are skipped when
+    `HF_TOKEN` is absent (e.g. local runs or forks without the secret).
+    """
 
     def test_dataset_initialization_singles(self, proteingym_dataset_singles):
         """Test that singles dataset initializes correctly."""
