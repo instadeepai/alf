@@ -1,7 +1,7 @@
 Acquisition Functions
 =====================
 
-Concrete acquisition function implementations that inherit from `alf_core.optimizer.AcquisitionFunction`.
+Concrete acquisition function implementations that inherit from ``alf_core.optimizer.AcquisitionFunction``.
 These functions score candidates during the active learning loop to determine which candidates are most
 promising for evaluation.
 
