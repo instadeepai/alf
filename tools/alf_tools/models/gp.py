@@ -28,6 +28,7 @@ from alf_core import (
     BaseTrainConfig,
     Candidate,
     InputNormaliser,
+    InputStandardiser,
     LabelledCandidates,
     OutputStandardiser,
     Predictions,
@@ -135,14 +136,14 @@ class GPModelConfig:
 class GPTrainConfig(BaseTrainConfig):
     """Configuration for Gaussian Process training.
 
-    Overrides `normalise_inputs` to `True` because GP kernels measure
-    distances between inputs; scaling continuous features to [0, 1]
+    Overrides `normalise_inputs_strategy` to `minmax` because GP kernels
+    measure distances between inputs; scaling continuous features to [0, 1]
     improves marginal log-likelihood optimisation.
 
     Args:
-        normalise_inputs: Whether to apply min-max normalisation to input
-            features before training. Defaults to True; GP kernels measure
-            distances so scaling continuous features to [0, 1] improves MLL.
+        normalise_inputs_strategy: Which input normalisation to apply before
+            training. Defaults to `minmax`; GP kernels measure distances so
+            scaling continuous features to [0, 1] improves MLL.
         standardise_outputs: Whether to apply Z-score standardisation to
             output labels before training. Defaults to True; standardisation
             can improve training. For constant labels, std is clamped to a
@@ -168,7 +169,9 @@ class GPTrainConfig(BaseTrainConfig):
             so a mismatch raises ValueError at model construction.
     """
 
-    normalise_inputs: bool = True  # override BaseTrainConfig default
+    normalise_inputs_strategy: Literal["minmax", "zscore"] | None = (
+        "minmax"  # override BaseTrainConfig default
+    )
     standardise_outputs: bool = True  # override BaseTrainConfig default
     learning_rate: float = 0.01  # override BaseTrainConfig default
     num_iterations: int = 100
@@ -299,7 +302,7 @@ class GPModel(BaseModel):
         self.train_y: Float[torch.Tensor, "n_samples"] | None = None
 
         # Normalisers — fitted on each train() call, used at predict() time
-        self._input_normaliser: InputNormaliser | None = None
+        self._input_transform: InputNormaliser | InputStandardiser | None = None
         self._output_standardiser: OutputStandardiser | None = None
 
         # Track metrics
@@ -633,10 +636,10 @@ class GPModel(BaseModel):
             A tuple of training features and targets as tensors on the current device.
         """
         label_dtype = self.train_config.label_dtype or self._dtype
-        train_x, train_y, self._input_normaliser, self._output_standardiser = transform_data(
+        train_x, train_y, self._input_transform, self._output_standardiser = transform_data(
             self.featurise(train_data),
             train_data.labels,
-            self.train_config.normalise_inputs,
+            self.train_config.normalise_inputs_strategy,
             self.train_config.standardise_outputs,
             label_dtype,
             self.device,
@@ -750,7 +753,7 @@ class GPModel(BaseModel):
             self.train_x = None
             self.train_y = None
             self.feature_dim = None
-            self._input_normaliser = None
+            self._input_transform = None
             self._output_standardiser = None
             self.training_metrics = {}
             self._epoch_metrics = []
@@ -834,8 +837,8 @@ class GPModel(BaseModel):
         test_x_np = test_x.cpu().numpy()
 
         # Apply input normalization if fitted
-        if self._input_normaliser is not None:
-            test_x_np = self._input_normaliser.transform(test_x_np)
+        if self._input_transform is not None:
+            test_x_np = self._input_transform.transform(test_x_np)
         test_x = torch.tensor(test_x_np, dtype=self._dtype).to(self.device)
 
         # Make predictions with fast predictive variance computation

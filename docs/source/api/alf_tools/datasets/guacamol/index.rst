@@ -7,7 +7,7 @@ goal-directed molecular design benchmarks. This implementation supports two comp
 modes: **property prediction** (RDKit physicochemical descriptors as regression targets) and
 **benchmark tasks** (goal-directed scoring functions that evaluate molecular design quality).
 
-Data is downloaded automatically from `Figshare <https://figshare.com/projects/GuacaMol/62224>`_
+Data is downloaded automatically from ``Figshare <https://figshare.com/projects/GuacaMol/62224>``_
 on first use and cached locally at ``~/.cache/alf/``.
 
 **Supported physicochemical properties:**
@@ -140,7 +140,7 @@ requested properties; ``GuacaMol._prop_cols`` lists the property names in the co
 order. ``Candidate.features`` is always ``{}`` for corpus molecules — accessing it will return an
 empty dict, not a ``KeyError``.
 
-Novel molecules queried via :meth:`~alf_tools.datasets.guacamol.GuacaMol.query` still receive a
+Novel molecules queried via :meth:``~alf_tools.datasets.guacamol.GuacaMol.query`` still receive a
 populated ``features`` dict in the returned candidate (properties are computed on-the-fly by
 RDKit), because they have no entry in ``_prop_matrix``.
 
@@ -148,7 +148,7 @@ Benchmark-task datasets do not compute RDKit properties on load; ``_prop_matrix`
 empty sentinel shape of ``(0, 0)`` and ``_prop_cols`` is ``[]``.
 
 **Novel molecules:** For property targets, SMILES not present in the loaded corpus are labelled
-on-the-fly via RDKit in :meth:`~alf_tools.datasets.guacamol.GuacaMol.query`. This means
+on-the-fly via RDKit in :meth:``~alf_tools.datasets.guacamol.GuacaMol.query``. This means
 generative models can propose entirely new molecules and receive valid labels without reloading
 the dataset.
 

@@ -14,8 +14,9 @@ dataset config: ``problem_type`` (the ``ProblemType`` enum value) and ``output_d
 of output neurons — ``1`` for regression and binary classification, ``num_classes`` for
 multiclass).
 
-The ``BaseTrainConfig`` dataclass provides shared training flags — including ``normalise_inputs`` and
-``standardise_outputs`` — that all concrete training configs inherit from.
+The ``BaseTrainConfig`` dataclass provides shared training fields — including
+``normalise_inputs_strategy`` and ``standardise_outputs`` — that all concrete training configs
+inherit from.
 
 .. toctree::
    :maxdepth: 1

@@ -423,34 +423,34 @@ class TestGPNormalisation:
     """Tests for GPModel input normalisation and output standardisation."""
 
     def test_gp_train_config_default_normalises_inputs(self) -> None:
-        """GPTrainConfig must default normalise_inputs to True."""
+        """GPTrainConfig must default normalise_inputs_strategy to 'minmax'."""
         config = GPTrainConfig()
-        assert config.normalise_inputs is True
+        assert config.normalise_inputs_strategy == "minmax"
 
     def test_input_normalisation_enabled(self, sample_data, sample_val_data):
-        """normalise_inputs=True must run without error; predictions in original label scale."""
+        """A 'minmax' strategy must run without error; predictions in original label scale."""
         model = GPModel(
-            train_config=GPTrainConfig(num_iterations=5, normalise_inputs=True),
+            train_config=GPTrainConfig(num_iterations=5, normalise_inputs_strategy="minmax"),
             featurizer_config=FeaturizerConfig(featurizer_type="one_hot"),
             device="cpu",
         )
         model.train(sample_data, val_data=sample_val_data)
-        assert model._input_normaliser is not None
-        assert model._input_normaliser.is_fitted
+        assert model._input_transform is not None
+        assert model._input_transform.is_fitted
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
         assert np.all(predictions.variances >= 0)
 
     def test_input_normalisation_disabled(self, sample_data, sample_val_data):
-        """normalise_inputs=False leaves _input_normaliser as None and predict still works."""
+        """A None strategy leaves _input_transform as None and predict still works."""
         model = GPModel(
-            train_config=GPTrainConfig(num_iterations=5, normalise_inputs=False),
+            train_config=GPTrainConfig(num_iterations=5, normalise_inputs_strategy=None),
             featurizer_config=FeaturizerConfig(featurizer_type="one_hot"),
             device="cpu",
         )
         model.train(sample_data, val_data=sample_val_data)
-        assert model._input_normaliser is None
+        assert model._input_transform is None
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
@@ -821,7 +821,7 @@ class TestGPBoTorchBackbone:
         assert precomputed_gp_model.train_x is None
         assert precomputed_gp_model.train_y is None
         assert precomputed_gp_model.feature_dim is None
-        assert precomputed_gp_model._input_normaliser is None
+        assert precomputed_gp_model._input_transform is None
         assert precomputed_gp_model._output_standardiser is None
         assert precomputed_gp_model.training_metrics == {}
         assert precomputed_gp_model._epoch_metrics == []
@@ -859,7 +859,7 @@ class TestGPBoTorchBackbone:
 
         # Build the same normalised test tensor predict() uses internally
         test_x_np = precomputed_gp_model.featurise(tabular_data.candidates).cpu().numpy()
-        test_x_np = precomputed_gp_model._input_normaliser.transform(test_x_np)
+        test_x_np = precomputed_gp_model._input_transform.transform(test_x_np)
         test_x = torch.tensor(test_x_np, dtype=torch.float64)
 
         with torch.no_grad():

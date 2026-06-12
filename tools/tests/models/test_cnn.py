@@ -437,29 +437,34 @@ class TestCNNLabelDtype:
 class TestCNNNormalisation:
     """Tests for CNNModel input normalisation and output standardisation."""
 
+    def test_cnn_train_config_default_no_input_normalisation(self) -> None:
+        """CNNTrainConfig must default normalise_inputs_strategy to None."""
+        config = CNNTrainConfig()
+        assert config.normalise_inputs_strategy is None
+
     def test_input_normalisation_enabled(self, sample_data, val_data):
-        """normalise_inputs=True must run without error."""
+        """An explicit 'zscore' strategy must run without error."""
         model = CNNModel(
-            train_config=CNNTrainConfig(num_epochs=2, normalise_inputs=True),
+            train_config=CNNTrainConfig(num_epochs=2, normalise_inputs_strategy="zscore"),
             device="cpu",
         )
         model.setup(_make_dataset(sample_data.labels, ProblemType.REGRESSION))
         model.train(sample_data, val_data=val_data)
-        assert model._input_normaliser is not None
-        assert model._input_normaliser.is_fitted
+        assert model._input_transform is not None
+        assert model._input_transform.is_fitted
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
 
     def test_input_normalisation_disabled(self, sample_data, val_data):
-        """normalise_inputs=False (the default) leaves _input_normaliser as None."""
+        """A None strategy leaves _input_transform as None."""
         model = CNNModel(
-            train_config=CNNTrainConfig(num_epochs=2, normalise_inputs=False),
+            train_config=CNNTrainConfig(num_epochs=2, normalise_inputs_strategy=None),
             device="cpu",
         )
         model.setup(_make_dataset(sample_data.labels, ProblemType.REGRESSION))
         model.train(sample_data, val_data=val_data)
-        assert model._input_normaliser is None
+        assert model._input_transform is None
 
         predictions = model.predict(sample_data.candidates)
         assert np.all(np.isfinite(predictions.means))
