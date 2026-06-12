@@ -19,7 +19,7 @@ import pytest
 import torch
 from alf_core import Candidate, Predictions
 from alf_core.dataclasses.candidate import Modality
-from alf_tools.utils.botorch_utils import (
+from alf_tools.models.utils.botorch_utils import (
     candidates_to_tensor,
     get_bounds_tensor,
     predictions_to_posterior,
@@ -72,6 +72,21 @@ def test_candidates_to_tensor_inconsistent_shapes():
     ]
 
     with pytest.raises(ValueError, match="same shape"):
+        candidates_to_tensor(candidates)
+
+
+def test_candidates_to_tensor_non_numeric_data_raises():
+    """Test that non-numeric candidate data (e.g. sequence strings) raises ValueError.
+
+    Without this guard, string data would fall through np.asarray and die later
+    in torch.from_numpy with an opaque TypeError.
+    """
+    candidates = [
+        Candidate(data="ACDE", modality=Modality.SEQUENCE),
+        Candidate(data="GHIK", modality=Modality.SEQUENCE),
+    ]
+
+    with pytest.raises(ValueError, match="must be numeric"):
         candidates_to_tensor(candidates)
 
 
