@@ -117,6 +117,7 @@ def proteingym_dataset_cv_multiples():
     return ProteinGym(config)
 
 
+@pytest.mark.integration
 @pytest.mark.skipif(
     not os.environ.get("HF_TOKEN"),
     reason="HF_TOKEN not set; required for gated ProteinGym dataset access",
