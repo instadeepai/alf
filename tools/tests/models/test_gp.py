@@ -30,6 +30,11 @@ from alf_tools.models.gp import (
 from alf_tools.models.utils import build_from_target, one_hot_encode
 from botorch.models import SingleTaskGP
 
+# Training on deliberately tiny datasets triggers the regret-metric fallback
+# warning (num_acquisitions > available items) from alf_core during the
+# train/validation metric computation in GPModel.train().
+pytestmark = pytest.mark.filterwarnings("ignore:num_acquisitions:UserWarning")
+
 
 @pytest.fixture
 def sample_sinusoidal_data():
@@ -887,8 +892,13 @@ class TestGPBoTorchBackbone:
         for param in precomputed_gp_model.botorch_model.parameters():
             assert param.dtype == torch.float64
 
+    @pytest.mark.filterwarnings("ignore::botorch.exceptions.InputDataWarning")
     def test_float32_end_to_end(self, tabular_data):
-        """dtype='float32' trains, predicts, and keeps parameters in float32."""
+        """dtype='float32' trains, predicts, and keeps parameters in float32.
+
+        BoTorch's float64 recommendation (InputDataWarning) is expected here
+        since float32 is the explicit point of this test.
+        """
         model = GPModel(
             model_config=GPModelConfig(kernel_type="rbf", ard=False),
             train_config=GPTrainConfig(num_iterations=10, dtype="float32"),
@@ -907,8 +917,17 @@ class TestGPBoTorchBackbone:
 class TestGPModelViaSurrogate:
     """Test GPModel accessed through the Surrogate wrapper."""
 
+    @pytest.mark.filterwarnings(
+        "ignore:invalid value encountered in multiply"
+        ":RuntimeWarning:alf_core.utils.metrics.regression"
+    )
     def test_surrogate_predict_returns_finite_results(self, trained_surrogate, branin_dataset):
-        """Predictions from a trained Surrogate have finite means and non-negative variances."""
+        """Predictions from a trained Surrogate have finite means and non-negative variances.
+
+        The rank-space ECE metric computed during fitting hits `inf * sqrt(0)`
+        (NaN) at its final confidence-grid point when Monte-Carlo rank
+        variances are exactly zero, emitting an expected RuntimeWarning.
+        """
         predictions = trained_surrogate.predict(branin_dataset.test_dataset.candidates)
 
         assert predictions.means is not None

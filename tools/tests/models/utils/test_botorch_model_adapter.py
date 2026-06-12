@@ -285,6 +285,7 @@ def test_batch_shape_alf_model(mock_alf_model_with_variances):
         _ = adapter.batch_shape
 
 
+@pytest.mark.filterwarnings("ignore:num_acquisitions:UserWarning")
 def test_num_outputs_alf_model_with_botorch_model(trained_gp_model):
     """num_outputs delegates to the wrapped ALF model's trained `botorch_model`."""
     adapter = BotorchModelWrapper(trained_gp_model.model)
@@ -292,6 +293,7 @@ def test_num_outputs_alf_model_with_botorch_model(trained_gp_model):
     assert adapter.num_outputs == 1
 
 
+@pytest.mark.filterwarnings("ignore:num_acquisitions:UserWarning")
 def test_batch_shape_alf_model_with_botorch_model(trained_gp_model):
     """batch_shape delegates to the wrapped ALF model's trained `botorch_model`."""
     adapter = BotorchModelWrapper(trained_gp_model.model)
@@ -409,8 +411,17 @@ def test_adapter_deterministic_predictions(mock_alf_model_with_variances):
 # =============================================================================
 
 
+@pytest.mark.filterwarnings("ignore:num_acquisitions:UserWarning")
+@pytest.mark.filterwarnings(
+    "ignore:invalid value encountered in multiply:RuntimeWarning:alf_core.utils.metrics.regression"
+)
 def test_adapter_integration_with_real_gp_model():
-    """Integration smoke test: real GPModel -> BoTorchModelAdapter -> posterior()."""
+    """Integration smoke test: real GPModel -> BoTorchModelAdapter -> posterior().
+
+    Training metrics on the tiny dataset emit expected alf_core metric
+    warnings (regret-metric fallback and a rank-space ECE `inf * sqrt(0)`
+    RuntimeWarning), which are filtered above.
+    """
     # Train a real GPModel on tiny data
     X_train = np.array([[0.1, 0.2], [0.4, 0.5], [0.7, 0.8], [0.3, 0.6]], dtype=np.float32)
     y_train = np.array([1.0, 2.0, 1.5, 1.8])

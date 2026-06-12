@@ -153,6 +153,7 @@ def test_botorch_acquisition_function_wraps_alf_model(
         acq_fn(test_candidates_2d, state)
 
 
+@pytest.mark.filterwarnings("ignore:num_acquisitions:UserWarning")
 def test_botorch_acquisition_function_qlognei_with_trained_gp_model(trained_gp_model):
     """QLogNoisyExpectedImprovement works with a trained GPModel via the adapter.
 
