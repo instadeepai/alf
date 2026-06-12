@@ -12,16 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.models.utils.botorch_utils import (
-    candidates_to_tensor,
-    get_bounds_tensor,
-    predictions_to_posterior,
-    tensor_to_candidates,
+from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
+    BotorchModelWrapper,
 )
 
-__all__ = [
-    "candidates_to_tensor",
-    "get_bounds_tensor",
-    "predictions_to_posterior",
-    "tensor_to_candidates",
-]
+__all__ = ["BotorchModelWrapper"]
