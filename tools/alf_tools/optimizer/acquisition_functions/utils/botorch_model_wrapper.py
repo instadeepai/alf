@@ -226,6 +226,26 @@ class BotorchModelWrapper(BotorchModel):
             return inner
         return None
 
+    # CONTRACT: Any ALF model that can produce a TRUE joint posterior (cross-point
+    # covariance) MUST expose a `botorch_model` attribute returning a trained
+    # BoTorch `Model`. The wrapper consumes it for `num_outputs`, `batch_shape`,
+    # and `posterior()`. Models without it are treated as marginal-only and get a
+    # diagonal (per-point independent) posterior built from `predict()`.
+    # TODO: if this duck-typed contract grows fragile, promote it to an explicit
+    # runtime_checkable Protocol (JointPosteriorProvider).
+    @property
+    def provides_joint_posterior(self) -> bool:
+        """Whether this model can produce a true joint posterior over q>1 points.
+
+        Returns:
+            `True` for native BoTorch models and for ALF models exposing a
+            trained `botorch_model`; `False` for marginal-only `predict()`-based
+            models (and for untrained models, which cannot yet supply one).
+        """
+        if self._is_botorch_model:
+            return True
+        return self._inner_botorch_model() is not None
+
     @property
     def num_outputs(self) -> int:
         """The number of outputs of the model.

@@ -301,6 +301,25 @@ def test_batch_shape_alf_model_with_botorch_model(trained_gp_model):
     assert wrapper.batch_shape == torch.Size([])
 
 
+def test_provides_joint_posterior_botorch_model(botorch_gp_model):
+    """Native BoTorch models are joint-capable."""
+    wrapper = BotorchModelWrapper(botorch_gp_model)
+    assert wrapper.provides_joint_posterior is True
+
+
+@pytest.mark.filterwarnings("ignore:num_acquisitions:UserWarning")
+def test_provides_joint_posterior_alf_with_botorch_model(trained_gp_model):
+    """ALF models exposing a trained `botorch_model` are joint-capable."""
+    wrapper = BotorchModelWrapper(trained_gp_model.model)
+    assert wrapper.provides_joint_posterior is True
+
+
+def test_provides_joint_posterior_marginal_only(mock_alf_model_with_variances):
+    """Predict-only ALF models are not joint-capable."""
+    wrapper = BotorchModelWrapper(mock_alf_model_with_variances)
+    assert wrapper.provides_joint_posterior is False
+
+
 def test_num_outputs_untrained_gp_model_raises():
     """num_outputs raises for an untrained GPModel (no `botorch_model` yet)."""
     wrapper = BotorchModelWrapper(GPModel(device="cpu"))
