@@ -24,7 +24,11 @@ from alf_core.utils.metrics.acquisition_batch import (
     compute_regret,
     intra_batch_diversity,
 )
-from alf_core.utils.metrics.aggregate import auc_top_k, compute_aggregate_metrics
+from alf_core.utils.metrics.aggregate import (
+    auc_top_k,
+    compute_aggregate_metrics,
+    compute_experiment_summary,
+)
 from alf_core.utils.metrics.base import (
     ClassificationMetricRegistry,
     RegressionMetricRegistry,

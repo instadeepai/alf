@@ -15,15 +15,12 @@
 import logging
 from typing import Any
 
-import numpy as np
 from alf_core.dataclasses import State
 from alf_core.dataclasses.round_metrics import RoundMetrics
 from alf_core.optimizer.optimizer import Optimizer
 from alf_core.oracle.oracle import Oracle
 from alf_core.tasks.base_task import BaseTask
-from alf_core.utils.enums import ProblemType
-from alf_core.utils.metrics.aggregate import compute_aggregate_metrics
-from alf_core.utils.metrics.regression import top_k_mean
+from alf_core.utils.metrics.aggregate import compute_experiment_summary
 from alf_core.utils.state_logger import StateLogger
 
 logger = logging.getLogger("alf-core")
@@ -85,10 +82,8 @@ class DesignTask(BaseTask):
 
         The loop continues for num_acq_rounds or until termination conditions are met.
 
-        After all rounds complete, runs all aggregate metrics (see
-        `alf_core.utils.metrics.aggregate`) over a per-round sample-efficiency
-        curve and logs the result under the round name `experiment_summary`.
-        The summary is skipped when no aggregate metric could be computed.
+        After all rounds complete, logs end-of-experiment aggregate metrics under
+        the round name `experiment_summary`.
 
         Args:
             state: Initial task state with dataset and surrogate.
@@ -114,11 +109,7 @@ class DesignTask(BaseTask):
             for state_logger in state_loggers:
                 state_logger.log(state)
 
-        is_regression = state.problem_type == ProblemType.REGRESSION
-        best_value = float(state.dataset.raw_dataset.labels.max()) if is_regression else 1.0
-        experiment_metrics = compute_aggregate_metrics(
-            np.array(self._sample_efficiency_curve(state)), best_value
-        )
+        experiment_metrics = compute_experiment_summary(state)
         if experiment_metrics:
             state.round_metrics = RoundMetrics(
                 round=self.num_acq_rounds, metrics=experiment_metrics
@@ -134,37 +125,3 @@ class DesignTask(BaseTask):
             )
 
         return
-
-    def _sample_efficiency_curve(self, state: State) -> list[float]:
-        """Build the per-round sample-efficiency curve fed to the aggregate metrics.
-
-        For regression the curve is the top-k mean of all candidates acquired
-        up to each round (it should rise as good candidates accumulate); for
-        classification it is the per-round test-set accuracy.
-
-        Note: `top_k_mean` uses an effective k of `min(k, n_acquired)`, so while
-        the cumulative acquired set is smaller than k the early rounds are
-        averaged over fewer candidates and are not directly comparable to later
-        rounds. With small acquisition batch sizes this can make the curve
-        non-monotonic and bias the downstream AUC; treat the AUC as a relative
-        ranking rather than an absolute score in that regime.
-
-        Args:
-            state: Final task state after all acquisition rounds.
-
-        Returns:
-            One value per acquisition round that produced a valid value.
-        """
-        if state.problem_type == ProblemType.REGRESSION:
-            curve = []
-            for round_i in range(1, len(state.history) + 1):
-                labels = np.concatenate([c.labels for c in state.history[:round_i]])
-                # top_k_mean returns a single dynamically-keyed entry (e.g.
-                # "top_10_mean"); take its value for the curve.
-                curve.append(float(next(iter(top_k_mean(labels, None, labels).values()))))
-            return curve
-        return [
-            float(metrics.metrics["surrogate/test_accuracy"])
-            for metrics in state.metrics_history
-            if metrics.round > 0 and "surrogate/test_accuracy" in metrics.metrics
-        ]

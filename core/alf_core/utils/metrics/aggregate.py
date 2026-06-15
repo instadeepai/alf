@@ -20,9 +20,15 @@ registered in the registry.
 """
 
 import warnings
+from typing import TYPE_CHECKING
 
 import numpy as np
+from alf_core.utils.enums import ProblemType
+from alf_core.utils.metrics.regression import top_k_mean
 from jaxtyping import Float
+
+if TYPE_CHECKING:
+    from alf_core.dataclasses import State
 
 
 def auc_top_k(
@@ -119,3 +125,58 @@ def compute_aggregate_metrics(
         except ValueError:
             continue
     return metrics
+
+
+def _sample_efficiency_curve(state: "State") -> list[float]:
+    """Build the per-round sample-efficiency curve fed to the aggregate metrics.
+
+    For regression the curve is the top-k mean of all candidates acquired up to
+    each round (it should rise as good candidates accumulate); for classification
+    it is the per-round test-set accuracy.
+
+    Note: `top_k_mean` uses an effective k of `min(k, n_acquired)`, so while the
+    cumulative acquired set is smaller than k the early rounds are averaged over
+    fewer candidates and are not directly comparable to later rounds. With small
+    acquisition batch sizes this can make the curve non-monotonic and bias the
+    downstream AUC; treat the AUC as a relative ranking rather than an absolute
+    score in that regime.
+
+    Args:
+        state: Final task state after all acquisition rounds.
+
+    Returns:
+        One value per acquisition round that produced a valid value.
+    """
+    if state.problem_type == ProblemType.REGRESSION:
+        curve = []
+        for round_i in range(1, len(state.history) + 1):
+            labels = np.concatenate([c.labels for c in state.history[:round_i]])
+            # top_k_mean returns a single dynamically-keyed entry (e.g.
+            # "top_10_mean"); take its value for the curve.
+            curve.append(float(next(iter(top_k_mean(labels, None, labels).values()))))
+        return curve
+    return [
+        float(metrics.metrics["surrogate/test_accuracy"])
+        for metrics in state.metrics_history
+        if metrics.round > 0 and "surrogate/test_accuracy" in metrics.metrics
+    ]
+
+
+def compute_experiment_summary(state: "State") -> dict[str, float]:
+    """Run all aggregate metrics over a task's per-round sample-efficiency curve.
+
+    State-based entry point for `alf_core.tasks`: builds the per-round curve and
+    normaliser from the final task state and delegates to
+    `compute_aggregate_metrics`, so the calling task stays free of metric logic
+    and new metrics only need adding to `_AGGREGATE_METRICS`.
+
+    Args:
+        state: Final task state after all acquisition rounds.
+
+    Returns:
+        Merged dictionary of all aggregate metrics that could be computed.
+        Empty when none could be computed.
+    """
+    is_regression = state.problem_type == ProblemType.REGRESSION
+    best_value = float(state.dataset.raw_dataset.labels.max()) if is_regression else 1.0
+    return compute_aggregate_metrics(np.array(_sample_efficiency_curve(state)), best_value)
