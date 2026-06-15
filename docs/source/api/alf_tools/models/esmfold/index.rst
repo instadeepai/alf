@@ -1,7 +1,7 @@
 ESMFold Model
 =============
 
-An inference-only oracle that runs `ESMFold <https://huggingface.co/facebook/esmfold_v1>`_ structure
+An inference-only oracle that runs ``ESMFold <https://huggingface.co/facebook/esmfold_v1>``_ structure
 prediction on amino acid sequences and returns a scalar confidence score per candidate. Suitable for
 use as a black-box oracle inside ``Oracle(scorer=ESMFoldModel(ESMFoldModelConfig(...)))``.
 

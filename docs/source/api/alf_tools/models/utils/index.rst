@@ -1,7 +1,10 @@
 Model Utilities
 ===============
 
-Shared utilities for ALF model implementations.
+Shared data transformation utilities for ALF model implementations.
+``transform_data`` applies input normalisation and output standardisation
+to training data in a single call, returning the transformed tensors and
+the fitted normaliser objects for later use at inference time.
 
 ``transform_data`` (in ``data_utils``) applies input normalisation and output standardisation
 to training data in a single call, returning the transformed tensors and fitted normaliser
