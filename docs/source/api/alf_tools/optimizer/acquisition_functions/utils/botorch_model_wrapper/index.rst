@@ -13,6 +13,10 @@ their ``predict()`` output translated into a diagonal (per-point independent) Bo
 Models that do not provide prediction variances (e.g. deterministic or CNN-based models) cannot be
 used with uncertainty-driven acquisition functions and will raise a ``ValueError`` at call time.
 
+The module also exposes ``resolve_botorch_model``, the shared capability check used across the
+BoTorch integration: it returns a surrogate's joint-posterior BoTorch model (native model, or an
+ALF model's trained ``botorch_model``) or ``None`` for marginal-only models.
+
 .. automodule:: alf_tools.optimizer.acquisition_functions.utils.botorch_model_wrapper
    :members:
    :show-inheritance:
