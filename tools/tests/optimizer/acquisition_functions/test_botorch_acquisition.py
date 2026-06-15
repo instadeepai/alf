@@ -783,6 +783,21 @@ def test_analytic_acquisition_marginal_only_succeeds(mock_alf_model_with_varianc
     assert all(np.isfinite(result.labels))
 
 
+def test_batch_size_gt_one_marginal_only_raises_optimisation_mode(mock_alf_model_with_variances):
+    """batch_size>1 on a marginal-only model raises in continuous optimisation mode."""
+    surrogate = MagicMock()
+    surrogate.model = mock_alf_model_with_variances
+    state = MagicMock()
+    state.surrogate = surrogate
+    state.dataset.train_dataset.labels.max.return_value = 1.0
+
+    acq_fn = BoTorchAcquisition(
+        acquisition_type="qUCB", beta=2.0, batch_size=2, bounds=[[0.0, 1.0], [0.0, 1.0]]
+    )
+    with pytest.raises(ValueError, match="joint posterior"):
+        acq_fn(search_candidates=[], state=state)
+
+
 # =============================================================================
 # AcquisitionType / _VALID_TYPES consistency
 # =============================================================================
