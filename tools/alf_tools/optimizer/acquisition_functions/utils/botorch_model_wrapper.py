@@ -38,6 +38,31 @@ if TYPE_CHECKING:
     from botorch.acquisition.objective import PosteriorTransform
 
 
+def resolve_botorch_model(model: "BotorchModel | BaseModel") -> "BotorchModel | None":
+    """Return the joint-posterior BoTorch `Model` a surrogate provides, if any.
+
+    This is the single capability check used across the BoTorch integration:
+    native BoTorch `Model` instances are returned as-is; ALF `BaseModel`
+    instances are expected to expose a trained `botorch_model` attribute (the
+    documented joint-posterior contract), which is returned when available.
+
+    Args:
+        model: A native BoTorch `Model` or an ALF `BaseModel`.
+
+    Returns:
+        The joint-posterior BoTorch model, or `None` for marginal-only models —
+        those without a `botorch_model`, or whose `botorch_model` is unavailable
+        because the model is untrained.
+    """
+    if isinstance(model, BotorchModel):
+        return model
+    try:
+        inner = getattr(model, "botorch_model", None)
+    except RuntimeError:
+        return None
+    return inner if isinstance(inner, BotorchModel) else None
+
+
 class BotorchModelWrapper(BotorchModel):
     """Universal wrapper for BoTorch acquisition functions compatibility.
 
@@ -141,12 +166,16 @@ class BotorchModelWrapper(BotorchModel):
 
         # Case 1b: ALF model exposing a trained joint posterior -> delegate to it
         # for a true joint covariance (honours observation_noise/transforms).
-        # Cast X to the inner model's dtype: ALF GP models train in double by
-        # default, whereas BoTorch acquisitions hand us X in single precision,
-        # and SingleTaskGP rejects a dtype mismatch.
+        # Cast X (and tensor observation_noise) to the inner model's dtype: ALF GP
+        # models train in double by default, whereas BoTorch acquisitions hand us
+        # X in single precision, and SingleTaskGP rejects a dtype mismatch. The
+        # `next(..., X)` default keeps a (degenerate) parameter-free inner model
+        # from raising StopIteration.
         inner = self._inner_botorch_model()
         if inner is not None:
-            inner_dtype = next(inner.parameters()).dtype
+            inner_dtype = next(inner.parameters(), X).dtype
+            if isinstance(observation_noise, Tensor):
+                observation_noise = observation_noise.to(inner_dtype)
             return inner.posterior(
                 X=X.to(inner_dtype),
                 output_indices=output_indices,
@@ -236,13 +265,7 @@ class BotorchModelWrapper(BotorchModel):
             absent, raises `RuntimeError` on access (untrained model), or
             does not hold a BoTorch `Model`.
         """
-        try:
-            inner = getattr(self._wrapped_model, "botorch_model", None)
-        except RuntimeError:
-            return None
-        if isinstance(inner, BotorchModel):
-            return inner
-        return None
+        return resolve_botorch_model(self._wrapped_model)
 
     # CONTRACT: Any ALF model that can produce a TRUE joint posterior (cross-point
     # covariance) MUST expose a `botorch_model` attribute returning a trained
@@ -278,7 +301,8 @@ class BotorchModelWrapper(BotorchModel):
         inner = self._inner_botorch_model()
         if inner is not None:
             return int(inner.num_outputs)
-        # Marginal-only model: predict() returns a 1-D means array -> single output.
+        # Marginal-only model: ALF predict() returns a 1-D means array (ALF is
+        # single-objective), so the wrapped model is single-output by construction.
         return 1
 
     @property

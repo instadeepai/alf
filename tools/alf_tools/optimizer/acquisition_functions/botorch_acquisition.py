@@ -33,6 +33,7 @@ from alf_tools.models.utils.botorch_utils import (
 from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
 from alf_tools.optimizer.acquisition_functions.utils.botorch_model_wrapper import (
     BotorchModelWrapper,
+    resolve_botorch_model,
 )
 from botorch.acquisition.analytic import (
     LogExpectedImprovement,
@@ -168,6 +169,12 @@ class BoTorchAcquisition(AcquisitionFunction):
         NotImplementedError: If acquisition_type is "qKG" (planned but not yet implemented).
     """
 
+    _BATCH_JOINT_POSTERIOR_ERROR = (
+        "Batch acquisition (q>1) needs a model with a joint posterior. Use a "
+        "joint-posterior surrogate (one exposing a trained `botorch_model`), or "
+        "select batches with ALF's native CoreSet/Thompson acquisitions."
+    )
+
     def __init__(
         self,
         acquisition_type: AcquisitionType,
@@ -224,12 +231,6 @@ class BoTorchAcquisition(AcquisitionFunction):
             f"Initialized BoTorch acquisition function: {acquisition_type} "
             f"with sampler: {self.sampler_config}"
         )
-
-    _BATCH_JOINT_POSTERIOR_ERROR = (
-        "Batch acquisition (q>1) needs a model with a joint posterior. Use a "
-        "joint-posterior surrogate (one exposing a trained `botorch_model`), or "
-        "select batches with ALF's native CoreSet/Thompson acquisitions."
-    )
 
     def _require_joint_posterior_for_batch(self, wrapped_model: BotorchModel) -> None:
         """Raise if a batch (q>1) acquisition is requested for a marginal-only model.
@@ -450,15 +451,15 @@ class BoTorchAcquisition(AcquisitionFunction):
 
         logger.info(f"Optimizing {self.acquisition_type} with {self.num_restarts} restarts")
 
-        # For continuous optimization, prefer native BoTorch models for gradient support
-        # Check if the model has a native BoTorch model (e.g., BoTorchGPModel.model)
-        if hasattr(state.surrogate.model, "model") and state.surrogate.model.model is not None:
-            # Use the native BoTorch model directly (has proper gradients for optimization)
-            model = state.surrogate.model.model
-        else:
-            # Fall back to wrapper for ALF models (uses numerical gradients)
-            model = BotorchModelWrapper(state.surrogate.model)
-            self._require_joint_posterior_for_batch(model)
+        # Resolve the surrogate to its joint-posterior BoTorch model when it has one
+        # (native model, or ALF model exposing a trained `botorch_model`). Using it
+        # directly gives analytic gradients for continuous optimisation. Marginal-only
+        # models fall back to the wrapper (numerical gradients via predict()).
+        inner_model = resolve_botorch_model(state.surrogate.model)
+        model = (
+            inner_model if inner_model is not None else BotorchModelWrapper(state.surrogate.model)
+        )
+        self._require_joint_posterior_for_batch(model)
 
         # Infer model dtype so bounds/data tensors match (avoids double != float errors).
         # Fall back to float64 (BoTorch default) when the model has no registered parameters

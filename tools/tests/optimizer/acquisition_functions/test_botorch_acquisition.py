@@ -40,6 +40,9 @@ from alf_tools.optimizer.acquisition_functions.botorch_acquisition import (
 from alf_tools.optimizer.acquisition_functions.botorch_samplers import (
     BoTorchMCSampler,
 )
+from alf_tools.optimizer.acquisition_functions.utils.botorch_model_wrapper import (
+    resolve_botorch_model,
+)
 
 
 class _InlineBraninDataset(BaseDataset):
@@ -383,18 +386,18 @@ def test_optimization_mode_qnei(task_state, simple_dataset):
     assert all(np.isfinite(labelled.labels))
 
 
-def test_optimization_mode_qucb_gpmodel_through_wrapper(simple_dataset, trained_gp_model):
-    """Continuous optimisation of a plain ALF GPModel routes through the wrapper.
+def test_optimization_mode_qucb_gpmodel(simple_dataset, trained_gp_model):
+    """Continuous optimisation works for a plain ALF GPModel surrogate.
 
-    A trained `GPModel` exposes `botorch_model` but NOT a `.model` attribute, so
-    `_optimize_continuous` takes the `else` branch and wraps it in
-    `BotorchModelWrapper`. This exercises the wrapper's `posterior()` delegation
-    and dtype-cast under `optimize_acqf` gradients at integration level, which the
-    `BoTorchGPModel`-backed tests (which take the native `.model` branch) do not.
+    A trained `GPModel` is not itself a native BoTorch model but exposes a trained
+    `botorch_model`. `_optimize_continuous` resolves it to that inner model (for
+    analytic gradients) via the shared `resolve_botorch_model` capability check,
+    then optimises. This covers the joint-capable ALF surrogate type that the
+    `BoTorchGPModel`-backed tests do not exercise.
     """
     gp_model = trained_gp_model.model
-    # Guard the premise: a regular GPModel must take the wrapper branch.
-    assert not (hasattr(gp_model, "model") and gp_model.model is not None)
+    # The GPModel is joint-capable: it resolves to a trained inner BoTorch model.
+    assert resolve_botorch_model(gp_model) is not None
 
     surrogate = Surrogate(model=gp_model)
     state = State(dataset=simple_dataset, surrogate=surrogate)
