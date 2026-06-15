@@ -112,12 +112,8 @@ class DesignTask(BaseTask):
 
         experiment_metrics = compute_experiment_summary(state)
         if experiment_metrics:
-            state.round_metrics = RoundMetrics(
-                round=self.num_acq_rounds, metrics=experiment_metrics
-            )
-            state.round_predictions = None
             for state_logger in state_loggers:
-                state_logger.log(state, round_name="experiment_summary")
+                state_logger.log_summary(experiment_metrics, round_name="experiment_summary")
         else:
             logger.info(
                 "No aggregate experiment-summary metrics computed, so no "
