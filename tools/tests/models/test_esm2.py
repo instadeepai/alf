@@ -136,6 +136,7 @@ class TestConfigs:
         assert config.freeze_backbone is True
         assert config.loss_fn is None
         assert config.output_dim == 1
+        assert config.backbone_learning_rate == 1e-5
         assert config.mask_probability == 0.15
         assert config.mask_splitting == (0.8, 0.1, 0.1)
         assert config.learning_rate == 1e-4
@@ -234,10 +235,16 @@ class TestConfigs:
                 mode="likelihoods", freeze_backbone=True, mask_splitting=(0.7, 0.2, 0.1)
             )
 
-    def test_freeze_backbone_false_raises_for_linear_head(self):
-        """freeze_backbone=False with mode='linear_head' raises NotImplementedError."""
-        with pytest.raises(NotImplementedError):
-            ESM2TrainConfig(mode="linear_head", freeze_backbone=False)
+    def test_linear_head_unfrozen_valid(self):
+        """mode='linear_head' + freeze_backbone=False is valid (backbone fine-tuning)."""
+        cfg = ESM2TrainConfig(mode="linear_head", loss_fn="mse", freeze_backbone=False)
+        assert cfg.freeze_backbone is False
+        assert cfg.loss_fn == "mse"
+
+    def test_backbone_learning_rate_warning_when_frozen(self):
+        """Non-default backbone_learning_rate with freeze_backbone=True emits UserWarning."""
+        with pytest.warns(UserWarning, match="backbone_learning_rate"):
+            ESM2TrainConfig(mode="linear_head", loss_fn="mse", backbone_learning_rate=1e-4)
 
     def test_last_hidden_state_with_linear_head_mode_raises(self):
         """last_hidden_state pooling with mode='linear_head' raises at model init."""
@@ -534,6 +541,59 @@ def esm2_mlp_classification_model():
     return ESM2Model(
         name="test_esm2_mlp_cls", model_config=config, train_config=train_cfg, device="cpu"
     )
+
+
+@pytest.fixture
+def esm2_mlp_unfrozen_model():
+    """Function-scoped ESM-2 with a trainable backbone + linear head (mse).
+
+    Function-scoped so each test gets a fresh, untrained model.
+
+    Returns:
+        An ESM2Model with mode='linear_head', loss_fn='mse', freeze_backbone=False, CPU.
+    """
+    config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
+    train_cfg = ESM2TrainConfig(
+        mode="linear_head",
+        loss_fn="mse",
+        output_dim=1,
+        freeze_backbone=False,
+        num_epochs=1,
+        batch_size=2,
+        learning_rate=1e-3,
+        backbone_learning_rate=1e-4,
+        log_frequency=1,
+    )
+    return ESM2Model(
+        name="test_esm2_mlp_unfrozen", model_config=config, train_config=train_cfg, device="cpu"
+    )
+
+
+class TestLinearHeadUnfrozen:
+    """Tests for mode='linear_head' with freeze_backbone=False (backbone fine-tuning)."""
+
+    def test_backbone_trainable_when_unfrozen(self, esm2_mlp_unfrozen_model):
+        """Backbone parameters keep requires_grad=True when freeze_backbone=False."""
+        assert all(p.requires_grad for p in esm2_mlp_unfrozen_model.esm_model.parameters())
+
+    def test_unfrozen_train_updates_backbone(self, esm2_mlp_unfrozen_model, sample_data):
+        """train() with freeze_backbone=False changes at least one backbone parameter."""
+        initial = {
+            name: param.clone()
+            for name, param in esm2_mlp_unfrozen_model.esm_model.named_parameters()
+        }
+        esm2_mlp_unfrozen_model.train(sample_data)
+        changed = any(
+            not torch.equal(initial[name], param)
+            for name, param in esm2_mlp_unfrozen_model.esm_model.named_parameters()
+        )
+        assert changed, "No backbone parameters changed after unfrozen linear-head training"
+
+    def test_unfrozen_train_updates_head(self, esm2_mlp_unfrozen_model, sample_data):
+        """train() with freeze_backbone=False also updates the linear head parameters."""
+        initial_weight = esm2_mlp_unfrozen_model._head.weight.clone()
+        esm2_mlp_unfrozen_model.train(sample_data)
+        assert not torch.equal(initial_weight, esm2_mlp_unfrozen_model._head.weight)
 
 
 class TestMLPHead:

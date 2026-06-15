@@ -5,9 +5,12 @@ A protein language model surrogate using `ESM-2 <https://huggingface.co/docs/tra
 as the backbone. Accepts amino acid sequences as inputs and supports three operating modes,
 selected via ``ESM2TrainConfig.mode`` together with ``freeze_backbone``:
 
-- **mode='linear_head'** (default): the ESM-2 backbone is frozen and a trainable linear head
-  is stacked on top of pooled sequence embeddings. Requires ``freeze_backbone=True``. The head
-  is configured via ``loss_fn`` and ``output_dim``:
+- **mode='linear_head'** (default): a trainable linear head is stacked on top of pooled
+  sequence embeddings. With ``freeze_backbone=True`` (default) only the head is trained on
+  top of the frozen backbone. With ``freeze_backbone=False`` the backbone is fine-tuned
+  jointly with the head, using ``backbone_learning_rate`` (typically lower than
+  ``learning_rate``) for the backbone parameters — usually slower to train but often more
+  accurate. The head is configured via ``loss_fn`` and ``output_dim``:
 
   - ``loss_fn='mse'``: mean-squared-error regression. Set ``output_dim=1``.
     ``predict()`` returns raw scalar values.

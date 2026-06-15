@@ -49,8 +49,10 @@ uv sync --extra esm2 --extra chemprop
 - **ESM2Model** - Protein language model surrogate backed by
   [ESM-2](https://huggingface.co/docs/transformers/model_doc/esm). Accepts amino acid sequences
   directly. Three operating modes via `ESM2TrainConfig`:
-  `mode='linear_head'` (default) freezes the backbone and trains a linear head for regression
-  (`loss_fn='mse'`) or classification (`loss_fn='cross_entropy'`);
+  `mode='linear_head'` (default) trains a linear head for regression
+  (`loss_fn='mse'`) or classification (`loss_fn='cross_entropy'`) on top of the backbone —
+  frozen by default, or fine-tuned jointly when `freeze_backbone=False` (the backbone then
+  uses `backbone_learning_rate`);
   `mode='likelihoods'` with frozen backbone performs zero-shot pseudo-log-likelihood (PLL)
   scoring with no training; `mode='likelihoods'` with `freeze_backbone=False, loss_fn='mlm'`
   fine-tunes the full ESM-2 backbone via MLM on the input sequences (labels are ignored, but

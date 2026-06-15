@@ -81,24 +81,31 @@ class ESM2TrainConfig(BaseTrainConfig):
 
     Set `mode` first — it determines the architecture and which other fields are active:
 
-    - 'linear_head': Frozen backbone + trainable linear head (supervised).
-      Active fields: loss_fn ('mse'/'cross_entropy'), output_dim.
+    - 'linear_head': trainable linear head on top of pooled embeddings (supervised).
+      freeze_backbone=True  -> backbone frozen; only the head is trained.
+      freeze_backbone=False -> backbone fine-tuned jointly with the head, using
+                               backbone_learning_rate for the backbone parameters.
+      Active fields: loss_fn ('mse'/'cross_entropy'), output_dim, and (when unfrozen)
+      backbone_learning_rate.
     - 'likelihoods': Base ESM-2 backbone, no linear head.
       freeze_backbone=True  -> zero-shot PLL only; train() unavailable.
       freeze_backbone=False -> MLM fine-tuning; loss_fn must be 'mlm'.
       Active fields (when unfrozen): loss_fn ('mlm'), mask_probability, mask_splitting.
 
     Args:
-        mode: Architecture mode. 'linear_head' adds a trainable head on top of a frozen
+        mode: Architecture mode. 'linear_head' adds a trainable head on top of the
             backbone. 'likelihoods' uses the base backbone directly; predict() always
             returns PLL scores.
         freeze_backbone: Whether to freeze ESM-2 backbone parameters.
-            For 'linear_head': must be True (unfrozen not yet supported).
+            For 'linear_head': True = train head only; False = fine-tune backbone + head.
             For 'likelihoods': True = zero-shot PLL only; False = MLM fine-tuning.
         loss_fn: Training objective. None = no training intended. 'mse' and 'cross_entropy'
             are only for mode='linear_head'. 'mlm' is only for mode='likelihoods' +
             freeze_backbone=False.
         output_dim: Output dimension of the linear head. Only for mode='linear_head'.
+        backbone_learning_rate: Learning rate applied to the ESM-2 backbone parameters
+            when mode='linear_head' + freeze_backbone=False. The linear head still uses
+            learning_rate. Has no effect when the backbone is frozen.
         mask_probability: Fraction of eligible tokens to mask per sequence.
             Only active when mode='likelihoods' + freeze_backbone=False.
         mask_splitting: (p_mask, p_random, p_unchanged) 3-way replacement probabilities.
@@ -117,7 +124,7 @@ class ESM2TrainConfig(BaseTrainConfig):
     mode: Literal["linear_head", "likelihoods"] = "linear_head"
 
     # ── backbone freezing ─────────────────────────────────────────────
-    # linear_head:       True only (False not yet supported)
+    # linear_head:  True = train head only; False = fine-tune backbone + head
     # likelihoods:  True = zero-shot PLL; False = MLM fine-tuning
     freeze_backbone: bool = True
 
@@ -129,6 +136,8 @@ class ESM2TrainConfig(BaseTrainConfig):
 
     # ── linear_head only ──────────────────────────────────────────────
     output_dim: int = 1
+    # backbone_learning_rate is used only when freeze_backbone=False (fine-tunes backbone).
+    backbone_learning_rate: float = 1e-5
 
     # ── likelihoods + freeze_backbone=False only ─────────────────
     mask_probability: float = 0.15
@@ -148,7 +157,6 @@ class ESM2TrainConfig(BaseTrainConfig):
 
         Raises:
             ValueError: For invalid field combinations or out-of-range values.
-            NotImplementedError: If freeze_backbone=False with mode='linear_head'.
         """
         if self.mode not in ("linear_head", "likelihoods"):
             raise ValueError(f"mode must be 'linear_head' or 'likelihoods', got {self.mode!r}")
@@ -160,15 +168,17 @@ class ESM2TrainConfig(BaseTrainConfig):
             )
 
         if self.mode == "linear_head":
-            if not self.freeze_backbone:
-                raise NotImplementedError(
-                    "freeze_backbone=False is not yet supported for mode='linear_head'. "
-                    "Set freeze_backbone=True."
-                )
             if self.loss_fn == "mlm":
                 raise ValueError(
                     "loss_fn='mlm' is only valid for mode='likelihoods' with "
                     "freeze_backbone=False."
+                )
+            if self.freeze_backbone and self.backbone_learning_rate != 1e-5:
+                warnings.warn(
+                    "backbone_learning_rate has no effect when freeze_backbone=True; "
+                    "the backbone is frozen and only the linear head is trained.",
+                    UserWarning,
+                    stacklevel=3,
                 )
 
         else:  # likelihoods
@@ -287,8 +297,9 @@ class ESM2Model(BaseModel):
             hidden_dim = self.esm_model.config.hidden_size
             self._head = torch.nn.Linear(hidden_dim, self.train_config.output_dim)
             self._head.to(self.device)
-            for param in self.esm_model.parameters():
-                param.requires_grad = False
+            if self.train_config.freeze_backbone:
+                for param in self.esm_model.parameters():
+                    param.requires_grad = False
 
         total_params = sum(p.numel() for p in self.esm_model.parameters())
         logger.info(f"ESM-2 loaded: {self.model_config.model_id} ({total_params:,} parameters)")
@@ -398,8 +409,9 @@ class ESM2Model(BaseModel):
         mean PLL over residue positions per sequence (higher = more probable). Sequences
         with ≤_PLL_BATCH_THRESHOLD residues are scored in a single batched forward pass;
         longer sequences are scored position-by-position to bound memory usage.
-        When mode='linear_head': embeds sequences through the frozen backbone and passes
-        them through the linear head. Returns regression values (output_dim=1) or
+        When mode='linear_head': embeds sequences through the backbone (frozen or
+        fine-tuned) and passes them through the linear head. Returns regression values
+        (output_dim=1) or
         argmax class indices (output_dim>1).
 
         Args:
@@ -944,11 +956,16 @@ class ESM2Model(BaseModel):
         train_loader: DataLoader,
         optimizer: optim.Optimizer,
     ) -> tuple[float, dict[str, float]]:
-        """Train the linear head for one epoch with frozen backbone.
+        """Train the linear head for one epoch.
+
+        When freeze_backbone=False the backbone is fine-tuned jointly with the head:
+        embeddings are computed with gradients enabled and the backbone runs in train()
+        mode. When frozen, embeddings are computed under torch.no_grad() with the backbone
+        in eval() mode and only the head is updated.
 
         Args:
             train_loader: DataLoader yielding (input_ids, attention_mask, targets).
-            optimizer: Optimizer for the head parameters.
+            optimizer: Optimizer for the head (and, when unfrozen, the backbone).
 
         Returns:
             Tuple of (average_loss, empty metrics_dict).
@@ -958,7 +975,11 @@ class ESM2Model(BaseModel):
             ValueError: If the DataLoader produces no batches.
         """
         head = self._require_head()
-        self.esm_model.eval()
+        freeze = self.train_config.freeze_backbone
+        if freeze:
+            self.esm_model.eval()
+        else:
+            self.esm_model.train()
         head.train()
         epoch_losses: list[float] = []
 
@@ -967,7 +988,10 @@ class ESM2Model(BaseModel):
             batch_mask = attention_mask.to(self.device)
             batch_targets = targets.to(self.device)
 
-            with torch.no_grad():
+            if freeze:
+                with torch.no_grad():
+                    embeddings = self._embed_batch(batch_ids, batch_mask)
+            else:
                 embeddings = self._embed_batch(batch_ids, batch_mask)
 
             optimizer.zero_grad()
@@ -982,7 +1006,10 @@ class ESM2Model(BaseModel):
                 )
             loss.backward()
             if self.train_config.max_grad_norm is not None:
-                torch.nn.utils.clip_grad_norm_(head.parameters(), self.train_config.max_grad_norm)
+                clip_params = list(head.parameters())
+                if not freeze:
+                    clip_params += list(self.esm_model.parameters())
+                torch.nn.utils.clip_grad_norm_(clip_params, self.train_config.max_grad_norm)
             optimizer.step()
             epoch_losses.append(loss.item())
 
@@ -990,6 +1017,8 @@ class ESM2Model(BaseModel):
             raise ValueError(
                 "Linear training DataLoader produced no batches. Ensure train_data is non-empty."
             )
+        if not freeze:
+            self.esm_model.eval()
         avg_loss = float(np.mean(epoch_losses))
         return avg_loss, {}
 
@@ -1088,7 +1117,8 @@ class ESM2Model(BaseModel):
         NotImplementedError (zero-shot PLL only; nothing to train). When
         mode='likelihoods' and freeze_backbone=False, fine-tunes the full
         ESM-2 backbone via masked language modelling. When mode='linear_head',
-        trains the linear head on top of frozen embeddings.
+        trains the linear head (with frozen backbone) or fine-tunes the backbone
+        jointly with the head when freeze_backbone=False.
 
         Args:
             train_data: Training data containing sequences and (for linear_head) labels.
@@ -1128,7 +1158,18 @@ class ESM2Model(BaseModel):
             val_loader = self._prepare_data_loader(val_data, shuffle=False)
 
         if self.train_config.mode == "linear_head":
-            params = self._require_head().parameters()
+            # Head trains at learning_rate; when unfrozen, the backbone is fine-tuned in a
+            # separate param group at backbone_learning_rate (typically lower).
+            params: Any = [
+                {"params": self._require_head().parameters()},
+            ]
+            if not self.train_config.freeze_backbone:
+                params.append(
+                    {
+                        "params": self.esm_model.parameters(),
+                        "lr": self.train_config.backbone_learning_rate,
+                    }
+                )
         else:
             params = self.esm_model.parameters()
 
