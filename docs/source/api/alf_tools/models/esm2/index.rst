@@ -57,3 +57,22 @@ Key properties:
    :members:
    :show-inheritance:
    :undoc-members:
+
+Configuration
+-------------
+
+.. automodule:: alf_tools.models.esm_utils.config
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Loss and scoring
+----------------
+
+.. automodule:: alf_tools.models.esm_utils.loss
+   :members:
+   :undoc-members:
+
+.. automodule:: alf_tools.models.esm_utils.scoring_function
+   :members:
+   :undoc-members:

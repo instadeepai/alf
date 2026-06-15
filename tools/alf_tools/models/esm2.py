@@ -13,16 +13,13 @@
 # limitations under the License.
 
 import logging
-import warnings
-from dataclasses import dataclass
-from typing import Any, Iterator, Literal
+from typing import Any, Iterator
 
 import numpy as np
 import torch
 import torch.optim as optim
 from alf_core import (
     BaseModel,
-    BaseTrainConfig,
     Candidate,
     LabelledCandidates,
     Predictions,
@@ -37,193 +34,12 @@ try:
 except ImportError:
     _TRANSFORMERS_AVAILABLE = False
 
+from alf_tools.models.esm_utils.config import ESM2ModelConfig, ESM2TrainConfig
+from alf_tools.models.esm_utils.loss import compute_supervised_loss, mask_tokens
+from alf_tools.models.esm_utils.scoring_function import compute_pll
 from alf_tools.models.utils import get_device
 
 logger = logging.getLogger("alf-tools")
-
-
-@dataclass
-class ESM2ModelConfig:
-    """Configuration for ESM-2 model architecture.
-
-    Args:
-        model_id: HuggingFace model identifier, e.g. 'facebook/esm2_t6_8M_UR50D'.
-        pooling: Strategy for reducing per-token hidden states to a sequence embedding.
-            'mean' averages over all non-padding positions (CLS and EOS included).
-            'cls' uses only the first [CLS] token representation.
-            'last_hidden_state' returns the full (seq_len, hidden_dim) tensor per sequence.
-        repr_layer: Transformer layer index to extract embeddings from. -1 = final layer.
-        max_length: Maximum tokenisation length. Defaults to the tokeniser's model_max_length.
-        seed: Random seed for reproducible linear head initialisation.
-    """
-
-    model_id: str
-    pooling: Literal["mean", "cls", "last_hidden_state"] = "mean"
-    repr_layer: int = -1
-    max_length: int | None = None
-    seed: int = 42
-
-    def __post_init__(self) -> None:
-        """Validate ESM2ModelConfig fields.
-
-        Raises:
-            ValueError: If pooling is not a recognised strategy.
-        """
-        if self.pooling not in ("mean", "cls", "last_hidden_state"):
-            raise ValueError(
-                f"pooling must be 'mean', 'cls', or 'last_hidden_state', got {self.pooling!r}"
-            )
-
-
-@dataclass
-class ESM2TrainConfig(BaseTrainConfig):
-    """Configuration for ESM-2 training.
-
-    Set `mode` first — it determines the architecture and which other fields are active:
-
-    - 'linear_head': trainable linear head on top of pooled embeddings (supervised).
-      freeze_backbone=True  -> backbone frozen; only the head is trained.
-      freeze_backbone=False -> backbone fine-tuned jointly with the head, using
-                               backbone_learning_rate for the backbone parameters.
-      Active fields: loss_fn ('mse'/'cross_entropy'), output_dim, and (when unfrozen)
-      backbone_learning_rate.
-    - 'likelihoods': Base ESM-2 backbone, no linear head.
-      freeze_backbone=True  -> zero-shot PLL only; train() unavailable.
-      freeze_backbone=False -> MLM fine-tuning; loss_fn must be 'mlm'.
-      Active fields (when unfrozen): loss_fn ('mlm'), mask_probability, mask_splitting.
-
-    Args:
-        mode: Architecture mode. 'linear_head' adds a trainable head on top of the
-            backbone. 'likelihoods' uses the base backbone directly; predict() always
-            returns PLL scores.
-        freeze_backbone: Whether to freeze ESM-2 backbone parameters.
-            For 'linear_head': True = train head only; False = fine-tune backbone + head.
-            For 'likelihoods': True = zero-shot PLL only; False = MLM fine-tuning.
-        loss_fn: Training objective. None = no training intended. 'mse' and 'cross_entropy'
-            are only for mode='linear_head'. 'mlm' is only for mode='likelihoods' +
-            freeze_backbone=False.
-        output_dim: Output dimension of the linear head. Only for mode='linear_head'.
-        backbone_learning_rate: Learning rate applied to the ESM-2 backbone parameters
-            when mode='linear_head' + freeze_backbone=False. The linear head still uses
-            learning_rate. Has no effect when the backbone is frozen.
-        mask_probability: Fraction of eligible tokens to mask per sequence.
-            Only active when mode='likelihoods' + freeze_backbone=False.
-        mask_splitting: (p_mask, p_random, p_unchanged) 3-way replacement probabilities.
-            Must sum to 1.0. Only active when mode='likelihoods' + freeze_backbone=False.
-        learning_rate: Learning rate for the optimizer.
-        optimizer_type: Which optimizer to use ('adam' or 'adamw').
-        batch_size: Batch size for training.
-        batch_size_inference: Batch size for embed() and linear-head predict().
-            None defaults to batch_size.
-        num_epochs: Number of epochs to train for.
-        log_frequency: Record epoch metrics every N epochs.
-        max_grad_norm: Maximum norm for gradient clipping. None disables clipping.
-    """
-
-    # ── mode ──────────────────────────────────────────────────────────
-    mode: Literal["linear_head", "likelihoods"] = "linear_head"
-
-    # ── backbone freezing ─────────────────────────────────────────────
-    # linear_head:  True = train head only; False = fine-tune backbone + head
-    # likelihoods:  True = zero-shot PLL; False = MLM fine-tuning
-    freeze_backbone: bool = True
-
-    # ── training objective ────────────────────────────────────────────
-    # None:                   no training (likelihoods + freeze_backbone=True)
-    # 'mse', 'cross_entropy': linear_head only
-    # 'mlm':                  likelihoods + freeze_backbone=False only
-    loss_fn: Literal["mse", "cross_entropy", "mlm"] | None = None
-
-    # ── linear_head only ──────────────────────────────────────────────
-    output_dim: int = 1
-    # backbone_learning_rate is used only when freeze_backbone=False (fine-tunes backbone).
-    backbone_learning_rate: float = 1e-5
-
-    # ── likelihoods + freeze_backbone=False only ─────────────────
-    mask_probability: float = 0.15
-    mask_splitting: tuple[float, float, float] = (0.8, 0.1, 0.1)
-
-    # ── shared ────────────────────────────────────────────────────────
-    learning_rate: float = 1e-4
-    optimizer_type: Literal["adam", "adamw"] = "adamw"
-    batch_size: int = 8
-    batch_size_inference: int | None = None
-    num_epochs: int = 10
-    log_frequency: int = 1
-    max_grad_norm: float | None = None
-
-    def __post_init__(self) -> None:
-        """Validate ESM2TrainConfig fields.
-
-        Raises:
-            ValueError: For invalid field combinations or out-of-range values.
-        """
-        if self.mode not in ("linear_head", "likelihoods"):
-            raise ValueError(f"mode must be 'linear_head' or 'likelihoods', got {self.mode!r}")
-        if self.num_epochs < 1:
-            raise ValueError(f"num_epochs must be >= 1, got {self.num_epochs}")
-        if self.optimizer_type not in ("adam", "adamw"):
-            raise ValueError(
-                f"optimizer_type must be 'adam' or 'adamw', got {self.optimizer_type!r}"
-            )
-
-        if self.mode == "linear_head":
-            if self.loss_fn == "mlm":
-                raise ValueError(
-                    "loss_fn='mlm' is only valid for mode='likelihoods' with "
-                    "freeze_backbone=False."
-                )
-            if self.freeze_backbone and self.backbone_learning_rate != 1e-5:
-                warnings.warn(
-                    "backbone_learning_rate has no effect when freeze_backbone=True; "
-                    "the backbone is frozen and only the linear head is trained.",
-                    UserWarning,
-                    stacklevel=3,
-                )
-
-        else:  # likelihoods
-            if self.freeze_backbone:
-                if self.loss_fn is not None:
-                    raise ValueError(
-                        "loss_fn cannot be set when freeze_backbone=True in "
-                        "mode='likelihoods'; the backbone is frozen and no training "
-                        "will occur."
-                    )
-                if self.mask_probability != 0.15:
-                    warnings.warn(
-                        "mask_probability has no effect: freeze_backbone=True means no "
-                        "training will occur.",
-                        UserWarning,
-                        stacklevel=3,
-                    )
-                if self.mask_splitting != (0.8, 0.1, 0.1):
-                    warnings.warn(
-                        "mask_splitting has no effect: freeze_backbone=True means no "
-                        "training will occur.",
-                        UserWarning,
-                        stacklevel=3,
-                    )
-            else:
-                if self.loss_fn != "mlm":
-                    raise ValueError(
-                        "ESM-2 base model can only be trained with an MLM loss; other losses "
-                        "are not implemented. Set loss_fn='mlm'."
-                    )
-                if not (0.0 < self.mask_probability < 1.0):
-                    raise ValueError(
-                        f"mask_probability must be in (0, 1), got {self.mask_probability}"
-                    )
-                if any(p < 0.0 for p in self.mask_splitting):
-                    raise ValueError(
-                        f"mask_splitting probabilities must be non-negative, got "
-                        f"{self.mask_splitting}"
-                    )
-                p_sum = sum(self.mask_splitting)
-                if abs(p_sum - 1.0) > 1e-6:
-                    raise ValueError(
-                        f"mask_splitting must sum to 1.0, got {p_sum:.6f} "
-                        f"(values: {self.mask_splitting})"
-                    )
 
 
 class ESM2Model(BaseModel):
@@ -453,104 +269,14 @@ class ESM2Model(BaseModel):
                     all_preds.append(preds.cpu())
             return Predictions(means=torch.cat(all_preds, dim=0).numpy().astype(np.float32))
         else:
-            return self._compute_pll(all_input_ids, all_attention_mask)
-
-    def _compute_pll(
-        self, all_input_ids: torch.Tensor, all_attention_mask: torch.Tensor
-    ) -> Predictions:
-        """Compute zero-shot pseudo-log-likelihood (PLL) scores for sequences.
-
-        This method scores each sequence by masking one residue at a time and
-        accumulating the log-probability the model assigns to the correct
-        residue at that position. The per-sequence score is the mean
-        (average) log-probability across all non-special (i.e. amino-acid)
-        positions. Two execution modes are used to trade off memory and
-        speed:
-
-        - If the number of scoreable residues is ≤ _PLL_BATCH_THRESHOLD, residues
-            are masked in a single batched forward pass (one masked position per
-            batch row) to leverage GPU parallelism. This creates a forward pass of
-            shape (n_residues × padded_seq_len), which can spike GPU memory for
-            sequences near the threshold on large models.
-        - For longer sequences, positions are masked and scored one-at-a-time
-            to avoid excessive memory usage.
-
-        Args:
-            all_input_ids: Tensor of shape (n_candidates, seq_len) with token IDs.
-            all_attention_mask: Tensor of shape (n_candidates, seq_len) with 1
-                for non-padding tokens.
-
-        Returns:
-            Predictions: means is a float32 numpy array of per-sequence PLL
-                scores (average log-likelihood per residue).
-
-        Raises:
-            ValueError: If any sequence has no scoreable residue positions
-                (e.g. all special tokens).
-        """
-        n_candidates = all_input_ids.shape[0]
-
-        # PLL: mask one residue at a time, scored per sequence
-        log_likelihoods: list[float] = []
-        _pll_oom_warned = False
-        with torch.no_grad():
-            for i in range(n_candidates):
-                input_ids_i = all_input_ids[i].unsqueeze(0).to(self.device)  # (1, L)
-                attention_mask_i = all_attention_mask[i].unsqueeze(0).to(self.device)
-
-                special_mask = self._special_tokens_mask(input_ids_i[0])
-                residue_positions = (~special_mask).nonzero(as_tuple=True)[0].tolist()
-
-                if not residue_positions:
-                    raise ValueError(
-                        "One or more sequences have no scoreable positions (all special tokens). "
-                        "Ensure each sequence contains at least one amino acid residue, "
-                        "or increase max_length to avoid full truncation."
-                    )
-
-                if len(residue_positions) <= self._PLL_BATCH_THRESHOLD:
-                    n = len(residue_positions)
-                    seq_len = input_ids_i.shape[1]
-                    if not _pll_oom_warned and n * seq_len > 50_000:
-                        logger.warning(
-                            "Zero-shot PLL batched forward pass: %d residues × %d padded tokens "
-                            "= %d tokens. This may cause OOM on memory-constrained devices. "
-                            "Reduce ESM2ModelConfig.max_length or call predict() on "
-                            "smaller batches.",
-                            n,
-                            seq_len,
-                            n * seq_len,
-                        )
-                        _pll_oom_warned = True
-                    batch_input = input_ids_i.expand(n, -1).clone()  # (N, L)
-                    for row, pos in enumerate(residue_positions):
-                        batch_input[row, pos] = self.tokeniser.mask_token_id
-                    logits = self.esm_model(
-                        input_ids=batch_input,
-                        attention_mask=attention_mask_i.expand(n, -1),
-                    ).logits  # (N, L, vocab_size)
-                    ll = sum(
-                        torch.nn.functional.log_softmax(logits[row, pos], dim=-1)[
-                            input_ids_i[0, pos]
-                        ].item()
-                        for row, pos in enumerate(residue_positions)
-                    )
-                else:
-                    ll = 0.0
-                    for pos in residue_positions:
-                        masked_input = input_ids_i.clone()
-                        masked_input[0, pos] = self.tokeniser.mask_token_id
-                        logits = self.esm_model(
-                            input_ids=masked_input,
-                            attention_mask=attention_mask_i,
-                        ).logits  # (1, L, vocab_size)
-                        ll += torch.nn.functional.log_softmax(logits[0, pos], dim=-1)[
-                            input_ids_i[0, pos]
-                        ].item()
-
-                log_likelihoods.append(ll / len(residue_positions))
-
-        return Predictions(means=np.array(log_likelihoods, dtype=np.float32))
+            return compute_pll(
+                self.esm_model,
+                self.tokeniser,
+                self.device,
+                all_input_ids,
+                all_attention_mask,
+                self._PLL_BATCH_THRESHOLD,
+            )
 
     def embed(self, candidate_points: list[Candidate]) -> np.ndarray:
         """Compute sequence embeddings using the configured pooling strategy.
@@ -648,19 +374,6 @@ class ESM2Model(BaseModel):
         )
         return encoding["input_ids"], encoding["attention_mask"]
 
-    def _special_tokens_mask(self, input_ids: torch.Tensor) -> torch.Tensor:
-        """Return a boolean tensor True at positions occupied by CLS, EOS, PAD, or UNK tokens."""
-        special_ids = {
-            self.tokeniser.cls_token_id,
-            self.tokeniser.eos_token_id,
-            self.tokeniser.pad_token_id,
-            self.tokeniser.unk_token_id,
-        } - {None}
-        special_id_tensor = torch.tensor(
-            list(special_ids), dtype=input_ids.dtype, device=input_ids.device
-        )
-        return torch.isin(input_ids, special_id_tensor)
-
     def _embed_batch(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         """Run the frozen backbone and pool hidden states for one batch.
 
@@ -714,39 +427,18 @@ class ESM2Model(BaseModel):
         else:  # last_hidden_state
             return hidden_state
 
-    def _compute_loss(self, preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        """Compute loss between predictions and targets using the configured loss function.
-
-        Returns:
-            Scalar loss tensor.
-
-        Raises:
-            AssertionError: If `loss_fn` is not 'mse' or 'cross_entropy' (should be unreachable
-                given `ESM2TrainConfig.__post_init__` validation).
-        """
-        if self.train_config.loss_fn == "mse":
-            return torch.nn.functional.mse_loss(preds.squeeze(-1), targets)
-        elif self.train_config.loss_fn == "cross_entropy":
-            return torch.nn.functional.cross_entropy(preds, targets.long())
-        else:
-            raise AssertionError(
-                f"Unreachable: loss_fn={self.train_config.loss_fn!r} "
-                "should have been caught by ESM2TrainConfig.__post_init__"
-            )
-
     def _mask_tokens(
         self, input_ids: torch.Tensor, generator: torch.Generator | None = None
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Apply random token masking for MLM.
+        """Apply BERT-style random token masking for MLM.
 
-        Non-masked positions in labels are set to -100 so CrossEntropyLoss ignores them.
-        Special tokens (cls, eos, pad, unk) are never masked.
+        Thin wrapper around `esm_utils.loss.mask_tokens` using this model's tokeniser and
+        configured `mask_probability` / `mask_splitting`.
 
         Args:
             input_ids: Token IDs of shape (batch, seq_len).
-            generator: Optional torch.Generator for reproducible masking. Pass a seeded
-                generator (e.g. during validation) to keep the masking fixed across calls;
-                None uses the global RNG.
+            generator: Optional torch.Generator for reproducible masking; None uses the
+                global RNG.
 
         Returns:
             Tuple of (masked_input_ids, labels), both of shape (batch, seq_len).
@@ -754,74 +446,13 @@ class ESM2Model(BaseModel):
         Raises:
             ValueError: If the tokeniser does not have a mask token.
         """
-        if self.tokeniser.mask_token_id is None:
-            raise ValueError(
-                "Tokeniser has no mask token. Cannot perform MLM masking. "
-                "Ensure the tokeniser is initialised with a [MASK] token."
-            )
-
-        labels = input_ids.clone()
-
-        special_tokens_mask = self._special_tokens_mask(input_ids)
-        eligible = ~special_tokens_mask
-
-        prob_matrix = torch.full(
-            input_ids.shape, self.train_config.mask_probability, device=input_ids.device
+        return mask_tokens(
+            input_ids,
+            self.tokeniser,
+            self.train_config.mask_probability,
+            self.train_config.mask_splitting,
+            generator,
         )
-        prob_matrix.masked_fill_(special_tokens_mask, 0.0)
-        masked = torch.bernoulli(prob_matrix, generator=generator).bool()
-
-        rows_with_no_mask = ~masked.any(dim=1)
-        if rows_with_no_mask.any():
-            eligible_float = eligible[rows_with_no_mask].float()
-            if eligible_float.sum(dim=1).eq(0).any():
-                logger.warning(
-                    "One or more sequences consist entirely of special tokens. "
-                    "These rows will contribute zero loss. Check your data pipeline."
-                )
-                has_eligible = eligible_float.sum(dim=1) > 0
-                if has_eligible.any():
-                    picks = torch.multinomial(
-                        eligible_float[has_eligible], num_samples=1, generator=generator
-                    ).squeeze(1)
-                    target_rows = rows_with_no_mask.nonzero(as_tuple=True)[0][has_eligible]
-                    masked[target_rows, picks] = True
-            else:
-                picks = torch.multinomial(
-                    eligible_float, num_samples=1, generator=generator
-                ).squeeze(1)
-                target_rows = rows_with_no_mask.nonzero(as_tuple=True)[0]
-                masked[target_rows, picks] = True
-
-        labels[~masked] = -100
-
-        masked_input_ids = input_ids.clone()
-
-        masked_indices = masked.nonzero(as_tuple=False)
-        n_masked = masked_indices.shape[0]
-        p_mask, p_random, _ = self.train_config.mask_splitting
-        if n_masked > 0:
-            split = torch.rand(n_masked, device=input_ids.device, generator=generator)
-
-            replace_with_mask = split < p_mask
-            if replace_with_mask.any():
-                idx = masked_indices[replace_with_mask]
-                masked_input_ids[idx[:, 0], idx[:, 1]] = self.tokeniser.mask_token_id
-
-            replace_with_random = (split >= p_mask) & (split < (p_mask + p_random))
-            if replace_with_random.any():
-                idx = masked_indices[replace_with_random]
-                # Samples from full vocab including special tokens, matching vanilla BERT.
-                random_ids = torch.randint(
-                    low=0,
-                    high=self.tokeniser.vocab_size,
-                    size=(idx.shape[0],),
-                    device=input_ids.device,
-                    generator=generator,
-                )
-                masked_input_ids[idx[:, 0], idx[:, 1]] = random_ids
-
-        return masked_input_ids, labels
 
     def _train_epoch_mlm(
         self,
@@ -997,7 +628,7 @@ class ESM2Model(BaseModel):
             optimizer.zero_grad()
             preds = head(embeddings)
 
-            loss = self._compute_loss(preds, batch_targets)
+            loss = compute_supervised_loss(preds, batch_targets, self.train_config.loss_fn)
 
             if not torch.isfinite(loss):
                 raise RuntimeError(
@@ -1048,7 +679,7 @@ class ESM2Model(BaseModel):
 
                 embeddings = self._embed_batch(batch_ids, batch_mask)
                 preds = head(embeddings)
-                loss = self._compute_loss(preds, batch_targets)
+                loss = compute_supervised_loss(preds, batch_targets, self.train_config.loss_fn)
                 val_losses.append(loss.item())
 
         if not val_losses:
@@ -1164,12 +795,10 @@ class ESM2Model(BaseModel):
                 {"params": self._require_head().parameters()},
             ]
             if not self.train_config.freeze_backbone:
-                params.append(
-                    {
-                        "params": self.esm_model.parameters(),
-                        "lr": self.train_config.backbone_learning_rate,
-                    }
-                )
+                params.append({
+                    "params": self.esm_model.parameters(),
+                    "lr": self.train_config.backbone_learning_rate,
+                })
         else:
             params = self.esm_model.parameters()
 
