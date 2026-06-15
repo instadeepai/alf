@@ -383,6 +383,42 @@ def test_optimization_mode_qnei(task_state, simple_dataset):
     assert all(np.isfinite(labelled.labels))
 
 
+def test_optimization_mode_qucb_gpmodel_through_wrapper(simple_dataset, trained_gp_model):
+    """Continuous optimisation of a plain ALF GPModel routes through the wrapper.
+
+    A trained `GPModel` exposes `botorch_model` but NOT a `.model` attribute, so
+    `_optimize_continuous` takes the `else` branch and wraps it in
+    `BotorchModelWrapper`. This exercises the wrapper's `posterior()` delegation
+    and dtype-cast under `optimize_acqf` gradients at integration level, which the
+    `BoTorchGPModel`-backed tests (which take the native `.model` branch) do not.
+    """
+    gp_model = trained_gp_model.model
+    # Guard the premise: a regular GPModel must take the wrapper branch.
+    assert not (hasattr(gp_model, "model") and gp_model.model is not None)
+
+    surrogate = Surrogate(model=gp_model)
+    state = State(dataset=simple_dataset, surrogate=surrogate)
+
+    # GPModel was trained on 2-feature candidates in the unit square.
+    bounds = [[0.0, 1.0], [0.0, 1.0]]
+    acq_fn = BoTorchAcquisition(
+        acquisition_type="qUCB",
+        bounds=bounds,
+        beta=0.3,
+        batch_size=2,
+        num_restarts=2,
+        raw_samples=64,
+    )
+
+    labelled = acq_fn(search_candidates=[], state=state)
+
+    assert len(labelled) == 2
+    assert all(np.isfinite(labelled.labels))
+    for candidate in labelled.candidates:
+        assert np.all(candidate.data >= np.array([b[0] for b in bounds]))
+        assert np.all(candidate.data <= np.array([b[1] for b in bounds]))
+
+
 def test_optimization_mode_without_bounds_raises_error(task_state):
     """Test that optimization mode without bounds raises ValueError."""
     acq_fn = BoTorchAcquisition(acquisition_type="qEI", batch_size=3)
