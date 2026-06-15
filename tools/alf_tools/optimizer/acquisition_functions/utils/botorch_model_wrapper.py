@@ -45,24 +45,27 @@ class BotorchModelWrapper(BotorchModel):
     `posterior()`) or an ALF `BaseModel` (adapts `predict()` to BoTorch's
     `posterior()` interface). The wrapper detects the model type automatically.
 
-    ALF models that expose a trained `botorch_model` attribute (e.g. `GPModel`)
-    additionally support q-based acquisitions such as
-    `qLogNoisyExpectedImprovement` — `num_outputs` and `batch_shape` are
-    delegated to the underlying BoTorch model. Note that `posterior()` for ALF
-    models always routes through `predict()`, which yields a diagonal
-    (per-point independent) posterior. q-based acquisitions are therefore
-    evaluated under a per-point independence approximation — baseline-candidate
-    correlations are zero — rather than with the exact joint covariance. Pure
-    `predict()`-only ALF models cannot provide `num_outputs`/`batch_shape` and
-    raise `NotImplementedError` for those properties.
+    ALF models split into two posterior paths:
 
-    Because `predict()` has no notion of BoTorch's posterior options, the ALF
-    path also ignores the `observation_noise` flag: the returned posterior
-    always carries whatever variance `predict()` reports. For `GPModel` that is
-    the noise-inclusive predictive variance, so acquisitions see slightly
-    inflated uncertainty compared to the latent (noise-free) posterior they
-    request by default. `posterior_transform` and `output_indices` cannot be
-    honoured on this path and raise `NotImplementedError` if passed.
+    Joint-capable ALF models that expose a trained `botorch_model` attribute
+    (e.g. `GPModel`/`BoTorchGPModel`) delegate `posterior()` to the inner
+    BoTorch model's native `posterior()`. This yields a true joint covariance
+    and fully honours `observation_noise`, `posterior_transform` and
+    `output_indices`, all of which are forwarded to the inner model. q-based
+    acquisitions such as `qLogNoisyExpectedImprovement` are therefore evaluated
+    with the exact joint covariance, and `num_outputs`/`batch_shape` are
+    delegated to the underlying BoTorch model.
+
+    Marginal-only (predict-only) ALF models route `posterior()` through
+    `predict()`, which yields a diagonal (per-point independent) posterior.
+    q-based acquisitions over q>1 are evaluated under a per-point independence
+    approximation — baseline-candidate correlations are zero — rather than with
+    the exact joint covariance. On this path the `observation_noise` flag is
+    ignored: the returned posterior always carries whatever variance `predict()`
+    reports. `posterior_transform` and `output_indices` cannot be honoured and
+    raise `NotImplementedError` if passed. Such models cannot provide
+    `num_outputs`/`batch_shape` and raise `NotImplementedError` for those
+    properties.
 
     Models that don't provide prediction variances (e.g., CNNModel, deterministic
     models) cannot be used with BoTorch acquisition functions. Expected Improvement
