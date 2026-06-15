@@ -14,7 +14,7 @@
 
 """Integration tests for the factory + ALF pipeline."""
 
-import factory
+import alf_factory as factory
 import numpy as np
 import pandas as pd
 import torch
@@ -43,10 +43,10 @@ from omegaconf import OmegaConf
 
 
 class _SinusoidalDataset(BaseDataset):
-    """100-point sinusoidal dataset backed entirely in memory."""
+    """300-point sinusoidal dataset backed entirely in memory."""
 
     def load_dataset(self) -> LabelledCandidates:
-        """Load a sinusoidal dataset with 100 points on [0, 2*pi].
+        """Load a sinusoidal dataset with 300 points on [0, 2*pi].
 
         Returns:
             LabelledCandidates with noisy sinusoidal observations.

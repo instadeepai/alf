@@ -15,10 +15,13 @@
 """Hydra entry point for ALF experiments."""
 
 import logging
+import random
 from pathlib import Path
 
-import factory
+import alf_factory as factory
 import hydra
+import numpy as np
+import torch
 from alf_core.surrogate.surrogate import Surrogate
 from hydra.core.hydra_config import HydraConfig
 from omegaconf import DictConfig
@@ -42,14 +45,19 @@ def main(cfg: DictConfig) -> None:
         cfg.experiment.seed,
     )
 
+    seed = cfg.experiment.seed
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
     dataset = factory.build_dataset(cfg)
+    dataset.setup()
     surrogate = Surrogate(model=factory.build_model(cfg))
     optimizer = factory.build_optimizer(cfg)
     oracle = factory.build_oracle(cfg, dataset)
-    loggers = factory.build_state_loggers(cfg, output_dir)
+    loggers = factory.build_state_loggers(output_dir)
     task = factory.build_task(cfg)
 
-    dataset.setup()
     state = task.setup(dataset=dataset, surrogate=surrogate)
     task.run(state=state, state_loggers=loggers, optimizer=optimizer, oracle=oracle)
 

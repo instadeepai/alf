@@ -14,7 +14,7 @@
 
 from unittest.mock import MagicMock, patch
 
-import factory
+import alf_factory as factory
 import pytest
 from alf_core.optimizer.optimizer import Optimizer
 from alf_core.oracle.oracle import Oracle
@@ -48,7 +48,7 @@ def _gfp_cfg():
 
 def test_build_dataset_gfp_constructs_correct_config():
     """build_dataset passes the right config fields to the GFP constructor."""
-    with patch("factory.GFP") as mock_cls:
+    with patch("alf_factory.GFP") as mock_cls:
         mock_cls.return_value = MagicMock()
         factory.build_dataset(_gfp_cfg())
     mock_cls.assert_called_once()
@@ -141,6 +141,32 @@ def test_build_model_mlp_returns_mlp_model():
     assert isinstance(model, MLPModel)
     assert model.model_config.hidden_dims == [64, 32]
     assert model.train_config.num_epochs == 5
+
+
+def test_build_model_mlp_unknown_key_raises():
+    """_build_mlp raises ValueError when the config contains an unrecognised key."""
+    cfg = OmegaConf.create({
+        "model": {
+            "class_name": "mlp",
+            "name": "test_mlp",
+            "hidden_dims": [64, 32],
+            "activation": "relu",
+            "norm": "none",
+            "drpout": 0.0,  # typo — should be 'dropout'
+            "n_mc_passes": 0,
+            "model_seed": 0,
+            "train": {
+                "learning_rate": 1e-3,
+                "batch_size": 32,
+                "num_epochs": 5,
+                "optimizer": "adam",
+                "weight_decay": 0.0,
+                "log_frequency": 5,
+            },
+        }
+    })
+    with pytest.raises(ValueError, match="Unknown MLPModelConfig field"):
+        factory.build_model(cfg)
 
 
 def test_build_model_unknown_class_raises():
@@ -291,8 +317,7 @@ def test_build_task_zeroshot():
 
 def test_build_state_loggers_includes_file_and_terminal(tmp_path):
     """build_state_loggers returns both TerminalStateLogger and FileStateLogger."""
-    cfg = OmegaConf.create({})
-    loggers = factory.build_state_loggers(cfg, tmp_path)
+    loggers = factory.build_state_loggers(tmp_path)
     types = {type(lg) for lg in loggers}
     assert TerminalStateLogger in types
     assert FileStateLogger in types

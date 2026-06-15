@@ -4,7 +4,7 @@ model:
   name: gp_rbf
   kernel_type: rbf
   ard: true
-  matern_nu: 2.5
+  matern_nu: 2.5  # used only by Matérn kernel; ignored for RBF
   mean_type: constant
   featurizer_type: one_hot
   lengthscale_prior:
