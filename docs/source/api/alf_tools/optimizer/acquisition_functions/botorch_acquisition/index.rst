@@ -13,6 +13,12 @@ it optimises the acquisition function directly in continuous space via BoTorch's
 configured with a ``BoTorchMCSampler``; scipy optimiser behaviour is controlled via
 ``BoTorchAcquisitionOptConfig``.
 
+Batch acquisition (``batch_size`` > 1) requires a surrogate with a joint posterior — a
+native BoTorch model or an ALF model exposing a trained ``botorch_model``. Marginal-only
+``predict()``-based surrogates can only supply a diagonal posterior, so requesting
+``batch_size`` > 1 with one raises a ``ValueError``; score them one point at a time, or use
+ALF's native ``CoreSet``/``ThompsonSampling`` acquisitions for batch selection.
+
 .. automodule:: alf_tools.optimizer.acquisition_functions.botorch_acquisition
    :members:
    :show-inheritance:
