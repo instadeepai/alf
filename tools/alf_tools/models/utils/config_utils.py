@@ -31,7 +31,7 @@ def build_from_target(
     Supports any GPyTorch prior or constraint. The dict must contain a
     `_target_` key with a fully-qualified class path; all other keys
     are passed as constructor kwargs.
-    
+
     Args:
         cfg: Dict with `_target_` (e.g. `"gpytorch.priors.LogNormalPrior"`)
             and any constructor kwargs. `None` returns `None`.
