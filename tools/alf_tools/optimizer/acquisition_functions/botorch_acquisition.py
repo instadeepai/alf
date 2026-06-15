@@ -225,6 +225,30 @@ class BoTorchAcquisition(AcquisitionFunction):
             f"with sampler: {self.sampler_config}"
         )
 
+    _BATCH_JOINT_POSTERIOR_ERROR = (
+        "Batch acquisition (q>1) needs a model with a joint posterior. Use a "
+        "joint-posterior surrogate (one exposing a trained `botorch_model`), or "
+        "select batches with ALF's native CoreSet/Thompson acquisitions."
+    )
+
+    def _require_joint_posterior_for_batch(self, wrapped_model: BotorchModel) -> None:
+        """Raise if a batch (q>1) acquisition is requested for a marginal-only model.
+
+        Args:
+            wrapped_model: The (possibly wrapped) model that will score candidates.
+
+        Raises:
+            ValueError: If `batch_size > 1` and the model cannot provide a joint
+                posterior.
+        """
+        if self.batch_size <= 1:
+            return
+        if (
+            isinstance(wrapped_model, BotorchModelWrapper)
+            and not wrapped_model.provides_joint_posterior
+        ):
+            raise ValueError(self._BATCH_JOINT_POSTERIOR_ERROR)
+
     def _create_acquisition_function(
         self, model, best_f: float, X_baseline: torch.Tensor | None = None
     ):
@@ -357,6 +381,7 @@ class BoTorchAcquisition(AcquisitionFunction):
         wrapped_model = (
             raw_model if isinstance(raw_model, BotorchModel) else BotorchModelWrapper(raw_model)
         )
+        self._require_joint_posterior_for_batch(wrapped_model)
 
         # Infer tensor dtype from model parameters; fall back to float64 (BoTorch default)
         # if the model has no registered PyTorch parameters (e.g. pure ALF BaseModel).
@@ -433,6 +458,7 @@ class BoTorchAcquisition(AcquisitionFunction):
         else:
             # Fall back to wrapper for ALF models (uses numerical gradients)
             model = BotorchModelWrapper(state.surrogate.model)
+            self._require_joint_posterior_for_batch(model)
 
         # Infer model dtype so bounds/data tensors match (avoids double != float errors).
         # Fall back to float64 (BoTorch default) when the model has no registered parameters

@@ -751,6 +751,38 @@ def test_score_candidates_wraps_alf_model(mock_alf_model_with_variances):
     assert all(np.isfinite(result.labels))
 
 
+def test_batch_size_gt_one_marginal_only_raises(mock_alf_model_with_variances):
+    """batch_size>1 on a marginal-only model raises a pointed error (scoring mode)."""
+    surrogate = MagicMock()
+    surrogate.model = mock_alf_model_with_variances
+    state = MagicMock()
+    state.surrogate = surrogate
+    state.dataset.train_dataset.labels.max.return_value = 1.0
+
+    acq_fn = BoTorchAcquisition(acquisition_type="qUCB", beta=2.0, batch_size=2)
+    candidates = [
+        Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR),
+        Candidate(data=np.array([0.2, 0.8]), modality=Modality.TABULAR),
+    ]
+    with pytest.raises(ValueError, match="joint posterior"):
+        acq_fn(search_candidates=candidates, state=state)
+
+
+def test_analytic_acquisition_marginal_only_succeeds(mock_alf_model_with_variances):
+    """Analytic acquisitions work on marginal-only models (single-point)."""
+    surrogate = MagicMock()
+    surrogate.model = mock_alf_model_with_variances
+    state = MagicMock()
+    state.surrogate = surrogate
+    state.dataset.train_dataset.labels.max.return_value = 1.0
+
+    acq_fn = BoTorchAcquisition(acquisition_type="upper_confidence_bound", beta=2.0, batch_size=1)
+    candidates = [Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR)]
+    result = acq_fn(search_candidates=candidates, state=state)
+    assert len(result.labels) == 1
+    assert all(np.isfinite(result.labels))
+
+
 # =============================================================================
 # AcquisitionType / _VALID_TYPES consistency
 # =============================================================================
