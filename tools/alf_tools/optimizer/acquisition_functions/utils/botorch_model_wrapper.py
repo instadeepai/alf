@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Universal adapter for models to work with BoTorch acquisition functions.
+"""Universal wrapper for models to work with BoTorch acquisition functions.
 
 This module provides a unified interface that allows both native BoTorch models
 and ALF BaseModel instances to work seamlessly with BoTorch acquisition
@@ -39,11 +39,11 @@ if TYPE_CHECKING:
 
 
 class BotorchModelWrapper(BotorchModel):
-    """Universal adapter for BoTorch acquisition functions compatibility.
+    """Universal wrapper for BoTorch acquisition functions compatibility.
 
     Accepts either a native BoTorch `Model` (direct pass-through to
     `posterior()`) or an ALF `BaseModel` (adapts `predict()` to BoTorch's
-    `posterior()` interface). The adapter detects the model type automatically.
+    `posterior()` interface). The wrapper detects the model type automatically.
 
     ALF models that expose a trained `botorch_model` attribute (e.g. `GPModel`)
     additionally support q-based acquisitions such as
@@ -80,7 +80,7 @@ class BotorchModelWrapper(BotorchModel):
     """
 
     def __init__(self, model: BotorchModel | BaseModel):
-        """Initialize the adapter with a model.
+        """Initialize the wrapper with a model.
 
         Args:
             model: Either a native BoTorch Model or an ALF BaseModel.

@@ -3,7 +3,7 @@ BoTorch Acquisition Functions
 
 Wraps BoTorch acquisition functions for use in the ALF active learning loop.
 Accepts either a native BoTorch ``Model`` or an ALF ``BaseModel``; a
-:class:``~alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter.BoTorchModelAdapter``
+:class:``~alf_tools.optimizer.acquisition_functions.utils.botorch_model_wrapper.BotorchModelWrapper``
 is inserted automatically when needed.
 
 Configure via :class:``~alf_tools.optimizer.acquisition_functions.botorch_acquisition_function.BotorchAcquisitionConfig``

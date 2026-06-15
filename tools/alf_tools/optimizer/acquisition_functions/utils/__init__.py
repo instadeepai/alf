@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
+from alf_tools.optimizer.acquisition_functions.utils.botorch_model_wrapper import (
     BotorchModelWrapper,
 )
 

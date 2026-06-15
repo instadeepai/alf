@@ -714,8 +714,8 @@ def test_invalid_acquisition_type_rejects_new_names():
 # =============================================================================
 
 
-def test_score_candidates_skips_adapter_for_native_botorch_model(task_state, botorch_gp_model):
-    """_score_candidates does not wrap a native BotorchModel in BoTorchModelAdapter."""
+def test_score_candidates_skips_wrapper_for_native_botorch_model(task_state, botorch_gp_model):
+    """_score_candidates does not wrap a native BotorchModel in BotorchModelWrapper."""
     task_state.surrogate.model = botorch_gp_model
 
     acq_fn = BoTorchAcquisition(acquisition_type="qEI", batch_size=1)
@@ -726,16 +726,16 @@ def test_score_candidates_skips_adapter_for_native_botorch_model(task_state, bot
 
     with (
         patch(
-            "alf_tools.optimizer.acquisition_functions.botorch_acquisition.BoTorchModelAdapter"
-        ) as mock_adapter,
+            "alf_tools.optimizer.acquisition_functions.botorch_acquisition.BotorchModelWrapper"
+        ) as mock_wrapper,
         patch.object(acq_fn, "_create_acquisition_function", return_value=mock_acq_fn),
     ):
         acq_fn(search_candidates=candidates, state=task_state)
-        mock_adapter.assert_not_called()
+        mock_wrapper.assert_not_called()
 
 
 def test_score_candidates_wraps_alf_model(mock_alf_model_with_variances):
-    """_score_candidates wraps an ALF BaseModel in BoTorchModelAdapter."""
+    """_score_candidates wraps an ALF BaseModel in BotorchModelWrapper."""
     surrogate = MagicMock()
     surrogate.model = mock_alf_model_with_variances
 

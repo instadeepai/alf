@@ -20,7 +20,7 @@ making it easy to switch between different acquisition strategies.
 
 import logging
 from dataclasses import dataclass
-from typing import Literal, Optional, get_args
+from typing import Literal, get_args
 
 import numpy as np
 import torch
@@ -31,8 +31,8 @@ from alf_tools.models.utils.botorch_utils import (
     tensor_to_candidates,
 )
 from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
-from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
-    BoTorchModelAdapter,
+from alf_tools.optimizer.acquisition_functions.utils.botorch_model_wrapper import (
+    BotorchModelWrapper,
 )
 from botorch.acquisition.analytic import (
     LogExpectedImprovement,
@@ -171,14 +171,14 @@ class BoTorchAcquisition(AcquisitionFunction):
     def __init__(
         self,
         acquisition_type: AcquisitionType,
-        sampler: Optional[BoTorchMCSampler] = None,
-        bounds: Optional[list[list[float]]] = None,
+        sampler: BoTorchMCSampler | None = None,
+        bounds: list[list[float]] | None = None,
         num_restarts: int = 10,
         raw_samples: int = 512,
         batch_size: int = 1,
         sequential: bool = False,
         beta: float = 0.2,
-        optimization_config: Optional[BoTorchAcquisitionOptConfig] = None,
+        optimization_config: BoTorchAcquisitionOptConfig | None = None,
         **kwargs,
     ):
         """Initialize generic BoTorch acquisition function.
@@ -226,7 +226,7 @@ class BoTorchAcquisition(AcquisitionFunction):
         )
 
     def _create_acquisition_function(
-        self, model, best_f: float, X_baseline: Optional[torch.Tensor] = None
+        self, model, best_f: float, X_baseline: torch.Tensor | None = None
     ):
         """Create the specific BoTorch acquisition function.
 
@@ -354,14 +354,14 @@ class BoTorchAcquisition(AcquisitionFunction):
         logger.info(f"Scoring {len(candidates)} candidates with {self.acquisition_type}")
 
         raw_model = state.surrogate.model
-        adapted_model = (
-            raw_model if isinstance(raw_model, BotorchModel) else BoTorchModelAdapter(raw_model)
+        wrapped_model = (
+            raw_model if isinstance(raw_model, BotorchModel) else BotorchModelWrapper(raw_model)
         )
 
         # Infer tensor dtype from model parameters; fall back to float64 (BoTorch default)
         # if the model has no registered PyTorch parameters (e.g. pure ALF BaseModel).
         try:
-            infer_dtype = next(adapted_model.parameters()).dtype
+            infer_dtype = next(wrapped_model.parameters()).dtype
         except StopIteration:
             infer_dtype = torch.float64
 
@@ -372,7 +372,7 @@ class BoTorchAcquisition(AcquisitionFunction):
                 state.dataset.train_dataset.candidates, dtype=infer_dtype
             )
 
-        acq_fn = self._create_acquisition_function(adapted_model, best_f, X_baseline)
+        acq_fn = self._create_acquisition_function(wrapped_model, best_f, X_baseline)
 
         # Evaluate acquisition function
         # For discrete scoring, evaluate each candidate independently
@@ -431,8 +431,8 @@ class BoTorchAcquisition(AcquisitionFunction):
             # Use the native BoTorch model directly (has proper gradients for optimization)
             model = state.surrogate.model.model
         else:
-            # Fall back to adapter for ALF models (uses numerical gradients)
-            model = BoTorchModelAdapter(state.surrogate.model)
+            # Fall back to wrapper for ALF models (uses numerical gradients)
+            model = BotorchModelWrapper(state.surrogate.model)
 
         # Infer model dtype so bounds/data tensors match (avoids double != float errors).
         # Fall back to float64 (BoTorch default) when the model has no registered parameters

@@ -17,7 +17,7 @@
 Provides :data:`ACQUISITION_REGISTRY` mapping names to BoTorch acquisition
 function classes and :class:`BotorchAcquisitionFunction`.  The class accepts
 either a native BoTorch `Model` or an ALF `BaseModel` — a
-:class:`~alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter.BoTorchModelAdapter`
+:class:`~alf_tools.optimizer.acquisition_functions.utils.botorch_model_wrapper.BotorchModelWrapper`
 is inserted automatically when needed.
 
 Usage::
@@ -34,7 +34,7 @@ import torch
 from alf_core import AcquisitionFunction as AlfAcquisitionFunction
 from alf_core import Candidate, LabelledCandidates, State
 from alf_tools.models.utils.botorch_utils import candidates_to_tensor
-from alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter import (
+from alf_tools.optimizer.acquisition_functions.utils.botorch_model_wrapper import (
     BotorchModelWrapper,
 )
 from botorch.acquisition import AcquisitionFunction
@@ -119,12 +119,12 @@ class BotorchAcquisitionFunction(AlfAcquisitionFunction):
     The acquisition class is resolved from :data:`ACQUISITION_REGISTRY` once at
     construction and instantiated on each call with `model` injected from `state.surrogate.model`.
     If the surrogate model is an ALF `BaseModel` it is adapted via
-    :class:`~alf_tools.optimizer.acquisition_functions.utils.botorch_model_adapter.BoTorchModelAdapter`
+    :class:`~alf_tools.optimizer.acquisition_functions.utils.botorch_model_wrapper.BotorchModelWrapper`
     before being passed to the BoTorch acquisition.
 
     Candidates are converted to a float64 tensor before scoring. Native
     BoTorch models trained in another dtype (e.g. float32) will raise a dtype
-    mismatch at call time; ALF models are unaffected, as the adapter routes
+    mismatch at call time; ALF models are unaffected, as the wrapper routes
     through `predict()`, which handles dtype internally.
 
     Args:

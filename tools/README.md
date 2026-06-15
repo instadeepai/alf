@@ -79,7 +79,7 @@ uv sync --extra esm2 --extra chemprop
   functions for use in the ALF loop. Configured via `BotorchAcquisitionConfig(name=..., kwargs=...)`;
   supported names are `log_expected_improvement`, `upper_confidence_bound`,
   `probability_of_improvement`, and `log_noisy_expected_improvement`. Accepts either a native
-  BoTorch model or an ALF `BaseModel` (wrapped automatically via `BoTorchModelAdapter`); ALF models
+  BoTorch model or an ALF `BaseModel` (wrapped automatically via `BotorchModelWrapper`); ALF models
   must provide prediction variances
 
 ### Search Strategies

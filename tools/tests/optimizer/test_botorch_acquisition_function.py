@@ -142,7 +142,7 @@ def test_botorch_acquisition_function_wraps_alf_model(
     """BotorchAcquisitionFunction raises NotImplementedError for ALF BaseModel.
 
     BoTorch acquisition functions call model.num_outputs during construction;
-    BoTorchModelAdapter raises for ALF models without a trained
+    BotorchModelWrapper raises for ALF models without a trained
     `botorch_model`. Use a model exposing `botorch_model` (e.g. GPModel).
     """
     cfg = BotorchAcquisitionConfig(name="upper_confidence_bound", kwargs={"beta": 2.0})
@@ -155,11 +155,11 @@ def test_botorch_acquisition_function_wraps_alf_model(
 
 @pytest.mark.filterwarnings("ignore:num_acquisitions:UserWarning")
 def test_botorch_acquisition_function_qlognei_with_trained_gp_model(trained_gp_model):
-    """QLogNoisyExpectedImprovement works with a trained GPModel via the adapter.
+    """QLogNoisyExpectedImprovement works with a trained GPModel via the wrapper.
 
-    A trained GPModel exposes `botorch_model`, so the adapter can provide
+    A trained GPModel exposes `botorch_model`, so the wrapper can provide
     `num_outputs`/`batch_shape` and q-based acquisitions become usable. Note
-    that the adapter's `posterior()` routes through `predict()` and yields a
+    that the wrapper's `posterior()` routes through `predict()` and yields a
     diagonal posterior, so qLogNEI is evaluated under a per-point independence
     approximation (baseline-candidate correlations are zero), not with the
     exact joint covariance.

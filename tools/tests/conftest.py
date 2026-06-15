@@ -16,7 +16,7 @@
 
 This module provides fixtures needed by the data-conversion utility tests
 (test_botorch_utils.py) and GP model tests (test_gp.py,
-test_botorch_model_adapter.py). Acquisition and dataset fixtures are added
+test_botorch_model_wrapper.py). Acquisition and dataset fixtures are added
 in later PRs.
 """
 
