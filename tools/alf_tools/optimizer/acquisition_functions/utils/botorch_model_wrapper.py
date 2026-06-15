@@ -63,9 +63,8 @@ class BotorchModelWrapper(BotorchModel):
     the exact joint covariance. On this path the `observation_noise` flag is
     ignored: the returned posterior always carries whatever variance `predict()`
     reports. `posterior_transform` and `output_indices` cannot be honoured and
-    raise `NotImplementedError` if passed. Such models cannot provide
-    `num_outputs`/`batch_shape` and raise `NotImplementedError` for those
-    properties.
+    raise `NotImplementedError` if passed. Such models report the single-output
+    defaults `num_outputs=1` and `batch_shape=torch.Size([])`.
 
     Models that don't provide prediction variances (e.g., CNNModel, deterministic
     models) cannot be used with BoTorch acquisition functions. Expected Improvement
