@@ -11,6 +11,7 @@ prediction, and sampling.
    CNN Model <cnn/index>
    ESMFold Model <esmfold/index>
    GP Model <gp/index>
+   ESM2 Model <esm2/index>
    Chemprop Model <chemprop/index>
    PyRosetta Model <pyrosetta/index>
    Ensemble Wrapper <ensemble/index>

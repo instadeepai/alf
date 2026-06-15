@@ -11,6 +11,29 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 
 **Note:** Requires authentication via `.netrc` file (see main [README](../README.md#authentication))
 
+### Optional Extras
+
+Some models require additional dependencies. Append one or more extras to the package URL:
+
+```bash
+# ESM2 — protein language model (for ESM2Model)
+pip install "alf_tools[esm2] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+
+# Chemprop — small-molecule MPNN (for ChempropModel)
+pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+
+# Both extras together
+pip install "alf_tools[esm2,chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+```
+
+For development installs, pass `--extra` flags to `uv sync`:
+
+```bash
+uv sync --extra esm2
+uv sync --extra chemprop
+uv sync --extra esm2 --extra chemprop
+```
+
 ## What's Included
 
 ### Datasets
@@ -23,6 +46,13 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 - **CNNModel** - Convolutional neural network for sequence modeling. Supports `ProblemType.REGRESSION`, `ProblemType.BINARY`, and `ProblemType.MULTICLASS`; output shape and activation are determined automatically from the dataset's `problem_type`
 - **GPModel** - Gaussian Process model for sequence fitness prediction with flexible kernel
   selection, input normalisation, and output standardisation enabled by default
+- **ESM2Model** - Protein language model surrogate backed by
+  [ESM-2](https://huggingface.co/docs/transformers/model_doc/esm). Accepts amino acid sequences
+  directly. Two modes via `ESM2TrainConfig.scoring_function`: `scoring_function='linear_head'` (default) freezes the
+  backbone and trains a linear head for regression (`loss_fn='mse'`) or classification
+  (`loss_fn='cross_entropy'`); `scoring_function=None` performs zero-shot pseudo-log-likelihood scoring
+  with no training. Embeddings can be extracted via `embed()`. Requires the `[esm2]` optional extra:
+  `pip install "alf-tools[esm2]"`
 - **ESMFoldModel** - ESMFold protein structure prediction oracle; returns a scalar confidence score per candidate. Use as `Oracle(scorer=ESMFoldModel(ESMFoldModelConfig(...)))`. Requires `transformers>=4.36.0` and `accelerate>=0.26.0`.
   Three scoring metrics are supported (all in **[0, 1]**, higher is better):
   - `ptm` *(default)* — global fold confidence (pTM). > 0.5 = confident fold; < 0.1 = disordered / very short peptide.
@@ -102,6 +132,7 @@ configs (see `alf_core.model.base_model.BaseTrainConfig`).
 |-------|---------------------------|-------------------------------|
 | `CNNModel` | `False` | `False` |
 | `GPModel` | `True` | `True` |
+| `ESM2Model` | `False` | `False` |
 | `ChempropModel` | `False` | `False` |
 
 **`GPTrainConfig`** overrides both defaults to `True`:
