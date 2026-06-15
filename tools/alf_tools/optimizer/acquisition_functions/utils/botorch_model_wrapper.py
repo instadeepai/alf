@@ -252,24 +252,16 @@ class BotorchModelWrapper(BotorchModel):
 
         Returns:
             Number of outputs for native BoTorch models, or for ALF models
-            exposing a trained `botorch_model` (delegated to it).
-
-        Raises:
-            NotImplementedError: For ALF BaseModel instances without a trained
-                `botorch_model`. Use a model exposing `botorch_model`
-                (e.g. `GPModel`) and train it first.
+            exposing a trained `botorch_model` (delegated to it). Returns 1 for
+            marginal-only ALF models (single-output `predict()`).
         """
         if self._is_botorch_model:
             return int(self._wrapped_model.num_outputs)  # type: ignore[union-attr, no-any-return]
         inner = self._inner_botorch_model()
         if inner is not None:
             return int(inner.num_outputs)
-        raise NotImplementedError(
-            f"num_outputs is not supported for ALF BaseModel "
-            f"({type(self._wrapped_model).__name__}) without a trained "
-            "botorch_model. Use a model exposing botorch_model, such as "
-            "GPModel, and train it first."
-        )
+        # Marginal-only model: predict() returns a 1-D means array -> single output.
+        return 1
 
     @property
     def batch_shape(self) -> torch.Size:
@@ -277,21 +269,13 @@ class BotorchModelWrapper(BotorchModel):
 
         Returns:
             Batch shape for native BoTorch models, or for ALF models
-            exposing a trained `botorch_model` (delegated to it).
-
-        Raises:
-            NotImplementedError: For ALF BaseModel instances without a trained
-                `botorch_model`. Use a model exposing `botorch_model`
-                (e.g. `GPModel`) and train it first.
+            exposing a trained `botorch_model` (delegated to it). Returns an
+            empty batch shape for marginal-only ALF models.
         """
         if self._is_botorch_model:
             return self._wrapped_model.batch_shape  # type: ignore[union-attr]
         inner = self._inner_botorch_model()
         if inner is not None:
             return inner.batch_shape
-        raise NotImplementedError(
-            f"batch_shape is not supported for ALF BaseModel "
-            f"({type(self._wrapped_model).__name__}) without a trained "
-            "botorch_model. Use a model exposing botorch_model, such as "
-            "GPModel, and train it first."
-        )
+        # Marginal-only model: no batched models -> empty batch shape.
+        return torch.Size([])

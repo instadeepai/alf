@@ -256,15 +256,10 @@ def test_num_outputs_botorch_model(botorch_gp_model):
     assert wrapper.num_outputs == botorch_gp_model.num_outputs
 
 
-def test_num_outputs_alf_model(mock_alf_model_with_variances):
-    """Test num_outputs raises for ALF models without a `botorch_model`."""
+def test_num_outputs_marginal_only(mock_alf_model_with_variances):
+    """num_outputs is 1 for marginal-only (single-output predict) ALF models."""
     wrapper = BotorchModelWrapper(mock_alf_model_with_variances)
-
-    with pytest.raises(
-        NotImplementedError,
-        match="num_outputs is not supported for ALF BaseModel",
-    ):
-        _ = wrapper.num_outputs
+    assert wrapper.num_outputs == 1
 
 
 def test_batch_shape_botorch_model(botorch_gp_model):
@@ -274,15 +269,10 @@ def test_batch_shape_botorch_model(botorch_gp_model):
     assert wrapper.batch_shape == botorch_gp_model.batch_shape
 
 
-def test_batch_shape_alf_model(mock_alf_model_with_variances):
-    """Test batch_shape raises for ALF models without a `botorch_model`."""
+def test_batch_shape_marginal_only(mock_alf_model_with_variances):
+    """batch_shape is empty for marginal-only ALF models."""
     wrapper = BotorchModelWrapper(mock_alf_model_with_variances)
-
-    with pytest.raises(
-        NotImplementedError,
-        match="batch_shape is not supported for ALF BaseModel",
-    ):
-        _ = wrapper.batch_shape
+    assert wrapper.batch_shape == torch.Size([])
 
 
 @pytest.mark.filterwarnings("ignore:num_acquisitions:UserWarning")
@@ -320,26 +310,16 @@ def test_provides_joint_posterior_marginal_only(mock_alf_model_with_variances):
     assert wrapper.provides_joint_posterior is False
 
 
-def test_num_outputs_untrained_gp_model_raises():
-    """num_outputs raises for an untrained GPModel (no `botorch_model` yet)."""
+def test_num_outputs_untrained_gp_model_defaults_to_one():
+    """An untrained GPModel has no botorch_model yet; num_outputs defaults to 1."""
     wrapper = BotorchModelWrapper(GPModel(device="cpu"))
-
-    with pytest.raises(
-        NotImplementedError,
-        match="num_outputs is not supported for ALF BaseModel",
-    ):
-        _ = wrapper.num_outputs
+    assert wrapper.num_outputs == 1
 
 
-def test_batch_shape_untrained_gp_model_raises():
-    """batch_shape raises for an untrained GPModel (no `botorch_model` yet)."""
+def test_batch_shape_untrained_gp_model_defaults_to_empty():
+    """An untrained GPModel has no botorch_model yet; batch_shape defaults to empty."""
     wrapper = BotorchModelWrapper(GPModel(device="cpu"))
-
-    with pytest.raises(
-        NotImplementedError,
-        match="batch_shape is not supported for ALF BaseModel",
-    ):
-        _ = wrapper.batch_shape
+    assert wrapper.batch_shape == torch.Size([])
 
 
 # =============================================================================
