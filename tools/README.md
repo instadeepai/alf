@@ -51,8 +51,8 @@ uv sync --extra esm2 --extra chemprop
   directly. Three operating modes via `ESM2TrainConfig`:
   `mode='linear_head'` (default) freezes the backbone and trains a linear head for regression
   (`loss_fn='mse'`) or classification (`loss_fn='cross_entropy'`);
-  `mode='esm2_likelihoods'` with frozen backbone performs zero-shot pseudo-log-likelihood (PLL)
-  scoring with no training; `mode='esm2_likelihoods'` with `freeze_backbone=False, loss_fn='mlm'`
+  `mode='likelihoods'` with frozen backbone performs zero-shot pseudo-log-likelihood (PLL)
+  scoring with no training; `mode='likelihoods'` with `freeze_backbone=False, loss_fn='mlm'`
   fine-tunes the full ESM-2 backbone via MLM on the input sequences (labels are ignored, but
   `train()` still takes `LabelledCandidates` — placeholder labels are fine) and then returns
   PLL scores.

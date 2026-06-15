@@ -37,12 +37,12 @@ def model_config():
 
 @pytest.fixture(scope="session")
 def train_config():
-    """Zero-shot ESM2TrainConfig (esm2_likelihoods, frozen backbone).
+    """Zero-shot ESM2TrainConfig (likelihoods, frozen backbone).
 
     Returns:
-        An ESM2TrainConfig with mode='esm2_likelihoods' (freeze_backbone defaults to True).
+        An ESM2TrainConfig with mode='likelihoods' (freeze_backbone defaults to True).
     """
-    return ESM2TrainConfig(mode="esm2_likelihoods")
+    return ESM2TrainConfig(mode="likelihoods")
 
 
 @pytest.fixture(scope="session")
@@ -62,10 +62,10 @@ def esm2_small_batch_model():
     """Frozen ESM-2 with batch_size=2 to exercise multi-batch predict.
 
     Returns:
-        An ESM2Model with batch_size=2, mode='esm2_likelihoods', frozen backbone, CPU.
+        An ESM2Model with batch_size=2, mode='likelihoods', frozen backbone, CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
-    train_cfg = ESM2TrainConfig(mode="esm2_likelihoods", batch_size=2)
+    train_cfg = ESM2TrainConfig(mode="likelihoods", batch_size=2)
     return ESM2Model(
         name="test_esm2_small_batch", model_config=config, train_config=train_cfg, device="cpu"
     )
@@ -159,54 +159,54 @@ class TestConfigs:
         with pytest.raises(ValueError, match="loss_fn='mlm' is only valid"):
             ESM2TrainConfig(mode="linear_head", loss_fn="mlm")
 
-    def test_loss_fn_set_with_frozen_esm2_likelihoods_raises(self):
-        """loss_fn not None when mode='esm2_likelihoods' + freeze_backbone=True raises."""
+    def test_loss_fn_set_with_frozen_likelihoods_raises(self):
+        """loss_fn not None when mode='likelihoods' + freeze_backbone=True raises."""
         with pytest.raises(ValueError, match="loss_fn cannot be set"):
-            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=True, loss_fn="mlm")
+            ESM2TrainConfig(mode="likelihoods", freeze_backbone=True, loss_fn="mlm")
 
-    def test_loss_fn_mse_with_frozen_esm2_likelihoods_raises(self):
-        """loss_fn='mse' with mode='esm2_likelihoods' + freeze_backbone=True raises."""
+    def test_loss_fn_mse_with_frozen_likelihoods_raises(self):
+        """loss_fn='mse' with mode='likelihoods' + freeze_backbone=True raises."""
         with pytest.raises(ValueError, match="loss_fn cannot be set"):
-            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=True, loss_fn="mse")
+            ESM2TrainConfig(mode="likelihoods", freeze_backbone=True, loss_fn="mse")
 
-    def test_esm2_likelihoods_frozen_no_loss_fn_valid(self):
-        """mode='esm2_likelihoods' + freeze_backbone=True + loss_fn=None is valid."""
-        cfg = ESM2TrainConfig(mode="esm2_likelihoods")
-        assert cfg.mode == "esm2_likelihoods"
+    def test_likelihoods_frozen_no_loss_fn_valid(self):
+        """mode='likelihoods' + freeze_backbone=True + loss_fn=None is valid."""
+        cfg = ESM2TrainConfig(mode="likelihoods")
+        assert cfg.mode == "likelihoods"
         assert cfg.loss_fn is None
 
-    def test_esm2_likelihoods_unfrozen_mlm_valid(self):
-        """mode='esm2_likelihoods' + freeze_backbone=False + loss_fn='mlm' is valid."""
-        cfg = ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=False, loss_fn="mlm")
+    def test_likelihoods_unfrozen_mlm_valid(self):
+        """mode='likelihoods' + freeze_backbone=False + loss_fn='mlm' is valid."""
+        cfg = ESM2TrainConfig(mode="likelihoods", freeze_backbone=False, loss_fn="mlm")
         assert cfg.loss_fn == "mlm"
 
-    def test_esm2_likelihoods_unfrozen_non_mlm_loss_raises(self):
-        """mode='esm2_likelihoods' + freeze_backbone=False + loss_fn='mse' raises."""
+    def test_likelihoods_unfrozen_non_mlm_loss_raises(self):
+        """mode='likelihoods' + freeze_backbone=False + loss_fn='mse' raises."""
         with pytest.raises(ValueError, match="MLM loss"):
-            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=False, loss_fn="mse")
+            ESM2TrainConfig(mode="likelihoods", freeze_backbone=False, loss_fn="mse")
 
-    def test_esm2_likelihoods_unfrozen_cross_entropy_raises(self):
-        """mode='esm2_likelihoods' + freeze_backbone=False + loss_fn='cross_entropy' raises."""
+    def test_likelihoods_unfrozen_cross_entropy_raises(self):
+        """mode='likelihoods' + freeze_backbone=False + loss_fn='cross_entropy' raises."""
         with pytest.raises(ValueError, match="MLM loss"):
-            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=False, loss_fn="cross_entropy")
+            ESM2TrainConfig(mode="likelihoods", freeze_backbone=False, loss_fn="cross_entropy")
 
-    def test_esm2_likelihoods_unfrozen_none_loss_fn_raises(self):
-        """mode='esm2_likelihoods' + freeze_backbone=False + loss_fn=None raises."""
+    def test_likelihoods_unfrozen_none_loss_fn_raises(self):
+        """mode='likelihoods' + freeze_backbone=False + loss_fn=None raises."""
         with pytest.raises(ValueError, match="MLM loss"):
-            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=False, loss_fn=None)
+            ESM2TrainConfig(mode="likelihoods", freeze_backbone=False, loss_fn=None)
 
     def test_mask_probability_out_of_range_raises(self):
         """mask_probability outside (0, 1) raises ValueError."""
         with pytest.raises(ValueError, match="mask_probability"):
             ESM2TrainConfig(
-                mode="esm2_likelihoods", freeze_backbone=False, loss_fn="mlm", mask_probability=0.0
+                mode="likelihoods", freeze_backbone=False, loss_fn="mlm", mask_probability=0.0
             )
 
     def test_mask_splitting_not_summing_to_one_raises(self):
         """mask_splitting that does not sum to 1.0 raises ValueError."""
         with pytest.raises(ValueError, match="mask_splitting"):
             ESM2TrainConfig(
-                mode="esm2_likelihoods",
+                mode="likelihoods",
                 freeze_backbone=False,
                 loss_fn="mlm",
                 mask_splitting=(0.8, 0.1, 0.05),
@@ -216,7 +216,7 @@ class TestConfigs:
         """mask_splitting with a negative probability raises ValueError even if it sums to 1.0."""
         with pytest.raises(ValueError, match="non-negative"):
             ESM2TrainConfig(
-                mode="esm2_likelihoods",
+                mode="likelihoods",
                 freeze_backbone=False,
                 loss_fn="mlm",
                 mask_splitting=(1.2, -0.2, 0.0),
@@ -225,13 +225,13 @@ class TestConfigs:
     def test_mask_probability_warning_when_frozen(self):
         """Non-default mask_probability with freeze_backbone=True emits UserWarning."""
         with pytest.warns(UserWarning, match="mask_probability"):
-            ESM2TrainConfig(mode="esm2_likelihoods", freeze_backbone=True, mask_probability=0.3)
+            ESM2TrainConfig(mode="likelihoods", freeze_backbone=True, mask_probability=0.3)
 
     def test_mask_splitting_warning_when_frozen(self):
         """Non-default mask_splitting with freeze_backbone=True emits UserWarning."""
         with pytest.warns(UserWarning, match="mask_splitting"):
             ESM2TrainConfig(
-                mode="esm2_likelihoods", freeze_backbone=True, mask_splitting=(0.7, 0.2, 0.1)
+                mode="likelihoods", freeze_backbone=True, mask_splitting=(0.7, 0.2, 0.1)
             )
 
     def test_freeze_backbone_false_raises_for_linear_head(self):
@@ -310,7 +310,7 @@ class TestPredict:
     def test_last_hidden_state_batch_size_gt_1_raises(self):
         """last_hidden_state pooling with batch_size > 1 must raise ValueError at init."""
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
-        train_cfg = ESM2TrainConfig(mode="esm2_likelihoods", batch_size=2)
+        train_cfg = ESM2TrainConfig(mode="likelihoods", batch_size=2)
         with pytest.raises(ValueError, match="pooling='last_hidden_state' requires batch_size=1"):
             ESM2Model(name="lhs_bad", model_config=config, train_config=train_cfg, device="cpu")
 
@@ -394,7 +394,7 @@ class TestEmbed:
     def test_embed_last_hidden_state_shape(self, sample_data):
         """embed() with last_hidden_state pooling returns shape (n_seqs, seq_len, hidden_dim)."""
         config = ESM2ModelConfig(model_id=MODEL_ID, pooling="last_hidden_state")
-        train_cfg = ESM2TrainConfig(mode="esm2_likelihoods", batch_size=1)
+        train_cfg = ESM2TrainConfig(mode="likelihoods", batch_size=1)
         model = ESM2Model(
             name="lhs_model", model_config=config, train_config=train_cfg, device="cpu"
         )
@@ -460,19 +460,19 @@ def frozen_train_model():
     """ESM-2 in zero-shot mode for TestTrainFrozen.
 
     Returns:
-        An ESM2Model with mode='esm2_likelihoods' (freeze_backbone defaults to True), CPU.
+        An ESM2Model with mode='likelihoods' (freeze_backbone defaults to True), CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
-    train_cfg = ESM2TrainConfig(mode="esm2_likelihoods")
+    train_cfg = ESM2TrainConfig(mode="likelihoods")
     return ESM2Model(
         name="test_esm2_frozen_train", model_config=config, train_config=train_cfg, device="cpu"
     )
 
 
 class TestTrainFrozen:
-    """Tests for ESM2Model.train() when mode='esm2_likelihoods' and freeze_backbone=True."""
+    """Tests for ESM2Model.train() when mode='likelihoods' and freeze_backbone=True."""
 
-    def test_train_frozen_esm2_likelihoods_raises(self, frozen_train_model, sample_data):
+    def test_train_frozen_likelihoods_raises(self, frozen_train_model, sample_data):
         """train() raises NotImplementedError when backbone is frozen and there is no head."""
         with pytest.raises(NotImplementedError):
             frozen_train_model.train(sample_data)
@@ -561,8 +561,8 @@ class TestMLPHead:
         model_device = next(esm2_mlp_model.esm_model.parameters()).device
         assert head_device == model_device
 
-    def test_no_head_in_esm2_likelihoods_mode(self, esm2_model):
-        """_head is None when mode='esm2_likelihoods'."""
+    def test_no_head_in_likelihoods_mode(self, esm2_model):
+        """_head is None when mode='likelihoods'."""
         assert esm2_model._head is None
 
     def test_classification_head_output_dim(self, esm2_mlp_classification_model):
@@ -577,8 +577,8 @@ class TestMLPHead:
         _, _, targets = batch
         assert targets.dtype == torch.float32
 
-    def test_prepare_data_loader_no_labels_in_esm2_likelihoods_mode(self, esm2_model, sample_data):
-        """DataLoader with mode='esm2_likelihoods' yields (input_ids, attention_mask) pairs."""
+    def test_prepare_data_loader_no_labels_in_likelihoods_mode(self, esm2_model, sample_data):
+        """DataLoader with mode='likelihoods' yields (input_ids, attention_mask) pairs."""
         loader = esm2_model._prepare_data_loader(sample_data)
         batch = next(iter(loader))
         assert len(batch) == 2
@@ -804,14 +804,14 @@ class TestEmbedBatch:
 
 
 @pytest.fixture(scope="module")
-def esm2_likelihoods_model():
-    """Module-scoped ESM-2 in esm2_likelihoods mode (frozen) for mask and predict tests.
+def likelihoods_model():
+    """Module-scoped ESM-2 in likelihoods mode (frozen) for mask and predict tests.
 
     Returns:
-        An ESM2Model with mode='esm2_likelihoods', freeze_backbone=True, CPU.
+        An ESM2Model with mode='likelihoods', freeze_backbone=True, CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
-    train_cfg = ESM2TrainConfig(mode="esm2_likelihoods")
+    train_cfg = ESM2TrainConfig(mode="likelihoods")
     return ESM2Model(name="test_esm2_ll", model_config=config, train_config=train_cfg, device="cpu")
 
 
@@ -820,12 +820,12 @@ def esm2_mlm_config_model():
     """Module-scoped ESM-2 in MLM training mode for _mask_tokens tests.
 
     Returns:
-        An ESM2Model with mode='esm2_likelihoods', freeze_backbone=False,
+        An ESM2Model with mode='likelihoods', freeze_backbone=False,
         loss_fn='mlm', CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
     train_cfg = ESM2TrainConfig(
-        mode="esm2_likelihoods",
+        mode="likelihoods",
         freeze_backbone=False,
         loss_fn="mlm",
         mask_probability=0.15,
@@ -966,12 +966,12 @@ def esm2_mlm_train_model():
     Function-scoped so each test gets a fresh, untrained model.
 
     Returns:
-        An ESM2Model with mode='esm2_likelihoods', freeze_backbone=False,
+        An ESM2Model with mode='likelihoods', freeze_backbone=False,
         loss_fn='mlm', 1 epoch, batch_size=2, CPU.
     """
     config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
     train_cfg = ESM2TrainConfig(
-        mode="esm2_likelihoods",
+        mode="likelihoods",
         freeze_backbone=False,
         loss_fn="mlm",
         num_epochs=1,
@@ -985,16 +985,16 @@ def esm2_mlm_train_model():
 
 
 class TestMLMTrain:
-    """Integration tests for MLM fine-tuning via mode='esm2_likelihoods' + freeze_backbone=False."""
+    """Integration tests for MLM fine-tuning via mode='likelihoods' + freeze_backbone=False."""
 
-    def test_head_is_none_in_esm2_likelihoods_mode(self, esm2_mlm_train_model):
-        """_head is None when mode='esm2_likelihoods'."""
+    def test_head_is_none_in_likelihoods_mode(self, esm2_mlm_train_model):
+        """_head is None when mode='likelihoods'."""
         assert esm2_mlm_train_model._head is None
 
     def test_train_raises_when_backbone_frozen(self, sample_data):
-        """train() raises NotImplementedError for esm2_likelihoods with freeze_backbone=True."""
+        """train() raises NotImplementedError for likelihoods with freeze_backbone=True."""
         config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
-        train_cfg = ESM2TrainConfig(mode="esm2_likelihoods")
+        train_cfg = ESM2TrainConfig(mode="likelihoods")
         model = ESM2Model(
             name="frozen_pll", model_config=config, train_config=train_cfg, device="cpu"
         )
@@ -1002,16 +1002,16 @@ class TestMLMTrain:
             model.train(sample_data)
 
     def test_zero_shot_predict_returns_finite_pll(self):
-        """predict() with mode='esm2_likelihoods' + freeze_backbone=True returns finite PLL."""
+        """predict() with mode='likelihoods' + freeze_backbone=True returns finite PLL."""
         config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
-        train_cfg = ESM2TrainConfig(mode="esm2_likelihoods")
+        train_cfg = ESM2TrainConfig(mode="likelihoods")
         model = ESM2Model(name="zs_pll", model_config=config, train_config=train_cfg, device="cpu")
         preds = model.predict([Candidate(data="ACGT", modality="sequence")])
         assert np.all(np.isfinite(preds.means))
         assert preds.means.shape == (1,)
 
     def test_mlm_train_updates_backbone_weights(self, esm2_mlm_train_model, sample_data):
-        """train() with mode='esm2_likelihoods' + freeze_backbone=False changes backbone params."""
+        """train() with mode='likelihoods' + freeze_backbone=False changes backbone params."""
         initial = {n: p.clone() for n, p in esm2_mlm_train_model.esm_model.named_parameters()}
         esm2_mlm_train_model.train(sample_data)
         assert any(

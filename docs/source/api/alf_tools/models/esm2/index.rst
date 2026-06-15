@@ -17,12 +17,12 @@ selected via ``ESM2TrainConfig.mode`` together with ``freeze_backbone``:
 
   Call ``train()`` to fit the head on labelled data (``loss_fn`` must be set). Sequence
   embeddings can also be extracted via ``embed()`` for use with downstream models.
-- **mode='esm2_likelihoods'** with ``freeze_backbone=True``: zero-shot scoring. ``predict()``
+- **mode='likelihoods'** with ``freeze_backbone=True``: zero-shot scoring. ``predict()``
   returns per-sequence pseudo-log-likelihood (PLL) scores — each non-special token is masked
   one at a time and the log-probability of the correct residue at that position is accumulated,
   and the final score is the mean log-probability across all non-special positions. Nothing is
   trained, so ``train()`` raises ``NotImplementedError`` and ``loss_fn`` must be left ``None``.
-- **mode='esm2_likelihoods'** with ``freeze_backbone=False``: MLM fine-tuning. ``train()``
+- **mode='likelihoods'** with ``freeze_backbone=False``: MLM fine-tuning. ``train()``
   fine-tunes the **full ESM-2 backbone** via masked language modelling on the input sequences;
   ``loss_fn`` must be ``'mlm'``. Masking is controlled by ``mask_probability`` (fraction of
   eligible tokens masked per sequence) and ``mask_splitting`` (the ``(p_mask, p_random,
