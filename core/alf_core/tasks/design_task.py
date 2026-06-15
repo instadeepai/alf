@@ -126,6 +126,12 @@ class DesignTask(BaseTask):
             state.round_predictions = None
             for state_logger in state_loggers:
                 state_logger.log(state, round_name="experiment_summary")
+        else:
+            logger.info(
+                "No aggregate experiment-summary metrics computed, so no "
+                "experiment_summary was logged (e.g. fewer than 2 rounds, or a "
+                "non-positive best_value for a regression task)."
+            )
 
         return
 
@@ -135,6 +141,13 @@ class DesignTask(BaseTask):
         For regression the curve is the top-k mean of all candidates acquired
         up to each round (it should rise as good candidates accumulate); for
         classification it is the per-round test-set accuracy.
+
+        Note: `top_k_mean` uses an effective k of `min(k, n_acquired)`, so while
+        the cumulative acquired set is smaller than k the early rounds are
+        averaged over fewer candidates and are not directly comparable to later
+        rounds. With small acquisition batch sizes this can make the curve
+        non-monotonic and bias the downstream AUC; treat the AUC as a relative
+        ranking rather than an absolute score in that regime.
 
         Args:
             state: Final task state after all acquisition rounds.

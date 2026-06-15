@@ -19,6 +19,8 @@ pool-relative quality metrics (recall and regret against the full
 candidate pool).
 """
 
+from itertools import combinations
+
 import numpy as np
 from alf_core.dataclasses import LabelledCandidates
 from alf_core.dataclasses.candidate import Candidate, Modality
@@ -91,12 +93,11 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
 
     if modality == Modality.SEQUENCE:
         pairs = []
-        for i in range(len(candidates)):
-            for j in range(i + 1, len(candidates)):
-                a, b = str(candidates[i].data), str(candidates[j].data)
-                max_len = max(len(a), len(b))
-                dist = 0.0 if max_len == 0 else _levenshtein(a, b) / max_len
-                pairs.append(dist)
+        for ci, cj in combinations(candidates, 2):
+            a, b = str(ci.data), str(cj.data)
+            max_len = max(len(a), len(b))
+            dist = 0.0 if max_len == 0 else _levenshtein(a, b) / max_len
+            pairs.append(dist)
         return {"intra_batch_diversity": float(np.mean(pairs))}
 
     if modality in (Modality.EMBEDDING, Modality.TABULAR):

@@ -31,11 +31,17 @@ def auc_top_k(
 ) -> dict[str, float]:
     """Compute the normalised area under the top-k mean curve.
 
-    Integrates the per-round top-k mean values using the trapezoidal rule,
-    then normalises the result so that a perfect experiment (one that always
-    achieves `best_value`) scores 1.0.  Lower values indicate that high-
-    performing candidates were found later in the experiment.  Use as the
-    primary leaderboard ranking metric for sample efficiency.
+    Integrates the per-round curve using the trapezoidal rule, then divides by
+    `best_value` so the AUC lands in [0, 1].  The value 1.0 is only reachable
+    when the curve itself is bounded by `best_value` and saturates at it from
+    the first round — true for a max-based curve (e.g. classification accuracy
+    with `best_value=1.0`), but not for a top-k *mean* curve normalised by the
+    global *max*, where the mean of the top k can equal the max only if every
+    top-k label equals the global optimum.  For that reason the AUC is best
+    read as a relative sample-efficiency ranking within a fixed dataset and
+    round budget, not as an absolute "fraction of optimal".  Lower values
+    indicate that high-performing candidates were found later in the
+    experiment.
 
     Args:
         round_values: Array of shape (n_rounds,).  Per-round top-k mean, where
@@ -56,6 +62,8 @@ def auc_top_k(
     """
     if len(round_values) < 2:
         raise ValueError(f"auc_top_k requires at least 2 rounds, got {len(round_values)}")
+    # Written as `not (best_value > 0.0)` rather than `best_value <= 0.0` so
+    # that NaN (for which all comparisons are False) is also rejected.
     if not (best_value > 0.0):
         raise ValueError(
             f"best_value must be strictly positive (non-zero) to normalise the AUC, "
