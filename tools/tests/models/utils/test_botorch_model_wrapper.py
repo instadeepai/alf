@@ -213,6 +213,29 @@ def test_posterior_alf_model_rejects_output_indices(mock_alf_model_with_variance
         wrapper.posterior(test_tensor_2d, output_indices=[0])
 
 
+@pytest.mark.filterwarnings("ignore:num_acquisitions:UserWarning")
+def test_posterior_delegates_to_inner_joint_model(trained_gp_model):
+    """For joint-capable ALF models, posterior() uses the inner GP's joint covariance."""
+    from linear_operator.operators import DiagLinearOperator
+
+    wrapper = BotorchModelWrapper(trained_gp_model.model)
+    # 3 distinct points -> a real GP returns a non-diagonal joint covariance.
+    X = torch.linspace(0.0, 1.0, 6, dtype=torch.float64).reshape(1, 3, 2)
+    post = wrapper.posterior(X)
+    covar = post.mvn.lazy_covariance_matrix
+    assert not isinstance(covar, DiagLinearOperator)
+
+
+def test_posterior_marginal_only_stays_diagonal(mock_alf_model_with_variances):
+    """Marginal-only models keep the diagonal predict()-based posterior."""
+    from linear_operator.operators import DiagLinearOperator
+
+    wrapper = BotorchModelWrapper(mock_alf_model_with_variances)
+    X = torch.zeros(1, 3, 2, dtype=torch.float64)
+    post = wrapper.posterior(X)
+    assert isinstance(post.mvn.lazy_covariance_matrix, DiagLinearOperator)
+
+
 def test_posterior_alf_model_preserves_batch_structure(mock_alf_model_with_variances):
     """Test that 3D reshaping preserves batch structure correctly."""
     wrapper = BotorchModelWrapper(mock_alf_model_with_variances)

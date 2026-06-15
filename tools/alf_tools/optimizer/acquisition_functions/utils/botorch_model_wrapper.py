@@ -137,7 +137,23 @@ class BotorchModelWrapper(BotorchModel):
                 posterior_transform=posterior_transform,
             )
 
-        # Case 2: ALF BaseModel - adapt predict() to posterior()
+        # Case 1b: ALF model exposing a trained joint posterior -> delegate to it
+        # for a true joint covariance (honours observation_noise/transforms).
+        # Cast X to the inner model's dtype: ALF GP models train in double by
+        # default, whereas BoTorch acquisitions hand us X in single precision,
+        # and SingleTaskGP rejects a dtype mismatch.
+        inner = self._inner_botorch_model()
+        if inner is not None:
+            inner_dtype = next(inner.parameters()).dtype
+            return inner.posterior(
+                X=X.to(inner_dtype),
+                output_indices=output_indices,
+                observation_noise=observation_noise,
+                posterior_transform=posterior_transform,
+            )
+
+        # Case 2: marginal-only ALF BaseModel - adapt predict() to a diagonal
+        # (per-point independent) posterior.
         if posterior_transform is not None or output_indices is not None:
             raise NotImplementedError(
                 "posterior_transform and output_indices are not supported when "
