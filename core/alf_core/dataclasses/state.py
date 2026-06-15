@@ -59,12 +59,14 @@ class State:
     def update(self, acquired_candidates: LabelledCandidates) -> None:
         """Update the state with newly acquired candidates.
 
-        Adds the acquired candidates to history and updates the dataset splits.
-        Also increments the round counter.
+        Records the current round's metrics in `metrics_history`, adds the
+        acquired candidates to history and updates the dataset splits. Also
+        increments the round counter.
 
         Args:
             acquired_candidates: The newly acquired candidates with their labels.
         """
+        self.metrics_history.append(self.round_metrics)
         self.history.append(copy.copy(acquired_candidates))
         self.dataset.update_splits(acquired_candidates)
         self.round += 1

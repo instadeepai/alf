@@ -100,10 +100,11 @@ class DesignTask(BaseTask):
 
         for round_i in range(1, self.num_acq_rounds + 1):
             state.round_metrics = RoundMetrics(round=round_i)
-            state.metrics_history.append(state.round_metrics)
             acquired_candidates, state = optimizer.ask(state)
             labelled_candidates, state = oracle.evaluate(acquired_candidates, state)
-            state.update(labelled_candidates)  # increments state.round to round_i + 1
+            # update() records round_metrics in metrics_history and increments
+            # state.round to round_i + 1
+            state.update(labelled_candidates)
             state = optimizer.tell(state=state)  # populates round_metrics.training_history
             state = self.evaluate(state=state)
             for state_logger in state_loggers:
