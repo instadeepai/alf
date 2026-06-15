@@ -139,18 +139,22 @@ def test_botorch_acquisition_function_scores_are_finite(botorch_gp_model, test_c
 def test_botorch_acquisition_function_wraps_alf_model(
     mock_alf_model_with_variances, test_candidates_2d
 ):
-    """BotorchAcquisitionFunction raises NotImplementedError for ALF BaseModel.
+    """BotorchAcquisitionFunction scores a marginal-only ALF BaseModel.
 
     BoTorch acquisition functions call model.num_outputs during construction;
-    BotorchModelWrapper raises for ALF models without a trained
-    `botorch_model`. Use a model exposing `botorch_model` (e.g. GPModel).
+    BotorchModelWrapper now defaults to `num_outputs == 1` and
+    `batch_shape == torch.Size([])` for marginal-only ALF models (no trained
+    `botorch_model`), so analytic acquisitions such as UCB are usable.
     """
     cfg = BotorchAcquisitionConfig(name="upper_confidence_bound", kwargs={"beta": 2.0})
     acq_fn = BotorchAcquisitionFunction(cfg)
     state = _MockState(mock_alf_model_with_variances)
 
-    with pytest.raises(NotImplementedError, match="num_outputs is not supported for ALF BaseModel"):
-        acq_fn(test_candidates_2d, state)
+    result = acq_fn(test_candidates_2d, state)
+
+    assert isinstance(result, LabelledCandidates)
+    assert len(result.labels) == len(test_candidates_2d)
+    assert np.all(np.isfinite(result.labels))
 
 
 @pytest.mark.filterwarnings("ignore:num_acquisitions:UserWarning")
