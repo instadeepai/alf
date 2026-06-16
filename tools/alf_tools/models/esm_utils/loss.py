@@ -150,14 +150,22 @@ def mask_tokens(
         replace_with_random = (split >= p_mask) & (split < (p_mask + p_random))
         if replace_with_random.any():
             idx = masked_indices[replace_with_random]
-            # Samples from full vocab including special tokens, matching vanilla BERT.
-            random_ids = torch.randint(
-                low=0,
-                high=tokeniser.vocab_size,
-                size=(idx.shape[0],),
-                device=input_ids.device,
-                generator=generator,
-            )
+            # Sample replacements from non-special (amino-acid) tokens only, excluding
+            # special tokens and [MASK] so the random branch stays distinct from masking
+            # and never injects padding/CLS/EOS into the input.
+            all_ids = torch.arange(tokeniser.vocab_size, device=input_ids.device)
+            excluded = special_tokens_mask(all_ids, tokeniser)
+            excluded |= all_ids == tokeniser.mask_token_id
+            allowed_ids = all_ids[~excluded]
+            random_ids = allowed_ids[
+                torch.randint(
+                    low=0,
+                    high=allowed_ids.numel(),
+                    size=(idx.shape[0],),
+                    device=input_ids.device,
+                    generator=generator,
+                )
+            ]
             masked_input_ids[idx[:, 0], idx[:, 1]] = random_ids
 
     return masked_input_ids, labels

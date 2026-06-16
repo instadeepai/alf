@@ -970,6 +970,28 @@ class TestMaskTokens:
         assert torch.equal(masked_a, masked_b)
         assert torch.equal(labels_a, labels_b)
 
+    def test_random_replacement_excludes_special_tokens(self, esm2_mlm_config_model):
+        """Masked positions never hold a special token — random replacement draws only from
+        non-special amino-acid tokens (and never the [MASK] id via that branch).
+        """
+        torch.manual_seed(7)
+        # Token ids 4..19 are amino-acid (non-special) tokens for the ESM-2 tokeniser.
+        input_ids = torch.randint(4, 20, (200, 25))
+        masked_ids, labels = esm2_mlm_config_model._mask_tokens(input_ids)
+        tok = esm2_mlm_config_model.tokeniser
+        special_ids = {
+            tok.cls_token_id,
+            tok.eos_token_id,
+            tok.pad_token_id,
+            tok.unk_token_id,
+        } - {None}
+
+        active_tokens = masked_ids[labels != -100]
+        for sid in special_ids:
+            assert not (active_tokens == sid).any(), (
+                f"special token id {sid} appeared at a masked position"
+            )
+
 
 class TestSeed:
     """Tests for ESM2ModelConfig.seed reproducibility of the linear head."""
@@ -1106,3 +1128,30 @@ class TestMLMTrain:
         summary = esm2_mlm_train_model.get_training_summary_metrics()
         assert "final_val_loss" in summary
         assert np.isfinite(summary["final_val_loss"])
+
+    def test_mlm_training_is_reproducible_from_seed(self, sample_data):
+        """Two MLM runs with the same seed produce identical backbone weights — the shuffle
+        order and per-batch masking are both seeded from model_config.seed.
+        """
+
+        def _train_once() -> dict:
+            config = ESM2ModelConfig(model_id=MODEL_ID, seed=42)
+            train_cfg = ESM2TrainConfig(
+                mode="likelihoods",
+                freeze_backbone=False,
+                loss_fn="mlm",
+                num_epochs=2,
+                batch_size=2,
+                learning_rate=1e-4,
+            )
+            model = ESM2Model(
+                name="mlm_repro", model_config=config, train_config=train_cfg, device="cpu"
+            )
+            model.train(sample_data)
+            return {n: p.clone() for n, p in model.esm_model.named_parameters()}
+
+        first = _train_once()
+        second = _train_once()
+        assert all(torch.equal(first[n], second[n]) for n in first), (
+            "MLM training was not reproducible across two seeded runs"
+        )

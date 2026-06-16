@@ -318,7 +318,12 @@ class ESM2Model(BaseModel):
                 all_embeddings.append(embeddings.cpu())
         return torch.cat(all_embeddings, dim=0).numpy().astype(np.float32)
 
-    def _prepare_data_loader(self, data: LabelledCandidates, shuffle: bool = False) -> DataLoader:
+    def _prepare_data_loader(
+        self,
+        data: LabelledCandidates,
+        shuffle: bool = False,
+        generator: torch.Generator | None = None,
+    ) -> DataLoader:
         """Create a DataLoader for training or validation.
 
         For mode='linear_head', the whole dataset is tokenised eagerly into a single
@@ -330,6 +335,9 @@ class ESM2Model(BaseModel):
             data: LabelledCandidates containing sequences and (for
                 mode='linear_head') labels.
             shuffle: Whether to shuffle the dataset.
+            generator: Optional torch.Generator driving the shuffle order. Passing a seeded
+                generator (MLM mode) makes the epoch ordering reproducible; None uses the
+                global RNG.
 
         Returns:
             DataLoader yielding (input_ids, attention_mask) pairs when mode='likelihoods',
@@ -349,11 +357,20 @@ class ESM2Model(BaseModel):
             dataset = TensorDataset(batch["input_ids"], batch["attention_mask"], targets)
             return DataLoader(dataset, batch_size=self.train_config.batch_size, shuffle=shuffle)
 
+        effective_max = self.max_length - 2  # account for CLS and EOS tokens
+        if any(len(seq) > effective_max for seq in data.data):
+            logger.warning(
+                "One or more sequences exceed max_length=%d (after reserving 2 positions for "
+                "CLS/EOS tokens). They will be silently truncated during MLM fine-tuning. "
+                "Increase ESM2ModelConfig.max_length to avoid this.",
+                self.max_length,
+            )
         return DataLoader(
             list(data.data),
             batch_size=self.train_config.batch_size,
             shuffle=shuffle,
             collate_fn=self._collate_mlm,
+            generator=generator,
         )
 
     def _collate_mlm(self, sequences: list[str]) -> tuple[torch.Tensor, torch.Tensor]:
@@ -458,12 +475,16 @@ class ESM2Model(BaseModel):
         self,
         train_loader: DataLoader,
         optimizer: optim.Optimizer,
+        generator: torch.Generator | None = None,
     ) -> tuple[float, dict[str, float]]:
         """Train the full ESM-2 backbone for one epoch via masked language modelling.
 
         Args:
             train_loader: DataLoader yielding (input_ids, attention_mask) pairs.
             optimizer: Optimizer over esm_model.parameters().
+            generator: Optional torch.Generator driving the per-batch masking. Persisting a
+                single generator across epochs makes a whole training run reproducible from a
+                seed while still drawing fresh masks each epoch; None uses the global RNG.
 
         Returns:
             Tuple of (avg_loss, {"perplexity": float, "token_accuracy": float}). avg_loss is
@@ -483,7 +504,7 @@ class ESM2Model(BaseModel):
             batch_mask = attention_mask.to(self.device)
 
             optimizer.zero_grad()
-            masked_ids, labels = self._mask_tokens(batch_ids)
+            masked_ids, labels = self._mask_tokens(batch_ids, generator=generator)
             logits = self.esm_model(
                 input_ids=masked_ids, attention_mask=batch_mask
             ).logits  # (B, L, vocab)
@@ -715,15 +736,11 @@ class ESM2Model(BaseModel):
                 additional["train_perplexity"] = float(v)
             if (v := train_metrics.get("token_accuracy")) is not None:
                 additional["train_token_accuracy"] = float(v)
-            if (v := train_metrics.get("log_likelihood")) is not None:
-                additional["train_log_likelihood"] = float(v)
             if val_metrics is not None:
                 if (v := val_metrics.get("perplexity")) is not None:
                     additional["val_perplexity"] = float(v)
                 if (v := val_metrics.get("token_accuracy")) is not None:
                     additional["val_token_accuracy"] = float(v)
-                if (v := val_metrics.get("log_likelihood")) is not None:
-                    additional["val_log_likelihood"] = float(v)
             epoch_metric = SurrogateEpochMetrics(
                 epoch=epoch,
                 train_loss=avg_train_loss,
@@ -783,7 +800,21 @@ class ESM2Model(BaseModel):
             f"Fine-tuning ESM-2 ({self.model_config.model_id}) with {len(train_data)} sequences"
         )
 
-        train_loader = self._prepare_data_loader(train_data, shuffle=True)
+        # Seed both the MLM shuffle order and the per-batch masking from model_config.seed so
+        # a whole fine-tuning run is reproducible, while still drawing a fresh mask each epoch
+        # as the generators advance. Two generators are used because the DataLoader sampler
+        # requires a CPU generator whereas masking runs on self.device. Unused for linear_head.
+        mlm_generator: torch.Generator | None = None
+        shuffle_generator: torch.Generator | None = None
+        if self.train_config.mode == "likelihoods":
+            mlm_generator = torch.Generator(device=self.device)
+            mlm_generator.manual_seed(self.model_config.seed)
+            shuffle_generator = torch.Generator()
+            shuffle_generator.manual_seed(self.model_config.seed)
+
+        train_loader = self._prepare_data_loader(
+            train_data, shuffle=True, generator=shuffle_generator
+        )
         val_loader = None
         if val_data is not None and len(val_data) > 0:
             val_loader = self._prepare_data_loader(val_data, shuffle=False)
@@ -827,7 +858,9 @@ class ESM2Model(BaseModel):
                 if val_loader is not None:
                     avg_val_loss, val_metrics = self._validate_epoch_linear_head(val_loader)
             else:  # likelihoods, freeze_backbone=False
-                avg_train_loss, train_metrics = self._train_epoch_mlm(train_loader, optimizer)
+                avg_train_loss, train_metrics = self._train_epoch_mlm(
+                    train_loader, optimizer, generator=mlm_generator
+                )
                 if val_loader is not None:
                     avg_val_loss, val_metrics = self._validate_epoch_mlm(val_loader)
 
