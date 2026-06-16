@@ -21,6 +21,14 @@ from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.utils.enums import ProblemType
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 
+# Training on deliberately tiny datasets can produce constant predictions or
+# targets, which makes scipy's correlation metrics warn during the
+# train/validation metric computation in CNNModel.train().
+pytestmark = pytest.mark.filterwarnings(
+    "ignore::scipy.stats.ConstantInputWarning",
+    "ignore::scipy.stats.NearConstantInputWarning",
+)
+
 SEQ = "ACDEFGHIKLMNPQRSTVWY"  # 20-char sequence (protein alphabet)
 
 

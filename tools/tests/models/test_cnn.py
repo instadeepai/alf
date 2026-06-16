@@ -26,6 +26,14 @@ from alf_tools.models.cnn import (
     _apply_activation,  # noqa: PLC2701
 )
 
+# Training on deliberately tiny datasets can produce constant predictions or
+# targets, which makes scipy's correlation metrics warn during the
+# train/validation metric computation in CNNModel.train().
+pytestmark = pytest.mark.filterwarnings(
+    "ignore::scipy.stats.ConstantInputWarning",
+    "ignore::scipy.stats.NearConstantInputWarning",
+)
+
 
 def _make_dataset(labels: np.ndarray, problem_type: ProblemType) -> BaseDataset:
     """Create a minimal BaseDataset for model setup in tests.

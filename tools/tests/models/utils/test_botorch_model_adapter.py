@@ -415,6 +415,7 @@ def test_adapter_deterministic_predictions(mock_alf_model_with_variances):
 @pytest.mark.filterwarnings(
     "ignore:invalid value encountered in multiply:RuntimeWarning:alf_core.utils.metrics.regression"
 )
+@pytest.mark.filterwarnings("ignore::scipy.stats.ConstantInputWarning")
 def test_adapter_integration_with_real_gp_model():
     """Integration smoke test: real GPModel -> BoTorchModelAdapter -> posterior().
 

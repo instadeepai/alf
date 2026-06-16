@@ -1,13 +1,13 @@
 # Switch offline to online
 
 The loop is identical in both modes; what changes is **where the labels come from**, which is set
-by the `Oracle`'s scorer. This means a method validated offline moves to a real campaign without
+by the `Oracle`'s scorer. This means a method validated offline moves to a real experiment without
 rewriting it.
 
 | Mode | Oracle scorer | Use case |
 |------|---------------|----------|
 | **Offline** | a `Dataset` (held-out, pre-scored pool) | benchmarking and method development; reproducible, no external calls |
-| **Online** | a trained `Model` (or simulator) | driving a real campaign where labels come on demand |
+| **Online** | a trained `Model` (or simulator) | driving a real experiment where labels come on demand |
 
 ## Steps
 
