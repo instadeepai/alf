@@ -59,7 +59,7 @@ AcquisitionType = Literal[
     "qLogEI",
     "qNEI",
     "qUCB",
-    "expected_improvement",
+    "log_expected_improvement",
     "upper_confidence_bound",
     "probability_of_improvement",
     "log_noisy_expected_improvement",
@@ -272,7 +272,7 @@ class BoTorchAcquisition(AcquisitionFunction):
         sampler = self.sampler_config.get_sampler()
 
         # Create acquisition function based on type
-        if self.acquisition_type == "expected_improvement":
+        if self.acquisition_type == "log_expected_improvement":
             return LogExpectedImprovement(model=model, best_f=best_f)
         elif self.acquisition_type == "probability_of_improvement":
             return ProbabilityOfImprovement(model=model, best_f=best_f)

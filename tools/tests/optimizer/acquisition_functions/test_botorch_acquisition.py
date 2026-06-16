@@ -700,7 +700,7 @@ def test_optimization_produces_reasonable_candidates(task_state, simple_dataset)
 
 def test_analytic_ei_scores_candidates(task_state):
     """LogExpectedImprovement returns finite scores for each candidate."""
-    acq_fn = BoTorchAcquisition(acquisition_type="expected_improvement", batch_size=1)
+    acq_fn = BoTorchAcquisition(acquisition_type="log_expected_improvement", batch_size=1)
     candidates = [
         Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR),
         Candidate(data=np.array([0.1, 0.9]), modality=Modality.TABULAR),
@@ -739,7 +739,7 @@ def test_log_noisy_ei_scores_candidates(task_state):
 
 def test_invalid_acquisition_type_rejects_new_names():
     """New analytic type names are accepted; an unrecognised name still raises ValueError."""
-    BoTorchAcquisition(acquisition_type="expected_improvement")
+    BoTorchAcquisition(acquisition_type="log_expected_improvement")
     BoTorchAcquisition(acquisition_type="upper_confidence_bound")
     BoTorchAcquisition(acquisition_type="probability_of_improvement")
     BoTorchAcquisition(acquisition_type="log_noisy_expected_improvement")
@@ -850,7 +850,7 @@ def test_acquisition_type_in_sync_with_valid_types():
     assert "qLogEI" in valid
     assert "qNEI" in valid
     assert "qUCB" in valid
-    assert "expected_improvement" in valid
+    assert "log_expected_improvement" in valid
     assert "upper_confidence_bound" in valid
     assert "probability_of_improvement" in valid
     assert "log_noisy_expected_improvement" in valid
