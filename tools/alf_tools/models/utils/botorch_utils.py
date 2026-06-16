@@ -19,8 +19,9 @@ This module provides conversion utilities between ALF's data structures
 """
 
 import logging
-from typing import Any
+from typing import Any, Callable, Literal, TypeAlias
 
+import gpytorch
 import numpy as np
 import torch
 from alf_core import Candidate, Predictions
@@ -29,7 +30,82 @@ from botorch.posteriors.gpytorch import GPyTorchPosterior
 from gpytorch.distributions import MultivariateNormal
 from linear_operator.operators import DiagLinearOperator
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("alf-tools")
+
+
+KernelTypes: TypeAlias = Literal["rbf", "matern", "linear", "polynomial", "rbf_linear", "custom"]
+
+
+def _build_kernel(
+    kernel_type: KernelTypes,
+    input_dim: int,
+    ard: bool,
+    matern_nu: float,
+    lengthscale_prior: gpytorch.priors.Prior | None,
+    lengthscale_constraint: gpytorch.constraints.Constraint | None,
+    outputscale_prior: gpytorch.priors.Prior | None,
+    build_kernel_fn: Callable[..., gpytorch.kernels.Kernel] | None = None,
+) -> gpytorch.kernels.Kernel:
+    """Build the kernel based on configuration.
+
+    Args:
+        kernel_type: Type of kernel to build.
+        input_dim: Dimensionality of input features.
+        ard: Whether to use ARD.
+        matern_nu: Smoothness for Matern kernel.
+        lengthscale_prior: Prior for lengthscale (already instantiated).
+        lengthscale_constraint: Constraint for lengthscale (already instantiated).
+        outputscale_prior: Prior for output scale (already instantiated).
+        build_kernel_fn: Custom kernel builder, required when
+            kernel_type='custom'. Returns the kernel as-is (no ScaleKernel
+            wrapping).
+
+    Returns:
+        Configured GPyTorch kernel.
+
+    Raises:
+        ValueError: If kernel_type is not supported, or if
+            kernel_type='custom' and build_kernel_fn is None.
+    """
+    if kernel_type == "custom":
+        if build_kernel_fn is None:
+            raise ValueError("build_kernel_fn must be provided when kernel_type='custom'")
+        return build_kernel_fn()
+
+    ard_num_dims = input_dim if ard else None
+
+    if kernel_type == "rbf":
+        base_kernel = gpytorch.kernels.RBFKernel(
+            ard_num_dims=ard_num_dims,
+            lengthscale_prior=lengthscale_prior,
+            lengthscale_constraint=lengthscale_constraint,
+        )
+    elif kernel_type == "matern":
+        base_kernel = gpytorch.kernels.MaternKernel(
+            nu=matern_nu,
+            ard_num_dims=ard_num_dims,
+            lengthscale_prior=lengthscale_prior,
+            lengthscale_constraint=lengthscale_constraint,
+        )
+    elif kernel_type == "linear":
+        base_kernel = gpytorch.kernels.LinearKernel(ard_num_dims=ard_num_dims)
+    elif kernel_type == "polynomial":
+        base_kernel = gpytorch.kernels.PolynomialKernel(power=2, ard_num_dims=ard_num_dims)
+    elif kernel_type == "rbf_linear":
+        rbf_kernel = gpytorch.kernels.RBFKernel(
+            ard_num_dims=ard_num_dims,
+            lengthscale_prior=lengthscale_prior,
+            lengthscale_constraint=lengthscale_constraint,
+        )
+        linear_kernel = gpytorch.kernels.LinearKernel(ard_num_dims=ard_num_dims)
+        base_kernel = rbf_kernel + linear_kernel
+    else:
+        raise ValueError(
+            f"Unsupported kernel_type: {kernel_type}. "
+            f"Supported types: 'rbf', 'matern', 'linear', 'polynomial', 'rbf_linear', 'custom'"
+        )
+
+    return gpytorch.kernels.ScaleKernel(base_kernel, outputscale_prior=outputscale_prior)
 
 
 def candidates_to_tensor(
@@ -91,6 +167,14 @@ def candidates_to_tensor(
         raise ValueError(
             f"Failed to stack candidate data. Ensure all candidates have the same shape. Error: {e}"
         ) from e
+
+    if not np.issubdtype(X.dtype, np.number):
+        raise ValueError(
+            f"Candidate.data must be numeric (np.ndarray or torch.Tensor), got dtype "
+            f"{X.dtype}. Wrap your data in a numeric np.ndarray or torch.Tensor when "
+            f"creating Candidates, or use a featuriser (e.g. featurizer_type='one_hot') "
+            f"for sequence data."
+        )
 
     # Convert to tensor
     X_tensor = torch.from_numpy(X).to(dtype).to(device)
@@ -181,9 +265,8 @@ def predictions_to_posterior(
     min_variance = variance.min().item()
     if min_variance < -1e-4:
         raise RuntimeError(
-            "Predictions contain significantly negative variances (min=%.6g). "
-            "This may indicate a problem with the surrogate model.",
-            min_variance,
+            f"Predictions contain significantly negative variances (min={min_variance:.6g}). "
+            "This may indicate a problem with the surrogate model."
         )
 
     variance_clamped = torch.clamp(variance, min=1e-6)
@@ -217,7 +300,7 @@ def get_bounds_tensor(
 
     Raises:
         ValueError: If bounds are not in a valid format or if lower
-        bounds are not <= upper bounds.
+            bounds are not <= upper bounds.
 
     Returns:
         Tensor of shape (2, d) in BoTorch format.
@@ -231,7 +314,7 @@ def get_bounds_tensor(
     if device is None:
         device = torch.device("cpu")
 
-    def is_valid_bounds_array(arr):
+    def is_valid_bounds_array(arr: np.ndarray) -> bool:
         return (
             isinstance(arr, np.ndarray)
             and arr.ndim == 2

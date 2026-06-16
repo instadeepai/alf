@@ -17,6 +17,7 @@ from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, Su
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.mlp import MLP, MLPModel, MLPModelConfig, MLPTrainConfig
 from alf_tools.models.utils import (
+    build_from_target,
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
     get_device,
@@ -24,6 +25,7 @@ from alf_tools.models.utils import (
 )
 
 __all__ = [
+    "build_from_target",
     "CNNModel",
     "CNNModelConfig",
     "CNNTrainConfig",
@@ -49,7 +51,7 @@ try:
     from alf_tools.models.esmfold import ESMFoldModel, ESMFoldModelConfig
 
     _esmfold_available = True
-except ModuleNotFoundError:
+except ImportError:
     _esmfold_available = False
 
 if _esmfold_available:

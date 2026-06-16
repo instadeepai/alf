@@ -126,6 +126,35 @@ class TestResultsRegressionRouting:
         assert "accuracy" not in results.metrics
         assert "f1" not in results.metrics
 
+    def test_accuracy_metrics_present_when_variances_provided(self):
+        """Variance-independent metrics must still be computed when variances exist.
+
+        Regression test: previously the registry was queried either/or, so a
+        surrogate that provided variances lost mse/spearman/pearson entirely.
+        """
+        means = np.array([1.0, 2.0, 3.0, 4.0])
+        targets = np.array([1.1, 1.9, 3.2, 3.8])
+
+        without_variances = Results(
+            targets=targets,
+            predictions=Predictions(means=means),
+            problem_type=ProblemType.REGRESSION,
+        ).metrics
+        with_variances = Results(
+            targets=targets,
+            predictions=Predictions(means=means, variances=np.array([0.1, 0.2, 0.1, 0.3])),
+            problem_type=ProblemType.REGRESSION,
+        ).metrics
+
+        # The accuracy metrics must not disappear once variances are present.
+        for key in ("mse", "spearman", "pearson"):
+            assert key in with_variances
+
+        # Variance metrics are computed in addition to (not instead of) the
+        # variance-independent ones.
+        assert set(without_variances).issubset(with_variances)
+        assert len(with_variances) > len(without_variances)
+
 
 class TestResultsBinaryRouting:
     """Results correctly routes to classification metrics for BINARY."""

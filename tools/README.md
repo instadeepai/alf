@@ -75,6 +75,12 @@ uv sync --extra esm2 --extra chemprop
 - **CoreSet** - Greedy k-centres selection for input-space diversity (coverage-based); uses
   `surrogate.featurise()` rather than predictions, so it is compatible with any model and
   does not require uncertainty estimates
+- **BotorchAcquisitionFunction** - Wraps native [BoTorch](https://botorch.org/) acquisition
+  functions for use in the ALF loop. Configured via `BotorchAcquisitionConfig(name=..., kwargs=...)`;
+  supported names are `log_expected_improvement`, `upper_confidence_bound`,
+  `probability_of_improvement`, and `log_noisy_expected_improvement`. Accepts either a native
+  BoTorch model or an ALF `BaseModel` (wrapped automatically via `BoTorchModelAdapter`); ALF models
+  must provide prediction variances
 
 ### Search Strategies
 - **SingleMutantSearch** - Generate single-mutation variants of reference sequences
@@ -128,26 +134,31 @@ For detailed API documentation and tutorials, see:
 Models in `alf-tools` support input normalisation and output standardisation via their train
 configs (see `alf_core.model.base_model.BaseTrainConfig`).
 
-| Model | `normalise_inputs` default | `standardise_outputs` default |
-|-------|---------------------------|-------------------------------|
-| `CNNModel` | `False` | `False` |
-| `GPModel` | `True` | `True` |
-| `ESM2Model` | `False` | `False` |
-| `ChempropModel` | `False` | `False` |
+| Model | `normalise_inputs_strategy` default | `standardise_outputs` default |
+|-------|-------------------------------------|-------------------------------|
+| `CNNModel` | `None` | `False` |
+| `GPModel` | `"minmax"` | `True` |
+| `ESM2Model` | `None` | `False` |
+| `ChempropModel` | `None` | `False` |
 
-**`GPTrainConfig`** overrides both defaults to `True`:
-- `normalise_inputs=True`: min-max scales features to [0, 1] — GP kernels measure distances and
-  benefit from inputs on a common scale.
+**`GPTrainConfig`** defaults to `normalise_inputs_strategy="minmax"` and `standardise_outputs=True`:
+- `"minmax"`: min-max scales features to [0, 1] — GP kernels measure distances and benefit from
+  inputs on a common scale.
 - `standardise_outputs=True`: Z-score standardises labels before training — improves marginal
   log-likelihood optimisation. Predictions are inverse-transformed back to the original label
   scale before being returned, so **all metrics are computed on the original label scale**.
 
-To disable normalisation for a GP, pass an explicit config:
+The `"zscore"` strategy (`InputStandardiser`) zero-centres continuous features and is generally
+preferred for deep neural networks. It is **not** enabled by default for `CNNModel`, whose one-hot
+sequence inputs are degraded by standardisation; set `normalise_inputs_strategy="zscore"` explicitly
+when feeding a CNN continuous features.
+
+To disable input normalisation for a GP, pass an explicit config:
 
 ```python
 from alf_tools.models.gp import GPModel, GPTrainConfig
 
-model = GPModel(train_config=GPTrainConfig(normalise_inputs=False, standardise_outputs=False))
+model = GPModel(train_config=GPTrainConfig(normalise_inputs_strategy=None, standardise_outputs=False))
 ```
 
 For implementation details see [`alf_core.model.normaliser`](../core/alf_core/model/normaliser.py)

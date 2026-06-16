@@ -238,6 +238,41 @@ class TestRegretUcbAlphaSweep:
         result = regret_ucb_alpha_sweep(means, variances, targets, alpha=0.5)
         assert len(result) > 0
 
+    def test_int_alpha_works(self):
+        """A scalar int alpha is accepted, consistent with ints inside an alpha list."""
+        means = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        variances = np.ones(5)
+        targets = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
+        result = regret_ucb_alpha_sweep(means, variances, targets, alpha=1, num_acquisitions=2)
+        assert set(result) == {"regret_ucb_sweep_1.00"}
+
+    def test_default_alpha_sweep_returns_four_namespaced_keys(self):
+        """The default alpha sweep emits one namespaced key per alpha in [0.1, 0.3, 0.5, 1.0]."""
+        means = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        variances = np.ones(5)
+        targets = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
+        result = regret_ucb_alpha_sweep(means, variances, targets, num_acquisitions=2)
+        assert set(result) == {
+            "regret_ucb_sweep_0.10",
+            "regret_ucb_sweep_0.30",
+            "regret_ucb_sweep_0.50",
+            "regret_ucb_sweep_1.00",
+        }
+
+    def test_sweep_keys_do_not_collide_with_standalone_metric(self):
+        """Regression test: the sweep previously emitted regret_ucb_{alpha}, colliding
+        with the standalone regret_ucb_alpha metric and silently overwriting it when
+        both were merged in the metric registry.
+        """
+        means = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        variances = np.ones(5)
+        targets = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
+        single = regret_ucb_alpha(means, variances, targets, alpha=0.1, num_acquisitions=2)
+        sweep = regret_ucb_alpha_sweep(means, variances, targets, num_acquisitions=2)
+        assert "regret_ucb_0.10" in single
+        assert all(key.startswith("regret_ucb_sweep_") for key in sweep)
+        assert set(single).isdisjoint(sweep)
+
 
 class TestRegretUcbAlphaEdgeCases:
     """Additional edge case tests for regret_ucb_alpha."""

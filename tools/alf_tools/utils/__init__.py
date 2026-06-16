@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.utils.botorch_utils import (
+from alf_tools.models.utils.botorch_utils import (
     candidates_to_tensor,
     get_bounds_tensor,
     predictions_to_posterior,

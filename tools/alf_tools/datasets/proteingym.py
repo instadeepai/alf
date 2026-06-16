@@ -15,13 +15,14 @@
 import logging
 import os
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
 import numpy as np
 import pandas as pd
 from alf_core import BaseDataset, Candidate, LabelledCandidates, ProblemType
 from alf_core.dataset.base_dataset import BaseDatasetConfig
 from huggingface_hub import hf_hub_download
+from pydantic import model_validator
 
 from alf_tools.utils.constants import HF_DATASETS_REPOSITORY_NAME
 
@@ -38,6 +39,7 @@ class ProteinGymConfig(BaseDatasetConfig):
         dms_type: Type of DMS data ("singles" or "multiples").
         cross_validation: Whether to use cross-validation splits.
         cross_validation_type: Type of CV split ("random", "modulo", or "contiguous").
+            Only "random" folds are available for dms_type="multiples".
         cross_validation_fold: Which CV fold to use (0-4).
     """
 
@@ -47,6 +49,33 @@ class ProteinGymConfig(BaseDatasetConfig):
     cross_validation_type: Literal["random", "modulo", "contiguous"] | None = None
     cross_validation_fold: Literal[0, 1, 2, 3, 4] | None = None
     problem_type: ProblemType = ProblemType.REGRESSION
+
+    @model_validator(mode="after")
+    def _validate_cross_validation(self) -> Self:
+        """Validate the cross-validation configuration.
+
+        Returns:
+            The validated configuration instance.
+
+        Raises:
+            ValueError: If cross_validation is enabled without both
+                cross_validation_type and cross_validation_fold set, or if a
+                non-"random" fold is requested for dms_type="multiples" (which
+                only provides random folds).
+        """
+        if not self.cross_validation:
+            return self
+        if self.cross_validation_type is None or self.cross_validation_fold is None:
+            raise ValueError(
+                "cross_validation=True requires both cross_validation_type and "
+                "cross_validation_fold to be set."
+            )
+        if self.dms_type == "multiples" and self.cross_validation_type != "random":
+            raise ValueError(
+                "dms_type='multiples' only provides 'random' cross-validation folds; "
+                f"cross_validation_type='{self.cross_validation_type}' is not available."
+            )
+        return self
 
 
 class ProteinGym(BaseDataset):
@@ -77,9 +106,10 @@ class ProteinGym(BaseDataset):
             Labeled candidates with ProteinGym data.
 
         Raises:
-            ValueError: If HF token is not set as environment variable.
+            ValueError: If the HF_TOKEN environment variable is unset or empty.
         """
-        if os.environ.get("HF_TOKEN") is None:
+        hf_token = os.environ.get("HF_TOKEN")
+        if not hf_token:
             raise ValueError(
                 "HF token must be set as environment variable; "
                 "HF_TOKEN environment variable is not set — export HF_TOKEN=<your_token> "
@@ -112,7 +142,7 @@ class ProteinGym(BaseDataset):
                 features.update({
                     "random_fold_id": row["fold_random_5"],
                     "modulo_fold_id": row["fold_modulo_5"],
-                    "fold_contiguous_id": row["fold_contiguous_5"],
+                    "contiguous_fold_id": row["fold_contiguous_5"],
                 })
             else:
                 features.update({
