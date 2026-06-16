@@ -8,7 +8,6 @@ promising for evaluation.
 .. toctree::
    :maxdepth: 1
 
-   BoTorch Acquisition Functions <botorch_acquisition_function/index>
    BoTorch Acquisition Wrapper <botorch_acquisition/index>
    BoTorch MC Samplers <botorch_samplers/index>
    CoreSet <core_set/index>

@@ -75,12 +75,13 @@ uv sync --extra esm2 --extra chemprop
 - **CoreSet** - Greedy k-centres selection for input-space diversity (coverage-based); uses
   `surrogate.featurise()` rather than predictions, so it is compatible with any model and
   does not require uncertainty estimates
-- **BotorchAcquisitionFunction** - Wraps native [BoTorch](https://botorch.org/) acquisition
-  functions for use in the ALF loop. Configured via `BotorchAcquisitionConfig(name=..., kwargs=...)`;
-  supported names are `log_expected_improvement`, `upper_confidence_bound`,
-  `probability_of_improvement`, and `log_noisy_expected_improvement`. Accepts either a native
-  BoTorch model or an ALF `BaseModel` (wrapped automatically via `BotorchModelWrapper`); ALF models
-  must provide prediction variances
+- **BoTorchAcquisition** - Unified wrapper around BoTorch's analytic and Monte Carlo acquisition
+  functions, selected via a single `acquisition_type` argument (`"qEI"`, `"qLogEI"`, `"qNEI"`,
+  `"qUCB"`, `"log_expected_improvement"`, `"upper_confidence_bound"`,
+  `"probability_of_improvement"`, `"log_noisy_expected_improvement"`). Supports discrete candidate
+  scoring and continuous `optimize_acqf` optimisation. Accepts either a native BoTorch model or an
+  ALF `BaseModel` (wrapped automatically via `BotorchModelWrapper`); ALF models must provide
+  prediction variances
 
 ### Search Strategies
 - **SingleMutantSearch** - Generate single-mutation variants of reference sequences
