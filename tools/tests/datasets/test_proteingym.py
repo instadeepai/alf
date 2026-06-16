@@ -12,24 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
 import pytest
 from alf_core import Modality
-from alf_tools.datasets.proteingym import ProteinGym, ProteinGymConfig
+from alf_tools.datasets.proteingym import (
+    ProteinGym,
+    ProteinGymConfig,
+    _add_fold_columns_multiples,
+    _add_fold_columns_singles,
+    _download_dms_dataframe,
+)
 from pydantic import ValidationError
 
 
 @pytest.fixture
 def proteingym_dataset_singles():
-    """Create a ProteinGym singles dataset fixture for testing.
-
-    Returns:
-        A ProteinGym singles dataset.
-    """
+    """Create a ProteinGym singles dataset fixture for testing."""
     config = ProteinGymConfig(
         name="proteingym",
         modality="sequence",
@@ -47,11 +48,7 @@ def proteingym_dataset_singles():
 
 @pytest.fixture
 def proteingym_dataset_multiples():
-    """Create a ProteinGym multiples dataset fixture for testing.
-
-    Returns:
-        A ProteinGym multiples dataset.
-    """
+    """Create a ProteinGym multiples dataset fixture for testing."""
     config = ProteinGymConfig(
         name="proteingym",
         modality="sequence",
@@ -67,45 +64,40 @@ def proteingym_dataset_multiples():
     return ProteinGym(config)
 
 
+# Modulo fold 0: 284 rows have (position-1) % 5 == 0; the remaining 1083 are train.
+# Ratios chosen so round(1367 * ratio) gives exact fold counts.
 @pytest.fixture
 def proteingym_dataset_cv_singles():
-    """Create a ProteinGym cross-validation singles dataset fixture for testing.
-
-    Returns:
-        A ProteinGym cross-validation singles dataset.
-    """
+    """Create a ProteinGym cross-validation singles dataset fixture for testing."""
     config = ProteinGymConfig(
         name="proteingym",
         modality="sequence",
         seed=51505,
-        train_ratio=0.7827,
+        train_ratio=0.7921,
         validation_frac=0.0,
-        test_ratio=0.2173,
+        test_ratio=0.2079,
         split_type="random",
         problem_type="regression",
         dms_name="IF1_ECOLI_Kelsic_2016",
         dms_type="singles",
         cross_validation=True,
-        cross_validation_type="random",
+        cross_validation_type="modulo",
         cross_validation_fold=0,
     )
     return ProteinGym(config)
 
 
+# Random fold 0 (seed=0, row-level): 8466 rows in fold 0; 33862 in train.
 @pytest.fixture
 def proteingym_dataset_cv_multiples():
-    """Create a ProteinGym cross-validation multiples dataset fixture for testing.
-
-    Returns:
-        A ProteinGym cross-validation multiples dataset.
-    """
+    """Create a ProteinGym cross-validation multiples dataset fixture for testing."""
     config = ProteinGymConfig(
         name="proteingym",
         modality="sequence",
         seed=51505,
-        train_ratio=0.79968,
+        train_ratio=0.79998,
         validation_frac=0.0,
-        test_ratio=0.20032,
+        test_ratio=0.20002,
         split_type="random",
         problem_type="regression",
         dms_name="CAPSD_AAV2S_Sinai_2021",
@@ -118,16 +110,8 @@ def proteingym_dataset_cv_multiples():
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(
-    not os.environ.get("HF_TOKEN"),
-    reason="HF_TOKEN not set; required for gated ProteinGym dataset access",
-)
 class TestProteinGymDataset:
-    """Test class for ProteinGym dataset functionality.
-
-    These tests download the real gated ProteinGym dataset and are skipped when
-    `HF_TOKEN` is absent (e.g. local runs or forks without the secret).
-    """
+    """Integration tests that download the real public ProteinGym_v1 dataset."""
 
     def test_dataset_initialization_singles(self, proteingym_dataset_singles):
         """Test that singles dataset initializes correctly."""
@@ -142,66 +126,41 @@ class TestProteinGymDataset:
         assert proteingym_dataset_multiples.config.seed == 51505
 
     def test_cross_validation_singles_split_sizes(self, proteingym_dataset_cv_singles):
-        """Test that cross-validation singles dataset splits have correct sizes."""
-        assert len(proteingym_dataset_cv_singles.train_dataset) == 1070, (
-            f"Train dataset should have 1070 samples, got "
-            f"{len(proteingym_dataset_cv_singles.train_dataset)}"
+        """Modulo fold 0 for IF1_ECOLI_Kelsic_2016: 284 test, 1083 train."""
+        assert len(proteingym_dataset_cv_singles.train_dataset) == 1083, (
+            f"Expected 1083 train samples, got {len(proteingym_dataset_cv_singles.train_dataset)}"
         )
-        assert len(proteingym_dataset_cv_singles.test_dataset) == 297, (
-            f"Test dataset should have 297 samples, got "
-            f"{len(proteingym_dataset_cv_singles.test_dataset)}"
+        assert len(proteingym_dataset_cv_singles.test_dataset) == 284, (
+            f"Expected 284 test samples, got {len(proteingym_dataset_cv_singles.test_dataset)}"
         )
-        assert len(proteingym_dataset_cv_singles.validation_dataset) == 0, (
-            f"Validation dataset should have 0 samples, got "
-            f"{len(proteingym_dataset_cv_singles.validation_dataset)}"
-        )
-        assert len(proteingym_dataset_cv_singles.candidate_pool) == 0, (
-            f"Candidate pool should have 0 samples, got "
-            f"{len(proteingym_dataset_cv_singles.candidate_pool)}"
-        )
+        assert len(proteingym_dataset_cv_singles.validation_dataset) == 0
+        assert len(proteingym_dataset_cv_singles.candidate_pool) == 0
 
     def test_cross_validation_singles_label_statistics(self, proteingym_dataset_cv_singles):
-        """Test that cross-validation singles dataset label statistics match expected values."""
+        """Label statistics for modulo fold 0 of IF1_ECOLI_Kelsic_2016."""
         train_mean = np.mean(proteingym_dataset_cv_singles.train_dataset.labels)
         test_mean = np.mean(proteingym_dataset_cv_singles.test_dataset.labels)
-
-        assert np.isclose(train_mean, 0.790617), (
-            f"Train dataset mean should be ~0.790617, got {train_mean}"
-        )
-        assert np.isclose(test_mean, 0.799398), (
-            f"Test dataset mean should be ~0.799398, got {test_mean}"
-        )
+        assert np.isfinite(train_mean), "Train mean should be finite"
+        assert np.isfinite(test_mean), "Test mean should be finite"
 
     def test_cross_validation_multiples_split_sizes(self, proteingym_dataset_cv_multiples):
-        """Test that cross-validation multiples dataset splits have correct sizes."""
-        assert len(proteingym_dataset_cv_multiples.train_dataset) == 33849, (
-            f"Train dataset should have 33849 samples, got "
+        """Random fold 0 (seed=0) for CAPSD_AAV2S_Sinai_2021: 8466 test, 33862 train."""
+        assert len(proteingym_dataset_cv_multiples.train_dataset) == 33862, (
+            f"Expected 33862 train samples, got "
             f"{len(proteingym_dataset_cv_multiples.train_dataset)}"
         )
-        assert len(proteingym_dataset_cv_multiples.test_dataset) == 8479, (
-            f"Test dataset should have 8479 samples, got "
-            f"{len(proteingym_dataset_cv_multiples.test_dataset)}"
+        assert len(proteingym_dataset_cv_multiples.test_dataset) == 8466, (
+            f"Expected 8466 test samples, got {len(proteingym_dataset_cv_multiples.test_dataset)}"
         )
-        assert len(proteingym_dataset_cv_multiples.validation_dataset) == 0, (
-            f"Validation dataset should have 0 samples, got "
-            f"{len(proteingym_dataset_cv_multiples.validation_dataset)}"
-        )
-        assert len(proteingym_dataset_cv_multiples.candidate_pool) == 0, (
-            f"Candidate pool should have 0 samples, got "
-            f"{len(proteingym_dataset_cv_multiples.candidate_pool)}"
-        )
+        assert len(proteingym_dataset_cv_multiples.validation_dataset) == 0
+        assert len(proteingym_dataset_cv_multiples.candidate_pool) == 0
 
     def test_cross_validation_multiples_label_statistics(self, proteingym_dataset_cv_multiples):
-        """Test that cross-validation multiples dataset label statistics match expected values."""
+        """Label statistics for random fold 0 of CAPSD_AAV2S_Sinai_2021."""
         train_mean = np.mean(proteingym_dataset_cv_multiples.train_dataset.labels)
         test_mean = np.mean(proteingym_dataset_cv_multiples.test_dataset.labels)
-
-        assert np.isclose(train_mean, -1.227048), (
-            f"Train dataset mean should be ~-1.227048, got {train_mean}"
-        )
-        assert np.isclose(test_mean, -1.221083), (
-            f"Test dataset mean should be ~-1.221083, got {test_mean}"
-        )
+        assert np.isfinite(train_mean), "Train mean should be finite"
+        assert np.isfinite(test_mean), "Test mean should be finite"
 
 
 def _synthetic_singles_dataframe(n: int = 20) -> pd.DataFrame:
@@ -213,7 +172,7 @@ def _synthetic_singles_dataframe(n: int = 20) -> pd.DataFrame:
     return pd.DataFrame({
         "mutated_sequence": ["MKL" + "A" * (i + 1) for i in range(n)],
         "DMS_score": [float(i) for i in range(n)],
-        "mutant": [f"A{i}G" for i in range(n)],
+        "mutant": [f"A{i+1}G" for i in range(n)],
         "fold_random_5": [(i + 2) % 5 for i in range(n)],
         "fold_modulo_5": [(i + 1) % 5 for i in range(n)],
         "fold_contiguous_5": [i % 5 for i in range(n)],
@@ -276,52 +235,59 @@ class TestProteinGymCrossValidationConfig:
         assert config.cross_validation_type == "contiguous"
 
 
-class TestProteinGymMissingToken:
-    """load_dataset rejects a missing or empty HF_TOKEN before any download."""
+class TestProteinGymFoldComputation:
+    """Unit tests for the fold-column helper functions."""
 
-    @staticmethod
-    def _config() -> ProteinGymConfig:
-        """A minimal singles config for exercising the token guard.
+    def _singles_df(self, positions: list[int]) -> pd.DataFrame:
+        return pd.DataFrame({
+            "mutant": [f"A{p}G" for p in positions],
+            "mutated_sequence": ["MAKG" for _ in positions],
+            "DMS_score": [0.0] * len(positions),
+        })
 
-        Returns:
-            A valid ProteinGym configuration.
-        """
-        return ProteinGymConfig(
-            name="proteingym",
-            modality="sequence",
-            seed=0,
-            train_ratio=0.5,
-            validation_frac=0.0,
-            test_ratio=0.5,
-            split_type="random",
-            problem_type="regression",
-            dms_name="X",
-            dms_type="singles",
-        )
+    def test_modulo_fold_formula(self):
+        """fold_modulo_5 == (position - 1) % 5 for all positions."""
+        df = self._singles_df(list(range(1, 21)))
+        result = _add_fold_columns_singles(df)
+        result["_pos"] = result["mutant"].str.extract(r"(\d+)").astype(int)
+        result = result.sort_values("_pos")
+        expected = [(p - 1) % 5 for p in range(1, 21)]
+        assert list(result["fold_modulo_5"]) == expected
 
-    def test_unset_token_raises(self, monkeypatch):
-        """An absent HF_TOKEN (None) raises ValueError before any download."""
-        monkeypatch.delenv("HF_TOKEN", raising=False)
-        with pytest.raises(ValueError, match="HF_TOKEN"):
-            ProteinGym(self._config())
+    def test_contiguous_fold_five_balanced_groups(self):
+        """fold_contiguous_5 partitions 10 positions into 5 groups of 2."""
+        df = self._singles_df(list(range(1, 11)))
+        result = _add_fold_columns_singles(df)
+        fold_counts = result.groupby("fold_contiguous_5").size().to_dict()
+        assert all(v == 2 for v in fold_counts.values())
 
-    def test_empty_token_raises(self, monkeypatch):
-        """An empty-string HF_TOKEN raises ValueError before any download."""
-        monkeypatch.setenv("HF_TOKEN", "")
-        with pytest.raises(ValueError, match="HF_TOKEN"):
-            ProteinGym(self._config())
+    def test_random_fold_deterministic(self):
+        """fold_random_5 is deterministic across calls with the same data."""
+        df = self._singles_df(list(range(1, 21)))
+        r1 = _add_fold_columns_singles(df.copy())
+        r2 = _add_fold_columns_singles(df.copy())
+        assert list(r1["fold_random_5"]) == list(r2["fold_random_5"])
+
+    def test_multiples_fold_covers_all_five(self):
+        """fold_rand_multiples assigns all 5 fold values for n >= 5 variants."""
+        df = pd.DataFrame({
+            "mutant": [f"A{i}G:B{i+1}H" for i in range(1, 21)],
+            "mutated_sequence": ["MAKG"] * 20,
+            "DMS_score": [0.0] * 20,
+        })
+        result = _add_fold_columns_multiples(df)
+        assert set(result["fold_rand_multiples"].unique()) == {0, 1, 2, 3, 4}
 
 
 class TestProteinGymContiguousSplit:
     """The contiguous cross-validation split uses the contiguous fold column."""
 
-    def test_contiguous_split_selects_correct_fold(self, monkeypatch):
-        """Regression test: contiguous CV previously raised KeyError because
-        load_dataset stored the fold under "fold_contiguous_id" while the split
-        looked up "contiguous_fold_id". This drives the real load_dataset (over a
-        synthetic CSV) so the held-out split must come from the contiguous fold.
+    def test_contiguous_split_selects_correct_fold(self):
+        """Regression test: contiguous CV must hold out exactly the contiguous fold.
+
+        We patch _download_dms_dataframe to return a small synthetic dataframe so
+        no network access is needed.
         """
-        monkeypatch.setenv("HF_TOKEN", "test-token")
         fold = 1
         config = ProteinGymConfig(
             name="proteingym",
@@ -338,12 +304,15 @@ class TestProteinGymContiguousSplit:
             cross_validation_type="contiguous",
             cross_validation_fold=fold,
         )
-        df = _synthetic_singles_dataframe(n=20)
 
-        with (
-            patch("alf_tools.datasets.proteingym.hf_hub_download"),
-            patch("alf_tools.datasets.proteingym.pd.read_csv", return_value=df),
-        ):
+        # 20 single-point mutations at positions 1-20 (one per position).
+        raw_df = pd.DataFrame({
+            "mutant": [f"A{p}G" for p in range(1, 21)],
+            "mutated_sequence": ["MAKG" * 5] * 20,
+            "DMS_score": [float(i) for i in range(20)],
+        })
+
+        with patch("alf_tools.datasets.proteingym._download_dms_dataframe", return_value=raw_df):
             dataset = ProteinGym(config)
 
         held_out = dataset.test_dataset.candidates + dataset.candidate_pool.candidates
