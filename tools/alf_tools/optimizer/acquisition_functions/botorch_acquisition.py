@@ -25,16 +25,16 @@ from typing import Literal, get_args
 import numpy as np
 import torch
 from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
+from alf_tools.models.utils.botorch_model_wrapper import (
+    BotorchModelWrapper,
+    resolve_botorch_model,
+)
 from alf_tools.models.utils.botorch_utils import (
     candidates_to_tensor,
     get_bounds_tensor,
     tensor_to_candidates,
 )
 from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
-from alf_tools.models.utils.botorch_model_wrapper import (
-    BotorchModelWrapper,
-    resolve_botorch_model,
-)
 from botorch.acquisition.analytic import (
     LogExpectedImprovement,
     ProbabilityOfImprovement,
@@ -64,6 +64,21 @@ AcquisitionType = Literal[
     "probability_of_improvement",
     "log_noisy_expected_improvement",
 ]
+
+
+def _infer_model_dtype(model: BotorchModel) -> torch.dtype:
+    """Infer a model's tensor dtype, defaulting to float64 when it has no parameters.
+
+    Pure ALF `BaseModel` surrogates wrapped for BoTorch may register no PyTorch
+    parameters; BoTorch's default working dtype is float64, so fall back to that.
+
+    Returns:
+        The dtype of the first parameter, or `torch.float64` if the model has none.
+    """
+    try:
+        return next(model.parameters()).dtype
+    except StopIteration:
+        return torch.float64
 
 
 @dataclass
@@ -384,12 +399,7 @@ class BoTorchAcquisition(AcquisitionFunction):
         )
         self._require_joint_posterior_for_batch(wrapped_model)
 
-        # Infer tensor dtype from model parameters; fall back to float64 (BoTorch default)
-        # if the model has no registered PyTorch parameters (e.g. pure ALF BaseModel).
-        try:
-            infer_dtype = next(wrapped_model.parameters()).dtype
-        except StopIteration:
-            infer_dtype = torch.float64
+        infer_dtype = _infer_model_dtype(wrapped_model)
 
         # Get training data for qNEI / log_noisy_expected_improvement
         X_baseline = None
@@ -461,13 +471,7 @@ class BoTorchAcquisition(AcquisitionFunction):
         )
         self._require_joint_posterior_for_batch(model)
 
-        # Infer model dtype so bounds/data tensors match (avoids double != float errors).
-        # Fall back to float64 (BoTorch default) when the model has no registered parameters
-        # (e.g. an ALF BaseModel that is not an nn.Module).
-        try:
-            model_dtype = next(model.parameters()).dtype
-        except StopIteration:
-            model_dtype = torch.float64
+        model_dtype = _infer_model_dtype(model)
 
         # Convert bounds from list[list[float]] to list[tuple[float, float]]
         bounds_tuples = [(b[0], b[1]) for b in self.bounds]
