@@ -31,7 +31,7 @@ from alf_tools.models.utils.botorch_utils import (
     tensor_to_candidates,
 )
 from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
-from alf_tools.optimizer.acquisition_functions.utils.botorch_model_wrapper import (
+from alf_tools.models.utils.botorch_model_wrapper import (
     BotorchModelWrapper,
     resolve_botorch_model,
 )

@@ -22,7 +22,7 @@ The ``botorch_utils`` module provides conversion utilities between ALF's data st
    :show-inheritance:
    :undoc-members:
 
-.. automodule:: alf_tools.optimizer.acquisition_functions.utils.botorch_model_wrapper
+.. automodule:: alf_tools.models.utils.botorch_model_wrapper
    :members:
    :show-inheritance:
    :undoc-members:

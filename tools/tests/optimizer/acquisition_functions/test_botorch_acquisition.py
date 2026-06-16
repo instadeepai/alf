@@ -40,7 +40,7 @@ from alf_tools.optimizer.acquisition_functions.botorch_acquisition import (
 from alf_tools.optimizer.acquisition_functions.botorch_samplers import (
     BoTorchMCSampler,
 )
-from alf_tools.optimizer.acquisition_functions.utils.botorch_model_wrapper import (
+from alf_tools.models.utils.botorch_model_wrapper import (
     resolve_botorch_model,
 )
 
