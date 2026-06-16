@@ -434,8 +434,9 @@ def test_wrapper_deterministic_predictions(mock_alf_model_with_variances):
 @pytest.mark.filterwarnings(
     "ignore:invalid value encountered in multiply:RuntimeWarning:alf_core.utils.metrics.regression"
 )
-def test_wrapper_integration_with_real_gp_model():
-    """Integration smoke test: real GPModel -> BotorchModelWrapper -> posterior().
+@pytest.mark.filterwarnings("ignore::scipy.stats.ConstantInputWarning")
+def test_adapter_integration_with_real_gp_model():
+    """Integration smoke test: real GPModel -> BoTorchModelAdapter -> posterior().
 
     Training metrics on the tiny dataset emit expected alf_core metric
     warnings (regret-metric fallback and a rank-space ECE `inf * sqrt(0)`

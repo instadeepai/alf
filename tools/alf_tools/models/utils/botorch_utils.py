@@ -18,6 +18,8 @@ This module provides conversion utilities between ALF's data structures
 (Candidates, Predictions) and BoTorch's expected formats (tensors, posteriors).
 """
 
+from __future__ import annotations
+
 import logging
 from typing import Any, Callable, Literal, TypeAlias
 

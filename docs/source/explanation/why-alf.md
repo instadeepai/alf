@@ -27,7 +27,7 @@ See [Intro to Active Learning](intro-to-active-learning.md) for the loop itself,
 
 Existing protein benchmarks such as **ProteinGym** and **FLIP** are, at heart, *static* supervised
 benchmarks: fixed train/test splits that measure how well a model predicts fitness. That is a real
-and useful question, but it is not the question a discovery campaign actually faces.
+and useful question, but it is not the question a discovery experiment actually faces.
 
 ALF is built to measure the part those benchmarks leave open: **how good a method is at the
 sequential loop**. Instead of a single accuracy number, ALF tracks performance *as a function of

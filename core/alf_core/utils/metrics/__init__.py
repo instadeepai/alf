@@ -19,6 +19,16 @@ sub-modules so that existing imports of `alf_core.utils.metrics` continue to
 work without change.
 """
 
+from alf_core.utils.metrics.acquisition_batch import (
+    compute_recall,
+    compute_regret,
+    intra_batch_diversity,
+)
+from alf_core.utils.metrics.aggregate import (
+    auc_top_k,
+    compute_aggregate_metrics,
+    compute_experiment_summary,
+)
 from alf_core.utils.metrics.base import (
     ClassificationMetricRegistry,
     RegressionMetricRegistry,
@@ -27,6 +37,10 @@ from alf_core.utils.metrics.base import (
     classification_metric_registry,
     regression_metric_registry,
     require_min_samples,
+)
+from alf_core.utils.metrics.calibration import (
+    expected_calibration_error,
+    rank_expected_calibration_error,
 )
 from alf_core.utils.metrics.classification import (
     accuracy,
@@ -38,13 +52,13 @@ from alf_core.utils.metrics.classification import (
 )
 from alf_core.utils.metrics.regression import (
     coverage,
-    expected_calibration_error,
+    hit_rate,
     monte_carlo_ranking,
     mse,
+    nll_gaussian,
     pairwise_xent,
     pearson,
     rank_coverage,
-    rank_expected_calibration_error,
     rank_width,
     register_no_variance_required,
     register_requires_variance,
@@ -53,5 +67,7 @@ from alf_core.utils.metrics.regression import (
     residual_pearson,
     residual_spearman,
     spearman,
+    top_k_max,
+    top_k_mean,
     width,
 )

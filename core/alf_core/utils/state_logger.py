@@ -63,6 +63,20 @@ class StateLogger(abc.ABC):
         """
         pass
 
+    @abc.abstractmethod
+    def log_summary(self, metrics: dict[str, float], round_name: str) -> None:
+        """Log a set of end-of-experiment summary metrics.
+
+        Unlike :meth:`log`, this records only the given scalar metrics (e.g. the
+        aggregate `experiment_summary` emitted by `DesignTask`) and does not
+        touch round-level state such as predictions or acquisition batches.
+
+        Args:
+            metrics: Mapping of summary metric name to value.
+            round_name: Label for the summary entry, e.g. "experiment_summary".
+        """
+        pass
+
     def _log_training_history(
         self, training_history: list[SurrogateEpochMetrics], round_num: int | None = None
     ) -> None:
@@ -125,6 +139,16 @@ class TerminalStateLogger(StateLogger):
         logger.info(f"Round {round_name}:\n{message}")
         logger.debug(f"Training history for round {round_name}:")
         self._log_training_history(state.round_metrics.training_history)
+
+    def log_summary(self, metrics: dict[str, float], round_name: str) -> None:
+        """Log summary metrics to the terminal.
+
+        Args:
+            metrics: Mapping of summary metric name to value.
+            round_name: Label for the summary entry, e.g. "experiment_summary".
+        """
+        message = "\n".join(f"{key}: {value:.3f}" for key, value in metrics.items())
+        logger.info(f"Round {round_name}:\n{message}")
 
 
 class FileStateLogger(StateLogger):
@@ -247,6 +271,19 @@ class FileStateLogger(StateLogger):
 
         if state.history:
             self._log_acquisition_batch(state.history[-1], state.round)
+
+        if self.upload_function is not None:
+            self.upload_function(self.output_path)
+
+    def log_summary(self, metrics: dict[str, float], round_name: str) -> None:
+        """Append summary metrics to metrics.csv.
+
+        Args:
+            metrics: Mapping of summary metric name to value.
+            round_name: Label for the summary entry; unused by the file logger
+                but kept for interface symmetry with the terminal logger.
+        """
+        self._log_metrics(metrics)
 
         if self.upload_function is not None:
             self.upload_function(self.output_path)
