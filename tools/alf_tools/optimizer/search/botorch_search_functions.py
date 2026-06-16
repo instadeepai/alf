@@ -18,8 +18,7 @@ This module provides search functions designed to work with BoTorch acquisition
 functions that can directly optimize candidates in continuous spaces.
 """
 
-from alf_core import Candidate, State
-from alf_core.optimizer.search import BaseSearch
+from alf_core import BaseSearch, Candidate, State
 
 
 class ContinuousSearch(BaseSearch):
