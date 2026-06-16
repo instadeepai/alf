@@ -14,23 +14,29 @@
 
 """Tests for regression metrics."""
 
+import warnings
+
 import numpy as np
 import pytest
-from alf_core.utils.metrics.base import regression_metric_registry
-from alf_core.utils.metrics.regression import (
+from alf_core.utils.metrics import (
     coverage,
     expected_calibration_error,
+    hit_rate,
     mse,
+    nll_gaussian,
     pairwise_xent,
     pearson,
     rank_coverage,
     rank_expected_calibration_error,
     rank_width,
+    regression_metric_registry,
     regret_ucb_alpha,
     regret_ucb_alpha_sweep,
     residual_pearson,
     residual_spearman,
     spearman,
+    top_k_max,
+    top_k_mean,
     width,
 )
 
@@ -124,6 +130,24 @@ class TestExpectedCalibrationError:
         assert "ece" in result
         assert result["ece"] >= 0.0
 
+    def test_zero_variance_exact_predictions_do_not_warn(self):
+        """Zero-variance exact predictions compute ECE without NaN warnings.
+
+        At the confidence-1.0 grid point `norm.ppf(1)` is inf, and inf * 0
+        variance previously produced NaN interval bounds (RuntimeWarning)
+        that mis-counted exact predictions as uncovered.
+        """
+        means = np.array([1.0, 2.0, 3.0])
+        variances = np.zeros(3)
+        targets = np.array([1.0, 2.0, 3.0])
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            result = expected_calibration_error(means, variances, targets)
+        # Exact predictions are covered at every confidence level, so the
+        # observed coverage is 1.0 everywhere and ECE is the area between
+        # the constant-1 curve and the diagonal (~0.5).
+        assert result["ece"] == pytest.approx(0.5, abs=0.02)
+
 
 class TestRegretUcbAlpha:
     """Tests for regret_ucb_alpha."""
@@ -137,10 +161,11 @@ class TestRegretUcbAlpha:
         assert result.get("regret_ucb_0.00", -1) == pytest.approx(0.0)
 
     def test_small_dataset_returns_empty(self):
-        """Dataset of size 1 returns empty dict."""
-        result = regret_ucb_alpha(
-            np.array([1.0]), np.array([0.1]), np.array([1.0]), num_acquisitions=1
-        )
+        """Dataset of size 1 warns and returns empty dict."""
+        with pytest.warns(UserWarning, match="too small"):
+            result = regret_ucb_alpha(
+                np.array([1.0]), np.array([0.1]), np.array([1.0]), num_acquisitions=1
+            )
         assert result == {}
 
     def test_returns_non_negative_regret(self):
@@ -235,7 +260,10 @@ class TestRegretUcbAlphaSweep:
         means = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
         variances = np.ones(5)
         targets = np.array([5.0, 4.0, 3.0, 2.0, 1.0])
-        result = regret_ucb_alpha_sweep(means, variances, targets, alpha=0.5)
+        # The default num_acquisitions (100) exceeds the 5 items, triggering
+        # the documented fallback warning.
+        with pytest.warns(UserWarning, match="num_acquisitions"):
+            result = regret_ucb_alpha_sweep(means, variances, targets, alpha=0.5)
         assert len(result) > 0
 
     def test_int_alpha_works(self):
@@ -485,3 +513,129 @@ class TestPairwiseXent:
         )
         assert isinstance(result, dict)
         assert isinstance(float(result["pairwise_xent"]), float)
+
+
+class TestTopKMean:
+    """Tests for top_k_mean metric."""
+
+    def test_returns_correct_key(self):
+        """top_k_mean returns a dict with the correct dynamic key."""
+        result = top_k_mean(np.zeros(5), None, np.array([1.0, 2.0, 3.0, 4.0, 5.0]), k=3)
+        assert "top_3_mean" in result
+
+    def test_known_value(self):
+        """top_k_mean returns the mean of the top-k targets."""
+        result = top_k_mean(np.zeros(5), None, np.array([1.0, 2.0, 3.0, 4.0, 5.0]), k=2)
+        assert result["top_2_mean"] == pytest.approx(4.5)
+
+    def test_k_exceeds_length_uses_all(self):
+        """When k > len(targets), all targets are used."""
+        result = top_k_mean(np.zeros(3), None, np.array([1.0, 2.0, 3.0]), k=100)
+        assert "top_3_mean" in result
+        assert result["top_3_mean"] == pytest.approx(2.0)
+
+    def test_registered_no_variance(self):
+        """top_k_mean is registered in the no-variance registry."""
+        assert "top_k_mean" in regression_metric_registry.get_metrics(requires_variance=False)
+
+
+class TestTopKMax:
+    """Tests for top_k_max metric."""
+
+    def test_returns_correct_key(self):
+        """top_k_max returns a dict with the correct dynamic key."""
+        result = top_k_max(np.zeros(5), None, np.array([1.0, 2.0, 3.0, 4.0, 5.0]), k=3)
+        assert "top_3_max" in result
+
+    def test_known_value(self):
+        """top_k_max returns the maximum of the top-k targets."""
+        result = top_k_max(np.zeros(5), None, np.array([1.0, 2.0, 3.0, 4.0, 5.0]), k=3)
+        assert result["top_3_max"] == pytest.approx(5.0)
+
+    def test_k_exceeds_length_uses_all(self):
+        """When k > len(targets), all targets are used."""
+        result = top_k_max(np.zeros(3), None, np.array([1.0, 2.0, 3.0]), k=100)
+        assert "top_3_max" in result
+        assert result["top_3_max"] == pytest.approx(3.0)
+
+    def test_registered_no_variance(self):
+        """top_k_max is registered in the no-variance registry."""
+        assert "top_k_max" in regression_metric_registry.get_metrics(requires_variance=False)
+
+
+class TestHitRate:
+    """Tests for hit_rate metric."""
+
+    def test_all_hits(self):
+        """All targets above threshold gives hit rate 1.0."""
+        result = hit_rate(np.zeros(3), None, np.array([0.9, 0.8, 0.7]), threshold=0.5)
+        assert result["hit_rate_0.500"] == pytest.approx(1.0)
+
+    def test_no_hits(self):
+        """No targets above threshold gives hit rate 0.0."""
+        result = hit_rate(np.zeros(3), None, np.array([0.1, 0.2, 0.3]), threshold=0.5)
+        assert result["hit_rate_0.500"] == pytest.approx(0.0)
+
+    def test_partial_hits(self):
+        """Half the targets above threshold gives hit rate 0.5."""
+        result = hit_rate(np.zeros(4), None, np.array([0.9, 0.1, 0.8, 0.2]), threshold=0.5)
+        assert result["hit_rate_0.500"] == pytest.approx(0.5)
+
+    def test_threshold_inclusive(self):
+        """Targets exactly at threshold are counted as hits."""
+        result = hit_rate(np.zeros(2), None, np.array([0.5, 0.4]), threshold=0.5)
+        assert result["hit_rate_0.500"] == pytest.approx(0.5)
+
+    def test_returns_dynamic_key(self):
+        """Key reflects the threshold value."""
+        result = hit_rate(np.zeros(3), None, np.array([1.0, 2.0, 3.0]), threshold=1.5)
+        assert "hit_rate_1.500" in result
+
+    def test_registered_no_variance(self):
+        """hit_rate is registered in the no-variance registry."""
+        assert "hit_rate" in regression_metric_registry.get_metrics(requires_variance=False)
+
+
+class TestNllGaussian:
+    """Tests for nll_gaussian metric."""
+
+    def test_returns_nll_key(self):
+        """nll_gaussian returns a dict with key 'nll'."""
+        result = nll_gaussian(
+            np.array([0.0, 1.0, 2.0]),
+            np.array([1.0, 1.0, 1.0]),
+            np.array([0.0, 1.0, 2.0]),
+        )
+        assert "nll" in result
+
+    def test_perfect_predictions_low_nll(self):
+        """Predictions matching targets with low variance produce low NLL."""
+        means = np.array([1.0, 2.0, 3.0])
+        variances = np.full(3, 0.01)
+        targets = np.array([1.0, 2.0, 3.0])
+        result = nll_gaussian(means, variances, targets)
+        assert result["nll"] < 0.0
+
+    def test_nll_increases_with_error(self):
+        """Higher prediction error leads to higher NLL."""
+        means_good = np.array([1.0, 2.0, 3.0])
+        means_bad = np.array([3.0, 0.0, 1.0])
+        variances = np.ones(3)
+        targets = np.array([1.0, 2.0, 3.0])
+        nll_good = nll_gaussian(means_good, variances, targets)["nll"]
+        nll_bad = nll_gaussian(means_bad, variances, targets)["nll"]
+        assert nll_good < nll_bad
+
+    def test_zero_variance_does_not_raise(self):
+        """Zero variance is handled without raising (clipped internally)."""
+        result = nll_gaussian(
+            np.array([1.0, 2.0]),
+            np.array([0.0, 0.0]),
+            np.array([1.0, 2.0]),
+        )
+        assert "nll" in result
+        assert np.isfinite(result["nll"])
+
+    def test_registered_requires_variance(self):
+        """nll_gaussian is registered in the requires-variance registry."""
+        assert "nll_gaussian" in regression_metric_registry.get_metrics(requires_variance=True)

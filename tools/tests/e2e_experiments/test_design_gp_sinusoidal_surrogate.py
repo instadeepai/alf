@@ -35,6 +35,17 @@ from alf_tools.models import FeaturizerConfig, GPModel, GPModelConfig, GPTrainCo
 from alf_tools.optimizer.acquisition_functions.ucb import UCB
 from scipy.stats import spearmanr
 
+# Expected warnings from running a small experiment end-to-end:
+# - the 25-item test split is below the default num_acquisitions (100), so the
+#   regret metrics fall back with a warning during evaluation;
+# - the oracle re-labels acquired candidates with its own noise, so acquired
+#   labels can exceed the raw dataset's best label and auc_top_k warns that
+#   the normalised AUC is clamped.
+pytestmark = [
+    pytest.mark.filterwarnings("ignore:num_acquisitions:UserWarning"),
+    pytest.mark.filterwarnings("ignore:Some round_values exceed best_value:UserWarning"),
+]
+
 # ---------------------------------------------------------------------------
 # Synthetic sinusoidal helpers
 # ---------------------------------------------------------------------------
@@ -269,8 +280,9 @@ class TestDesignGPSinusoidalSurrogate:
 
         metrics = pd.read_csv(metrics_file)
 
-        # 4 rows: round 0 + 3 acquisition rounds
-        assert len(metrics) == 4, f"Expected 4 rows, got {len(metrics)}"
+        # 5 rows: round 0 + 3 acquisition rounds + 1 trailing experiment_summary
+        # row (carries only auc_top_k, leaving per-round columns NaN).
+        assert len(metrics) == 5, f"Expected 5 rows, got {len(metrics)}"
 
         # Required columns — surrogate/test_ece is the error metric present
         # in the CSV when the surrogate produces variances (GP always does).
@@ -288,7 +300,8 @@ class TestDesignGPSinusoidalSurrogate:
         # validation_frac=0.0 — all acquired candidates go to train.
         acq_batch_size = 5
         expected_num_train = [initial_num_train + i * acq_batch_size for i in range(4)]
-        actual_num_train = metrics["dataset/num_train"].tolist()
+        # dropna() drops the trailing experiment_summary row (num_train is NaN there).
+        actual_num_train = metrics["dataset/num_train"].dropna().astype(int).tolist()
         assert actual_num_train == expected_num_train, (
             f"Expected num_train={expected_num_train}, got {actual_num_train}"
         )

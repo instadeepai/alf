@@ -126,6 +126,9 @@ class TestResultsRegressionRouting:
         assert "accuracy" not in results.metrics
         assert "f1" not in results.metrics
 
+    # The registry runs regret metrics with the default num_acquisitions (100),
+    # which exceeds the 4 test samples and triggers the documented fallback warning.
+    @pytest.mark.filterwarnings("ignore:num_acquisitions:UserWarning")
     def test_accuracy_metrics_present_when_variances_provided(self):
         """Variance-independent metrics must still be computed when variances exist.
 

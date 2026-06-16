@@ -17,7 +17,7 @@
 import numpy as np
 import pytest
 from alf_core.dataclasses import Candidate, LabelledCandidates, Modality
-from alf_core.optimizer.metrics import compute_recall, compute_regret
+from alf_core.utils.metrics.acquisition_batch import compute_recall, compute_regret
 
 
 def _labelled(labels: list[float]) -> LabelledCandidates:

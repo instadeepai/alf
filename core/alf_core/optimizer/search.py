@@ -17,7 +17,7 @@ import abc
 
 from alf_core.dataclasses import Candidate, State
 from alf_core.model.base_model import BaseModel
-from alf_core.optimizer.metrics import compute_recall, compute_regret
+from alf_core.utils.metrics.acquisition_batch import compute_recall, compute_regret
 
 
 class BaseSearch(abc.ABC):

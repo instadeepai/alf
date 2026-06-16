@@ -244,73 +244,6 @@ def pairwise_xent(
 
 
 @register_requires_variance
-def expected_calibration_error(
-    means: Float[np.ndarray, " b"],
-    variances: Float[np.ndarray, " b"],
-    targets: Float[np.ndarray, " b"],
-    n_grid_points: int = 100,
-) -> dict[str, float]:
-    """Compute Expected Calibration Error (ECE).
-
-    For each confidence level alpha in a grid from 0 to 1:
-    - Find alpha% confidence intervals for all predictions
-    - Count percentage of targets that fall within the confidence intervals
-    - ECE = area between x=y line and the observed coverage curve
-
-    Lower ECE values indicate better calibration.
-
-    Args:
-        means: Array of shape (b,). Mean predictions.
-        variances: Array of shape (b,). Predicted variances.
-        targets: Array of shape (b,). True labels.
-        n_grid_points: Number of grid points for confidence level discretization.
-            Defaults to 100.
-
-    Returns:
-        Dictionary with key "ece" mapping to the ECE value.
-    """
-    grid = np.linspace(0, 1, n_grid_points)
-    perc = np.zeros(n_grid_points)
-    for i, cdf_cutoff in enumerate(grid):
-        num_stds = norm.ppf(1 - ((1 - cdf_cutoff) / 2))
-        perc[i] = (
-            (targets >= means - num_stds * np.sqrt(variances))
-            & (targets <= means + num_stds * np.sqrt(variances))
-        ).mean()
-    ece = np.sum(np.abs(perc - grid)) * (1 / n_grid_points)
-    return {"ece": ece}
-
-
-@register_requires_variance
-def rank_expected_calibration_error(
-    means: Float[np.ndarray, " b"],
-    variances: Float[np.ndarray, " b"],
-    targets: Float[np.ndarray, " b"],
-) -> dict[str, float]:
-    """Compute Expected Calibration Error (ECE) in rank space.
-
-    Computes ECE using Monte Carlo ranking to estimate rank distributions,
-    then applies the standard ECE computation in rank space.
-
-    Lower ECE values indicate better calibration.
-
-    Args:
-        means: Array of shape (b,). Mean predictions.
-        variances: Array of shape (b,). Predicted variances.
-        targets: Array of shape (b,). True labels.
-
-    Returns:
-        Dictionary with key "rank_ece" mapping to the ECE value.
-    """
-    mean_rank, rank_variances = monte_carlo_ranking(means, variances, seed=42)
-    target_ranks = (-targets).argsort().argsort() + 1
-
-    ece = expected_calibration_error(mean_rank, rank_variances, target_ranks)["ece"]
-
-    return {"rank_ece": ece}
-
-
-@register_requires_variance
 def width(
     _: Float[np.ndarray, " b"],
     variances: Float[np.ndarray, " b"],
@@ -546,13 +479,14 @@ def regret_ucb_alpha(
     assert num_acquisitions > 0, "num_acquisitions should be positive"
     # Handle case where num_acquisitions > available items
     if num_acquisitions > len(means):
+        fallback_acquisitions = max(1, round(len(means) / 2))
         warnings.warn(
-            f"num_acquisitions ({num_acquisitions}) is greater than the number"
-            f"of available items ({len(means)}). Using round({len(means) / 2})"
+            f"num_acquisitions ({num_acquisitions}) is greater than the number "
+            f"of available items ({len(means)}). Using {fallback_acquisitions} "
             f"acquisitions instead.",
             stacklevel=2,
         )
-        num_acquisitions = max(1, round(len(means) / 2))
+        num_acquisitions = fallback_acquisitions
 
     # With 1 candidate:
     # UCB would select that 1 candidate (the only option)
@@ -584,6 +518,127 @@ def regret_ucb_alpha(
     cumulative_regret = best_possible_sum - selected_sum
 
     return {f"regret_ucb_{alpha:.2f}": cumulative_regret}
+
+
+@register_no_variance_required
+def top_k_mean(
+    _means: Float[np.ndarray, " b"],
+    _variances: Float[np.ndarray, " b"] | None,
+    targets: Float[np.ndarray, " b"],
+    k: int = 10,
+) -> dict[str, float]:
+    """Compute the mean label of the top-k oracle-labelled candidates.
+
+    Selects the k highest target values and returns their mean.  When k
+    exceeds the number of available targets the function falls back to all
+    available targets.  Use this as the primary optimisation metric to track
+    how quickly an active-learning experiment surfaces high-performing
+    candidates across rounds.
+
+    Args:
+        _means: Array of shape (b,). Unused (for API consistency with registry).
+        _variances: Array of shape (b,) or None. Unused.
+        targets: Array of shape (b,). Oracle labels for acquired candidates.
+        k: Number of top candidates to consider. Defaults to 10.
+
+    Returns:
+        Dictionary with key `top_{k_eff}_mean` mapping to the mean value of
+        the top-k targets.
+    """
+    k_eff = min(k, len(targets))
+    top_k = np.partition(targets, -k_eff)[-k_eff:]
+    return {f"top_{k_eff}_mean": float(top_k.mean())}
+
+
+@register_no_variance_required
+def top_k_max(
+    _means: Float[np.ndarray, " b"],
+    _variances: Float[np.ndarray, " b"] | None,
+    targets: Float[np.ndarray, " b"],
+    k: int = 10,
+) -> dict[str, float]:
+    """Compute the maximum label of the top-k oracle-labelled candidates.
+
+    Selects the k highest target values and returns the maximum.  When k
+    exceeds the number of available targets the function falls back to all
+    available targets.  Use alongside `top_k_mean` to distinguish between
+    experiments that find one very good candidate versus many good ones.
+
+    Args:
+        _means: Array of shape (b,). Unused (for API consistency with registry).
+        _variances: Array of shape (b,) or None. Unused.
+        targets: Array of shape (b,). Oracle labels for acquired candidates.
+        k: Number of top candidates to consider. Defaults to 10.
+
+    Returns:
+        Dictionary with key `top_{k_eff}_max` mapping to the maximum value
+        of the top-k targets.
+    """
+    k_eff = min(k, len(targets))
+    top_k = np.partition(targets, -k_eff)[-k_eff:]
+    return {f"top_{k_eff}_max": float(top_k.max())}
+
+
+@register_no_variance_required
+def hit_rate(
+    _means: Float[np.ndarray, " b"],
+    _variances: Float[np.ndarray, " b"] | None,
+    targets: Float[np.ndarray, " b"],
+    threshold: float = 0.5,
+) -> dict[str, float]:
+    """Compute the fraction of acquired candidates whose label exceeds a threshold.
+
+    Counts how many oracle-labelled candidates are considered "hits" (i.e.
+    their label is at or above `threshold`) and returns this as a fraction
+    of the total.  Suitable for discovery-framing tasks such as drug screening
+    or protein fitness optimisation, where "active" or "fit" is a binary
+    concept derived from a continuous score.
+
+    Args:
+        _means: Array of shape (b,). Unused (for API consistency with registry).
+        _variances: Array of shape (b,) or None. Unused.
+        targets: Array of shape (b,). Oracle labels for acquired candidates.
+        threshold: Minimum label value to count as a hit. Defaults to 0.5.
+
+    Returns:
+        Dictionary with key `hit_rate_{threshold:.3f}` mapping to the hit
+        rate in [0, 1].
+    """
+    return {f"hit_rate_{threshold:.3f}": float((targets >= threshold).mean())}
+
+
+@register_requires_variance
+def nll_gaussian(
+    means: Float[np.ndarray, " b"],
+    variances: Float[np.ndarray, " b"],
+    targets: Float[np.ndarray, " b"],
+) -> dict[str, float]:
+    """Compute the mean negative log-likelihood under a Gaussian predictive distribution.
+
+    Evaluates the per-sample NLL assuming the model produces independent
+    Gaussian predictions N(μ_i, σ²_i) for each candidate i:
+
+        NLL = 0.5 * mean(log(2π) + log(σ²_i) + (y_i - μ_i)² / σ²_i)
+
+    Lower values indicate that the model places high probability mass on the
+    true targets. Use together with `expected_calibration_error` to
+    characterise both sharpness and calibration of the surrogate's uncertainty
+    estimates. Variances are clipped to a small positive value before
+    computing the logarithm to guard against numerical instability.
+
+    Args:
+        means: Array of shape (b,). Mean predictions.
+        variances: Array of shape (b,). Predicted variances.  Must be
+            non-negative (enforced by the registry decorator).
+        targets: Array of shape (b,). True labels.
+
+    Returns:
+        Dictionary with key `nll` mapping to the mean NLL value.
+    """
+    eps = 1e-6
+    safe_vars = np.maximum(variances, eps)
+    nll = 0.5 * np.mean(np.log(2 * np.pi * safe_vars) + (targets - means) ** 2 / safe_vars)
+    return {"nll": float(nll)}
 
 
 @register_requires_variance
