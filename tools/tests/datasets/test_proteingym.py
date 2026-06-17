@@ -21,9 +21,8 @@ from alf_core import Modality
 from alf_tools.datasets.proteingym import (
     ProteinGym,
     ProteinGymConfig,
-    _add_fold_columns_multiples,
-    _add_fold_columns_singles,
-    _download_dms_dataframe,
+    _add_fold_columns_multiples,  # noqa: PLC2701
+    _add_fold_columns_singles,  # noqa: PLC2701
 )
 from pydantic import ValidationError
 
@@ -163,7 +162,6 @@ class TestProteinGymDataset:
         assert np.isclose(test_mean, -1.230568, atol=1e-4), f"Test mean off: {test_mean}"
 
 
-
 class TestProteinGymCrossValidationConfig:
     """Validation of the cross-validation configuration."""
 
@@ -256,7 +254,7 @@ class TestProteinGymFoldComputation:
     def test_multiples_fold_covers_all_five(self):
         """fold_rand_multiples assigns all 5 fold values for n >= 5 variants."""
         df = pd.DataFrame({
-            "mutant": [f"A{i}G:B{i+1}H" for i in range(1, 21)],
+            "mutant": [f"A{i}G:B{i + 1}H" for i in range(1, 21)],
             "mutated_sequence": ["MAKG"] * 20,
             "DMS_score": [0.0] * 20,
         })

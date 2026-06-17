@@ -55,8 +55,7 @@ def _download_dms_dataframe(dms_name: str) -> pd.DataFrame:
     """
     for shard_idx in range(_N_SUBSTITUTION_SHARDS):
         filename = (
-            f"DMS_substitutions/train-0000{shard_idx}"
-            f"-of-0000{_N_SUBSTITUTION_SHARDS}.parquet"
+            f"DMS_substitutions/train-0000{shard_idx}-of-0000{_N_SUBSTITUTION_SHARDS}.parquet"
         )
         local_path = hf_hub_download(
             repo_id=_UPSTREAM_REPO,
@@ -225,16 +224,21 @@ class ProteinGym(BaseDataset):
 
         df = pd.read_csv(filepath)
         if dms_type == "singles":
-            fold_cols = {"random_fold_id": "fold_random_5", "modulo_fold_id": "fold_modulo_5",
-                         "contiguous_fold_id": "fold_contiguous_5"}
+            fold_cols = {
+                "random_fold_id": "fold_random_5",
+                "modulo_fold_id": "fold_modulo_5",
+                "contiguous_fold_id": "fold_contiguous_5",
+            }
         else:
             fold_cols = {"random_fold_id": "fold_rand_multiples"}
         candidates = [
             Candidate(
                 data=row["mutated_sequence"],
                 modality=self.modality,
-                features={"mutant_code": row["mutant"],
-                          **{k: row[v] for k, v in fold_cols.items()}},
+                features={
+                    "mutant_code": row["mutant"],
+                    **{k: row[v] for k, v in fold_cols.items()},
+                },
             )
             for row in df.to_dict("records")
         ]
