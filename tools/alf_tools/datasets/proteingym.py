@@ -30,6 +30,7 @@ DATAPATH = Path(__file__).parent / "data"
 # Public ProteinGym dataset — no token required.
 _UPSTREAM_REPO = "OATML-Markslab/ProteinGym_v1"
 _N_SUBSTITUTION_SHARDS = 5
+assert _N_SUBSTITUTION_SHARDS < 10, "Update filename format for shard counts >= 10"
 
 # Fixed seed for the random CV fold assignment.  This does not reproduce the
 # original ProteinGym benchmark random folds; use modulo or contiguous splits
@@ -65,7 +66,7 @@ def _download_dms_dataframe(dms_name: str) -> pd.DataFrame:
         )
         shard_df = pd.read_parquet(local_path)
         result = shard_df[shard_df["DMS_id"] == dms_name]
-        if len(result) > 0:
+        if not result.empty:
             return result[["mutant", "mutated_sequence", "DMS_score"]].reset_index(drop=True)
     raise ValueError(
         f"DMS assay '{dms_name}' was not found in any shard of {_UPSTREAM_REPO}. "
@@ -92,7 +93,7 @@ def _add_fold_columns_singles(df: pd.DataFrame) -> pd.DataFrame:
         The input DataFrame (sorted by mutant, reindexed) with three new columns.
     """
     df = df.sort_values("mutant").reset_index(drop=True)
-    df["_pos"] = df["mutant"].str.extract(r"(\d+)").astype(int)
+    df["_pos"] = df["mutant"].str.extract(r"(\d+)", expand=False).astype(int)
     positions = sorted(df["_pos"].unique())
 
     df["fold_modulo_5"] = (df["_pos"] - 1) % 5
@@ -101,7 +102,7 @@ def _add_fold_columns_singles(df: pd.DataFrame) -> pd.DataFrame:
     pos_to_contiguous = {p: fold for fold, grp in enumerate(groups) for p in grp}
     df["fold_contiguous_5"] = df["_pos"].map(pos_to_contiguous)
 
-    pos_folds = np.array([i % 5 for i in range(len(positions))])
+    pos_folds = np.arange(len(positions)) % 5
     np.random.default_rng(_RANDOM_CV_SEED).shuffle(pos_folds)
     pos_to_random = dict(zip(positions, pos_folds))
     df["fold_random_5"] = df["_pos"].map(pos_to_random)
@@ -139,6 +140,9 @@ class ProteinGymConfig(BaseDatasetConfig):
         cross_validation_type: Type of CV split ("random", "modulo", or "contiguous").
             Only "random" folds are available for dms_type="multiples".
         cross_validation_fold: Which CV fold to use (0-4).
+        force_download: If True, delete the local cache before loading so the
+            dataset is re-downloaded from upstream.  Use this to pick up
+            corrected versions of an assay published by ProteinGym_v1.
     """
 
     dms_name: str
@@ -146,6 +150,7 @@ class ProteinGymConfig(BaseDatasetConfig):
     cross_validation: bool = False
     cross_validation_type: Literal["random", "modulo", "contiguous"] | None = None
     cross_validation_fold: Literal[0, 1, 2, 3, 4] | None = None
+    force_download: bool = False
     problem_type: ProblemType = ProblemType.REGRESSION
 
     @model_validator(mode="after")
@@ -204,6 +209,12 @@ class ProteinGym(BaseDataset):
         token is required.  CV fold columns are computed deterministically and
         saved alongside the raw data so subsequent loads are instant.
 
+        Note:
+            The local cache at ``data/ProteinGym/<dms_name>/data.csv`` is not
+            automatically invalidated when the upstream dataset is updated.  Set
+            ``force_download=True`` in the config to delete the cache and
+            re-download, or remove the file manually.
+
         Returns:
             Labeled candidates with ProteinGym data.
         """
@@ -211,6 +222,8 @@ class ProteinGym(BaseDataset):
         dms_type = self.config.dms_type
 
         filepath = DATAPATH / "ProteinGym" / dms_name / "data.csv"
+        if self.config.force_download and filepath.exists():
+            filepath.unlink()
         if not filepath.exists():
             filepath.parent.mkdir(parents=True, exist_ok=True)
             logger.info("Downloading %s from %s", dms_name, _UPSTREAM_REPO)
