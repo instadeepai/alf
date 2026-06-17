@@ -38,7 +38,8 @@ from alf_core import (
 )
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.model.base_model import BaseModel
-from alf_tools.datasets import FLIP, GFP, FLIPConfig, ProteinGym, ProteinGymConfig
+from alf_tools.datasets import FLIP, GFP, FLIPConfig, ProteinGym
+from alf_tools.datasets.proteingym import ProteinGymConfig
 from alf_tools.models import (
     CNNModel,
     CNNModelConfig,
