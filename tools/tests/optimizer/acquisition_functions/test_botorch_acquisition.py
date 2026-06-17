@@ -32,6 +32,9 @@ from alf_core import (
 from alf_core.dataclasses.state import State
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel, BoTorchTrainConfig
+from alf_tools.models.utils.botorch_model_wrapper import (
+    resolve_botorch_model,
+)
 from alf_tools.optimizer.acquisition_functions.botorch_acquisition import (
     AcquisitionType,
     BoTorchAcquisition,
@@ -39,9 +42,6 @@ from alf_tools.optimizer.acquisition_functions.botorch_acquisition import (
 )
 from alf_tools.optimizer.acquisition_functions.botorch_samplers import (
     BoTorchMCSampler,
-)
-from alf_tools.models.utils.botorch_model_wrapper import (
-    resolve_botorch_model,
 )
 
 

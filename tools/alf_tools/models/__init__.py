@@ -26,8 +26,6 @@ from alf_tools.models.utils import (
 )
 
 __all__ = [
-    "BoTorchGPModel",
-    "BoTorchTrainConfig",
     "build_from_target",
     "CNNModel",
     "CNNModelConfig",
