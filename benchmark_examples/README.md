@@ -1,6 +1,6 @@
 # ALF Benchmark Examples
 
-Two small **benchmark "taster" scripts** showing the kind of comparison ALF is built
+Two small **benchmark scripts** showing the kind of comparison ALF is built
 for: active-learning performance **as a function of acquisition round**. Each runs
 several AL experiments, prints a summary table, and saves comparison plots.
 
