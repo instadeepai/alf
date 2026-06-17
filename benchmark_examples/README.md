@@ -55,17 +55,3 @@ per-round `metrics.csv`, adds an explicit round index, derives best-found-so-far
 aggregates across seeds. For a fair comparison, **every config in a given seed rebuilds
 its own dataset with that same seed** (identical split), and all RNGs are seeded before
 the model is built.
-
-## Notes & caveats
-
-- **Fair comparison via shared splits.** Curves are comparable within a seed because all
-  configs use the same split; bands/lines across seeds show genuine variance.
-- **ESM-2** uses the small 8M checkpoint by default (downloaded once, cached) and trains
-  only a linear head on frozen embeddings — still the slowest surrogate; raise
-  `--num-seeds`/`--num-rounds` with that in mind.
-- **Acquisition × model.** UCB/EI need a surrogate with uncertainty — hence the fixed GP.
-  Thompson sampling is omitted (it needs an ensemble's empirical distribution; a GP has
-  none). The full `alf_benchmark` layer will cover ensembles and more.
-- **Budget.** GFP loads ~1000 rows, so the post-split pool is a few hundred — keep
-  `num_rounds × batch_size` below it (the scripts check and exit early otherwise).
-- **ProteinGym** needs the public-repo loader (no token) shipped in the corresponding fix.
