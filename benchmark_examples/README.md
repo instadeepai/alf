@@ -48,6 +48,31 @@ Each writes a comparison PNG and `summary.csv` under `--output-dir`
   (exploration) baseline that ignores the surrogate's predictions, so it is expected to
   trail on best-found — it is included as a contrast, not a contender.
 
+## Example output
+
+Illustrative result from the acquisition-function benchmark (your numbers will vary with
+dataset, seeds, and hardware):
+
+```bash
+uv run --group benchmark python benchmark_examples/benchmarking_acquisition_functions.py \
+    --dataset gfp --num-seeds 3 --num-rounds 5 --batch-size 50
+```
+
+![Acquisition function comparison on GFP](assets/acquisition_functions_comparison.png)
+
+Bold lines are the mean over seeds; faint lines are individual seeds. The printed summary
+(also written to `summary.csv`) reports final-round values, mean ± std over seeds:
+
+| acquisition | regret | best found | top-K recall |
+|-------------|--------|------------|--------------|
+| greedy      | -0.027 ± 0.064 | 4.020 ± 0.017 | 1.00 ± 0.00 |
+| ucb         | -0.027 ± 0.064 | 4.020 ± 0.017 | 1.00 ± 0.00 |
+| ei          | -0.016 ± 0.076 | 4.020 ± 0.017 | 1.00 ± 0.00 |
+| core_set    | -0.039 ± 0.054 | 4.033 ± 0.000 | 1.00 ± 0.00 |
+
+On GFP these acquisition functions perform similarly — a fair, if undramatic, result; the
+gaps widen on harder landscapes.
+
 ## How it works
 
 Each experiment is a `DesignTask` run with a `FileStateLogger`; `_bench.py` reads the
