@@ -11,17 +11,26 @@ Run the full ask/tell loop end to end:
 - [Offline Design Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/experiments/offline_design_tutorial.ipynb): the loop driven by labels from a held-out, pre-scored pool. The best entry point.
 - [Online Design Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/experiments/online_design_tutorial.ipynb): the same loop, with labels from a live scorer.
 
+## Lightweight (alf-core only, no PyTorch)
+
+If you want to explore ALF's core abstractions without installing PyTorch, start here:
+
+- [Core-only Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/core_only_tutorial.ipynb): a synthetic optimisation loop built entirely on `alf-core` using numpy and scipy. Shows how to subclass the base classes and run the active-learning loop with no ML framework dependencies.
+
 ## Go deeper on models
 
-- [GP Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/gp_tutorial.ipynb): Gaussian Process surrogate, and its [kernel cheat-sheet](https://github.com/instadeepai/alf/blob/main/tutorials/models/gp_kernel_cheatsheet.md).
-- [CNN Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/cnn_tutorial.ipynb): convolutional sequence surrogate.
-- [Ensemble Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/ensemble_tutorial.ipynb): seed ensembles, MC dropout, and combined ensembles for uncertainty-aware prediction.
-- [ESM-2 Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/esm2_tutorial.ipynb): protein language model as a surrogate or zero-shot scorer.
-- [Chemprop MPNN Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/chemprop_tutorial.ipynb): active learning for small molecules using SMILES inputs and the Chemprop MPNN.
+Each tutorial focuses on a specific surrogate model type—when to use it, how to configure it,
+and what its uncertainty estimates look like.
+
+- [GP Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/gp_tutorial.ipynb): Gaussian Process surrogate, and its [kernel cheat-sheet](https://github.com/instadeepai/alf/blob/main/tutorials/models/gp_kernel_cheatsheet.md). Good default for small datasets where uncertainty calibration matters.
+- [CNN Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/cnn_tutorial.ipynb): convolutional sequence surrogate. Scales better than GPs for larger candidate pools.
+- [Ensemble Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/ensemble_tutorial.ipynb): seed ensembles, MC dropout, and combined ensembles for uncertainty-aware prediction. Useful when you need calibrated uncertainty without a full Bayesian model.
+- [ESM-2 Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/esm2_tutorial.ipynb): using a protein language model as a surrogate or zero-shot scorer. Useful when sequence context matters and you have limited labelled data.
+- [Chemprop MPNN Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/chemprop_tutorial.ipynb): active learning for small molecules using SMILES inputs and the Chemprop message-passing neural network. The right choice when working with molecular graphs rather than sequences.
 
 ## Go deeper on datasets
 
-- [GuacaMol Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/datasets/guacamol_tutorial.ipynb): drug-like molecule corpus: download, property analysis, and SMILES querying.
+- [GuacaMol Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/datasets/guacamol_tutorial.ipynb): exploring the GuacaMol drug-like molecule corpus—download, property analysis, and SMILES querying. A good starting point for small-molecule experiments.
 
 To add your own model, dataset, acquisition or search function, see the
 [How-to / Recipes](../how-to/index.md).

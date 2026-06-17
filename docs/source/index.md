@@ -9,6 +9,16 @@ as protein sequences and small molecules.
 This project is under active development.
 ```
 
+## Why ALF?
+
+In scientific discovery, the bottleneck is rarely compute—it's the **experiment**. Each label
+costs a wet-lab assay, a simulation, or a measurement, and you can only afford a handful of
+rounds. ALF runs the full active-learning loop: train a surrogate on what you've measured, use an
+acquisition function to select the most informative next batch, score it, and repeat—all with
+modular, swappable components so you can change any one part without rewriting the rest.
+
+→ See [Why ALF?](explanation/why-alf.md) for the full motivation and design rationale.
+
 ## Start here
 
 ::::{grid} 1 2 2 2
@@ -45,15 +55,11 @@ API reference generated from docstrings, plus a glossary of ALF terms.
 
 ## Installation
 
-**Prerequisites:** Python 3.12 or higher and [uv](https://docs.astral.sh/uv/) (recommended) or `pip`.
-
-**Quick install** (directly from GitHub):
-
 ```bash
-# Install the core package (minimal dependencies, no PyTorch required)
+# Core package (minimal dependencies, no PyTorch required)
 pip install git+https://github.com/instadeepai/alf.git#subdirectory=core
 
-# Install the tools package (includes PyTorch, models, and datasets)
+# Tools package (includes PyTorch, models, and datasets)
 pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 ```
 
@@ -63,20 +69,13 @@ Add your GitHub credentials to `~/.netrc` for authentication:
 machine github.com login <USERNAME> password <TOKEN>
 ```
 
-**Development install:**
-
-```bash
-git clone git@github.com:instadeepai/alf.git
-cd alf
-uv sync
-```
-
-For GPU support and full installation details, see the
+For GPU support, optional extras, and development setup, see the
 [Installation Guide](https://github.com/instadeepai/alf/blob/main/docs/INSTALLATION.md).
 
 ## Quick start
 
-Run an active learning design experiment:
+The snippet below runs a full active learning design experiment. Each component is swappable:
+bring your own dataset, model, acquisition function, or oracle.
 
 ```python
 from alf_core import (
@@ -91,13 +90,20 @@ from alf_tools.datasets.gfp import GFP
 from alf_tools.models.cnn import CNNModel
 from alf_tools.optimizer.acquisition_functions.greedy import Greedy
 
-# Set up dataset and components
+# A dataset wraps your candidates and their known labels
 dataset = GFP(name="gfp", modality="sequence", seed=42)
+
+# The surrogate is a cheap probabilistic model trained on observed labels
 surrogate = Surrogate(model=CNNModel())
+
+# The optimizer picks the next batch: acquisition function scores candidates,
+# search function selects from them
 optimizer = Optimizer(acquisition_fn=Greedy(), search_fn=DatasetSearch())
+
+# The oracle scores selected candidates (here, it queries the held-out dataset)
 oracle = Oracle(scorer=dataset)
 
-# Run the design task
+# Run the active learning loop for 5 rounds, acquiring 100 candidates per round
 task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
 state = task.setup(dataset=dataset, surrogate=surrogate)
 task.run(

@@ -58,6 +58,7 @@ default_role = "code"
 
 html_theme = "furo"
 html_static_path = ['_static']
+html_css_files = ['custom.css']
 html_baseurl = "https://instadeepai.github.io/alf/"
 highlight_language = "python"
 pygments_style = "sphinx"
