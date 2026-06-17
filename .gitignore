@@ -142,6 +142,7 @@ dmypy.json
 # Results
 data/
 results/
+benchmark_examples/outputs/
 
 # Test meta-files
 tools/pytest-tools.xml
