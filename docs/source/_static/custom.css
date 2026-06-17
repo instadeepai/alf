@@ -1,8 +1,0 @@
-/* Override code block background from the default Furo yellow to neutral grey */
-div.highlight {
-    background-color: #f0f0f0 !important;
-}
-
-.highlight {
-    background-color: #f0f0f0 !important;
-}
