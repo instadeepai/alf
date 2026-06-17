@@ -47,7 +47,7 @@ Each script writes `metrics.csv` (and per-round prediction CSVs) under
 
 | Flag | Scripts | Default | Notes |
 |------|---------|---------|-------|
-| `--dataset {gfp,flip}` | offline, supervised, zeroshot | `gfp` | GFP needs no token; FLIP downloads from GitHub (`gb1`/`one_vs_rest`). |
+| `--dataset {gfp,flip,proteingym}` | offline, supervised, zeroshot | `gfp` | All download on first use, no token. GFP: small remote CSV. FLIP: GitHub (`gb1`/`one_vs_rest`). ProteinGym: public `ProteinGym_v1` (default assay `IF1_ECOLI_Kelsic_2016`). |
 | `--model {cnn,gp}` | offline, supervised | `cnn` | MLP is omitted — it takes tabular/embedding inputs, not raw sequences. |
 | `--acquisition {greedy,ucb,ei}` | offline | `greedy` | `ucb`/`ei` need uncertainty → require `--model gp`. |
 | `--num-rounds` / `--batch-size` | offline, online | `5` / `50` | Keep their product below the candidate-pool size (see below). |
@@ -70,8 +70,11 @@ Each script writes `metrics.csv` (and per-round prediction CSVs) under
 - **`zeroshot.py` needs the ESM-2 extra** (`transformers`) and downloads a model
   checkpoint on first run. The default 8M model is small; larger checkpoints are
   slower and need more memory.
-- **ProteinGym** is available in the API but requires an `HF_TOKEN`, so it is not
-  exposed via `--dataset` here. Construct `ProteinGymConfig` directly if you need it.
+- **ProteinGym** loads a single default DMS assay (`IF1_ECOLI_Kelsic_2016`, singles)
+  from the public `OATML-Markslab/ProteinGym_v1` repo — no `HF_TOKEN` required. To use a
+  different assay or a benchmark CV split, edit the `proteingym` branch of
+  `build_dataset` in `common.py` (`dms_name`, `dms_type`, `cross_validation*`). The first
+  run downloads parquet shards (cached afterwards).
 - **Acquisition × model compatibility.** `ucb`/`ei` require a model that predicts
   uncertainty (use `--model gp`); pairing them with `--model cnn` exits early with an
   explanation rather than crashing deep in the acquisition function.

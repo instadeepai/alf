@@ -38,7 +38,7 @@ from alf_core import (
 )
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.model.base_model import BaseModel
-from alf_tools.datasets import FLIP, GFP, FLIPConfig
+from alf_tools.datasets import FLIP, GFP, FLIPConfig, ProteinGym, ProteinGymConfig
 from alf_tools.models import (
     CNNModel,
     CNNModelConfig,
@@ -93,10 +93,10 @@ def add_dataset_arg(parser: argparse.ArgumentParser) -> None:
     """Add the ``--dataset`` argument (sequence datasets only)."""
     parser.add_argument(
         "--dataset",
-        choices=["gfp", "flip"],
+        choices=["gfp", "flip", "proteingym"],
         default="gfp",
-        help="Dataset to use (default: gfp). ProteinGym is also available in the API "
-        "but needs an HF_TOKEN, so it is not exposed here.",
+        help="Dataset to use (default: gfp). proteingym loads a default DMS assay "
+        "(IF1_ECOLI_Kelsic_2016) from the public ProteinGym_v1 repo -- no token needed.",
     )
 
 
@@ -188,7 +188,23 @@ def build_dataset(name: str, seed: int) -> BaseDataset:
                 problem_type=ProblemType.REGRESSION,
             )
         )
-    raise ValueError(f"Unknown dataset: {name!r}. Expected 'gfp' or 'flip'.")
+    if name == "proteingym":
+        # A single-substitution DMS assay; edit dms_name/dms_type for other assays.
+        return ProteinGym(
+            ProteinGymConfig(
+                name="proteingym_if1",
+                modality=Modality.SEQUENCE,
+                seed=seed,
+                dms_name="IF1_ECOLI_Kelsic_2016",
+                dms_type="singles",
+                train_ratio=0.4,
+                validation_frac=0.1,
+                test_ratio=0.1,
+                split_type="random",
+                problem_type=ProblemType.REGRESSION,
+            )
+        )
+    raise ValueError(f"Unknown dataset: {name!r}. Expected 'gfp', 'flip' or 'proteingym'.")
 
 
 def build_model(name: str, seed: int, epochs: int) -> BaseModel:
