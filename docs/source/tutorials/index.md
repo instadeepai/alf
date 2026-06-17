@@ -11,11 +11,11 @@ Run the full ask/tell loop end to end:
 - [Offline Design Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/experiments/offline_design_tutorial.ipynb): the loop driven by labels from a held-out, pre-scored pool. The best entry point.
 - [Online Design Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/experiments/online_design_tutorial.ipynb): the same loop, with labels from a live scorer.
 
-## Lightweight (alf-core only, no PyTorch)
+## Lightweight (alf-core only)
 
-If you want to explore ALF's core abstractions without installing PyTorch, start here:
+If you want to explore ALF's core abstractions with minimal dependencies, start here:
 
-- [Core-only Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/alf_core_quickstart.ipynb): a synthetic optimisation loop built entirely on `alf-core` using numpy and scipy. Implements a bootstrap ensemble surrogate and Probability of Improvement acquisition function — both custom, neither available in `alf-tools` — to show how to bring your own components with no ML framework dependencies.
+- [ALF Core Quickstart](https://github.com/instadeepai/alf/blob/main/tutorials/alf_core_quickstart.ipynb): a synthetic optimisation loop built entirely on `alf-core` using numpy and scipy. Implements a bootstrap ensemble surrogate and Probability of Improvement acquisition function — both custom, neither available in `alf-tools` — to show how to bring your own components.
 
 ## Go deeper on models
 

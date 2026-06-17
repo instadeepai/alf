@@ -105,9 +105,9 @@ New to active learning? Start with [Why ALF?](https://instadeepai.github.io/alf/
 - **[ESM-2 Tutorial](tutorials/models/esm2_tutorial.ipynb)** — protein language model as surrogate or zero-shot scorer
 - **[Chemprop MPNN Tutorial](tutorials/models/chemprop_tutorial.ipynb)** — active learning for small molecules with SMILES inputs
 
-### Lightweight (alf-core only, no PyTorch)
+### Lightweight (alf-core only)
 
-- **[Core-only Tutorial](tutorials/alf_core_quickstart.ipynb)** — synthetic optimisation loop using only `alf-core` and numpy/scipy
+- **[ALF Core Quickstart](tutorials/alf_core_quickstart.ipynb)** — bootstrap ensemble surrogate + Probability of Improvement acquisition function, implemented from scratch with numpy/scipy
 
 ### Extend ALF
 
