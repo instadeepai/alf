@@ -86,6 +86,14 @@ class TestTerminalStateLogger:
         assert "tell_time" in caplog.text
         assert "ask_time" in caplog.text
 
+    def test_log_summary_outputs_metrics_and_round_name(self, caplog: Any) -> None:
+        """log_summary must emit the round_name and each summary metric key."""
+        logger_inst = TerminalStateLogger()
+        with caplog.at_level(logging.INFO, logger="alf-core"):
+            logger_inst.log_summary({"auc_top_k": 0.75}, round_name="experiment_summary")
+        assert "experiment_summary" in caplog.text
+        assert "auc_top_k" in caplog.text
+
 
 class TestFileStateLogger:
     """Tests for FileStateLogger."""
@@ -156,3 +164,20 @@ class TestFileStateLogger:
         state = make_state_stub(round_val=1, metrics={"tell_time": 1.0})
         fl.log(state, round_name="round_1")
         assert not (tmp_path / "training_history").exists()
+
+    def test_log_summary_appends_metrics_to_metrics_csv(self, tmp_path: Any) -> None:
+        """log_summary must append the summary metrics as a row in metrics.csv."""
+        fl = FileStateLogger(output_path=tmp_path)
+        state = make_state_stub(round_val=1, metrics={"tell_time": 1.0})
+        fl.log(state, round_name="round_1")
+        fl.log_summary({"auc_top_k": 0.75}, round_name="experiment_summary")
+        df = pd.read_csv(tmp_path / "metrics.csv")
+        assert "auc_top_k" in df.columns
+        assert df["auc_top_k"].dropna().iloc[-1] == pytest.approx(0.75)
+
+    def test_log_summary_writes_only_metrics_csv(self, tmp_path: Any) -> None:
+        """log_summary must not write acquisition batches, predictions, or training history."""
+        fl = FileStateLogger(output_path=tmp_path)
+        fl.log_summary({"auc_top_k": 0.75}, round_name="experiment_summary")
+        written = {p.name for p in tmp_path.iterdir()}
+        assert written == {"metrics.csv"}

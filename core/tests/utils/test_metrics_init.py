@@ -17,6 +17,7 @@
 from alf_core.utils.metrics import (
     accuracy,
     auc_roc,
+    auc_top_k,
     check_inputs,
     check_variance_validity,
     classification_metric_registry,
@@ -37,6 +38,7 @@ def test_top_level_imports_are_callable():
     for symbol in [
         accuracy,
         auc_roc,
+        auc_top_k,
         f1,
         precision,
         recall,

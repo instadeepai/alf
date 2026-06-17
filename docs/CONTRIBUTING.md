@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to ALF (Active Learning Framework)!
 
-ALF's mission is to maximise information gained from multiple rounds of experimentation, applying active learning and Bayesian experimental design to accelerate scientific discovery. ALF targets domains where exploration is constrained by expensive data acquisition—wet-lab experiments, computational simulations, or physical measurements—and search spaces are high-dimensional or combinatorially vast. By contributing to ALF, you're helping researchers across computational biology, materials science, and chemistry optimize their experimental campaigns more efficiently.
+ALF's mission is to maximise information gained from multiple rounds of experimentation, applying active learning and Bayesian experimental design to accelerate scientific discovery. ALF targets domains where exploration is constrained by expensive data acquisition—wet-lab experiments, computational simulations, or physical measurements—and search spaces are high-dimensional or combinatorially vast. By contributing to ALF, you're helping researchers across computational biology, materials science, and chemistry optimize their experiments more efficiently.
 
 This guide will help you get started with extending the framework and contributing code.
 

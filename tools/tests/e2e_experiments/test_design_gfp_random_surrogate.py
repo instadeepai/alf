@@ -250,7 +250,9 @@ class TestDesignGFPRandomSurrogate:
     def _assert_dataset_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert dataset metrics."""
         for metric_name, expected_values in expected.items():
-            actual_values = metrics[f"dataset/{metric_name}"].tolist()
+            # Drop the trailing experiment_summary row, which only carries
+            # auc_top_k and leaves per-round columns NaN.
+            actual_values = metrics[f"dataset/{metric_name}"].dropna().tolist()
             assert np.isclose(actual_values, expected_values, atol=1e-10).all(), (
                 f"Dataset metric {metric_name} mismatch: expected {expected_values}, "
                 f"got {actual_values}"
@@ -259,7 +261,9 @@ class TestDesignGFPRandomSurrogate:
     def _assert_acquired_candidates_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert acquired candidates metrics."""
         for metric_name, expected_values in expected.items():
-            actual_values = metrics[f"acquired_candidates/{metric_name}"].tolist()[1:]
+            # dropna() removes both round 0 (no acquisition) and the trailing
+            # experiment_summary row, leaving one value per acquisition round.
+            actual_values = metrics[f"acquired_candidates/{metric_name}"].dropna().tolist()
             assert np.isclose(actual_values, expected_values, atol=1e-10).all(), (
                 f"Acquired candidates metric {metric_name} mismatch: expected {expected_values}, "
                 f"got {actual_values}"
@@ -268,7 +272,8 @@ class TestDesignGFPRandomSurrogate:
     def _assert_surrogate_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert surrogate model performance metrics."""
         for metric_name, expected_values in expected.items():
-            actual_values = metrics[f"surrogate/{metric_name}"].tolist()
+            # Drop the trailing experiment_summary row (auc_top_k only).
+            actual_values = metrics[f"surrogate/{metric_name}"].dropna().tolist()
             assert np.isclose(actual_values, expected_values, atol=1e-10).all(), (
                 f"Surrogate metric {metric_name} mismatch: expected {expected_values}, "
                 f"got {actual_values}"

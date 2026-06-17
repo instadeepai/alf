@@ -34,6 +34,7 @@ class State:
         history: List of LabelledCandidates acquired in each round.
         round_metrics: RoundMetrics instance holding scalar metrics and per-epoch
             training history for the current round.
+        metrics_history: RoundMetrics for every round run so far, in order.
         round_predictions: Predictions on the test set for the current round.
     """
 
@@ -43,6 +44,7 @@ class State:
     acq_batch_size: int = 0
     history: list = field(default_factory=list)
     round_metrics: RoundMetrics = field(default_factory=lambda: RoundMetrics(round=0))
+    metrics_history: list[RoundMetrics] = field(default_factory=list)
     round_predictions: Predictions | None = None
 
     @property
@@ -57,12 +59,14 @@ class State:
     def update(self, acquired_candidates: LabelledCandidates) -> None:
         """Update the state with newly acquired candidates.
 
-        Adds the acquired candidates to history and updates the dataset splits.
-        Also increments the round counter.
+        Records the current round's metrics in `metrics_history`, adds the
+        acquired candidates to history and updates the dataset splits. Also
+        increments the round counter.
 
         Args:
             acquired_candidates: The newly acquired candidates with their labels.
         """
+        self.metrics_history.append(self.round_metrics)
         self.history.append(copy.copy(acquired_candidates))
         self.dataset.update_splits(acquired_candidates)
         self.round += 1
