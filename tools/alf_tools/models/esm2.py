@@ -13,15 +13,13 @@
 # limitations under the License.
 
 import logging
-from dataclasses import dataclass
-from typing import Any, Iterator, Literal
+from typing import Any, Iterator
 
 import numpy as np
 import torch
 import torch.optim as optim
 from alf_core import (
     BaseModel,
-    BaseTrainConfig,
     Candidate,
     LabelledCandidates,
     Predictions,
@@ -36,109 +34,12 @@ try:
 except ImportError:
     _TRANSFORMERS_AVAILABLE = False
 
+from alf_tools.models.esm_utils.config import ESM2ModelConfig, ESM2TrainConfig
+from alf_tools.models.esm_utils.loss import compute_supervised_loss, mask_tokens
+from alf_tools.models.esm_utils.scoring_function import compute_pll
 from alf_tools.models.utils import get_device
 
 logger = logging.getLogger("alf-tools")
-
-
-@dataclass
-class ESM2ModelConfig:
-    """Configuration for ESM-2 model architecture.
-
-    Args:
-        model_id: HuggingFace model identifier, e.g. 'facebook/esm2_t6_8M_UR50D'.
-        pooling: Strategy for reducing per-token hidden states to a sequence embedding.
-            'mean' averages over all non-padding positions (CLS and EOS included).
-            'cls' uses only the first [CLS] token representation.
-            'last_hidden_state' returns the full (seq_len, hidden_dim) tensor per sequence.
-        repr_layer: Transformer layer index to extract embeddings from. -1 = final layer.
-        max_length: Maximum tokenisation length. Defaults to the tokeniser's model_max_length.
-        seed: Random seed for reproducible linear head initialisation.
-    """
-
-    model_id: str
-    pooling: Literal["mean", "cls", "last_hidden_state"] = "mean"
-    repr_layer: int = -1
-    max_length: int | None = None
-    seed: int = 42
-
-    def __post_init__(self) -> None:
-        """Validate ESM2ModelConfig fields.
-
-        Raises:
-            ValueError: If pooling is not a recognised strategy.
-        """
-        if self.pooling not in ("mean", "cls", "last_hidden_state"):
-            raise ValueError(
-                f"pooling must be 'mean', 'cls', or 'last_hidden_state', got {self.pooling!r}"
-            )
-
-
-@dataclass
-class ESM2TrainConfig(BaseTrainConfig):
-    """Configuration for ESM-2 training.
-
-    Args:
-        freeze_backbone: Must be True. Unfrozen backbone training is not yet supported.
-        learning_rate: Learning rate for the optimizer.
-        optimizer_type: Which optimizer to use ('adam' or 'adamw').
-        batch_size: Batch size for training.
-        batch_size_inference: Batch size for embed() and linear-head predict(). Has no effect on
-            zero-shot PLL scoring; use smaller call-site batches instead.
-            None defaults to batch_size.
-        num_epochs: Number of epochs to train for.
-        log_frequency: Record epoch metrics every N epochs.
-        max_grad_norm: Maximum norm for gradient clipping. None disables clipping.
-        scoring_function: Scoring function to use. 'linear_head' (default) freezes the backbone
-            and trains a linear head via loss_fn. Pseudo log-likelihood 'pll' skips the head;
-            predict() returns per-sequence masked-marginal scores and train() raises
-            NotImplementedError.
-        loss_fn: Loss function for linear head training. 'mse' for regression;
-            'cross_entropy' for classification. Cross-entropy expects integer class labels in
-            [0, output_dim); float labels are truncated with a warning. Only used when
-            scoring_function='linear_head'.
-        output_dim: Output dimension of the linear head. 1 for regression; N for N-class
-            classification. Only used when scoring_function='linear_head'.
-    """
-
-    freeze_backbone: bool = True
-    learning_rate: float = 1e-4
-    optimizer_type: Literal["adam", "adamw"] = "adamw"
-    batch_size: int = 8
-    batch_size_inference: int | None = None
-    num_epochs: int = 10
-    log_frequency: int = 1
-    max_grad_norm: float | None = None
-    scoring_function: Literal["linear_head", "pll"] = "linear_head"
-    loss_fn: Literal["mse", "cross_entropy"] = "mse"
-    output_dim: int = 1
-
-    def __post_init__(self) -> None:
-        """Post-initialization checks for ESM2TrainConfig.
-
-        Raises:
-            NotImplementedError: If freeze_backbone=False.
-            ValueError: If num_epochs < 1.
-            ValueError: If optimizer_type is not 'adam' or 'adamw'.
-            ValueError: If loss_fn is not 'mse' or 'cross_entropy'.
-            ValueError: If scoring_function is not 'linear_head' or 'pll'.
-        """
-        if not self.freeze_backbone:
-            raise NotImplementedError(
-                "freeze_backbone=False is not yet supported. Set freeze_backbone=True."
-            )
-        if self.num_epochs < 1:
-            raise ValueError(f"num_epochs must be >= 1, got {self.num_epochs}")
-        if self.optimizer_type not in ("adam", "adamw"):
-            raise ValueError(
-                f"optimizer_type must be 'adam' or 'adamw', got {self.optimizer_type!r}"
-            )
-        if self.loss_fn not in ("mse", "cross_entropy"):
-            raise ValueError(f"loss_fn must be 'mse' or 'cross_entropy', got {self.loss_fn!r}")
-        if self.scoring_function not in ("linear_head", "pll"):
-            raise ValueError(
-                f"scoring_function must be 'linear_head' or 'pll', got {self.scoring_function!r}"
-            )
 
 
 class ESM2Model(BaseModel):
@@ -146,8 +47,8 @@ class ESM2Model(BaseModel):
 
     Loads a pre-trained ESM-2 checkpoint from HuggingFace and exposes it as a
     BaseModel. predict() returns per-sequence masked-marginal scores
-    (scoring_function='pll') or passes embeddings through a trainable linear head
-    (scoring_function='linear_head'). embed() returns per-sequence embeddings.
+    (mode='likelihoods') or passes embeddings through a trainable linear head
+    (mode='linear_head'). embed() returns per-sequence embeddings.
     """
 
     _PLL_BATCH_THRESHOLD = 128  # Use batching for shorter sequences
@@ -207,13 +108,14 @@ class ESM2Model(BaseModel):
         self._validate_esm_config()
 
         self._head: torch.nn.Linear | None = None
-        if self.train_config.scoring_function == "linear_head":
+        if self.train_config.mode == "linear_head":
             torch.manual_seed(self.model_config.seed)
             hidden_dim = self.esm_model.config.hidden_size
             self._head = torch.nn.Linear(hidden_dim, self.train_config.output_dim)
             self._head.to(self.device)
-            for param in self.esm_model.parameters():
-                param.requires_grad = False
+            if self.train_config.freeze_backbone:
+                for param in self.esm_model.parameters():
+                    param.requires_grad = False
 
         total_params = sum(p.numel() for p in self.esm_model.parameters())
         logger.info(f"ESM-2 loaded: {self.model_config.model_id} ({total_params:,} parameters)")
@@ -244,10 +146,10 @@ class ESM2Model(BaseModel):
             )
         if (
             self.model_config.pooling == "last_hidden_state"
-            and self.train_config.scoring_function == "linear_head"
+            and self.train_config.mode == "linear_head"
         ):
             raise ValueError(
-                "pooling='last_hidden_state' is not supported with scoring_function='linear_head'. "
+                "pooling='last_hidden_state' is not supported with mode='linear_head'. "
                 "The linear head requires a fixed-size embedding. "
                 "Use pooling='mean' or pooling='cls' instead."
             )
@@ -259,9 +161,7 @@ class ESM2Model(BaseModel):
             RuntimeError: If the head has not been initialised.
         """
         if self._head is None:
-            raise RuntimeError(
-                "_head is None; model was not configured with scoring_function='linear_head'"
-            )
+            raise RuntimeError("_head is None; model was not configured with mode='linear_head'")
         return self._head
 
     def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> dict[str, torch.Tensor]:
@@ -320,13 +220,14 @@ class ESM2Model(BaseModel):
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Compute predictions for the given candidates.
 
-        When scoring_function='pll': computes pseudo-log-likelihood (PLL) by masking one
+        When mode='likelihoods': computes pseudo-log-likelihood (PLL) by masking one
         residue at a time and recording log P(token_i | all other tokens). Returns the
         mean PLL over residue positions per sequence (higher = more probable). Sequences
         with ≤_PLL_BATCH_THRESHOLD residues are scored in a single batched forward pass;
         longer sequences are scored position-by-position to bound memory usage.
-        When scoring_function='linear_head': embeds sequences through the frozen backbone and passes
-        them through the linear head. Returns regression values (output_dim=1) or
+        When mode='linear_head': embeds sequences through the backbone (frozen or
+        fine-tuned) and passes them through the linear head. Returns regression values
+        (output_dim=1) or
         argmax class indices (output_dim>1).
 
         Args:
@@ -338,7 +239,7 @@ class ESM2Model(BaseModel):
         Raises:
             ValueError: If candidate_points is empty.
             ValueError: If any sequence has no scoreable residue positions.
-            RuntimeError: If scoring_function='linear_head' but the head is uninitialised
+            RuntimeError: If mode='linear_head' but the head is uninitialised
                 (should not happen if __init__ ran without error).
 
         Note:
@@ -354,7 +255,7 @@ class ESM2Model(BaseModel):
 
         self.esm_model.eval()
 
-        if self.train_config.scoring_function == "linear_head":
+        if self.train_config.mode == "linear_head":
             head = self._require_head()
             head.eval()
             all_preds: list[torch.Tensor] = []
@@ -368,104 +269,14 @@ class ESM2Model(BaseModel):
                     all_preds.append(preds.cpu())
             return Predictions(means=torch.cat(all_preds, dim=0).numpy().astype(np.float32))
         else:
-            return self._compute_pll(all_input_ids, all_attention_mask)
-
-    def _compute_pll(
-        self, all_input_ids: torch.Tensor, all_attention_mask: torch.Tensor
-    ) -> Predictions:
-        """Compute zero-shot pseudo-log-likelihood (PLL) scores for sequences.
-
-        This method scores each sequence by masking one residue at a time and
-        accumulating the log-probability the model assigns to the correct
-        residue at that position. The per-sequence score is the mean
-        (average) log-probability across all non-special (i.e. amino-acid)
-        positions. Two execution modes are used to trade off memory and
-        speed:
-
-        - If the number of scoreable residues is ≤ _PLL_BATCH_THRESHOLD, residues
-            are masked in a single batched forward pass (one masked position per
-            batch row) to leverage GPU parallelism. This creates a forward pass of
-            shape (n_residues × padded_seq_len), which can spike GPU memory for
-            sequences near the threshold on large models.
-        - For longer sequences, positions are masked and scored one-at-a-time
-            to avoid excessive memory usage.
-
-        Args:
-            all_input_ids: Tensor of shape (n_candidates, seq_len) with token IDs.
-            all_attention_mask: Tensor of shape (n_candidates, seq_len) with 1
-                for non-padding tokens.
-
-        Raises:
-            ValueError: If any sequence has no scoreable residue positions
-                (e.g. all special tokens).
-
-        Returns:
-            Predictions: means is a float32 numpy array of per-sequence PLL
-                scores (average log-likelihood per residue).
-        """
-        n_candidates = all_input_ids.shape[0]
-
-        # PLL: mask one residue at a time, scored per sequence
-        log_likelihoods: list[float] = []
-        _pll_oom_warned = False
-        with torch.no_grad():
-            for i in range(n_candidates):
-                input_ids_i = all_input_ids[i].unsqueeze(0).to(self.device)  # (1, L)
-                attention_mask_i = all_attention_mask[i].unsqueeze(0).to(self.device)
-
-                special_mask = self._special_tokens_mask(input_ids_i[0])
-                residue_positions = (~special_mask).nonzero(as_tuple=True)[0].tolist()
-
-                if not residue_positions:
-                    raise ValueError(
-                        "One or more sequences have no scoreable positions (all special tokens). "
-                        "Ensure each sequence contains at least one amino acid residue, "
-                        "or increase max_length to avoid full truncation."
-                    )
-
-                if len(residue_positions) <= self._PLL_BATCH_THRESHOLD:
-                    n = len(residue_positions)
-                    seq_len = input_ids_i.shape[1]
-                    if not _pll_oom_warned and n * seq_len > 50_000:
-                        logger.warning(
-                            "Zero-shot PLL batched forward pass: %d residues × %d padded tokens "
-                            "= %d tokens. This may cause OOM on memory-constrained devices. "
-                            "Reduce ESM2ModelConfig.max_length or call predict() on "
-                            "smaller batches.",
-                            n,
-                            seq_len,
-                            n * seq_len,
-                        )
-                        _pll_oom_warned = True
-                    batch_input = input_ids_i.expand(n, -1).clone()  # (N, L)
-                    for row, pos in enumerate(residue_positions):
-                        batch_input[row, pos] = self.tokeniser.mask_token_id
-                    logits = self.esm_model(
-                        input_ids=batch_input,
-                        attention_mask=attention_mask_i.expand(n, -1),
-                    ).logits  # (N, L, vocab_size)
-                    ll = sum(
-                        torch.nn.functional.log_softmax(logits[row, pos], dim=-1)[
-                            input_ids_i[0, pos]
-                        ].item()
-                        for row, pos in enumerate(residue_positions)
-                    )
-                else:
-                    ll = 0.0
-                    for pos in residue_positions:
-                        masked_input = input_ids_i.clone()
-                        masked_input[0, pos] = self.tokeniser.mask_token_id
-                        logits = self.esm_model(
-                            input_ids=masked_input,
-                            attention_mask=attention_mask_i,
-                        ).logits  # (1, L, vocab_size)
-                        ll += torch.nn.functional.log_softmax(logits[0, pos], dim=-1)[
-                            input_ids_i[0, pos]
-                        ].item()
-
-                log_likelihoods.append(ll / len(residue_positions))
-
-        return Predictions(means=np.array(log_likelihoods, dtype=np.float32))
+            return compute_pll(
+                self.esm_model,
+                self.tokeniser,
+                self.device,
+                all_input_ids,
+                all_attention_mask,
+                self._PLL_BATCH_THRESHOLD,
+            )
 
     def embed(self, candidate_points: list[Candidate]) -> np.ndarray:
         """Compute sequence embeddings using the configured pooling strategy.
@@ -507,20 +318,33 @@ class ESM2Model(BaseModel):
                 all_embeddings.append(embeddings.cpu())
         return torch.cat(all_embeddings, dim=0).numpy().astype(np.float32)
 
-    def _prepare_data_loader(self, data: LabelledCandidates, shuffle: bool = False) -> DataLoader:
+    def _prepare_data_loader(
+        self,
+        data: LabelledCandidates,
+        shuffle: bool = False,
+        generator: torch.Generator | None = None,
+    ) -> DataLoader:
         """Create a DataLoader for training or validation.
+
+        For mode='linear_head', the whole dataset is tokenised eagerly into a single
+        tensor (labels are required). For mode='likelihoods' (MLM), sequences are
+        tokenised lazily per batch via `_collate_mlm`, so memory scales with batch size
+        rather than corpus size and each batch is padded only to its own longest sequence.
 
         Args:
             data: LabelledCandidates containing sequences and (for
-                scoring_function='linear_head') labels.
+                mode='linear_head') labels.
             shuffle: Whether to shuffle the dataset.
+            generator: Optional torch.Generator driving the shuffle order. Passing a seeded
+                generator (MLM mode) makes the epoch ordering reproducible; None uses the
+                global RNG.
 
         Returns:
-            DataLoader yielding (input_ids, attention_mask) pairs when scoring_function='pll',
-            or (input_ids, attention_mask, targets) triples when scoring_function='linear_head'.
+            DataLoader yielding (input_ids, attention_mask) pairs when mode='likelihoods',
+            or (input_ids, attention_mask, targets) triples when mode='linear_head'.
         """
-        batch = self.featurise(data)
-        if self.train_config.scoring_function == "linear_head":
+        if self.train_config.mode == "linear_head":
+            batch = self.featurise(data)
             targets = torch.tensor(data.labels, dtype=torch.float32)
             if self.train_config.loss_fn == "cross_entropy":
                 labels_arr = np.asarray(data.labels)
@@ -531,22 +355,41 @@ class ESM2Model(BaseModel):
                         "Pass integer labels or switch to loss_fn='mse' for regression."
                     )
             dataset = TensorDataset(batch["input_ids"], batch["attention_mask"], targets)
-        else:
-            dataset = TensorDataset(batch["input_ids"], batch["attention_mask"])
-        return DataLoader(dataset, batch_size=self.train_config.batch_size, shuffle=shuffle)
+            return DataLoader(dataset, batch_size=self.train_config.batch_size, shuffle=shuffle)
 
-    def _special_tokens_mask(self, input_ids: torch.Tensor) -> torch.Tensor:
-        """Return a boolean tensor True at positions occupied by CLS, EOS, PAD, or UNK tokens."""
-        special_ids = {
-            self.tokeniser.cls_token_id,
-            self.tokeniser.eos_token_id,
-            self.tokeniser.pad_token_id,
-            self.tokeniser.unk_token_id,
-        } - {None}
-        special_id_tensor = torch.tensor(
-            list(special_ids), dtype=input_ids.dtype, device=input_ids.device
+        effective_max = self.max_length - 2  # account for CLS and EOS tokens
+        if any(len(seq) > effective_max for seq in data.data):
+            logger.warning(
+                "One or more sequences exceed max_length=%d (after reserving 2 positions for "
+                "CLS/EOS tokens). They will be silently truncated during MLM fine-tuning. "
+                "Increase ESM2ModelConfig.max_length to avoid this.",
+                self.max_length,
+            )
+        return DataLoader(
+            list(data.data),
+            batch_size=self.train_config.batch_size,
+            shuffle=shuffle,
+            collate_fn=self._collate_mlm,
+            generator=generator,
         )
-        return torch.isin(input_ids, special_id_tensor)
+
+    def _collate_mlm(self, sequences: list[str]) -> tuple[torch.Tensor, torch.Tensor]:
+        """Tokenise one batch of raw sequences for MLM, padding to the batch's longest sequence.
+
+        Args:
+            sequences: Amino-acid sequence strings for a single batch.
+
+        Returns:
+            Tuple of (input_ids, attention_mask) tensors of shape (batch, batch_max_len).
+        """
+        encoding = self.tokeniser(
+            sequences,
+            max_length=self.max_length,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+        )
+        return encoding["input_ids"], encoding["attention_mask"]
 
     def _embed_batch(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         """Run the frozen backbone and pool hidden states for one batch.
@@ -601,27 +444,180 @@ class ESM2Model(BaseModel):
         else:  # last_hidden_state
             return hidden_state
 
-    def _compute_loss(self, preds: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
-        """Compute loss between predictions and targets using the configured loss function.
+    def _mask_tokens(
+        self, input_ids: torch.Tensor, generator: torch.Generator | None = None
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Apply BERT-style random token masking for MLM.
+
+        Thin wrapper around `esm_utils.loss.mask_tokens` using this model's tokeniser and
+        configured `mask_probability` / `mask_splitting`.
+
+        Args:
+            input_ids: Token IDs of shape (batch, seq_len).
+            generator: Optional torch.Generator for reproducible masking; None uses the
+                global RNG.
 
         Returns:
-            Scalar loss tensor.
+            Tuple of (masked_input_ids, labels), both of shape (batch, seq_len).
+
+        Raises:
+            ValueError: If the tokeniser does not have a mask token.
         """
-        if self.train_config.loss_fn == "mse":
-            return torch.nn.functional.mse_loss(preds.squeeze(-1), targets)
-        else:
-            return torch.nn.functional.cross_entropy(preds, targets.long())
+        return mask_tokens(
+            input_ids,
+            self.tokeniser,
+            self.train_config.mask_probability,
+            self.train_config.mask_splitting,
+            generator,
+        )
+
+    def _train_epoch_mlm(
+        self,
+        train_loader: DataLoader,
+        optimizer: optim.Optimizer,
+        generator: torch.Generator | None = None,
+    ) -> tuple[float, dict[str, float]]:
+        """Train the full ESM-2 backbone for one epoch via masked language modelling.
+
+        Args:
+            train_loader: DataLoader yielding (input_ids, attention_mask) pairs.
+            optimizer: Optimizer over esm_model.parameters().
+            generator: Optional torch.Generator driving the per-batch masking. Persisting a
+                single generator across epochs makes a whole training run reproducible from a
+                seed while still drawing fresh masks each epoch; None uses the global RNG.
+
+        Returns:
+            Tuple of (avg_loss, {"perplexity": float, "token_accuracy": float}). avg_loss is
+            the token-weighted mean cross-entropy over masked positions.
+
+        Raises:
+            RuntimeError: If the loss becomes NaN or infinite.
+            ValueError: If the DataLoader yields no maskable positions.
+        """
+        self.esm_model.train()
+        total_loss = 0.0
+        n_correct = 0
+        n_total = 0
+
+        for input_ids, attention_mask in train_loader:
+            batch_ids = input_ids.to(self.device)
+            batch_mask = attention_mask.to(self.device)
+
+            optimizer.zero_grad()
+            masked_ids, labels = self._mask_tokens(batch_ids, generator=generator)
+            logits = self.esm_model(
+                input_ids=masked_ids, attention_mask=batch_mask
+            ).logits  # (B, L, vocab)
+
+            vocab_size = logits.shape[-1]
+            flat_logits = logits.view(-1, vocab_size)
+            flat_labels = labels.view(-1)
+            loss = torch.nn.functional.cross_entropy(flat_logits, flat_labels, ignore_index=-100)
+
+            if not torch.isfinite(loss):
+                raise RuntimeError(
+                    f"MLM training loss is {loss.item():.6g}. This can happen when a batch has "
+                    "no maskable residue positions (all special tokens) or from an unstable "
+                    "learning rate. Check your data or reduce the learning rate."
+                )
+
+            loss.backward()
+            if self.train_config.max_grad_norm is not None:
+                torch.nn.utils.clip_grad_norm_(
+                    self.esm_model.parameters(), self.train_config.max_grad_norm
+                )
+            optimizer.step()
+
+            active = flat_labels != -100
+            n_active = int(active.sum().item())
+            total_loss += loss.item() * n_active
+            preds = flat_logits[active].argmax(dim=-1)
+            n_correct += int((preds == flat_labels[active]).sum().item())
+            n_total += n_active
+
+        if n_total == 0:
+            raise ValueError(
+                "MLM training produced no maskable positions. Ensure train_data is non-empty "
+                "and contains residue (non-special) tokens."
+            )
+
+        avg_loss = total_loss / n_total
+        token_accuracy = n_correct / n_total
+        self.esm_model.eval()
+        return avg_loss, {"perplexity": float(np.exp(avg_loss)), "token_accuracy": token_accuracy}
+
+    def _validate_epoch_mlm(self, val_loader: DataLoader) -> tuple[float, dict[str, float]]:
+        """Validate the MLM model for one epoch.
+
+        Args:
+            val_loader: DataLoader yielding (input_ids, attention_mask) pairs.
+
+        Returns:
+            Tuple of (avg_loss, {"perplexity": float, "token_accuracy": float}). avg_loss is
+            the token-weighted mean cross-entropy over masked positions.
+
+        Raises:
+            ValueError: If the DataLoader yields no maskable positions.
+
+        Note:
+            Validation masking is seeded from `ESM2ModelConfig.seed` so the same positions
+            are masked every epoch, making val metrics comparable across epochs rather than
+            fluctuating with the random masking draw.
+        """
+        self.esm_model.eval()
+        generator = torch.Generator(device=self.device)
+        generator.manual_seed(self.model_config.seed)
+        total_loss = 0.0
+        n_correct = 0
+        n_total = 0
+
+        with torch.no_grad():
+            for input_ids, attention_mask in val_loader:
+                batch_ids = input_ids.to(self.device)
+                batch_mask = attention_mask.to(self.device)
+
+                masked_ids, labels = self._mask_tokens(batch_ids, generator=generator)
+                logits = self.esm_model(input_ids=masked_ids, attention_mask=batch_mask).logits
+
+                vocab_size = logits.shape[-1]
+                flat_logits = logits.view(-1, vocab_size)
+                flat_labels = labels.view(-1)
+                loss = torch.nn.functional.cross_entropy(
+                    flat_logits, flat_labels, ignore_index=-100
+                )
+
+                active = flat_labels != -100
+                n_active = int(active.sum().item())
+                total_loss += loss.item() * n_active
+                preds = flat_logits[active].argmax(dim=-1)
+                n_correct += int((preds == flat_labels[active]).sum().item())
+                n_total += n_active
+
+        if n_total == 0:
+            raise ValueError(
+                "MLM validation produced no maskable positions. Ensure val_data is non-empty "
+                "and contains residue (non-special) tokens."
+            )
+
+        avg_loss = total_loss / n_total
+        token_accuracy = n_correct / n_total
+        return avg_loss, {"perplexity": float(np.exp(avg_loss)), "token_accuracy": token_accuracy}
 
     def _train_epoch_linear_head(
         self,
         train_loader: DataLoader,
         optimizer: optim.Optimizer,
     ) -> tuple[float, dict[str, float]]:
-        """Train the linear head for one epoch with frozen backbone.
+        """Train the linear head for one epoch.
+
+        When freeze_backbone=False the backbone is fine-tuned jointly with the head:
+        embeddings are computed with gradients enabled and the backbone runs in train()
+        mode. When frozen, embeddings are computed under torch.no_grad() with the backbone
+        in eval() mode and only the head is updated.
 
         Args:
             train_loader: DataLoader yielding (input_ids, attention_mask, targets).
-            optimizer: Optimizer for the head parameters.
+            optimizer: Optimizer for the head (and, when unfrozen, the backbone).
 
         Returns:
             Tuple of (average_loss, empty metrics_dict).
@@ -631,7 +627,11 @@ class ESM2Model(BaseModel):
             ValueError: If the DataLoader produces no batches.
         """
         head = self._require_head()
-        self.esm_model.eval()
+        freeze = self.train_config.freeze_backbone
+        if freeze:
+            self.esm_model.eval()
+        else:
+            self.esm_model.train()
         head.train()
         epoch_losses: list[float] = []
 
@@ -640,13 +640,16 @@ class ESM2Model(BaseModel):
             batch_mask = attention_mask.to(self.device)
             batch_targets = targets.to(self.device)
 
-            with torch.no_grad():
+            if freeze:
+                with torch.no_grad():
+                    embeddings = self._embed_batch(batch_ids, batch_mask)
+            else:
                 embeddings = self._embed_batch(batch_ids, batch_mask)
 
             optimizer.zero_grad()
             preds = head(embeddings)
 
-            loss = self._compute_loss(preds, batch_targets)
+            loss = compute_supervised_loss(preds, batch_targets, self.train_config.loss_fn)
 
             if not torch.isfinite(loss):
                 raise RuntimeError(
@@ -655,7 +658,10 @@ class ESM2Model(BaseModel):
                 )
             loss.backward()
             if self.train_config.max_grad_norm is not None:
-                torch.nn.utils.clip_grad_norm_(head.parameters(), self.train_config.max_grad_norm)
+                clip_params = list(head.parameters())
+                if not freeze:
+                    clip_params += list(self.esm_model.parameters())
+                torch.nn.utils.clip_grad_norm_(clip_params, self.train_config.max_grad_norm)
             optimizer.step()
             epoch_losses.append(loss.item())
 
@@ -663,6 +669,8 @@ class ESM2Model(BaseModel):
             raise ValueError(
                 "Linear training DataLoader produced no batches. Ensure train_data is non-empty."
             )
+        if not freeze:
+            self.esm_model.eval()
         avg_loss = float(np.mean(epoch_losses))
         return avg_loss, {}
 
@@ -676,7 +684,7 @@ class ESM2Model(BaseModel):
             Tuple of (average_loss, empty metrics_dict).
 
         Raises:
-            RuntimeError: If the model was not configured with scoring_function='linear_head'.
+            RuntimeError: If the model was not configured with mode='linear_head'.
             ValueError: If the DataLoader produces no batches.
         """
         head = self._require_head()
@@ -692,7 +700,7 @@ class ESM2Model(BaseModel):
 
                 embeddings = self._embed_batch(batch_ids, batch_mask)
                 preds = head(embeddings)
-                loss = self._compute_loss(preds, batch_targets)
+                loss = compute_supervised_loss(preds, batch_targets, self.train_config.loss_fn)
                 val_losses.append(loss.item())
 
         if not val_losses:
@@ -722,21 +730,17 @@ class ESM2Model(BaseModel):
         is_last_epoch = epoch == self.train_config.num_epochs - 1
         if (epoch + 1) % self.train_config.log_frequency == 0 or is_last_epoch:
             additional: dict[str, float] = {}
-            # These keys are reserved for future training modes (e.g. full MLM fine-tuning).
-            # In linear head mode, train_metrics / val_metrics are always {}.
+            # MLM fine-tuning populates perplexity / token_accuracy; in linear head mode
+            # train_metrics / val_metrics are always {}.
             if (v := train_metrics.get("perplexity")) is not None:
                 additional["train_perplexity"] = float(v)
             if (v := train_metrics.get("token_accuracy")) is not None:
                 additional["train_token_accuracy"] = float(v)
-            if (v := train_metrics.get("log_likelihood")) is not None:
-                additional["train_log_likelihood"] = float(v)
             if val_metrics is not None:
                 if (v := val_metrics.get("perplexity")) is not None:
                     additional["val_perplexity"] = float(v)
                 if (v := val_metrics.get("token_accuracy")) is not None:
                     additional["val_token_accuracy"] = float(v)
-                if (v := val_metrics.get("log_likelihood")) is not None:
-                    additional["val_log_likelihood"] = float(v)
             epoch_metric = SurrogateEpochMetrics(
                 epoch=epoch,
                 train_loss=avg_train_loss,
@@ -755,30 +759,38 @@ class ESM2Model(BaseModel):
     def train(
         self, train_data: LabelledCandidates, val_data: LabelledCandidates | None = None
     ) -> None:
-        """Fine-tune the linear head using the configured loss function.
+        """Fine-tune ESM-2 using the configured mode and loss function.
 
-        When scoring_function='pll', train() raises NotImplementedError (predict uses
-        masked-marginal scoring). When scoring_function='linear_head', trains the linear head
-        on top of frozen embeddings.
+        When mode='likelihoods' and freeze_backbone=True, train() raises
+        NotImplementedError (zero-shot PLL only; nothing to train). When
+        mode='likelihoods' and freeze_backbone=False, fine-tunes the full
+        ESM-2 backbone via masked language modelling. When mode='linear_head',
+        trains the linear head (with frozen backbone) or fine-tunes the backbone
+        jointly with the head when freeze_backbone=False.
 
         Args:
-            train_data: Training data containing sequences and labels.
+            train_data: Training data containing sequences and (for linear_head) labels.
+                MLM fine-tuning ignores labels, but LabelledCandidates still requires them —
+                pass placeholder values.
             val_data: Optional validation data for monitoring training loss.
 
         Raises:
-            NotImplementedError: If scoring_function='pll'.
+            NotImplementedError: If mode='likelihoods' and freeze_backbone=True.
+            ValueError: If mode='linear_head' and loss_fn is None.
             AssertionError: If optimizer_type is invalid (unreachable if __post_init__ ran).
-            RuntimeError: If scoring_function='linear_head' but head is uninitialised.
+            RuntimeError: If mode='linear_head' but head is uninitialised.
         """
-        if self.train_config.scoring_function == "pll":
+        if self.train_config.mode == "likelihoods" and self.train_config.freeze_backbone:
             raise NotImplementedError(
-                "train() requires scoring_function='linear_head'. "
-                "Set scoring_function='linear_head' in ESM2TrainConfig to enable "
-                "training a linear head, "
-                "or use predict() for masked-marginal scoring without training. "
-                "Currently, training/fine-tuning the model with pseudo "
-                "log-likelihood scores is not implemented; use the 'linear_head' "
-                "for training."
+                "train() is not available when mode='likelihoods' and "
+                "freeze_backbone=True. The backbone is frozen and there is no linear head "
+                "to train. Set freeze_backbone=False and loss_fn='mlm' to enable MLM "
+                "fine-tuning, or call predict() directly for zero-shot PLL scoring."
+            )
+        if self.train_config.mode == "linear_head" and self.train_config.loss_fn is None:
+            raise ValueError(
+                "loss_fn must be set for mode='linear_head' training. "
+                "Choose 'mse' for regression or 'cross_entropy' for classification."
             )
 
         self._epoch_metrics = []
@@ -788,21 +800,45 @@ class ESM2Model(BaseModel):
             f"Fine-tuning ESM-2 ({self.model_config.model_id}) with {len(train_data)} sequences"
         )
 
-        self._require_head()
+        # Seed both the MLM shuffle order and the per-batch masking from model_config.seed so
+        # a whole fine-tuning run is reproducible, while still drawing a fresh mask each epoch
+        # as the generators advance. Two generators are used because the DataLoader sampler
+        # requires a CPU generator whereas masking runs on self.device. Unused for linear_head.
+        mlm_generator: torch.Generator | None = None
+        shuffle_generator: torch.Generator | None = None
+        if self.train_config.mode == "likelihoods":
+            mlm_generator = torch.Generator(device=self.device)
+            mlm_generator.manual_seed(self.model_config.seed)
+            shuffle_generator = torch.Generator()
+            shuffle_generator.manual_seed(self.model_config.seed)
 
-        train_loader = self._prepare_data_loader(train_data, shuffle=True)
+        train_loader = self._prepare_data_loader(
+            train_data, shuffle=True, generator=shuffle_generator
+        )
         val_loader = None
         if val_data is not None and len(val_data) > 0:
             val_loader = self._prepare_data_loader(val_data, shuffle=False)
 
+        if self.train_config.mode == "linear_head":
+            # Head trains at learning_rate; when unfrozen, the backbone is fine-tuned in a
+            # separate param group at backbone_learning_rate (typically lower).
+            params: Any = [
+                {"params": self._require_head().parameters()},
+            ]
+            if not self.train_config.freeze_backbone:
+                params.append({
+                    "params": self.esm_model.parameters(),
+                    "lr": self.train_config.backbone_learning_rate,
+                })
+        else:
+            params = self.esm_model.parameters()
+
         if self.train_config.optimizer_type == "adamw":
             optimizer: torch.optim.Optimizer = torch.optim.AdamW(
-                self._require_head().parameters(), lr=self.train_config.learning_rate
+                params, lr=self.train_config.learning_rate
             )
         elif self.train_config.optimizer_type == "adam":
-            optimizer = torch.optim.Adam(
-                self._require_head().parameters(), lr=self.train_config.learning_rate
-            )
+            optimizer = torch.optim.Adam(params, lr=self.train_config.learning_rate)
         else:
             raise AssertionError(
                 f"Unreachable: optimizer_type={self.train_config.optimizer_type!r} "
@@ -815,9 +851,20 @@ class ESM2Model(BaseModel):
         val_metrics: dict[str, float] = {}
 
         for epoch in range(self.train_config.num_epochs):
-            avg_train_loss, train_metrics = self._train_epoch_linear_head(train_loader, optimizer)
+            if self.train_config.mode == "linear_head":
+                avg_train_loss, train_metrics = self._train_epoch_linear_head(
+                    train_loader, optimizer
+                )
+                if val_loader is not None:
+                    avg_val_loss, val_metrics = self._validate_epoch_linear_head(val_loader)
+            else:  # likelihoods, freeze_backbone=False
+                avg_train_loss, train_metrics = self._train_epoch_mlm(
+                    train_loader, optimizer, generator=mlm_generator
+                )
+                if val_loader is not None:
+                    avg_val_loss, val_metrics = self._validate_epoch_mlm(val_loader)
+
             if val_loader is not None:
-                avg_val_loss, val_metrics = self._validate_epoch_linear_head(val_loader)
                 self._record_epoch_metrics(
                     epoch, avg_train_loss, train_metrics, avg_val_loss, val_metrics
                 )
