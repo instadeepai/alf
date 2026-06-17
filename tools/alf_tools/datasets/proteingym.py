@@ -51,8 +51,17 @@ def _download_dms_dataframe(dms_name: str) -> pd.DataFrame:
         DataFrame with columns: mutant, mutated_sequence, DMS_score.
 
     Raises:
+        ImportError: If pyarrow is not installed.
         ValueError: If dms_name is not found in any shard.
     """
+    try:
+        import pyarrow  # noqa: F401, PLC0415
+    except ImportError as e:
+        raise ImportError(
+            "pyarrow is required to download ProteinGym data. "
+            "Install it with: pip install 'alf_tools[proteingym]'"
+        ) from e
+
     for shard_idx in range(_N_SUBSTITUTION_SHARDS):
         filename = (
             f"DMS_substitutions/train-0000{shard_idx}-of-0000{_N_SUBSTITUTION_SHARDS}.parquet"
