@@ -140,8 +140,8 @@ class TestProteinGymDataset:
         """Label statistics for modulo fold 0 of IF1_ECOLI_Kelsic_2016."""
         train_mean = np.mean(proteingym_dataset_cv_singles.train_dataset.labels)
         test_mean = np.mean(proteingym_dataset_cv_singles.test_dataset.labels)
-        assert np.isfinite(train_mean), "Train mean should be finite"
-        assert np.isfinite(test_mean), "Test mean should be finite"
+        assert np.isclose(train_mean, 0.806602, atol=1e-4), f"Train mean off: {train_mean}"
+        assert np.isclose(test_mean, 0.738843, atol=1e-4), f"Test mean off: {test_mean}"
 
     def test_cross_validation_multiples_split_sizes(self, proteingym_dataset_cv_multiples):
         """Random fold 0 (seed=0) for CAPSD_AAV2S_Sinai_2021: 8466 test, 33862 train."""
@@ -159,24 +159,9 @@ class TestProteinGymDataset:
         """Label statistics for random fold 0 of CAPSD_AAV2S_Sinai_2021."""
         train_mean = np.mean(proteingym_dataset_cv_multiples.train_dataset.labels)
         test_mean = np.mean(proteingym_dataset_cv_multiples.test_dataset.labels)
-        assert np.isfinite(train_mean), "Train mean should be finite"
-        assert np.isfinite(test_mean), "Test mean should be finite"
+        assert np.isclose(train_mean, -1.224675, atol=1e-4), f"Train mean off: {train_mean}"
+        assert np.isclose(test_mean, -1.230568, atol=1e-4), f"Test mean off: {test_mean}"
 
-
-def _synthetic_singles_dataframe(n: int = 20) -> pd.DataFrame:
-    """Build a synthetic ProteinGym "singles" CSV table with distinct fold columns.
-
-    The contiguous and random fold assignments are deliberately different so a
-    test can confirm the contiguous fold column (not another) is the one used.
-    """
-    return pd.DataFrame({
-        "mutated_sequence": ["MKL" + "A" * (i + 1) for i in range(n)],
-        "DMS_score": [float(i) for i in range(n)],
-        "mutant": [f"A{i+1}G" for i in range(n)],
-        "fold_random_5": [(i + 2) % 5 for i in range(n)],
-        "fold_modulo_5": [(i + 1) % 5 for i in range(n)],
-        "fold_contiguous_5": [i % 5 for i in range(n)],
-    })
 
 
 class TestProteinGymCrossValidationConfig:

@@ -224,24 +224,21 @@ class ProteinGym(BaseDataset):
             logger.info("ProteinGym dataset cached at %s", filepath)
 
         df = pd.read_csv(filepath)
-        dataset = LabelledCandidates(candidates=[], labels=np.array([]))
-        for _, row in df.iterrows():
-            data = row["mutated_sequence"]
-            label = row["DMS_score"]
-            features = {"mutant_code": row["mutant"]}
-            if dms_type == "singles":
-                features.update({
-                    "random_fold_id": row["fold_random_5"],
-                    "modulo_fold_id": row["fold_modulo_5"],
-                    "contiguous_fold_id": row["fold_contiguous_5"],
-                })
-            else:
-                features.update({
-                    "random_fold_id": row["fold_rand_multiples"],
-                })
-            dataset.append(
-                [Candidate(data=data, modality=self.modality, features=features)], np.array([label])
+        if dms_type == "singles":
+            fold_cols = {"random_fold_id": "fold_random_5", "modulo_fold_id": "fold_modulo_5",
+                         "contiguous_fold_id": "fold_contiguous_5"}
+        else:
+            fold_cols = {"random_fold_id": "fold_rand_multiples"}
+        candidates = [
+            Candidate(
+                data=row["mutated_sequence"],
+                modality=self.modality,
+                features={"mutant_code": row["mutant"],
+                          **{k: row[v] for k, v in fold_cols.items()}},
             )
+            for row in df.to_dict("records")
+        ]
+        dataset = LabelledCandidates(candidates=candidates, labels=df["DMS_score"].to_numpy())
 
         return dataset
 
