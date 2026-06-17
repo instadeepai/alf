@@ -15,7 +15,7 @@ Run the full ask/tell loop end to end:
 
 If you want to explore ALF's core abstractions without installing PyTorch, start here:
 
-- [Core-only Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/alf_core_quickstart.ipynb): a synthetic optimisation loop built entirely on `alf-core` using numpy and scipy. Shows how to subclass the base classes and run the active-learning loop with no ML framework dependencies.
+- [Core-only Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/alf_core_quickstart.ipynb): a synthetic optimisation loop built entirely on `alf-core` using numpy and scipy. Implements a bootstrap ensemble surrogate and Probability of Improvement acquisition function — both custom, neither available in `alf-tools` — to show how to bring your own components with no ML framework dependencies.
 
 ## Go deeper on models
 
