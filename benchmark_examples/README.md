@@ -70,8 +70,7 @@ Bold lines are the mean over seeds; faint lines are individual seeds. The printe
 | ei          | -0.016 ± 0.076 | 4.020 ± 0.017 | 1.00 ± 0.00 |
 | core_set    | -0.039 ± 0.054 | 4.033 ± 0.000 | 1.00 ± 0.00 |
 
-On GFP these acquisition functions perform similarly — a fair, if undramatic, result; the
-gaps widen on harder landscapes.
+On GFP these acquisition functions perform similarly; the gaps widen on harder landscapes.
 
 ## How it works
 
