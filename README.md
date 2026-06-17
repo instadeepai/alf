@@ -107,7 +107,7 @@ New to active learning? Start with [Why ALF?](https://instadeepai.github.io/alf/
 
 ### Lightweight (alf-core only, no PyTorch)
 
-- **[Core-only Tutorial](tutorials/core_only_tutorial.ipynb)** — synthetic optimisation loop using only `alf-core` and numpy/scipy
+- **[Core-only Tutorial](tutorials/alf_core_quickstart.ipynb)** — synthetic optimisation loop using only `alf-core` and numpy/scipy
 
 ### Extend ALF
 
