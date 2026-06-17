@@ -31,7 +31,7 @@ from alf_core import (
 )
 from alf_core.dataclasses.state import State
 from alf_core.dataset.base_dataset import BaseDataset
-from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel, BoTorchTrainConfig
+from alf_tools.models.gp import FeaturizerConfig, GPModel, GPTrainConfig
 from alf_tools.models.utils.botorch_model_wrapper import (
     resolve_botorch_model,
 )
@@ -128,8 +128,11 @@ def trained_surrogate(simple_dataset: _InlineBraninDataset) -> Surrogate:
     Returns:
         Surrogate: A trained GP surrogate model.
     """
-    train_config = BoTorchTrainConfig(num_iterations=50, learning_rate=0.1)
-    gp_model = BoTorchGPModel(train_config=train_config)
+    gp_model = GPModel(
+        train_config=GPTrainConfig(num_iterations=50, learning_rate=0.1),
+        featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+        device="cpu",
+    )
     surrogate = Surrogate(model=gp_model)
     surrogate.fit(simple_dataset.train_dataset, simple_dataset.validation_dataset)
     return surrogate
@@ -392,8 +395,7 @@ def test_optimization_mode_qucb_gpmodel(simple_dataset, trained_gp_model):
     A trained `GPModel` is not itself a native BoTorch model but exposes a trained
     `botorch_model`. `_optimize_continuous` resolves it to that inner model (for
     analytic gradients) via the shared `resolve_botorch_model` capability check,
-    then optimises. This covers the joint-capable ALF surrogate type that the
-    `BoTorchGPModel`-backed tests do not exercise.
+    then optimises.
     """
     gp_model = trained_gp_model.model
     # The GPModel is joint-capable: it resolves to a trained inner BoTorch model.
@@ -495,7 +497,12 @@ def test_requires_trained_surrogate(simple_dataset):
 
     # State requires a Surrogate at construction time (beartype-enforced); set to None
     # afterward so the acquisition function's own guard is what raises the error.
-    placeholder = Surrogate(model=BoTorchGPModel())
+    placeholder = Surrogate(
+        model=GPModel(
+            featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+            device="cpu",
+        )
+    )
     state = State(dataset=simple_dataset, surrogate=placeholder)
     state.surrogate = None  # type: ignore
 
@@ -579,8 +586,11 @@ def test_high_dimensional_input(trained_surrogate):
     dataset.setup()
 
     # Train surrogate
-    train_config = BoTorchTrainConfig(num_iterations=50)
-    gp_model = BoTorchGPModel(train_config=train_config)
+    gp_model = GPModel(
+        train_config=GPTrainConfig(num_iterations=50),
+        featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+        device="cpu",
+    )
     surrogate = Surrogate(model=gp_model)
     surrogate.fit(dataset.train_dataset, dataset.validation_dataset)
 

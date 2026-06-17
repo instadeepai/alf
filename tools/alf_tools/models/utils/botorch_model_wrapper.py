@@ -74,7 +74,7 @@ class BotorchModelWrapper(BotorchModel):
     ALF models split into two posterior paths:
 
     Joint-capable ALF models that expose a trained `botorch_model` attribute
-    (e.g. `GPModel`/`BoTorchGPModel`) delegate `posterior()` to the inner
+    (e.g. `GPModel`) delegate `posterior()` to the inner
     BoTorch model's native `posterior()`. This yields a true joint covariance
     and fully honours `observation_noise`, `posterior_transform` and
     `output_indices`, all of which are forwarded to the inner model. q-based
