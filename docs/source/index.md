@@ -114,6 +114,13 @@ task.run(
 )
 ```
 
+What each component does:
+
+- **`Dataset`** — holds your candidates and their labels; handles train/candidate-pool splits
+- **`Surrogate`** — wraps a model that is cheaply re-trained each round to predict labels and uncertainty
+- **`Optimizer`** — scores the candidate pool with an acquisition function and selects the next batch
+- **`Oracle`** — evaluates selected candidates (wet-lab assay, simulation, or held-out dataset)
+
 New to active learning? Start with [Why ALF?](explanation/why-alf.md) for the motivation, then
 work through the [Tutorials](tutorials/index.md).
 
