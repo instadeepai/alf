@@ -31,7 +31,7 @@ Before you begin, ensure you have:
    uv sync
    ```
 
-   For detailed installation instructions, including GPU support, see [docs/INSTALLATION.md](INSTALLATION.md).
+   For detailed installation instructions, including GPU support, see [Installation Guide](https://instadeepai.github.io/alf/installation.html).
 
 3. **Install pre-commit hooks:**
    ```bash
@@ -72,7 +72,7 @@ ALF is organized into two packages to balance flexibility and usability:
 - **alf-core** (`core/alf_core/`) - Framework backbone with base classes, core data structures, and minimal dependencies (no ML frameworks)
 - **alf-tools** (`tools/alf_tools/`) - Ready-to-use implementations (models, datasets, acquisition functions) with heavier dependencies (PyTorch)
 
-📖 **For detailed architecture and dependency information, see [INSTALLATION.md](INSTALLATION.md#architecture)**.
+📖 **For detailed architecture and dependency information, see [INSTALLATION.md](https://instadeepai.github.io/alf/installation.html)**.
 
 ## Contributing Guidelines
 
@@ -310,12 +310,12 @@ Check the error message for specific type issues and add appropriate annotations
 #### Issue: CUDA/GPU errors during testing
 **Solution:** If you don't have a GPU or CUDA installed, install the CPU-only version:
 ```bash
-# See docs/INSTALLATION.md for GPU-specific setup
+# See the Installation Guide in the docs for GPU-specific setup
 uv sync
 ```
 
 #### Issue: Switching to GPU PyTorch
-**Solution:** There are two options — see [GPU Support in INSTALLATION.md](INSTALLATION.md#gpu-support-optional) for full prerequisites and verification steps.
+**Solution:** There are two options — see [GPU Support in INSTALLATION.md](https://instadeepai.github.io/alf/installation.html#gpu-support-optional) for full prerequisites and verification steps.
 
 **Option A — Temporary override (no file changes):**
 ```bash
