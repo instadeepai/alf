@@ -5,6 +5,12 @@ design targets. It provides modular components for candidate search, surrogate m
 acquisition, enabling efficient discovery across expensive, high-dimensional search spaces such
 as protein sequences and small molecules.
 
+```{image} _static/alf_loop.svg
+:alt: The ALF active learning loop
+:align: center
+:width: 80%
+```
+
 ```{note}
 This project is under active development.
 ```
