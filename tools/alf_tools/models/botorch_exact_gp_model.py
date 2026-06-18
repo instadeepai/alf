@@ -12,20 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """BoTorch-based Gaussian Process models for ALF.
 
 This module provides GP models built on BoTorch's SingleTaskGP, which offers:
@@ -46,6 +32,7 @@ import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
 from botorch.fit import fit_gpytorch_mll
 from botorch.models import SingleTaskGP
+from botorch.models.transforms import Normalize, Standardize
 from botorch.optim.fit import fit_gpytorch_mll_torch
 from gpytorch.constraints.constraints import GreaterThan
 from gpytorch.kernels import MaternKernel, RBFKernel, ScaleKernel
@@ -53,8 +40,8 @@ from gpytorch.mlls import ExactMarginalLogLikelihood
 from gpytorch.priors.torch_priors import LogNormalPrior
 from torch.optim import Adam
 
+from alf_tools.models.utils.botorch_utils import candidates_to_tensor
 from alf_tools.models.utils.torch_utils import get_device
-from alf_tools.utils.botorch_utils import candidates_to_tensor
 
 logger = logging.getLogger("alf-tools")
 
@@ -76,7 +63,7 @@ class BoTorchGPModel(BaseModel):
     - Outputs are standardized (handled automatically)
 
     Example:
-        >>> from alf_tools.models.botorch_gp_models import BoTorchGPModel
+        >>> from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
         >>> from alf_tools.datasets.botorch_synthetic_dataset import BoTorchSyntheticDataset
         >>>
         >>> # Create dataset
@@ -105,7 +92,7 @@ class BoTorchGPModel(BaseModel):
         optimizer: str = "scipy",
         max_attempts: int = 5,
         device: Optional[str] = None,
-        dtype: torch.dtype = torch.float32,
+        dtype: torch.dtype = torch.float64,
         kernel_type: str | None = None,
         nu: float = 2.5,
         use_ard: bool = False,
@@ -115,8 +102,8 @@ class BoTorchGPModel(BaseModel):
         Args:
             normalize_inputs: Whether to normalize inputs to [0, 1]. Default: True.
                 If your data is already normalized, set to False.
-            standardize_outputs: Whether to standardize outputs (zero mean, unit variance).
-                Default: True. BoTorch handles this automatically with Standardize transform.
+            standardize_outputs: Whether to standardize outputs (zero mean, unit variance)
+                via a BoTorch Standardize outcome transform. Default: True.
             num_iterations: Number of optimization iterations for MLL. Default: 100.
                 For scipy optimizer: controls 'maxiter' in L-BFGS-B.
                 For torch optimizer: controls step_limit.
@@ -129,7 +116,8 @@ class BoTorchGPModel(BaseModel):
                 If fitting fails (e.g., due to numerical issues), it will retry
                 up to max_attempts times with different initializations.
             device: Device to run on ('cpu' or 'cuda'). If None, auto-detects.
-            dtype: Data type for tensors. Default: torch.float32.
+            dtype: Data type for tensors. Default: torch.float64 (recommended by
+                BoTorch for numerical stability of GP fitting).
             kernel_type: "matern" or None. If None, RBF is used by default.
             nu: nu value for Matern kernel. Default 2.5 aka Matern 5/2.
             use_ard: Whether to use ARD (Automatic Relevance Determination) in the
@@ -225,8 +213,6 @@ class BoTorchGPModel(BaseModel):
         self._validate_shape(self.train_Y)
 
         # Initialize SingleTaskGP
-        # Note: SingleTaskGP automatically applies Standardize outcome transform
-        # if standardize_outputs=True (which is the default)
         ard_num_dims = self.train_X.shape[-1] if self.use_ard else None
         if self.kernel_type == "matern":
             covar_module = ScaleKernel(MaternKernel(nu=self.nu, ard_num_dims=ard_num_dims))
@@ -259,8 +245,19 @@ class BoTorchGPModel(BaseModel):
                 f"Invalid kernel_type '{self.kernel_type}' specified. Using default RBF kernel."
             )
 
+        # Optional input/output transforms (applied inside the GP so that
+        # predictions are returned on the original scale).
+        input_transform = Normalize(d=self.train_X.shape[-1]) if self.normalize_inputs else None
+        outcome_transform = (
+            Standardize(m=self.train_Y.shape[-1]) if self.standardize_outputs else None
+        )
+
         self.model = SingleTaskGP(
-            train_X=self.train_X, train_Y=self.train_Y, covar_module=covar_module
+            train_X=self.train_X,
+            train_Y=self.train_Y,
+            covar_module=covar_module,
+            input_transform=input_transform,
+            outcome_transform=outcome_transform,
         )
         self.model = self.model.to(device=self.device, dtype=self.dtype)
 
@@ -303,8 +300,9 @@ class BoTorchGPModel(BaseModel):
             self.model.eval()
             with torch.no_grad():
                 output = self.model(self.train_X)
-                loss_tensor = -mll(output, self.train_Y.squeeze(-1))  # type: ignore
-                loss = float(loss_tensor.item())  # type: ignore
+                # mll/loss_tensor are gpytorch dynamic types mypy cannot resolve
+                loss_tensor = -mll(output, self.train_Y.squeeze(-1))  # type: ignore[operator]
+                loss = float(loss_tensor.item())  # type: ignore[union-attr]
 
             self._training_metrics["loss"].append(loss)
             self._training_metrics["iteration"].append(self.num_iterations)

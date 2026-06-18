@@ -261,7 +261,7 @@ def predictions_to_posterior(
     if device is None:
         device = torch.device("cpu")
 
-    # TODO: double check that we don't need .detach() here
+    # predictions.means/variances are numpy arrays, so no autograd graph to detach.
     mean = torch.from_numpy(predictions.means).to(dtype).to(device)
     variance = torch.from_numpy(predictions.variances).to(dtype).to(device)
 

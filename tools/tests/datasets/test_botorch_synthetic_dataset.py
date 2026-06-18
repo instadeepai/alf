@@ -12,20 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Tests for BoTorch synthetic test function dataset adapter."""
 
 import numpy as np
@@ -322,3 +308,85 @@ def test_reproducibility_with_seed(base_config):
     ):
         assert np.allclose(c1.data, c2.data)
         assert np.isclose(l1, l2)
+
+
+# (function_name, dim, expected_dim, expected_num_objectives)
+MULTI_OBJECTIVE_CASES = [
+    ("branincurrin", None, 2, 2),
+    ("dtlz2", 4, 4, 2),
+    ("zdt1", 3, 3, 2),
+]
+
+
+@pytest.mark.parametrize("function_name, dim, expected_dim, num_objectives", MULTI_OBJECTIVE_CASES)
+def test_multi_objective_initialization(
+    base_config, function_name, dim, expected_dim, num_objectives
+):
+    """Multi-objective functions initialise with the right shape and no scalar optimum."""
+    dataset = BoTorchSyntheticDataset(
+        config=base_config,
+        function_name=function_name,
+        dim=dim,
+        n_initial_samples=50,
+    )
+
+    assert dataset.dim == expected_dim
+    assert dataset.bounds.shape == (2, expected_dim)
+    assert dataset.test_fn.num_objectives == num_objectives
+    # Multi-objective problems expose no single `_optimal_value`.
+    assert dataset.true_optimum is None
+
+
+@pytest.mark.parametrize("function_name, dim, expected_dim, num_objectives", MULTI_OBJECTIVE_CASES)
+def test_multi_objective_load_and_query_shapes(
+    base_config, function_name, dim, expected_dim, num_objectives
+):
+    """load_dataset and query return labels of shape (n, num_objectives)."""
+    n_samples = 50
+    dataset = BoTorchSyntheticDataset(
+        config=base_config,
+        function_name=function_name,
+        dim=dim,
+        n_initial_samples=n_samples,
+    )
+
+    labelled = dataset.load_dataset()
+    assert np.asarray(labelled.labels).shape == (n_samples, num_objectives)
+    assert len(labelled.candidates) == n_samples
+    assert np.all(np.isfinite(labelled.labels))
+
+    queried = dataset.query(labelled.candidates[:5])
+    assert np.asarray(queried.labels).shape == (5, num_objectives)
+
+
+@pytest.mark.parametrize("function_name, dim, expected_dim, num_objectives", MULTI_OBJECTIVE_CASES)
+def test_multi_objective_noise_preserves_shape(
+    base_config, function_name, dim, expected_dim, num_objectives
+):
+    """Noise injection keeps the multi-objective label shape intact."""
+    dataset = BoTorchSyntheticDataset(
+        config=base_config,
+        function_name=function_name,
+        dim=dim,
+        noise_std=0.1,
+        n_initial_samples=20,
+    )
+
+    labelled = dataset.load_dataset()
+    assert np.asarray(labelled.labels).shape == (20, num_objectives)
+
+
+@pytest.mark.parametrize("function_name, dim, expected_dim, num_objectives", MULTI_OBJECTIVE_CASES)
+def test_multi_objective_metadata(base_config, function_name, dim, expected_dim, num_objectives):
+    """Metadata is populated for multi-objective datasets."""
+    dataset = BoTorchSyntheticDataset(
+        config=base_config,
+        function_name=function_name,
+        dim=dim,
+        n_initial_samples=20,
+    )
+    dataset.set_metadata()
+
+    assert dataset.metadata["function_name"] == function_name
+    assert dataset.metadata["dim"] == expected_dim
+    assert dataset.metadata["true_optimum"] is None
