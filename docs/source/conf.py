@@ -57,9 +57,17 @@ default_role = "code"
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "furo"
+html_theme_options = {
+    "light_css_variables": {
+        "color-code-background": "#f0f0f0",
+    },
+    "dark_css_variables": {
+        "color-code-background": "#2a2a2a",
+    },
+}
 html_static_path = ['_static']
 html_baseurl = "https://instadeepai.github.io/alf/"
 highlight_language = "python"
-pygments_style = "sphinx"
+pygments_style = "default"
 
 add_function_parentheses = False

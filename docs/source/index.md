@@ -5,11 +5,27 @@ design targets. It provides modular components for candidate search, surrogate m
 acquisition, enabling efficient discovery across expensive, high-dimensional search spaces such
 as protein sequences and small molecules.
 
+```{image} _static/alf_loop.svg
+:alt: The ALF active learning loop
+:align: center
+:width: 80%
+```
+
 ```{note}
 This project is under active development.
 ```
 
-## Start here
+## 🔬 Why ALF?
+
+In scientific discovery, the bottleneck is rarely compute—it's the **experiment**. Each label
+costs a wet-lab assay, a simulation, or a measurement, and you can only afford a handful of
+rounds. ALF runs the full active-learning loop: train a surrogate on what you've measured, use an
+acquisition function to select the most informative next batch, score it, and repeat—all with
+modular, swappable components so you can change any one part without rewriting the rest.
+
+→ See [Why ALF?](explanation/why-alf.md) for the full motivation and design rationale.
+
+## 🗺️ Start here
 
 ::::{grid} 1 2 2 2
 :gutter: 3
@@ -43,17 +59,13 @@ API reference generated from docstrings, plus a glossary of ALF terms.
 :::
 ::::
 
-## Installation
-
-**Prerequisites:** Python 3.12 or higher and [uv](https://docs.astral.sh/uv/) (recommended) or `pip`.
-
-**Quick install** (directly from GitHub):
+## 📦 Installation
 
 ```bash
-# Install the core package (minimal dependencies, no PyTorch required)
+# Core package (minimal dependencies, no PyTorch required)
 pip install git+https://github.com/instadeepai/alf.git#subdirectory=core
 
-# Install the tools package (includes PyTorch, models, and datasets)
+# Tools package (includes PyTorch, models, and datasets)
 pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 ```
 
@@ -63,20 +75,20 @@ Add your GitHub credentials to `~/.netrc` for authentication:
 machine github.com login <USERNAME> password <TOKEN>
 ```
 
-**Development install:**
+For GPU support, optional extras, and development setup, see the
+[Installation Guide](installation.md).
 
-```bash
-git clone git@github.com:instadeepai/alf.git
-cd alf
-uv sync
-```
+## 🚀 Quick start
 
-For GPU support and full installation details, see the
-[Installation Guide](https://github.com/instadeepai/alf/blob/main/docs/INSTALLATION.md).
+The snippet below runs a full active learning design experiment. Each component is swappable:
+bring your own dataset, model, acquisition function, or oracle.
 
-## Quick start
+What each component does:
 
-Run an active learning design experiment:
+- **`Dataset`** — holds your candidates and their labels; handles train/candidate-pool splits
+- **`Surrogate`** — wraps a model that is cheaply re-trained each round to predict labels and uncertainty
+- **`Optimizer`** — scores the candidate pool with an acquisition function and selects the next batch
+- **`Oracle`** — evaluates selected candidates (wet-lab assay, simulation, or held-out dataset)
 
 ```python
 from alf_core import (
@@ -91,13 +103,20 @@ from alf_tools.datasets.gfp import GFP
 from alf_tools.models.cnn import CNNModel
 from alf_tools.optimizer.acquisition_functions.greedy import Greedy
 
-# Set up dataset and components
+# A dataset wraps your candidates and their known labels
 dataset = GFP(name="gfp", modality="sequence", seed=42)
+
+# The surrogate is a cheap probabilistic model trained on observed labels
 surrogate = Surrogate(model=CNNModel())
+
+# The optimizer picks the next batch: acquisition function scores candidates,
+# search function selects from them
 optimizer = Optimizer(acquisition_fn=Greedy(), search_fn=DatasetSearch())
+
+# The oracle scores selected candidates (here, it queries the held-out dataset)
 oracle = Oracle(scorer=dataset)
 
-# Run the design task
+# Run the active learning loop for 5 rounds, acquiring 100 candidates per round
 task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
 state = task.setup(dataset=dataset, surrogate=surrogate)
 task.run(
@@ -120,6 +139,7 @@ explanation/index
 tutorials/index
 how-to/index
 reference/index
+installation
 ```
 
 ```{toctree}

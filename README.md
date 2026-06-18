@@ -8,226 +8,154 @@
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 [![Tests and Linters 🧪](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml/badge.svg?branch=main)](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml)
 
+**ALF** is an active learning framework for computational science, designed to optimize high-dimensional and combinatorially vast search spaces where data acquisition is expensive—from wet-lab experiments and physical measurements to costly simulations. ALF accelerates discovery of optimal designs (proteins, molecules, materials) through intelligent candidate selection, adaptive modelling, and efficient evaluation strategies.
 
-**ALF** is an active learning framework for computational science, designed to optimize high-dimensional and combinatorially vast search spaces where data acquisition is expensive—from wet-lab experiments and physical measurements to costly simulations. ALF accelerates discovery of optimal designs (proteins, molecules, materials) through intelligent candidate selection, adaptive modeling, and efficient evaluation strategies.
+## Why ALF?
 
-## ✨ Features
+In scientific discovery, the bottleneck is rarely compute—it's the **experiment**. Each label costs a wet-lab assay, a simulation, or a measurement, and you can only afford a handful of rounds. ALF runs the full active-learning loop for you: train a surrogate on what you've measured, use an acquisition function to select the most informative next batch, score it, and repeat—all with modular, swappable components so you can change any one part without rewriting the rest.
 
-- **Modular Architecture**: Flexible, extensible components that can be easily swapped and customized
-- **Multiple Experiment Setups**: Multi-round optimization, supervised learning, and zero-shot evaluation
-- **Offline and Online Evaluation**: Dataset-based and model-based optimization scenarios
-- **Evaluation Metrics**: Metrics for prediction accuracy and uncertainty calibration
+→ [Full motivation and design rationale](https://instadeepai.github.io/alf/explanation/why-alf.html)
+
+## 📖 Documentation
+
+**[https://instadeepai.github.io/alf/](https://instadeepai.github.io/alf/)** — full docs including API reference, tutorials, and how-to guides.
+
+- 📥 [Installation Guide](https://instadeepai.github.io/alf/installation.html)
+- 🛠️ [Contributing Guide](docs/CONTRIBUTING.md)
 
 ## 📦 Package Architecture
 
 ALF is split into two packages:
 
-**alf-core** - Lightweight framework with base classes, core data structures, and minimal dependencies (numpy, pandas, scipy) - no ML framework dependencies. Use for custom implementations or when integrating into existing systems.
+**alf-core** — Lightweight framework with base classes, core data structures, and minimal dependencies (numpy, pandas, scipy). No ML framework dependencies. It is standalone and domain-agnostic — see the [ALF Core Quickstart](tutorials/alf_core_quickstart.ipynb) for an example. Use this for custom implementations or when integrating into existing systems.
 
-**alf-tools** - Ready-to-use datasets, models, and acquisition functions with heavier dependencies (PyTorch). Depends on alf-core. Use for quick start and prototyping.
-
-Install only what you need: `alf-core` for minimal dependencies, or `alf-tools` (includes alf-core) for batteries-included implementations.
+**alf-tools** — Ready-to-use datasets, models, and acquisition functions with heavier dependencies (PyTorch). Depends on alf-core. Use this for quick-start and prototyping.
 
 ## 📦 Installation
 
-### Quick Install
-
 ```bash
-# Install the core package
+# Core package only (no PyTorch required)
 pip install git+https://github.com/instadeepai/alf.git#subdirectory=core
 
-# Install the tools package (includes PyTorch)
+# Tools package (includes PyTorch, models, and datasets)
 pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 ```
 
-**Optional extras** (required for ESM2Model and ChempropModel):
-
-```bash
-# ESM2 — protein language model
-pip install "alf_tools[esm2] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
-
-# Chemprop — small-molecule MPNN
-pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
-
-# Both extras together
-pip install "alf_tools[esm2,chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
-```
-
-**Authentication:** Set up a `.netrc` file in your home directory with your GitHub personal access token:
+**Authentication:** add your GitHub credentials to `~/.netrc`:
 
 ```
 machine github.com login <USERNAME> password <TOKEN>
 ```
 
-For more information on creating personal access tokens, see [GitHub's documentation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
-
-📖 **For detailed installation instructions, including development setup and GPU configuration, see [INSTALLATION.md](docs/INSTALLATION.md)**.
-
-## 📖 Documentation
-
-- 📖 **[Full Documentation](https://instadeepai.github.io/alf/)** - Complete API reference
-- 🛠️ **[Contributing Guide](docs/CONTRIBUTING.md)** - How to extend ALF and contribute code
-- 📥 **[Installation Guide](docs/INSTALLATION.md)** - Detailed installation instructions
-
-### Building Documentation Locally
-
-To build and view the documentation on your local machine:
-
-1. Install documentation dependencies:
-   ```bash
-   uv sync --group docs
-   ```
-
-2. Build the HTML documentation:
-   ```bash
-   cd docs
-   make html
-   ```
-
-3. Open the documentation in your browser:
-   ```bash
-   # macOS
-   open build/html/index.html
-
-   # Linux
-   xdg-open build/html/index.html
-
-   # Windows
-   start build/html/index.html
-   ```
+For GPU support, optional extras (ESM2, Chemprop), and development setup, see the [Installation Guide](https://instadeepai.github.io/alf/installation.html).
 
 ## 🚀 Quick Start
 
-### Design Task
-
 ```python
-from alf_core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask, TerminalStateLogger
-from alf.tools.datasets.gfp import GFP
-from alf.tools.models.cnn import CNNModel
-from alf.tools.optimizer.acquisition_functions.greedy import Greedy
+from alf_core import (
+    DatasetSearch,
+    DesignTask,
+    Optimizer,
+    Oracle,
+    Surrogate,
+    TerminalStateLogger,
+)
+from alf_tools.datasets.gfp import GFP
+from alf_tools.models.cnn import CNNModel
+from alf_tools.optimizer.acquisition_functions.greedy import Greedy
 
-# Initialize components
-dataset = GFP(name="gfp", modality="sequence", seed=42, split_config=split_config)
+# A dataset wraps your candidates and their known labels
+dataset = GFP(name="gfp", modality="sequence", seed=42)
+
+# The surrogate is a cheap probabilistic model trained on observed labels
 surrogate = Surrogate(model=CNNModel())
-acquisition_fn = Greedy()
-search_fn = DatasetSearch()
-optimizer = Optimizer(acquisition_fn=acquisition_fn, search_fn=search_fn)
+
+# The optimizer picks the next batch: acquisition function scores candidates,
+# search function selects from them
+optimizer = Optimizer(acquisition_fn=Greedy(), search_fn=DatasetSearch())
+
+# The oracle scores selected candidates (here, it queries the held-out dataset)
 oracle = Oracle(scorer=dataset)
 
-# Run design task
+# Run the active learning loop for 5 rounds, acquiring 100 candidates per round
 task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
 state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, state_loggers=[TerminalStateLogger()], optimizer=optimizer, oracle=oracle)
+task.run(
+    state=state,
+    state_loggers=[TerminalStateLogger()],
+    optimizer=optimizer,
+    oracle=oracle,
+)
 ```
+
+New to active learning? Start with [Why ALF?](https://instadeepai.github.io/alf/explanation/why-alf.html), then work through the [Tutorials](https://instadeepai.github.io/alf/tutorials/index.html).
+
+## 🎓 Tutorials
+
+### Start with an experiment
+
+- **[Offline Design Tutorial](tutorials/experiments/offline_design_tutorial.ipynb)** — end-to-end active learning loop with labels from a held-out pool. The best entry point.
+- **[Online Design Tutorial](tutorials/experiments/online_design_tutorial.ipynb)** — the same loop, with labels from a live scorer.
+
+### Go deeper on models
+
+- **[GP Tutorial](tutorials/models/gp_tutorial.ipynb)** — Gaussian Process surrogate and kernel cheat-sheet
+- **[CNN Tutorial](tutorials/models/cnn_tutorial.ipynb)** — convolutional sequence surrogate
+- **[Ensemble Tutorial](tutorials/models/ensemble_tutorial.ipynb)** — seed ensembles, MC dropout, and combined ensembles for uncertainty-aware prediction
+- **[ESM-2 Tutorial](tutorials/models/esm2_tutorial.ipynb)** — protein language model as surrogate or zero-shot scorer
+- **[Chemprop MPNN Tutorial](tutorials/models/chemprop_tutorial.ipynb)** — active learning for small molecules with SMILES inputs
+
+### Lightweight (alf-core only)
+
+- **[ALF Core Quickstart](tutorials/alf_core_quickstart.ipynb)** — bootstrap ensemble surrogate + Probability of Improvement acquisition function, implemented from scratch with numpy/scipy
+
+### Extend ALF
+
+- **[Models](tutorials/extending_base_classes/models.ipynb)** — create custom models for oracle/surrogate/generator roles
+- **[Datasets](tutorials/extending_base_classes/datasets.ipynb)** — add custom data sources
+- **[Search Functions](tutorials/extending_base_classes/search_functions.ipynb)** — implement custom search strategies
+- **[Acquisition Functions](tutorials/extending_base_classes/acquisition_functions.ipynb)** — create custom acquisition strategies
+
+## 🛠️ Development
+
+```bash
+git clone git@github.com:instadeepai/alf.git
+cd alf
+uv sync
+```
+
+```bash
+uv run pytest                                         # run all tests
+uv run pytest --cov=alf_core --cov-report term-missing  # with coverage
+uv run pre-commit install                             # install pre-commit hooks
+```
+
+See the [Installation Guide](https://instadeepai.github.io/alf/installation.html) for GPU configuration and optional extras.
+
+## 🤝 Contributing
+
+Read our [Contributing Guide](docs/CONTRIBUTING.md) for development guidelines and the PR process. For questions or discussions, open an issue.
 
 ## 📁 Project Structure
 
 ```
 alf/
-├── core/                  # Core framework (see core/README.md)
-│   ├── alf_core/          # Core package
-│   │   ├── dataclasses/   # Data structures (Candidate, LabelledCandidates, etc.)
-│   │   ├── dataset/       # Dataset base classes and utilities
-│   │   ├── model/         # Model base classes
-│   │   ├── optimizer/     # Optimizer, acquisition functions, search strategies
-│   │   ├── oracle/        # Oracle for candidate evaluation
-│   │   ├── surrogate/     # Surrogate model wrapper
-│   │   ├── tasks/         # Task implementations (Design, Supervised, ZeroShot)
-│   │   └── utils/         # Utilities (metrics, logging)
-│   └── tests/             # Core framework tests
-├── tools/                 # Example implementations and tools (see tools/README.md)
-│   └── alf_tools/         # Tools package
-│       ├── datasets/      # Example datasets (e.g., GFP)
-│       ├── models/        # Example models (CNN, GP, Chemprop MPNN)
-│       └── optimizer/     # Example acquisition functions (UCB, Thompson Sampling, etc.) and search strategies
-├── tutorials/             # Tutorials and example scripts
-└── docs/                  # Documentation
+├── core/                  # alf-core package (base classes, tasks, utilities)
+├── tools/                 # alf-tools package (models, datasets, acquisition functions)
+├── tutorials/             # Tutorial notebooks
+└── docs/                  # Documentation source
 ```
 
-**Package Documentation:**
-- [Core Framework](core/README.md) - Base classes and task implementations
-- [Tools Package](tools/README.md) - Ready-to-use datasets, models, and acquisition functions
+See [core/README.md](core/README.md) and [tools/README.md](tools/README.md) for package-level details.
 
-## 🎓 Tutorials
-
-### Experiment Tutorials
-
-End-to-end guides for running active learning experiments:
-
-- **[Offline Design Tutorial](tutorials/experiments/offline_design_tutorial.ipynb)** - Dataset-based optimization
-- **[Online Design Tutorial](tutorials/experiments/online_design_tutorial.ipynb)** - Model-based optimization
-
-### Dataset Tutorials
-
-Deep-dives into specific datasets including download, statistics, and querying:
-
-- **[GuacaMol Tutorial](tutorials/datasets/guacamol_tutorial.ipynb)** - Drug-like molecule corpus: download, property analysis, and SMILES querying
-
-### Model Tutorials
-
-Deep-dives into specific model types including configuration, uncertainty quantification, and comparison:
-
-- **[Ensemble Tutorial](tutorials/models/ensemble_tutorial.ipynb)** - Seed ensembles, MC dropout, and combined ensembles for uncertainty-aware prediction
-- **[ESM2 Tutorial](tutorials/models/esm2_tutorial.ipynb)** - Fine-tuning ESM-2 as a protein fitness surrogate
-- **[Chemprop MPNN Tutorial](tutorials/models/chemprop_tutorial.ipynb)** - Active learning for small molecules using SMILES inputs and the Chemprop MPNN
-- **[GP Tutorial](tutorials/models/gp_tutorial.ipynb)** - Gaussian Process surrogate model usage
-
-### Extension Tutorials
-
-Learn how to extend ALF's base classes for custom implementations:
-
-- **[Models](tutorials/extending_base_classes/models.ipynb)** - Create custom models for oracle/surrogate/generator roles
-- **[Datasets](tutorials/extending_base_classes/datasets.ipynb)** - Add custom data sources
-- **[Search Functions](tutorials/extending_base_classes/search_functions.ipynb)** - Implement custom search strategies
-- **[Acquisition Functions](tutorials/extending_base_classes/acquisition_functions.ipynb)** - Create custom acquisition strategies
-- **[Model Roles](tutorials/extending_base_classes/model_roles.ipynb)** - Oracle, Surrogate, and Generator patterns
-
-
-## 🛠️ Development
-
-### Setup Development Environment
+## 📚 Building Documentation Locally
 
 ```bash
-# Clone the repository
-git clone git@github.com:instadeepai/alf.git
-cd alf
-
-# Install all packages with development dependencies
-uv sync
+uv sync --group docs
+uv run sphinx-build -b html docs/source docs/build/html
+open docs/build/html/index.html  # macOS
 ```
-
-For GPU support, see the [GPU Configuration](docs/INSTALLATION.md#gpu-support-optional) section in the installation guide.
-For including models like ESM2 or Chemprop, see the [Optional Extras](docs/INSTALLATION.md#optional-extras) section in the installation guide.
-
-### Run Tests
-
-```bash
-# Run all tests
-uv run pytest
-
-# Run with coverage
-uv run pytest --cov=alf_core --cov-report term-missing
-```
-
-### Pre-commit Hooks
-
-```bash
-# Install pre-commit hooks
-uv run pre-commit install
-
-# Run pre-commit on all files
-uv run pre-commit run --all-files
-```
-
-## 🤝 Contributing
-
-We welcome contributions! To get started:
-
-1. Read our **[Contributing Guide](docs/CONTRIBUTING.md)** for development setup and guidelines
-2. Check out the **[Extension Tutorials](tutorials/extending_base_classes/)** to learn how to extend ALF's base classes
-
-For questions or discussions, please open an issue.
 
 ## 📄 License
 
-This project is licensed under the Apache License 2.0 - see the LICENSE file for details.
+This project is licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.
