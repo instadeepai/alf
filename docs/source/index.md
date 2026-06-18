@@ -9,7 +9,7 @@ as protein sequences and small molecules.
 This project is under active development.
 ```
 
-## Why ALF?
+## 🔬 Why ALF?
 
 In scientific discovery, the bottleneck is rarely compute—it's the **experiment**. Each label
 costs a wet-lab assay, a simulation, or a measurement, and you can only afford a handful of
@@ -19,7 +19,7 @@ modular, swappable components so you can change any one part without rewriting t
 
 → See [Why ALF?](explanation/why-alf.md) for the full motivation and design rationale.
 
-## Start here
+## 🗺️ Start here
 
 ::::{grid} 1 2 2 2
 :gutter: 3
@@ -53,7 +53,7 @@ API reference generated from docstrings, plus a glossary of ALF terms.
 :::
 ::::
 
-## Installation
+## 📦 Installation
 
 ```bash
 # Core package (minimal dependencies, no PyTorch required)
@@ -72,7 +72,7 @@ machine github.com login <USERNAME> password <TOKEN>
 For GPU support, optional extras, and development setup, see the
 [Installation Guide](https://github.com/instadeepai/alf/blob/main/docs/INSTALLATION.md).
 
-## Quick start
+## 🚀 Quick start
 
 The snippet below runs a full active learning design experiment. Each component is swappable:
 bring your own dataset, model, acquisition function, or oracle.

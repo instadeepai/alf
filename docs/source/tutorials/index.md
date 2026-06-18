@@ -4,20 +4,20 @@ Learning-oriented, step-by-step guides that take you from zero to a working acti
 experiment. The notebooks live on GitHub (with committed outputs); this page curates them into a
 learning path.
 
-## Start with an experiment
+## 🧪 Start with an experiment
 
 Run the full ask/tell loop end to end:
 
 - [Offline Design Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/experiments/offline_design_tutorial.ipynb): the loop driven by labels from a held-out, pre-scored pool. The best entry point.
 - [Online Design Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/experiments/online_design_tutorial.ipynb): the same loop, with labels from a live scorer.
 
-## Lightweight (alf-core only)
+## 🪶 Lightweight (alf-core only)
 
 If you want to explore ALF's core abstractions with minimal dependencies, start here:
 
 - [ALF Core Quickstart](https://github.com/instadeepai/alf/blob/main/tutorials/alf_core_quickstart.ipynb): a synthetic optimisation loop built entirely on `alf-core` using numpy and scipy. Implements a bootstrap ensemble surrogate and Probability of Improvement acquisition function — both custom, neither available in `alf-tools` — to show how to bring your own components.
 
-## Go deeper on models
+## 🤖 Go deeper on models
 
 Each tutorial focuses on a specific surrogate model type—when to use it, how to configure it,
 and what its uncertainty estimates look like.
@@ -28,7 +28,7 @@ and what its uncertainty estimates look like.
 - [ESM-2 Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/esm2_tutorial.ipynb): using a protein language model as a surrogate or zero-shot scorer. Useful when sequence context matters and you have limited labelled data.
 - [Chemprop MPNN Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/chemprop_tutorial.ipynb): active learning for small molecules using SMILES inputs and the Chemprop message-passing neural network. The right choice when working with molecular graphs rather than sequences.
 
-## Go deeper on datasets
+## 🗄️ Go deeper on datasets
 
 - [GuacaMol Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/datasets/guacamol_tutorial.ipynb): exploring the GuacaMol drug-like molecule corpus—download, property analysis, and SMILES querying. A good starting point for small-molecule experiments.
 
