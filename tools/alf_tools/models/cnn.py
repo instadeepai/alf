@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.model.base_model import BaseModel, BaseTrainConfig
 from alf_core.model.normaliser import (
     InputNormaliser,
+    InputStandardiser,
     OutputStandardiser,
 )
 from alf_core.utils.enums import ProblemType
@@ -91,7 +92,10 @@ class CNNTrainConfig(BaseTrainConfig):
         num_epochs: Number of epochs to train for.
         learning_rate: Inherited from BaseTrainConfig. Default: 1e-3.
         log_frequency: Inherited from BaseTrainConfig. Default: 10.
-        normalise_inputs: Inherited from BaseTrainConfig. Default: False.
+        normalise_inputs_strategy: Inherited from BaseTrainConfig. Default: None
+            (no input normalisation). Z-score standardisation is a poor fit for
+            the one-hot sequence inputs CNNModel uses, so it is left disabled by
+            default; set explicitly to opt in for continuous-feature inputs.
         standardise_outputs: Inherited from BaseTrainConfig. Default: False.
         label_dtype: Inherited from BaseTrainConfig. None uses the model
             default (float32 for CNN regression). Override to force a dtype.
@@ -224,7 +228,7 @@ class CNNModel(BaseModel):
         self.seq_length: int | None = None
 
         # Input normaliser — fitted on each train() call, applied at predict() time
-        self._input_normaliser: InputNormaliser | None = None
+        self._input_transform: InputNormaliser | InputStandardiser | None = None
         self._output_standardiser: OutputStandardiser | None = None
 
         # Track metrics
@@ -322,10 +326,10 @@ class CNNModel(BaseModel):
                 f"standardise_outputs=True is not supported for {problem_type} — "
                 "standardisation only applies to regression targets."
             )
-        train_x, train_y, self._input_normaliser, self._output_standardiser = transform_data(
+        train_x, train_y, self._input_transform, self._output_standardiser = transform_data(
             self.featurise(train_data),
             train_data.labels,
-            self.train_config.normalise_inputs,
+            self.train_config.normalise_inputs_strategy,
             self.train_config.standardise_outputs,
             label_dtype,
             self.device,
@@ -341,8 +345,8 @@ class CNNModel(BaseModel):
         val_loader = None
         if val_data is not None and len(val_data) > 0:
             val_x_tensor = self.featurise(val_data)
-            if self._input_normaliser is not None:
-                val_x_np = self._input_normaliser.transform(np.array(val_x_tensor.cpu()))
+            if self._input_transform is not None:
+                val_x_np = self._input_transform.transform(np.array(val_x_tensor.cpu()))
                 val_x = torch.tensor(val_x_np, dtype=train_x.dtype).to(self.device)
             else:
                 val_x = val_x_tensor.to(dtype=train_x.dtype).to(self.device)
@@ -630,9 +634,9 @@ class CNNModel(BaseModel):
         self.model.eval()
         x = self.featurise(candidate_points)
 
-        if self._input_normaliser is not None:
+        if self._input_transform is not None:
             x_np = x.cpu().numpy()
-            x_np = self._input_normaliser.transform(x_np)
+            x_np = self._input_transform.transform(x_np)
             x = torch.tensor(x_np, dtype=x.dtype).to(self.device)
         else:
             x = x.to(self.device)

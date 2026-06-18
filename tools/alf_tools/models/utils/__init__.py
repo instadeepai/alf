@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from alf_tools.models.utils.botorch_model_wrapper import BotorchModelWrapper
+from alf_tools.models.utils.config_utils import build_from_target
 from alf_tools.models.utils.data_utils import transform_data
 from alf_tools.models.utils.sequence_utils import (
     create_char_to_idx_mapping,
@@ -21,6 +23,8 @@ from alf_tools.models.utils.sequence_utils import (
 from alf_tools.models.utils.torch_utils import get_device
 
 __all__ = [
+    "BotorchModelWrapper",
+    "build_from_target",
     "create_char_to_idx_mapping",
     "extract_sequences_from_inputs",
     "get_device",

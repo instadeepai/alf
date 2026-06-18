@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -163,11 +163,23 @@ class PyRosetta(BaseModel):
         """Mutates the wild-type structure to the given sequence and relaxes the structure.
 
         Args:
-            sequence: Sequence to mutate the wild-type structure to.
+            sequence: Sequence to mutate the wild-type structure to. Must have the
+                same length as the wild-type sequence (only point substitutions are
+                supported; insertions/deletions are not).
 
         Returns:
             Score of the relaxed structure.
+
+        Raises:
+            ValueError: If sequence length differs from the wild-type sequence.
         """
+        if len(sequence) != len(self.wt_sequence):
+            raise ValueError(
+                "sequence length must match the wild-type sequence "
+                f"({len(self.wt_sequence)}), got {len(sequence)}. Only point "
+                "substitutions are supported (no insertions/deletions)."
+            )
+
         pose = self.pose.clone()
 
         mutants = [(i, b) for i, (a, b) in enumerate(zip(self.wt_sequence, sequence)) if a != b]

@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,21 +13,121 @@
 # limitations under the License.
 
 import logging
-import os
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
 import numpy as np
 import pandas as pd
 from alf_core import BaseDataset, Candidate, LabelledCandidates, ProblemType
 from alf_core.dataset.base_dataset import BaseDatasetConfig
 from huggingface_hub import hf_hub_download
-
-from alf_tools.utils.constants import HF_DATASETS_REPOSITORY_NAME
+from pydantic import model_validator
 
 logger = logging.getLogger("alf-tools")
 
 DATAPATH = Path(__file__).parent / "data"
+
+# Public ProteinGym dataset — no token required.
+_UPSTREAM_REPO = "OATML-Markslab/ProteinGym_v1"
+_N_SUBSTITUTION_SHARDS = 5
+assert _N_SUBSTITUTION_SHARDS < 10, "Update filename format for shard counts >= 10"
+
+# Fixed seed for the random CV fold assignment.  This does not reproduce the
+# original ProteinGym benchmark random folds; use modulo or contiguous splits
+# when exact benchmark parity is required.
+_RANDOM_CV_SEED = 0
+
+
+def _download_dms_dataframe(dms_name: str) -> pd.DataFrame:
+    """Download a single DMS assay from ProteinGym_v1 by searching parquet shards.
+
+    Each assay (DMS_id) lives entirely within one shard, so the search stops as
+    soon as the matching shard is found.  Shards are cached by huggingface_hub
+    so repeat calls are fast.
+
+    Args:
+        dms_name: DMS assay identifier (e.g. "IF1_ECOLI_Kelsic_2016").
+
+    Returns:
+        DataFrame with columns: mutant, mutated_sequence, DMS_score.
+
+    Raises:
+        ValueError: If dms_name is not found in any shard.
+    """
+    for shard_idx in range(_N_SUBSTITUTION_SHARDS):
+        filename = (
+            f"DMS_substitutions/train-0000{shard_idx}-of-0000{_N_SUBSTITUTION_SHARDS}.parquet"
+        )
+        local_path = hf_hub_download(
+            repo_id=_UPSTREAM_REPO,
+            filename=filename,
+            repo_type="dataset",
+            local_dir=DATAPATH / ".cache" / "proteingym_v1",
+        )
+        shard_df = pd.read_parquet(local_path)
+        result = shard_df[shard_df["DMS_id"] == dms_name]
+        if not result.empty:
+            return result[["mutant", "mutated_sequence", "DMS_score"]].reset_index(drop=True)
+    raise ValueError(
+        f"DMS assay '{dms_name}' was not found in any shard of {_UPSTREAM_REPO}. "
+        "Check that dms_name matches the DMS_id in the ProteinGym_v1 dataset."
+    )
+
+
+def _add_fold_columns_singles(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute and attach CV fold columns for a single-substitution assay.
+
+    Three fold strategies are computed, all based on the mutated position:
+
+    - ``fold_modulo_5``:    ``(position - 1) % 5``  (matches ProteinGym benchmark)
+    - ``fold_contiguous_5``: positions partitioned into 5 contiguous blocks of
+      equal size via ``numpy.array_split``  (matches ProteinGym benchmark)
+    - ``fold_random_5``:    position-level random assignment with seed
+      ``_RANDOM_CV_SEED``.  **Does not reproduce the original ProteinGym random
+      folds**; use modulo/contiguous for benchmark parity.
+
+    Args:
+        df: DataFrame with at least a ``mutant`` column (e.g. "A16C").
+
+    Returns:
+        The input DataFrame (sorted by mutant, reindexed) with three new columns.
+    """
+    df = df.sort_values("mutant").reset_index(drop=True)
+    df["_pos"] = df["mutant"].str.extract(r"(\d+)", expand=False).astype(int)
+    positions = sorted(df["_pos"].unique())
+
+    df["fold_modulo_5"] = (df["_pos"] - 1) % 5
+
+    groups = np.array_split(positions, 5)
+    pos_to_contiguous = {p: fold for fold, grp in enumerate(groups) for p in grp}
+    df["fold_contiguous_5"] = df["_pos"].map(pos_to_contiguous)
+
+    pos_folds = np.arange(len(positions)) % 5
+    np.random.default_rng(_RANDOM_CV_SEED).shuffle(pos_folds)
+    pos_to_random = dict(zip(positions, pos_folds))
+    df["fold_random_5"] = df["_pos"].map(pos_to_random)
+
+    return df.drop(columns=["_pos"])
+
+
+def _add_fold_columns_multiples(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute and attach a random CV fold column for a multi-substitution assay.
+
+    Folds are assigned at the variant (row) level rather than position level
+    because multi-site mutations span many positions.
+
+    Args:
+        df: DataFrame with at least a ``mutant`` column.
+
+    Returns:
+        The input DataFrame (sorted by mutant, reindexed) with ``fold_rand_multiples``.
+    """
+    df = df.sort_values("mutant").reset_index(drop=True)
+    n = len(df)
+    folds = np.array([i % 5 for i in range(n)])
+    np.random.default_rng(_RANDOM_CV_SEED).shuffle(folds)
+    df["fold_rand_multiples"] = folds
+    return df
 
 
 class ProteinGymConfig(BaseDatasetConfig):
@@ -38,7 +138,11 @@ class ProteinGymConfig(BaseDatasetConfig):
         dms_type: Type of DMS data ("singles" or "multiples").
         cross_validation: Whether to use cross-validation splits.
         cross_validation_type: Type of CV split ("random", "modulo", or "contiguous").
+            Only "random" folds are available for dms_type="multiples".
         cross_validation_fold: Which CV fold to use (0-4).
+        force_download: If True, delete the local cache before loading so the
+            dataset is re-downloaded from upstream.  Use this to pick up
+            corrected versions of an assay published by ProteinGym_v1.
     """
 
     dms_name: str
@@ -46,7 +150,35 @@ class ProteinGymConfig(BaseDatasetConfig):
     cross_validation: bool = False
     cross_validation_type: Literal["random", "modulo", "contiguous"] | None = None
     cross_validation_fold: Literal[0, 1, 2, 3, 4] | None = None
+    force_download: bool = False
     problem_type: ProblemType = ProblemType.REGRESSION
+
+    @model_validator(mode="after")
+    def _validate_cross_validation(self) -> Self:
+        """Validate the cross-validation configuration.
+
+        Returns:
+            The validated configuration instance.
+
+        Raises:
+            ValueError: If cross_validation is enabled without both
+                cross_validation_type and cross_validation_fold set, or if a
+                non-"random" fold is requested for dms_type="multiples" (which
+                only provides random folds).
+        """
+        if not self.cross_validation:
+            return self
+        if self.cross_validation_type is None or self.cross_validation_fold is None:
+            raise ValueError(
+                "cross_validation=True requires both cross_validation_type and "
+                "cross_validation_fold to be set."
+            )
+        if self.dms_type == "multiples" and self.cross_validation_type != "random":
+            raise ValueError(
+                "dms_type='multiples' only provides 'random' cross-validation folds; "
+                f"cross_validation_type='{self.cross_validation_type}' is not available."
+            )
+        return self
 
 
 class ProteinGym(BaseDataset):
@@ -70,57 +202,60 @@ class ProteinGym(BaseDataset):
         )
 
     def load_dataset(self) -> LabelledCandidates:
-        """Load ProteinGym dataset from local file or download from HF if not present.
-        Process dataset and return as labelled candidates.
+        """Load ProteinGym dataset, downloading from the public ProteinGym_v1 HF
+        repository if a local cache is not present.
+
+        Data is sourced from ``OATML-Markslab/ProteinGym_v1`` — no HuggingFace
+        token is required.  CV fold columns are computed deterministically and
+        saved alongside the raw data so subsequent loads are instant.
+
+        Note:
+            The local cache at ``data/ProteinGym/<dms_name>/data.csv`` is not
+            automatically invalidated when the upstream dataset is updated.  Set
+            ``force_download=True`` in the config to delete the cache and
+            re-download, or remove the file manually.
 
         Returns:
             Labeled candidates with ProteinGym data.
-
-        Raises:
-            ValueError: If HF token is not set as environment variable.
         """
-        if os.environ.get("HF_TOKEN") is None:
-            raise ValueError(
-                "HF token must be set as environment variable; "
-                "HF_TOKEN environment variable is not set — export HF_TOKEN=<your_token> "
-                "or set os.environ['HF_TOKEN'] before loading ProteinGym"
-            )
-
         dms_name = self.config.dms_name
         dms_type = self.config.dms_type
 
-        filename = f"ProteinGym/ProteinGym_Cross_Validation/{dms_type}/{dms_name}.csv"
-        filepath = DATAPATH / filename
+        filepath = DATAPATH / "ProteinGym" / dms_name / "data.csv"
+        if self.config.force_download and filepath.exists():
+            filepath.unlink()
         if not filepath.exists():
-            DATAPATH.mkdir(parents=True, exist_ok=True)
-            logger.info("No local copy of file, so downloading from hub")
-            hf_hub_download(
-                repo_id=HF_DATASETS_REPOSITORY_NAME,
-                filename=filename,
-                repo_type="dataset",
-                local_dir=DATAPATH,
-            )
-            logger.info("ProteinGym dataset downloaded successfully.")
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+            logger.info("Downloading %s from %s", dms_name, _UPSTREAM_REPO)
+            df = _download_dms_dataframe(dms_name)
+            if dms_type == "singles":
+                df = _add_fold_columns_singles(df)
+            else:
+                df = _add_fold_columns_multiples(df)
+            df.to_csv(filepath, index=False)
+            logger.info("ProteinGym dataset cached at %s", filepath)
 
         df = pd.read_csv(filepath)
-        dataset = LabelledCandidates(candidates=[], labels=np.array([]))
-        for _, row in df.iterrows():
-            data = row["mutated_sequence"]
-            label = row["DMS_score"]
-            features = {"mutant_code": row["mutant"]}
-            if dms_type == "singles":
-                features.update({
-                    "random_fold_id": row["fold_random_5"],
-                    "modulo_fold_id": row["fold_modulo_5"],
-                    "fold_contiguous_id": row["fold_contiguous_5"],
-                })
-            else:
-                features.update({
-                    "random_fold_id": row["fold_rand_multiples"],
-                })
-            dataset.append(
-                [Candidate(data=data, modality=self.modality, features=features)], np.array([label])
+        if dms_type == "singles":
+            fold_cols = {
+                "random_fold_id": "fold_random_5",
+                "modulo_fold_id": "fold_modulo_5",
+                "contiguous_fold_id": "fold_contiguous_5",
+            }
+        else:
+            fold_cols = {"random_fold_id": "fold_rand_multiples"}
+        candidates = [
+            Candidate(
+                data=row["mutated_sequence"],
+                modality=self.modality,
+                features={
+                    "mutant_code": row["mutant"],
+                    **{k: row[v] for k, v in fold_cols.items()},
+                },
             )
+            for row in df.to_dict("records")
+        ]
+        dataset = LabelledCandidates(candidates=candidates, labels=df["DMS_score"].to_numpy())
 
         return dataset
 

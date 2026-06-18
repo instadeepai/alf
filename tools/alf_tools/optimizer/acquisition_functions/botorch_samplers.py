@@ -1,3 +1,17 @@
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # Copyright 2023 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,11 +29,10 @@
 """Monte Carlo samplers for BoTorch acquisition functions.
 
 This module provides sampler configurations used by BoTorch acquisition functions
-to approximate expectations via Monte Carlo sampling. These samplers are used
-by the BoTorch acquisition functions
+to approximate expectations via Monte Carlo sampling.
 """
 
-from typing import Literal, Optional
+from typing import Literal
 
 import torch
 from botorch.sampling.normal import IIDNormalSampler, SobolQMCNormalSampler
@@ -73,7 +86,7 @@ class BoTorchMCSampler:
         self,
         sampler_type: MCSamplerType = "sobol",
         num_samples: int = 512,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ):
         """Initialize MC sampler configuration.
 

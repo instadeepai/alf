@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,6 +40,20 @@ class TestBaseTrainConfig:
         field_names = {f.name for f in fields(config)}
         assert "learning_rate" in field_names
         assert "log_frequency" in field_names
+
+    def test_normalise_inputs_strategy_defaults_to_none(self):
+        """normalise_inputs_strategy must default to None (input normalisation disabled)."""
+        config = BaseTrainConfig()
+        assert config.normalise_inputs_strategy is None
+
+    def test_normalise_inputs_strategy_can_be_set(self):
+        """normalise_inputs_strategy must accept 'minmax' and 'zscore'."""
+        assert BaseTrainConfig(normalise_inputs_strategy="minmax").normalise_inputs_strategy == (
+            "minmax"
+        )
+        assert BaseTrainConfig(normalise_inputs_strategy="zscore").normalise_inputs_strategy == (
+            "zscore"
+        )
 
     def test_label_dtype_defaults_to_none(self):
         """label_dtype must default to None (model resolves its own default)."""

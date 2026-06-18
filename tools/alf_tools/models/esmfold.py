@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,9 +17,6 @@ from dataclasses import dataclass
 from typing import Any, Literal, NoReturn
 
 import numpy as np
-import pytest
-
-pytest.importorskip("transformers", reason="transformers not installed; install alf_tools[esmfold]")
 import torch
 from alf_core import BaseModel, Candidate, LabelledCandidates, Modality, Predictions
 

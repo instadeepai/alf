@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -100,9 +100,6 @@ class BaseTask(abc.ABC):
 
         Returns:
             Updated task state with evaluation metrics.
-
-        Raises:
-            AssertionError: If save_round_predictions is True but filename is empty.
         """
         if len(state.dataset.test_dataset) > 0:
             predictions = state.surrogate.predict(state.dataset.test_dataset.candidates)

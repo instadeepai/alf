@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ import abc
 
 from alf_core.dataclasses import Candidate, State
 from alf_core.model.base_model import BaseModel
-from alf_core.optimizer.metrics import compute_recall, compute_regret
+from alf_core.utils.metrics.acquisition_batch import compute_recall, compute_regret
 
 
 class BaseSearch(abc.ABC):

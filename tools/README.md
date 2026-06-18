@@ -48,10 +48,17 @@ uv sync --extra esm2 --extra chemprop
   selection, input normalisation, and output standardisation enabled by default
 - **ESM2Model** - Protein language model surrogate backed by
   [ESM-2](https://huggingface.co/docs/transformers/model_doc/esm). Accepts amino acid sequences
-  directly. Two modes via `ESM2TrainConfig.scoring_function`: `scoring_function='linear_head'` (default) freezes the
-  backbone and trains a linear head for regression (`loss_fn='mse'`) or classification
-  (`loss_fn='cross_entropy'`); `scoring_function=None` performs zero-shot pseudo-log-likelihood scoring
-  with no training. Embeddings can be extracted via `embed()`. Requires the `[esm2]` optional extra:
+  directly. Three operating modes via `ESM2TrainConfig`:
+  `mode='linear_head'` (default) trains a linear head for regression
+  (`loss_fn='mse'`) or classification (`loss_fn='cross_entropy'`) on top of the backbone —
+  frozen by default, or fine-tuned jointly when `freeze_backbone=False` (the backbone then
+  uses `backbone_learning_rate`);
+  `mode='likelihoods'` with frozen backbone performs zero-shot pseudo-log-likelihood (PLL)
+  scoring with no training; `mode='likelihoods'` with `freeze_backbone=False, loss_fn='mlm'`
+  fine-tunes the full ESM-2 backbone via MLM on the input sequences (labels are ignored, but
+  `train()` still takes `LabelledCandidates` — placeholder labels are fine) and then returns
+  PLL scores.
+  Embeddings can be extracted via `embed()`. Requires the `[esm2]` optional extra:
   `pip install "alf-tools[esm2]"`
 - **ESMFoldModel** - ESMFold protein structure prediction oracle; returns a scalar confidence score per candidate. Use as `Oracle(scorer=ESMFoldModel(ESMFoldModelConfig(...)))`. Requires `transformers>=4.36.0` and `accelerate>=0.26.0`.
   Three scoring metrics are supported (all in **[0, 1]**, higher is better):
@@ -75,6 +82,13 @@ uv sync --extra esm2 --extra chemprop
 - **CoreSet** - Greedy k-centres selection for input-space diversity (coverage-based); uses
   `surrogate.featurise()` rather than predictions, so it is compatible with any model and
   does not require uncertainty estimates
+- **BoTorchAcquisition** - Unified wrapper around BoTorch's analytic and Monte Carlo acquisition
+  functions, selected via a single `acquisition_type` argument (`"qEI"`, `"qLogEI"`, `"qNEI"`,
+  `"qUCB"`, `"log_expected_improvement"`, `"upper_confidence_bound"`,
+  `"probability_of_improvement"`, `"log_noisy_expected_improvement"`). Supports discrete candidate
+  scoring and continuous `optimize_acqf` optimisation. Accepts either a native BoTorch model or an
+  ALF `BaseModel` (wrapped automatically via `BotorchModelWrapper`); ALF models must provide
+  prediction variances
 
 ### Search Strategies
 - **SingleMutantSearch** - Generate single-mutation variants of reference sequences
@@ -128,26 +142,31 @@ For detailed API documentation and tutorials, see:
 Models in `alf-tools` support input normalisation and output standardisation via their train
 configs (see `alf_core.model.base_model.BaseTrainConfig`).
 
-| Model | `normalise_inputs` default | `standardise_outputs` default |
-|-------|---------------------------|-------------------------------|
-| `CNNModel` | `False` | `False` |
-| `GPModel` | `True` | `True` |
-| `ESM2Model` | `False` | `False` |
-| `ChempropModel` | `False` | `False` |
+| Model | `normalise_inputs_strategy` default | `standardise_outputs` default |
+|-------|-------------------------------------|-------------------------------|
+| `CNNModel` | `None` | `False` |
+| `GPModel` | `"minmax"` | `True` |
+| `ESM2Model` | `None` | `False` |
+| `ChempropModel` | `None` | `False` |
 
-**`GPTrainConfig`** overrides both defaults to `True`:
-- `normalise_inputs=True`: min-max scales features to [0, 1] — GP kernels measure distances and
-  benefit from inputs on a common scale.
+**`GPTrainConfig`** defaults to `normalise_inputs_strategy="minmax"` and `standardise_outputs=True`:
+- `"minmax"`: min-max scales features to [0, 1] — GP kernels measure distances and benefit from
+  inputs on a common scale.
 - `standardise_outputs=True`: Z-score standardises labels before training — improves marginal
   log-likelihood optimisation. Predictions are inverse-transformed back to the original label
   scale before being returned, so **all metrics are computed on the original label scale**.
 
-To disable normalisation for a GP, pass an explicit config:
+The `"zscore"` strategy (`InputStandardiser`) zero-centres continuous features and is generally
+preferred for deep neural networks. It is **not** enabled by default for `CNNModel`, whose one-hot
+sequence inputs are degraded by standardisation; set `normalise_inputs_strategy="zscore"` explicitly
+when feeding a CNN continuous features.
+
+To disable input normalisation for a GP, pass an explicit config:
 
 ```python
 from alf_tools.models.gp import GPModel, GPTrainConfig
 
-model = GPModel(train_config=GPTrainConfig(normalise_inputs=False, standardise_outputs=False))
+model = GPModel(train_config=GPTrainConfig(normalise_inputs_strategy=None, standardise_outputs=False))
 ```
 
 For implementation details see [`alf_core.model.normaliser`](../core/alf_core/model/normaliser.py)

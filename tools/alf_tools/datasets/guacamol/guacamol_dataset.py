@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,10 +14,12 @@
 
 import copy
 import logging
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Callable, Literal, cast, get_args
 
 import numpy as np
+import pandas as pd
 from alf_core import (
     BaseDataset,
     BaseDatasetConfig,
@@ -54,7 +56,7 @@ class GuacaMolConfig(BaseDatasetConfig):
         target_property: Property or task name used as labels in LabelledCandidates.
         task_type: Always auto-derived from target_property in the model validator.
             Any value supplied at construction is silently overwritten. Do not set.
-        computed_properties: RDKit properties computed and stored in Candidate.features.
+        computed_properties: RDKit properties computed and stored in `GuacaMol._prop_matrix`.
             None defaults to computing only [target_property]. Pass
             `list(_ALL_PROPERTIES_ORDERED)` to compute all 10. Only applies when
             task_type == "property".
@@ -81,7 +83,8 @@ class GuacaMolConfig(BaseDatasetConfig):
         `MolLogP`, `TPSA`, `QED`) computed molecule-by-molecule via
         `PROPERTY_FNS`.  Molecules are loaded from the corpus and queried by
         canonical SMILES lookup; novel SMILES not in the corpus are scored on the fly.
-        Each `Candidate` carries the requested properties in its `features` dict.
+        Requested properties are stored in `GuacaMol._prop_matrix`; `Candidate.features`
+        is always `{}` for corpus molecules.
 
         `"benchmark_task"` — the label is a score in [0, 1] produced by one of the
         19 goal-directed scoring functions from Brown et al. (2019).  Scores combine
@@ -143,6 +146,8 @@ class GuacaMol(BaseDataset):
         """
         self._paper_splits: dict[str, LabelledCandidates] | None = None
         self._smiles_index: dict[str, float] = {}
+        self._prop_matrix: np.ndarray = np.empty((0, 0), dtype=np.float64)
+        self._prop_cols: list[GuacaMolPropertyName] = []
         super().__init__(config)
         self.setup()
 
@@ -157,6 +162,27 @@ class GuacaMol(BaseDataset):
             if self._raw_dataset is not None
             else {}
         )
+
+    def properties_dataframe(self) -> pd.DataFrame:
+        """Computed properties aligned with `_raw_dataset.candidates` (row i ↔ candidate i).
+
+        Returns a DataFrame with one column per computed property plus a leading ``smiles``
+        column. Only meaningful for property-mode datasets; raises if the dataset has not
+        been loaded or no properties were computed.
+
+        Returns:
+            DataFrame of shape (N, P+1) with columns ``["smiles", *_prop_cols]``.
+
+        Raises:
+            RuntimeError: If the dataset is not loaded or no properties were computed.
+        """
+        if self._raw_dataset is None or self._prop_matrix.size == 0:
+            raise RuntimeError(
+                "properties_dataframe() is only available after loading a property-mode dataset."
+            )
+        df = pd.DataFrame(self._prop_matrix, columns=self._prop_cols)
+        df.insert(0, "smiles", [c.data for c in self._raw_dataset.candidates])
+        return df
 
     def __repr__(self) -> str:
         """Return a string representation identifying dataset and target."""
@@ -199,8 +225,44 @@ class GuacaMol(BaseDataset):
         if self.config.max_molecules is not None:
             smiles_list = smiles_list[: self.config.max_molecules]
         target = cast(GuacaMolPropertyName, self.config.target_property)
-        properties = list(self.config.computed_properties or [target])
-        return _label_smiles(smiles_list, properties, target, self.modality)
+        properties: list[GuacaMolPropertyName] = list(self.config.computed_properties or [target])
+        lc, prop_matrix = _label_smiles(smiles_list, properties, target, self.modality)
+        self._prop_matrix = prop_matrix
+        self._prop_cols = properties
+        return lc
+
+    def _iter_paper_splits(self) -> Iterator[tuple[str, list[str]]]:
+        """Yield (split_key, smiles_list) for each paper split file in order.
+
+        Handles download, file loading, max_molecules truncation, and the
+        max_molecules warning. Callers are responsible for labelling each batch.
+
+        Yields:
+            Tuple of (split_key, smiles_list) where split_key is one of
+            `"train"`, `"validation"`, `"test"`.
+        """
+        split_files = {k: v for k, v in GUACAMOL_FILES.items() if k != "ALL"}
+        tag_to_key = {"TRAIN": "train", "VALID": "validation", "TEST": "test"}
+        unknown = set(split_files) - tag_to_key.keys()
+        assert not unknown, f"Unexpected GUACAMOL_FILES keys: {unknown}"
+        if self.config.max_molecules is not None:
+            logger.warning(
+                "max_molecules=%d is applied per split file in paper mode — "
+                "total molecules may reach %d × 3.",
+                self.config.max_molecules,
+                self.config.max_molecules,
+            )
+        for tag, entry_info in split_files.items():
+            filepath = _download_file(
+                entry_info["url"],
+                self.config.data_dir / entry_info["name"],
+                self.config.max_molecules,
+                sha256=entry_info.get("sha256"),
+            )
+            smiles_list = _load_smiles_file(filepath)
+            if self.config.max_molecules is not None:
+                smiles_list = smiles_list[: self.config.max_molecules]
+            yield tag_to_key[tag], smiles_list
 
     def _load_paper_splits_with(
         self, label_fn: Callable[[list[str]], LabelledCandidates]
@@ -217,38 +279,21 @@ class GuacaMol(BaseDataset):
         Returns:
             Combined LabelledCandidates across all three paper splits.
         """
-        split_files = {k: v for k, v in GUACAMOL_FILES.items() if k != "ALL"}
-        tag_to_key = {"TRAIN": "train", "VALID": "validation", "TEST": "test"}
-        if self.config.max_molecules is not None:
-            logger.warning(
-                "max_molecules=%d is applied per split file in paper mode — "
-                "total molecules may reach %d × 3.",
-                self.config.max_molecules,
-                self.config.max_molecules,
-            )
-        self._paper_splits = {}
+        paper_splits: dict[str, LabelledCandidates] = {}
         all_candidates: list[Candidate] = []
         all_labels: list[float] = []
-        for tag, entry_info in split_files.items():
-            filepath = _download_file(
-                entry_info["url"],
-                self.config.data_dir / entry_info["name"],
-                self.config.max_molecules,
-                sha256=entry_info.get("sha256"),
-            )
-            smiles_list = _load_smiles_file(filepath)
-            if self.config.max_molecules is not None:
-                smiles_list = smiles_list[: self.config.max_molecules]
+        for key, smiles_list in self._iter_paper_splits():
             split_lc = label_fn(smiles_list)
             logger.debug(
                 "Paper split '%s': %d SMILES → %d valid candidates",
-                tag,
+                key,
                 len(smiles_list),
                 len(split_lc.candidates),
             )
-            self._paper_splits[tag_to_key[tag]] = split_lc
+            paper_splits[key] = split_lc
             all_candidates.extend(split_lc.candidates)
             all_labels.extend(split_lc.labels.tolist())
+        self._paper_splits = paper_splits
         return LabelledCandidates(
             candidates=all_candidates, labels=np.array(all_labels, dtype=float)
         )
@@ -258,17 +303,43 @@ class GuacaMol(BaseDataset):
 
         Stores the three splits in `self._paper_splits` keyed by
         `"train"`, `"validation"`, and `"test"`. Returns a combined
-        LabelledCandidates (without any split tag in features) for use as
-        `_raw_dataset` — this powers the SMILES lookup index in :meth:`query`.
+        LabelledCandidates (with empty Candidate.features) for use as
+        `_raw_dataset`. The property matrix is stored on `self._prop_matrix`.
 
         Returns:
             Combined LabelledCandidates across all three paper splits.
         """
         target = cast(GuacaMolPropertyName, self.config.target_property)
-        properties = list(self.config.computed_properties or [target])
-        return self._load_paper_splits_with(
-            lambda smiles_list: _label_smiles(smiles_list, properties, target, self.modality)
+        properties: list[GuacaMolPropertyName] = list(self.config.computed_properties or [target])
+        paper_splits: dict[str, LabelledCandidates] = {}
+        split_lcs: list[LabelledCandidates] = []
+        split_matrices: list[np.ndarray] = []
+        for key, smiles_list in self._iter_paper_splits():
+            split_lc, split_mat = _label_smiles(smiles_list, properties, target, self.modality)
+            logger.debug(
+                "Paper split '%s': %d SMILES → %d valid candidates",
+                key,
+                len(smiles_list),
+                len(split_lc.candidates),
+            )
+            paper_splits[key] = split_lc
+            split_lcs.append(split_lc)
+            split_matrices.append(split_mat)
+        self._paper_splits = paper_splits
+        p = len(properties)
+        all_labels = (
+            np.concatenate([lc.labels for lc in split_lcs])
+            if split_lcs
+            else np.array([], dtype=float)
         )
+        all_candidates = [c for lc in split_lcs for c in lc.candidates]
+        self._prop_matrix = (
+            np.concatenate(split_matrices, axis=0)
+            if split_matrices
+            else np.empty((0, p), dtype=np.float64)
+        )
+        self._prop_cols = properties
+        return LabelledCandidates(candidates=all_candidates, labels=all_labels)
 
     def _load_benchmark_task(self) -> LabelledCandidates:
         """Load corpus and score each valid SMILES using the benchmark task scorer.

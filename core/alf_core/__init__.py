@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,12 @@ from alf_core.dataclasses import (
 )
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.model.base_model import BaseModel, BaseTrainConfig
-from alf_core.model.normaliser import InputNormaliser, OutputStandardiser
+from alf_core.model.normaliser import (
+    InputNormaliser,
+    InputStandardiser,
+    OutputStandardiser,
+    make_input_transform,
+)
 from alf_core.optimizer.acquisition_function import AcquisitionFunction
 from alf_core.optimizer.optimizer import Optimizer
 from alf_core.optimizer.search import (

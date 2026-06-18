@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,14 @@ from alf_core import Candidate, LabelledCandidates
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.utils.enums import ProblemType
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
+
+# Training on deliberately tiny datasets can produce constant predictions or
+# targets, which makes scipy's correlation metrics warn during the
+# train/validation metric computation in CNNModel.train().
+pytestmark = pytest.mark.filterwarnings(
+    "ignore::scipy.stats.ConstantInputWarning",
+    "ignore::scipy.stats.NearConstantInputWarning",
+)
 
 SEQ = "ACDEFGHIKLMNPQRSTVWY"  # 20-char sequence (protein alphabet)
 

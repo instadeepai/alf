@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import pytest
 pytest.importorskip("rdkit", reason="guacamol not installed; install alf_tools[guacamol]")
 
 import requests
-from alf_core import Candidate, Modality
+from alf_core import Candidate, LabelledCandidates, Modality
 from alf_tools.datasets.guacamol.guacamol_dataset import (
     GuacaMol,
     GuacaMolConfig,
@@ -81,6 +81,7 @@ from alf_tools.datasets.guacamol.guacamol_utils import (
     _canonical_smiles,  # noqa: PLC2701
     _compute_properties,  # noqa: PLC2701
     _download_file,  # noqa: PLC2701
+    _label_smiles,  # noqa: PLC2701
     _load_smiles_file,  # noqa: PLC2701
     download_guacamol,
 )
@@ -89,6 +90,10 @@ from rdkit import Chem as _Chem
 from rdkit import DataStructs as _DataStructs
 from rdkit.Chem import rdMolDescriptors as _rdMD
 
+# These custom marks are not registered in tools/pyproject.toml [tool.pytest.ini_options]
+# markers, so pytest emits a PytestUnknownMarkWarning when this module is collected.
+# They exist only to let `-m guacamol` / `-m rdkit` select or deselect these tests;
+# register them under markers if the warning needs to be silenced.
 pytestmark = [pytest.mark.guacamol, pytest.mark.rdkit]
 
 
@@ -355,17 +360,56 @@ class TestGuacaMolSingleFileLoad:
         assert len(dataset._raw_dataset.labels) == 5
 
     def test_candidate_features_contain_computed_properties(self, tmp_path):
-        """Each candidate's features dict includes all requested computed properties."""
+        """Computed properties are stored in _prop_matrix, not Candidate.features."""
         config = _base_config(
             data_dir=tmp_path, max_molecules=3, computed_properties=["TPSA", "MolWt"]
         )
         with patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
             dataset = GuacaMol(config)
         assert dataset._raw_dataset is not None
+        assert "TPSA" in dataset._prop_cols
+        assert "MolWt" in dataset._prop_cols
+        assert dataset._prop_matrix.shape[1] == 2
+
+    def test_prop_matrix_shape_matches_candidates(self, tmp_path):
+        """_prop_matrix shape is (N, P) where N = corpus size and P = len(computed_properties)."""
+        config = _base_config(
+            data_dir=tmp_path, max_molecules=5, computed_properties=["TPSA", "MolWt"]
+        )
+        with patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
+            dataset = GuacaMol(config)
+        assert hasattr(dataset, "_prop_matrix")
+        assert dataset._prop_matrix is not None
+        n = len(dataset._raw_dataset.candidates)
+        assert dataset._prop_matrix.shape == (n, 2)
+
+    def test_prop_cols_match_computed_properties(self, tmp_path):
+        """_prop_cols lists the computed property names in the same order as config."""
+        config = _base_config(
+            data_dir=tmp_path, max_molecules=5, computed_properties=["TPSA", "MolWt"]
+        )
+        with patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
+            dataset = GuacaMol(config)
+        assert dataset._prop_cols == ["TPSA", "MolWt"]
+
+    def test_prop_matrix_values_are_finite(self, tmp_path):
+        """All property matrix values are finite floats."""
+        config = _base_config(
+            data_dir=tmp_path, max_molecules=5, computed_properties=["TPSA", "MolWt"]
+        )
+        with patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
+            dataset = GuacaMol(config)
+        assert np.all(np.isfinite(dataset._prop_matrix))
+
+    def test_corpus_candidate_features_are_empty(self, tmp_path):
+        """Corpus candidates no longer store features dicts — features is {}."""
+        config = _base_config(
+            data_dir=tmp_path, max_molecules=5, computed_properties=["TPSA", "MolWt"]
+        )
+        with patch("requests.get", return_value=_make_mock_response(VALID_SMILES_LINES)):
+            dataset = GuacaMol(config)
         for cand in dataset._raw_dataset.candidates:
-            if cand.features is not None:
-                assert "TPSA" in cand.features
-                assert "MolWt" in cand.features
+            assert cand.features == {}
 
     def test_invalid_smiles_are_skipped_and_not_in_dataset(self, tmp_path):
         """Invalid SMILES strings are silently skipped and excluded from candidates."""
@@ -494,6 +538,32 @@ class TestGuacaMolPaperSplits:
         assert len(dataset.train_dataset) > 0
         assert len(dataset.test_dataset) > 0
 
+    def test_paper_splits_prop_matrix_shape(self, tmp_path):
+        """_prop_matrix is set after paper-split load with shape (total_N, P)."""
+        _write_paper_files(tmp_path)
+        dataset = GuacaMol(_paper_config(data_dir=tmp_path, computed_properties=["TPSA", "MolWt"]))
+        total_n = len(dataset._raw_dataset.candidates)
+        assert dataset._prop_matrix.shape == (total_n, 2)
+        assert dataset._prop_cols == ["TPSA", "MolWt"]
+
+    def test_paper_splits_prop_matrix_row_count_matches_raw_dataset(self, tmp_path):
+        """Property matrix row count equals _raw_dataset length after paper splits."""
+        _write_paper_files(tmp_path)
+        dataset = GuacaMol(_paper_config(data_dir=tmp_path))
+        assert dataset._prop_matrix.shape[0] == len(dataset._raw_dataset.candidates)
+
+    def test_paper_split_corpus_candidates_have_empty_features(self, tmp_path):
+        """Paper-split corpus candidates store {} features (no dict overhead)."""
+        _write_paper_files(tmp_path)
+        dataset = GuacaMol(_paper_config(data_dir=tmp_path))
+        all_cands = (
+            dataset.train_dataset.candidates
+            + dataset.validation_dataset.candidates
+            + dataset.test_dataset.candidates
+        )
+        for cand in all_cands:
+            assert cand.features == {}
+
 
 class TestGuacaMolQuery:
     """Tests for GuacaMol.query(), including in-corpus lookup and on-the-fly RDKit labelling."""
@@ -519,6 +589,17 @@ class TestGuacaMolQuery:
         assert len(result) == 1
         expected = _compute_properties("c1ccncc1", ["TPSA"])["TPSA"]
         assert result.labels[0] == pytest.approx(expected, rel=1e-6)
+
+    def test_query_novel_smiles_populates_features_when_empty(self, tmp_path):
+        """Novel candidate with empty features gets computed properties in returned Candidate."""
+        dataset = self._loaded_dataset(tmp_path)
+        novel = Candidate(data="c1ccncc1", modality=Modality.SEQUENCE)  # pyridine, not in corpus
+        result = dataset.query([novel])
+        assert len(result) == 1
+        returned = result.candidates[0]
+        assert isinstance(returned.features, dict)
+        assert "TPSA" in returned.features
+        assert isinstance(returned.features["TPSA"], float)
 
     def test_query_mixed_known_and_novel_returns_both(self, tmp_path):
         """Querying a mix of corpus and novel candidates returns labels for all."""
@@ -773,16 +854,16 @@ class TestGuacaMolWithFixtures:
         assert isinstance(candidate.data, str)
         assert len(candidate.data) > 0
 
-    def test_computed_properties_none_stores_only_target_property_in_features(self, tmp_path):
-        """computed_properties=None stores only the target_property in candidate features."""
+    def test_computed_properties_none_uses_only_target_property_in_matrix(self, tmp_path):
+        """computed_properties=None -> _prop_matrix has 1 column (the target property)."""
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
         config = _base_config(data_dir=tmp_path, computed_properties=None)
         dataset = GuacaMol(config)
         assert dataset._raw_dataset is not None
+        assert dataset._prop_cols == ["TPSA"]
+        assert dataset._prop_matrix.shape[1] == 1
         for cand in dataset._raw_dataset.candidates:
-            assert "TPSA" in cand.features
-            # Only the target property is computed when computed_properties is None
-            assert len(cand.features) == 1
+            assert cand.features == {}
 
     def test_empty_smiles_file_produces_empty_dataset(self, tmp_path):
         """An empty fixture file results in a dataset with zero candidates."""
@@ -866,8 +947,8 @@ class TestGuacaMolEdgeCases:
         with pytest.raises(ValueError, match="invalid SMILES"):
             dataset.query([bad])
 
-    def test_computed_properties_stored_as_candidate_features(self, tmp_path):
-        """Each Candidate must carry exactly the requested computed_properties as features."""
+    def test_computed_properties_stored_in_prop_matrix(self, tmp_path):
+        """Requested computed_properties appear as columns in _prop_matrix."""
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
         config = _base_config(
             data_dir=tmp_path,
@@ -875,19 +956,11 @@ class TestGuacaMolEdgeCases:
             computed_properties=["MolWt", "MolLogP"],
         )
         dataset = GuacaMol(config)
-        all_splits = [
-            dataset.train_dataset,
-            dataset.validation_dataset,
-            dataset.test_dataset,
-            dataset.candidate_pool,
-        ]
-        for split in all_splits:
-            for candidate in split.candidates:
-                assert candidate.features is not None
-                assert "MolWt" in candidate.features
-                assert "MolLogP" in candidate.features
-                assert isinstance(candidate.features["MolWt"], float)
-                assert isinstance(candidate.features["MolLogP"], float)
+        assert "MolWt" in dataset._prop_cols
+        assert "MolLogP" in dataset._prop_cols
+        assert dataset._prop_matrix.shape == (len(dataset._raw_dataset.candidates), 2)
+        mw_idx = dataset._prop_cols.index("MolWt")
+        assert np.all(dataset._prop_matrix[:, mw_idx] > 0)
 
 
 class TestDownloadGuacaMol:
@@ -1503,6 +1576,14 @@ class TestGuacaMolBenchmarkTaskLoad:
         for cand in dataset._raw_dataset.candidates:
             assert cand.features == {}
 
+    def test_benchmark_task_prop_matrix_is_empty_sentinel(self, tmp_path):
+        """benchmark_task path does not set _prop_matrix — sentinel default (0, 0) is preserved."""
+        (tmp_path / FILENAME_ALL).write_text("c1ccccc1\nCCO\n")
+        config = _base_config(data_dir=tmp_path, target_property="celecoxib_rediscovery")
+        dataset = GuacaMol(config)
+        assert dataset._prop_matrix.shape == (0, 0)
+        assert dataset._prop_cols == []
+
     def test_query_scores_celecoxib_near_one(self, tmp_path):
         """Querying celecoxib against celecoxib_rediscovery should score near 1.0."""
         (tmp_path / FILENAME_ALL).write_text(
@@ -1535,3 +1616,49 @@ class TestGuacaMolBenchmarkTaskLoad:
         bad = Candidate(data="NOTSMILES!!!", modality=Modality.SEQUENCE)
         with pytest.raises(ValueError, match="invalid SMILES"):
             dataset.query([bad])
+
+
+class TestLabelSmiles:
+    """Tests for the updated _label_smiles return type."""
+
+    def test_returns_tuple_of_lc_and_matrix(self):
+        """_label_smiles returns (LabelledCandidates, np.ndarray)."""
+        result = _label_smiles(["c1ccccc1", "CCO"], ["TPSA", "MolWt"], "TPSA", Modality.SEQUENCE)
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        lc, mat = result
+        assert isinstance(lc, LabelledCandidates)
+        assert isinstance(mat, np.ndarray)
+
+    def test_property_matrix_shape(self):
+        """Property matrix shape is (N_valid, len(properties))."""
+        lc, mat = _label_smiles(["c1ccccc1", "CCO"], ["TPSA", "MolWt"], "TPSA", Modality.SEQUENCE)
+        assert mat.shape == (2, 2)
+
+    def test_property_matrix_values_match_compute_properties(self):
+        """Matrix row values match _compute_properties for each SMILES."""
+        smiles = "c1ccccc1"
+        lc, mat = _label_smiles([smiles], ["TPSA", "MolWt"], "TPSA", Modality.SEQUENCE)
+        expected = _compute_properties(smiles, ["TPSA", "MolWt"])
+        assert mat[0, 0] == pytest.approx(expected["TPSA"])
+        assert mat[0, 1] == pytest.approx(expected["MolWt"])
+
+    def test_candidate_features_are_empty(self):
+        """Corpus candidates have empty features dicts."""
+        lc, mat = _label_smiles(["c1ccccc1", "CCO"], ["TPSA", "MolWt"], "TPSA", Modality.SEQUENCE)
+        for cand in lc.candidates:
+            assert cand.features == {}
+
+    def test_invalid_smiles_excluded_from_matrix(self):
+        """Invalid SMILES are excluded from both LabelledCandidates and the matrix."""
+        lc, mat = _label_smiles(
+            ["c1ccccc1", "NOTVALID", "CCO"], ["TPSA"], "TPSA", Modality.SEQUENCE
+        )
+        assert len(lc.candidates) == 2
+        assert mat.shape == (2, 1)
+
+    def test_empty_smiles_list_returns_empty_matrix(self):
+        """Empty input produces empty LabelledCandidates and (0, P) matrix."""
+        lc, mat = _label_smiles([], ["TPSA", "MolWt"], "TPSA", Modality.SEQUENCE)
+        assert len(lc.candidates) == 0
+        assert mat.shape == (0, 2)

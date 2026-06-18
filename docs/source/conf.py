@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,8 +33,12 @@ extensions = [
     "sphinx.ext.autosummary",
     "myst_parser",
     "sphinx_autodoc_typehints",
+    "sphinx_design",
 ]
 autosummary_generate = True
+
+# Enable colon-fence syntax so sphinx-design grid/card directives can be nested in MyST.
+myst_enable_extensions = ["colon_fence"]
 
 # Mock imports for modules that require external dependencies
 # This allows documentation to be built without installing heavy dependencies like PyRosetta
@@ -54,7 +58,7 @@ default_role = "code"
 
 html_theme = "furo"
 html_static_path = ['_static']
-html_baseurl = "https://instadeep.github.io/alf/"
+html_baseurl = "https://instadeepai.github.io/alf/"
 highlight_language = "python"
 pygments_style = "sphinx"
 

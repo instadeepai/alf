@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, Su
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.mlp import MLP, MLPModel, MLPModelConfig, MLPTrainConfig
 from alf_tools.models.utils import (
+    build_from_target,
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
     get_device,
@@ -25,7 +26,7 @@ from alf_tools.models.utils import (
 )
 
 __all__ = [
-    "BoTorchGPModel",
+    "build_from_target",
     "CNNModel",
     "CNNModelConfig",
     "CNNTrainConfig",
@@ -51,7 +52,7 @@ try:
     from alf_tools.models.esmfold import ESMFoldModel, ESMFoldModelConfig
 
     _esmfold_available = True
-except ModuleNotFoundError:
+except ImportError:
     _esmfold_available = False
 
 if _esmfold_available:

@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,9 +41,9 @@ class StateLogger(abc.ABC):
     Per-epoch metrics are available as `state.round_metrics.training_history`,
     a `list[SurrogateEpochMetrics]` populated by the surrogate's
     `get_epoch_metrics()` after each training round.  `SurrogateEpochMetrics`
-    carries standard CNN fields (`train_loss`, `val_loss`,
-    `train_spearman`, `val_spearman`, `train_mse`, `val_mse`) plus an
-    `extra` dict for model-specific metrics.  The list is empty when the
+    carries `epoch`, `train_loss`, and `val_loss`, plus an
+    `additional_metrics` dict for model-specific metrics (e.g. `train_spearman`,
+    `val_spearman`, `train_mse`, `val_mse`).  The list is empty when the
     surrogate does not override `get_epoch_metrics()`.
     """
 
@@ -63,6 +63,20 @@ class StateLogger(abc.ABC):
         """
         pass
 
+    @abc.abstractmethod
+    def log_summary(self, metrics: dict[str, float], round_name: str) -> None:
+        """Log a set of end-of-experiment summary metrics.
+
+        Unlike :meth:`log`, this records only the given scalar metrics (e.g. the
+        aggregate `experiment_summary` emitted by `DesignTask`) and does not
+        touch round-level state such as predictions or acquisition batches.
+
+        Args:
+            metrics: Mapping of summary metric name to value.
+            round_name: Label for the summary entry, e.g. "experiment_summary".
+        """
+        pass
+
     def _log_training_history(
         self, training_history: list[SurrogateEpochMetrics], round_num: int | None = None
     ) -> None:
@@ -71,9 +85,9 @@ class StateLogger(abc.ABC):
         This is a no-op by default. Override in a subclass to capture
         `SurrogateEpochMetrics` from `state.round_metrics.training_history`.
 
-        `SurrogateEpochMetrics` fields: `epoch`, `train_loss`, `val_loss`,
-        `train_spearman`, `val_spearman`, `train_mse`, `val_mse`, and
-        `extra` (a dict for model-specific metrics). Use
+        `SurrogateEpochMetrics` fields: `epoch`, `train_loss`, `val_loss`, and
+        `additional_metrics` (a dict for model-specific metrics such as
+        `train_spearman`, `val_spearman`, `train_mse`, `val_mse`). Use
         `epoch_metrics.to_metrics_dict()` to get a flat `dict[str, float]`
         with `None` fields omitted.
 
@@ -125,6 +139,16 @@ class TerminalStateLogger(StateLogger):
         logger.info(f"Round {round_name}:\n{message}")
         logger.debug(f"Training history for round {round_name}:")
         self._log_training_history(state.round_metrics.training_history)
+
+    def log_summary(self, metrics: dict[str, float], round_name: str) -> None:
+        """Log summary metrics to the terminal.
+
+        Args:
+            metrics: Mapping of summary metric name to value.
+            round_name: Label for the summary entry, e.g. "experiment_summary".
+        """
+        message = "\n".join(f"{key}: {value:.3f}" for key, value in metrics.items())
+        logger.info(f"Round {round_name}:\n{message}")
 
 
 class FileStateLogger(StateLogger):
@@ -247,6 +271,19 @@ class FileStateLogger(StateLogger):
 
         if state.history:
             self._log_acquisition_batch(state.history[-1], state.round)
+
+        if self.upload_function is not None:
+            self.upload_function(self.output_path)
+
+    def log_summary(self, metrics: dict[str, float], round_name: str) -> None:
+        """Append summary metrics to metrics.csv.
+
+        Args:
+            metrics: Mapping of summary metric name to value.
+            round_name: Label for the summary entry; unused by the file logger
+                but kept for interface symmetry with the terminal logger.
+        """
+        self._log_metrics(metrics)
 
         if self.upload_function is not None:
             self.upload_function(self.output_path)
