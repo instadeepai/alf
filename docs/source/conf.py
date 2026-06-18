@@ -68,6 +68,6 @@ html_theme_options = {
 html_static_path = ['_static']
 html_baseurl = "https://instadeepai.github.io/alf/"
 highlight_language = "python"
-pygments_style = "sphinx"
+pygments_style = "default"
 
 add_function_parentheses = False
