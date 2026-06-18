@@ -7,7 +7,7 @@ counterparts) through the ALF ``AcquisitionFunction`` interface, so strategies c
 be swapped via a single ``acquisition_type`` argument.
 
 It operates in two modes: when the search function provides candidates, it scores
-the discrete pool; when the candidate list is empty (e.g. with ``ContinuousSearch``),
+the discrete pool; when the candidate list is empty (e.g. with ``BotorchContinuousSearch``),
 it optimises the acquisition function directly in continuous space via BoTorch's
 ``optimize_acqf``, which requires the ``bounds`` parameter. Monte Carlo variants are
 configured with a ``BoTorchMCSampler``; scipy optimiser behaviour is controlled via

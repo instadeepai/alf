@@ -145,7 +145,7 @@ class BoTorchAcquisition(AcquisitionFunction):
         >>> from alf_tools.optimizer.acquisition_functions import (
         ...     BoTorchAcquisition, BoTorchMCSampler
         ... )
-        >>> from alf_tools.optimizer.search import ContinuousSearch
+        >>> from alf_tools.optimizer.search import BotorchContinuousSearch
         >>>
         >>> # Create sampler configuration
         >>> sampler = BoTorchMCSampler(sampler_type="sobol", num_samples=512)
@@ -168,7 +168,7 @@ class BoTorchAcquisition(AcquisitionFunction):
         >>> from alf_core import Optimizer
         >>> optimizer = Optimizer(
         ...     acquisition_fn=acq_qei,  # or acq_qucb
-        ...     search_fn=ContinuousSearch()
+        ...     search_fn=BotorchContinuousSearch()
         ... )
 
     Args:
