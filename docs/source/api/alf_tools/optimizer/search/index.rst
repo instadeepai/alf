@@ -7,4 +7,5 @@ strategies define how to generate candidate pools for evaluation during the acti
 .. toctree::
    :maxdepth: 1
 
+   Botorch Continuous Search <botorch_continuous_search/index>
    Single Mutant Search <single_mutant_search/index>

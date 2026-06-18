@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.optimizer.acquisition_functions.botorch_acquisition_function import (
-    BotorchAcquisitionConfig,
-    BotorchAcquisitionFunction,
+from alf_tools.optimizer.acquisition_functions.botorch_acquisition import (
+    BoTorchAcquisition,
+    BoTorchAcquisitionOptConfig,
 )
+from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
 from alf_tools.optimizer.acquisition_functions.core_set import CoreSet
 from alf_tools.optimizer.acquisition_functions.expected_improvement import ExpectedImprovement
 from alf_tools.optimizer.acquisition_functions.greedy import Greedy
@@ -23,8 +24,9 @@ from alf_tools.optimizer.acquisition_functions.thompson_sampling import Thompson
 from alf_tools.optimizer.acquisition_functions.ucb import UCB
 
 __all__ = [
-    "BotorchAcquisitionConfig",
-    "BotorchAcquisitionFunction",
+    "BoTorchAcquisition",
+    "BoTorchAcquisitionOptConfig",
+    "BoTorchMCSampler",
     "CoreSet",
     "ExpectedImprovement",
     "Greedy",
