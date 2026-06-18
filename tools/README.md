@@ -48,10 +48,17 @@ uv sync --extra esm2 --extra chemprop
   selection, input normalisation, and output standardisation enabled by default
 - **ESM2Model** - Protein language model surrogate backed by
   [ESM-2](https://huggingface.co/docs/transformers/model_doc/esm). Accepts amino acid sequences
-  directly. Two modes via `ESM2TrainConfig.scoring_function`: `scoring_function='linear_head'` (default) freezes the
-  backbone and trains a linear head for regression (`loss_fn='mse'`) or classification
-  (`loss_fn='cross_entropy'`); `scoring_function=None` performs zero-shot pseudo-log-likelihood scoring
-  with no training. Embeddings can be extracted via `embed()`. Requires the `[esm2]` optional extra:
+  directly. Three operating modes via `ESM2TrainConfig`:
+  `mode='linear_head'` (default) trains a linear head for regression
+  (`loss_fn='mse'`) or classification (`loss_fn='cross_entropy'`) on top of the backbone —
+  frozen by default, or fine-tuned jointly when `freeze_backbone=False` (the backbone then
+  uses `backbone_learning_rate`);
+  `mode='likelihoods'` with frozen backbone performs zero-shot pseudo-log-likelihood (PLL)
+  scoring with no training; `mode='likelihoods'` with `freeze_backbone=False, loss_fn='mlm'`
+  fine-tunes the full ESM-2 backbone via MLM on the input sequences (labels are ignored, but
+  `train()` still takes `LabelledCandidates` — placeholder labels are fine) and then returns
+  PLL scores.
+  Embeddings can be extracted via `embed()`. Requires the `[esm2]` optional extra:
   `pip install "alf-tools[esm2]"`
 - **ESMFoldModel** - ESMFold protein structure prediction oracle; returns a scalar confidence score per candidate. Use as `Oracle(scorer=ESMFoldModel(ESMFoldModelConfig(...)))`. Requires `transformers>=4.36.0` and `accelerate>=0.26.0`.
   Three scoring metrics are supported (all in **[0, 1]**, higher is better):

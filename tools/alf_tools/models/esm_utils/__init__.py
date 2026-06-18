@@ -12,18 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from enum import Enum
-
-
-class ProblemType(str, Enum):
-    """Enum for the type of machine learning problem.
-
-    Attributes:
-        REGRESSION: Continuous output prediction.
-        BINARY: Binary classification (two classes).
-        MULTICLASS: Multi-class classification (three or more classes).
-    """
-
-    REGRESSION = "regression"
-    BINARY = "binary"
-    MULTICLASS = "multiclass"
+"""Helper modules for the ESM-2 model: config dataclasses, loss/masking, and scoring."""
