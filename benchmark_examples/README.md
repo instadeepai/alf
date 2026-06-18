@@ -4,8 +4,6 @@ Two small **benchmark scripts** showing the kind of comparison ALF is built
 for: active-learning performance **as a function of acquisition round**. Each runs
 several AL experiments, prints a summary table, and saves comparison plots.
 
-This is a preview of the (separate, post-v1) `alf_benchmark` layer — not the full thing.
-
 | Script | Compares | Fixed |
 |--------|----------|-------|
 | [`benchmarking_surrogates.py`](benchmarking_surrogates.py) | surrogate models: **CNN, GP, ESM-2** | greedy acquisition |
@@ -26,6 +24,9 @@ uv run --group benchmark python benchmark_examples/benchmarking_acquisition_func
 
 Each writes a comparison PNG and `summary.csv` under `--output-dir`
 (default `benchmark_examples/outputs/<script>/`).
+
+> **Note:** these scripts run from a source checkout with `uv run`, so they require a
+> [development installation](../docs/INSTALLATION.md#development-installation) of the repo.
 
 ## Flags
 
