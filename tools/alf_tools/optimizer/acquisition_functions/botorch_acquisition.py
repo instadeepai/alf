@@ -195,7 +195,6 @@ class BoTorchAcquisition(AcquisitionFunction):
 
     Raises:
         ValueError: If acquisition_type is not supported.
-        NotImplementedError: If acquisition_type is "qKG" (planned but not yet implemented).
     """
 
     _BATCH_JOINT_POSTERIOR_ERROR = (
@@ -221,15 +220,8 @@ class BoTorchAcquisition(AcquisitionFunction):
 
         Raises:
             ValueError: If acquisition_type is not supported.
-            NotImplementedError: If acquisition_type is "qKG".
         """
         super().__init__()
-
-        # qKG is planned but not implemented; raise early so the error is clear.
-        if acquisition_type == "qKG":
-            raise NotImplementedError(
-                "qKG (Knowledge Gradient) is not yet implemented. Use qEI, qNEI, or qUCB instead."
-            )
 
         # Validate acquisition type
         valid_types = get_args(AcquisitionType)
@@ -288,7 +280,7 @@ class BoTorchAcquisition(AcquisitionFunction):
             model: Model with a posterior() method compatible with BoTorch.
                 Can be a native BoTorch model or a wrapper around an ALF model.
             best_f: Best observed value so far.
-            X_baseline: Baseline points for qKG (optional).
+            X_baseline: Baseline points for qNEI / log_noisy_expected_improvement.
 
         Returns:
             BoTorch acquisition function instance.

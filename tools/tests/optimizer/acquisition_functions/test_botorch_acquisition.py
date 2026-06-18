@@ -237,15 +237,6 @@ def test_initialization_invalid_acquisition_type():
         )
 
 
-def test_initialization_qkg_raises_not_implemented():
-    """QKG raises NotImplementedError at init time (planned but not yet implemented)."""
-    with pytest.raises(NotImplementedError, match="qKG.*not yet implemented"):
-        BoTorchAcquisition(
-            acquisition_type="qKG",  # type: ignore[arg-type]
-            bounds=[[0.0, 1.0], [0.0, 1.0]],
-        )
-
-
 # =============================================================================
 # Scoring Mode Tests (Discrete Candidates)
 # =============================================================================
@@ -878,8 +869,6 @@ def test_acquisition_type_in_sync_with_valid_types():
     assert "upper_confidence_bound" in valid
     assert "probability_of_improvement" in valid
     assert "log_noisy_expected_improvement" in valid
-    # qKG must NOT be in the type (not yet implemented; raises at init).
-    assert "qKG" not in valid
 
 
 # =============================================================================
