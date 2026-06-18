@@ -25,6 +25,9 @@ uv run --group benchmark python benchmark_examples/benchmarking_acquisition_func
 Each writes a comparison PNG and `summary.csv` under `--output-dir`
 (default `benchmark_examples/outputs/<script>/`).
 
+> **Note:** these scripts run from a source checkout with `uv run`, so they require a
+> [development installation](../docs/INSTALLATION.md#development-installation) of the repo.
+
 ## Flags
 
 | Flag | Default | Notes |
