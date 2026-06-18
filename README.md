@@ -27,7 +27,7 @@ In scientific discovery, the bottleneck is rarely compute—it's the **experimen
 
 ALF is split into two packages:
 
-**alf-core** — Lightweight framework with base classes, core data structures, and minimal dependencies (numpy, pandas, scipy). No ML framework dependencies. Use this for custom implementations or when integrating into existing systems.
+**alf-core** — Lightweight framework with base classes, core data structures, and minimal dependencies (numpy, pandas, scipy). No ML framework dependencies. It is standalone and domain-agnostic — see the [ALF Core Quickstart](tutorials/alf_core_quickstart.ipynb) for an example. Use this for custom implementations or when integrating into existing systems.
 
 **alf-tools** — Ready-to-use datasets, models, and acquisition functions with heavier dependencies (PyTorch). Depends on alf-core. Use this for quick-start and prototyping.
 
