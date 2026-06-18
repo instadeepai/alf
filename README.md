@@ -148,6 +148,14 @@ alf/
 
 See [core/README.md](core/README.md) and [tools/README.md](tools/README.md) for package-level details.
 
+## 📚 Building Documentation Locally
+
+```bash
+uv sync --group docs
+uv run sphinx-build -b html docs/source docs/build/html
+open docs/build/html/index.html  # macOS
+```
+
 ## 📄 License
 
 This project is licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.
