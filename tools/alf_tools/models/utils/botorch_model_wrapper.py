@@ -273,8 +273,10 @@ class BotorchModelWrapper(BotorchModel):
     # BoTorch `Model`. The wrapper consumes it for `num_outputs`, `batch_shape`,
     # and `posterior()`. Models without it are treated as marginal-only and get a
     # diagonal (per-point independent) posterior built from `predict()`.
-    # TODO: if this duck-typed contract grows fragile, promote it to an explicit
-    # runtime_checkable Protocol (JointPosteriorProvider).
+    # The probe stays duck-typed (see `resolve_botorch_model`): it reads the
+    # attribute and validates the *value* is a BoTorch `Model`, which a
+    # runtime_checkable Protocol could not do (isinstance there only checks the
+    # attribute exists). Revisit only if a second joint-capable model lands.
     @property
     def provides_joint_posterior(self) -> bool:
         """Whether this model can produce a true joint posterior over q>1 points.
