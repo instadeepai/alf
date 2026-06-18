@@ -63,6 +63,12 @@ esm2 = ["alf_tools[esm2]"]
 esmfold = ["alf_tools[esmfold]"]
 chemprop = ["alf_tools[chemprop]"]
 
+# Dependencies for the benchmark_examples/ taster scripts: plotting + ESM2 (transformers).
+benchmark = [
+    "matplotlib>=3.7.0",
+    "alf_tools[esm2]",
+]
+
 [tool.uv]
 default-groups = ["dev"]
 
