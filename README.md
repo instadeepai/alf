@@ -20,7 +20,7 @@ In scientific discovery, the bottleneck is rarely compute—it's the **experimen
 
 **[https://instadeepai.github.io/alf/](https://instadeepai.github.io/alf/)** — full docs including API reference, tutorials, and how-to guides.
 
-- 📥 [Installation Guide](docs/INSTALLATION.md)
+- 📥 [Installation Guide](https://instadeepai.github.io/alf/installation.html)
 - 🛠️ [Contributing Guide](docs/CONTRIBUTING.md)
 
 ## 📦 Package Architecture
@@ -47,7 +47,7 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 machine github.com login <USERNAME> password <TOKEN>
 ```
 
-For GPU support, optional extras (ESM2, Chemprop), and development setup, see [docs/INSTALLATION.md](docs/INSTALLATION.md).
+For GPU support, optional extras (ESM2, Chemprop), and development setup, see the [Installation Guide](https://instadeepai.github.io/alf/installation.html).
 
 ## 🚀 Quick Start
 
@@ -130,7 +130,7 @@ uv run pytest --cov=alf_core --cov-report term-missing  # with coverage
 uv run pre-commit install                             # install pre-commit hooks
 ```
 
-See [docs/INSTALLATION.md](docs/INSTALLATION.md) for GPU configuration and optional extras.
+See the [Installation Guide](https://instadeepai.github.io/alf/installation.html) for GPU configuration and optional extras.
 
 ## 🤝 Contributing
 

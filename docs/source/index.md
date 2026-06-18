@@ -70,12 +70,19 @@ machine github.com login <USERNAME> password <TOKEN>
 ```
 
 For GPU support, optional extras, and development setup, see the
-[Installation Guide](https://github.com/instadeepai/alf/blob/main/docs/INSTALLATION.md).
+[Installation Guide](installation.md).
 
 ## 🚀 Quick start
 
 The snippet below runs a full active learning design experiment. Each component is swappable:
 bring your own dataset, model, acquisition function, or oracle.
+
+What each component does:
+
+- **`Dataset`** — holds your candidates and their labels; handles train/candidate-pool splits
+- **`Surrogate`** — wraps a model that is cheaply re-trained each round to predict labels and uncertainty
+- **`Optimizer`** — scores the candidate pool with an acquisition function and selects the next batch
+- **`Oracle`** — evaluates selected candidates (wet-lab assay, simulation, or held-out dataset)
 
 ```python
 from alf_core import (
@@ -114,13 +121,6 @@ task.run(
 )
 ```
 
-What each component does:
-
-- **`Dataset`** — holds your candidates and their labels; handles train/candidate-pool splits
-- **`Surrogate`** — wraps a model that is cheaply re-trained each round to predict labels and uncertainty
-- **`Optimizer`** — scores the candidate pool with an acquisition function and selects the next batch
-- **`Oracle`** — evaluates selected candidates (wet-lab assay, simulation, or held-out dataset)
-
 New to active learning? Start with [Why ALF?](explanation/why-alf.md) for the motivation, then
 work through the [Tutorials](tutorials/index.md).
 
@@ -133,6 +133,7 @@ explanation/index
 tutorials/index
 how-to/index
 reference/index
+installation
 ```
 
 ```{toctree}

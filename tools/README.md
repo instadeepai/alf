@@ -133,7 +133,7 @@ any model and requires no uncertainty estimates.
 For detailed API documentation and tutorials, see:
 - **Full documentation:** [instadeepai.github.io/alf](https://instadeepai.github.io/alf/)
 - **Core framework:** [../core/README.md](../core/README.md)
-- **Installation guide:** [../docs/INSTALLATION.md](../docs/INSTALLATION.md)
+- **Installation guide:** [https://instadeepai.github.io/alf/installation.html](https://instadeepai.github.io/alf/installation.html)
 - **Tutorials:** [../tutorials/](../tutorials/)
 
 ## Normalisation
