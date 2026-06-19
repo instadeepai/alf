@@ -11,4 +11,5 @@ add-a-dataset
 add-an-acquisition-function
 add-a-search-function
 switch-offline-online
+run-with-docker
 ```
