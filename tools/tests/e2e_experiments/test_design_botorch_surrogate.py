@@ -34,7 +34,6 @@ from alf_core import (
     TerminalStateLogger,
 )
 from alf_core.optimizer.search import BaseSearch
-from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
 from alf_tools.optimizer.acquisition_functions.botorch_acquisition import BoTorchAcquisition
 from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
 
