@@ -107,7 +107,7 @@ New to active learning? Start with [Why ALF?](https://instadeepai.github.io/alf/
 
 ### Lightweight (alf-core only)
 
-- **[ALF Core Quickstart](tutorials/alf_core_quickstart.ipynb)** — bootstrap ensemble surrogate + Probability of Improvement acquisition function, implemented from scratch with numpy/scipy
+- **[ALF Core Quickstart](tutorials/alf_core_quickstart.ipynb)** — active learning on MNIST digit classification, with a softmax-regression surrogate and uncertainty-sampling acquisition function implemented from scratch with numpy/scipy
 
 ### Extend ALF
 
