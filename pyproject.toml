@@ -59,9 +59,14 @@ tutorials = [
     "umap-learn>=0.5.0",
 ]
 
+transformers = ["alf_tools[transformers]"]
 esm2 = ["alf_tools[esm2]"]
 esmfold = ["alf_tools[esmfold]"]
 chemprop = ["alf_tools[chemprop]"]
+
+# Workflow umbrellas (mirror the alf_tools extras of the same name).
+protein = ["alf_tools[protein]"]
+molecule = ["alf_tools[molecule]"]
 
 # Dependencies for the benchmark_examples/ taster scripts: plotting + ESM2 (transformers).
 benchmark = [
