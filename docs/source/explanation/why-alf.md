@@ -7,7 +7,7 @@ bottleneck is rarely compute. It is the **experiment**: each label costs a wet-l
 simulation, or a measurement. You can afford only a handful of rounds, and each round you must
 decide *which* candidates are worth the spend.
 
-This is a **sequential decision problem**, not a one-shot prediction problem. The question is not
+This is a **{term}`sequential decision problem <Active learning>`**, not a one-shot prediction problem. The question is not
 "how accurately can a model predict fitness?" but "given everything measured so far, which batch
 should we measure *next* to reach a good design in as few rounds as possible?"
 
