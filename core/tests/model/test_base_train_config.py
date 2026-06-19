@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -41,6 +41,20 @@ class TestBaseTrainConfig:
         assert "learning_rate" in field_names
         assert "log_frequency" in field_names
 
+    def test_normalise_inputs_strategy_defaults_to_none(self):
+        """normalise_inputs_strategy must default to None (input normalisation disabled)."""
+        config = BaseTrainConfig()
+        assert config.normalise_inputs_strategy is None
+
+    def test_normalise_inputs_strategy_can_be_set(self):
+        """normalise_inputs_strategy must accept 'minmax' and 'zscore'."""
+        assert BaseTrainConfig(normalise_inputs_strategy="minmax").normalise_inputs_strategy == (
+            "minmax"
+        )
+        assert BaseTrainConfig(normalise_inputs_strategy="zscore").normalise_inputs_strategy == (
+            "zscore"
+        )
+
     def test_label_dtype_defaults_to_none(self):
         """label_dtype must default to None (model resolves its own default)."""
         config = BaseTrainConfig()
@@ -51,7 +65,7 @@ class TestBaseTrainConfig:
         config = BaseTrainConfig(label_dtype=torch.float64)
         assert config.label_dtype == torch.float64
 
-    def test_subclass_inherits_fields(self):
+    def test_subclass_inherits_fields(self) -> None:
         """Subclass must inherit learning_rate and log_frequency from BaseTrainConfig."""
 
         @dataclass
@@ -63,7 +77,7 @@ class TestBaseTrainConfig:
         assert config.log_frequency == 10
         assert config.extra_field == 99
 
-    def test_subclass_inherits_label_dtype(self):
+    def test_subclass_inherits_label_dtype(self) -> None:
         """Subclass must inherit label_dtype from BaseTrainConfig."""
 
         @dataclass

@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,14 @@ from alf_core import Candidate, LabelledCandidates
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.utils.enums import ProblemType
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
+
+# Training on deliberately tiny datasets can produce constant predictions or
+# targets, which makes scipy's correlation metrics warn during the
+# train/validation metric computation in CNNModel.train().
+pytestmark = pytest.mark.filterwarnings(
+    "ignore::scipy.stats.ConstantInputWarning",
+    "ignore::scipy.stats.NearConstantInputWarning",
+)
 
 SEQ = "ACDEFGHIKLMNPQRSTVWY"  # 20-char sequence (protein alphabet)
 
@@ -217,3 +225,35 @@ class TestCNNRegressionUnchanged:
         model.train(data_float, data_float)
         assert model.model is not None
         assert model.model._output_neurons == 1
+
+
+class TestCNNClassificationSummaryMetrics:
+    """Tests that get_training_summary_metrics() returns all 5 classification metric keys."""
+
+    def test_binary_summary_metrics_contains_all_classification_keys(self, binary_model):
+        """Binary training produces all 5 classification metric keys in summary."""
+        data = make_data([0, 1, 0, 1, 0, 1, 0, 1])
+        binary_model.train(data, val_data=data)
+        metrics = binary_model.get_training_summary_metrics()
+        for key in (
+            "final_train_accuracy",
+            "final_train_f1",
+            "final_train_precision",
+            "final_train_recall",
+            "final_train_auc_roc",
+        ):
+            assert key in metrics, f"Expected key '{key}' missing from summary metrics"
+
+    def test_multiclass_summary_metrics_contains_all_classification_keys(self, multiclass_model):
+        """Multiclass training produces all 5 classification metric keys in summary."""
+        data = make_data([0, 1, 2, 0, 1, 2, 0, 1, 2])
+        multiclass_model.train(data, val_data=data)
+        metrics = multiclass_model.get_training_summary_metrics()
+        for key in (
+            "final_train_accuracy",
+            "final_train_f1",
+            "final_train_precision",
+            "final_train_recall",
+            "final_train_auc_roc",
+        ):
+            assert key in metrics, f"Expected key '{key}' missing from summary metrics"

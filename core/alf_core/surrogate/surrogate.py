@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from typing import Union
+from typing import Any, Union
 
 import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
@@ -72,6 +72,19 @@ class Surrogate:
             and empirical distributions.
         """
         return self.model.predict(candidates)
+
+    def featurise(self, inputs: list[Candidate]) -> Any:
+        """Featurise the given inputs using the surrogate model's featurisation method.
+
+        Args:
+            inputs: List of Candidate objects or a LabelledCandidates instance
+                to featurise.
+
+        Returns:
+            Feature representation from the underlying model, typically
+            an np.ndarray or torch.Tensor.
+        """
+        return self.model.featurise(inputs)
 
     def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Get summary metrics from the most recent training run.

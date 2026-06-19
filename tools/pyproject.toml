@@ -11,13 +11,27 @@ requires-python = ">=3.12"
 dependencies = [
     "alf_core",
     "requests>=2.25.0",
-    "huggingface_hub==0.27.0",
+    "huggingface_hub>=0.27.0,<2.0",
+    "pyarrow>=22.0.0",
     "jaxtyping>=0.3.5",
     "torch>=2.10.0",
-    "gpytorch>=1.9.0",
+    "gpytorch>=1.9.0,<2.0",
     "scipy>=1.9.0",
-    "botorch>=0.12.0",
+    "botorch>=0.17.0,<1.0",
 ]
+
+[project.optional-dependencies]
+chemprop = [
+    "chemprop>=2.0.0,<3.0.0",
+]
+esm2 = [
+    "transformers>=4.36.0",
+]
+esmfold = [
+    "transformers>=4.36.0",
+    "accelerate>=0.26.0",
+]
+guacamol = ["rdkit>=2022.9.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -37,6 +51,11 @@ explicit = true
 alf_core = { path = "../core", editable = true }
 torch = [
   { index = "pytorch-cpu" },
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests requiring the real model (deselect with '-m not integration')",
 ]
 
 [dependency-groups]

@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, TypeAlias, Union
 
 import numpy as np
 
@@ -174,7 +174,7 @@ class Candidate:
 
     __hash__ = None  # type: ignore[assignment]
 
-    def to_serializable(self) -> Optional[DataFrameCompatible]:
+    def to_serializable(self) -> DataFrameCompatible | None:
         """Convert candidate data to a format suitable for pandas DataFrame storage.
 
         This method transforms the candidate's data into a format that can be efficiently

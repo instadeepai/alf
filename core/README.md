@@ -25,7 +25,7 @@ This README is organized into the following sections:
   candidate pool
 - **[8. State (`State`)](#8-state-state)** - Tracks the state of active
   learning tasks
-- **[9. Normalisation (`InputNormaliser`, `OutputStandardiser`)](#9-normalisation-inputnormaliser-outputstandardiser)**
+- **[9. Normalisation (`InputNormaliser`, `InputStandardiser`, `OutputStandardiser`)](#9-normalisation-inputnormaliser-inputstandardiser-outputstandardiser)**
   - Feature and label preprocessing
 
 ### Task Types
@@ -89,10 +89,11 @@ the framework. Models can serve multiple roles depending on the context:
 Concrete model implementations pair with a `BaseTrainConfig` dataclass that exposes normalisation
 flags alongside standard training hyperparameters:
 
-- `normalise_inputs: bool` — apply min-max input normalisation (default `False`)
+- `normalise_inputs_strategy: Literal["minmax", "zscore"] | None` — select the input normalisation
+  routine, or `None` to disable it (default `None`)
 - `standardise_outputs: bool` — apply Z-score output standardisation (default `False`)
 
-See [section 9](#9-normalisation-inputnormaliser-outputstandardiser) for full details on both
+See [section 9](#9-normalisation-inputnormaliser-inputstandardiser-outputstandardiser) for full details on both
 normalisation routines.
 
 **Implementation Notes:**
@@ -116,6 +117,7 @@ and provides:
 **Key Methods:**
 - `fit()`: Trains the surrogate on train/validation data
 - `predict()`: Generates predictions (means and uncertainties) for candidates
+- `featurise()`: Returns feature representations for candidates or `LabelledCandidates` by delegating to the underlying model — used by diversity-based acquisition functions such as `CoreSet`
 - `get_training_summary_metrics()`: Returns training metrics
 
 ### 4. Oracle (`Oracle`)
@@ -149,6 +151,7 @@ Acquisition functions determine which candidates are most promising to evaluate.
 score candidates based on:
 
 - Surrogate model predictions (means and uncertainties)
+- Model feature representations (for diversity-based selection)
 - Current task state (training data, round number, etc.)
 
 **Common Acquisition Functions:**
@@ -156,6 +159,7 @@ score candidates based on:
 - **UCB (Upper Confidence Bound)**: Balances exploitation and exploration
 - **Expected Improvement**: Selects candidates with highest expected improvement
 - **Thompson Sampling**: Uses Bayesian sampling for exploration
+- **CoreSet**: Greedy k-centres selection maximising input-space coverage — calls `state.surrogate.featurise()` rather than `predict()`, so it is independent of model uncertainty estimates
 
 ### 7. Search Strategy (`BaseSearch`)
 
@@ -182,10 +186,10 @@ The `State` dataclass tracks the complete state of an active learning task:
 **Key Methods:**
 - `update()`: Adds newly acquired candidates to history, updates dataset splits, and increments the round counter
 
-### 9. Normalisation (`InputNormaliser`, `OutputStandardiser`)
+### 9. Normalisation (`InputNormaliser`, `InputStandardiser`, `OutputStandardiser`)
 
-ALF provides two preprocessing classes in `alf_core.model.normaliser` for feature and label scaling.
-Both are fitted exclusively on training data and applied consistently at predict time to avoid data leakage.
+ALF provides preprocessing classes in `alf_core.model.normaliser` for feature and label scaling.
+All are fitted exclusively on training data and applied consistently at predict time to avoid data leakage.
 
 **`InputNormaliser`** — min-max scaling of input features to [0, 1]:
 - Statistics (per-feature min and range) are computed over the batch dimension, so each feature
@@ -197,6 +201,18 @@ Both are fitted exclusively on training data and applied consistently at predict
 - Well suited for GP models, where kernels measure distances between inputs and benefit from inputs
   spanning the unit cube [0, 1].
 
+**`InputStandardiser`** — Z-score standardisation of input features to zero mean and unit variance:
+- Statistics (per-feature mean and std) are computed over the batch dimension, so each feature
+  dimension is standardised independently. Supports the same 2-D and higher-dimensional inputs.
+- Edge case: a feature with near-zero std (< `_MIN_STD = 1e-8`) has its scale set to `1.0`, so the
+  column is only mean-centred. This keeps unseen non-constant values bounded at predict time instead
+  of being amplified by division by a near-zero std.
+- Generally preferred for deep neural networks (e.g. `CNNModel`): zero-centring inputs avoids the
+  gradient bias that arises from non-zero-centred activations.
+
+Use `make_input_transform(strategy)` to construct the transform matching a config's
+`normalise_inputs_strategy` (`"minmax"` → `InputNormaliser`, `"zscore"` → `InputStandardiser`).
+
 **`OutputStandardiser`** — Z-score standardisation of output labels to zero mean and unit variance:
 - `inverse_transform(mean, var)` maps predictions back to the original label scale:
   `mean_orig = mean_std * std + mean_train`, `var_orig = var_std * std²`
@@ -205,15 +221,16 @@ Both are fitted exclusively on training data and applied consistently at predict
   (inverse-transformed) label scale.** Predictions returned by `predict()` are always in the
   original label space.
 
-Both are controlled via `BaseTrainConfig` flags (see section 2):
+These are controlled via `BaseTrainConfig` fields (see section 2):
 
-| Flag | Default | Effect |
-|------|---------|--------|
-| `normalise_inputs` | `False` | Apply `InputNormaliser` (min-max) to input features |
+| Field | Default | Effect |
+|-------|---------|--------|
+| `normalise_inputs_strategy` | `None` | `"minmax"` applies `InputNormaliser`, `"zscore"` applies `InputStandardiser`, `None` disables input normalisation |
 | `standardise_outputs` | `False` | Apply `OutputStandardiser` (Z-score) to output labels |
 
-Concrete model configs may override these defaults; for example, `GPTrainConfig` sets both to `True`
-because GP kernels operate in distance space and benefit from standardised targets.
+Concrete model configs may override these defaults; for example, `GPTrainConfig` sets
+`normalise_inputs_strategy="minmax"` and `standardise_outputs=True` because GP kernels operate in
+distance space and benefit from standardised targets.
 
 ## Task Types
 
@@ -230,6 +247,7 @@ The design task implements a multi-round active learning loop for optimizing seq
    - **Tell**: Retrain surrogate on updated data
    - **Evaluate**: Assess surrogate performance on test set
    - **Log**: Record metrics and save results
+3. **Experiment Summary**: Compute and log `auc_top_k` — the normalised area under the per-round top-k mean curve — as a single sample-efficiency score for the full experiment
 
 **Use Case**: Iteratively improve sequences by actively selecting and evaluating
 promising candidates.
@@ -338,15 +356,19 @@ The zero-shot task evaluates a pre-trained or untrained model without training:
 
 ## Evaluation Metrics
 
-ALF provides comprehensive utilities for evaluating surrogate model predictions through metrics (see `utils/metrics.py`). Metrics are automatically added to the regsistry and categorized by whether variance is needed in the calculation of the metric:
+ALF provides utilities for evaluating model predictions through two metric registries
+(see `utils/metrics.py`). The active registry is selected automatically by `Results` based on
+the dataset's `problem_type`.
 
-**Accuracy Metrics** (no variance required):
+### Regression Metrics (`ProblemType.REGRESSION`)
+
+**Regression — Accuracy Metrics** (no variance required, `utils/metrics/regression.py`):
 - **MSE**: Mean Squared Error between predictions and targets
 - **Pearson**: Pearson correlation between predictions and targets
 - **Spearman**: Spearman correlation between predictions and targets
 - **Pairwise XEnt**: Ranking loss for pairwise classification
 
-**Calibration Metrics** (variance required):
+**Regression — Calibration Metrics** (variance required):
 - **ECE** (Expected Calibration Error): Area between observed coverage and ideal calibration curve (see [this](https://arxiv.org/abs/1706.04599) paper for more details)
 - **Rank ECE**: ECE computed in rank space using Monte Carlo ranking
 - **Coverage**: Percentage of targets falling within confidence intervals at a given alpha level
@@ -354,17 +376,51 @@ ALF provides comprehensive utilities for evaluating surrogate model predictions 
 - **Width**: Average confidence interval width normalized by dataset range
 - **Rank Width**: Width computed in rank space
 
-**Uncertainty Quantification (UQ) Metrics** (variance required):
+**Regression — Uncertainty Quantification (UQ) Metrics** (variance required):
 - **Residual Spearman**: Spearman correlation between absolute residuals and predicted variances
 - **Residual Pearson**: Pearson correlation between absolute residuals and standard deviations
+- **NLL Gaussian** (`nll_gaussian`): Mean negative log-likelihood under a Gaussian predictive distribution
 
-**Acquisition Performance Metrics** (variance required):
+**Regression — Active Learning Progress Metrics** (no variance required, `utils/metrics/regression.py`):
+- **Top-K Mean** (`top_k_mean`): Mean oracle label of the top-k acquired candidates per round
+- **Top-K Max** (`top_k_max`): Maximum oracle label of the top-k acquired candidates per round
+- **Hit Rate** (`hit_rate`): Fraction of acquired candidates whose label meets a threshold
+
+**Design Task Metrics** (standalone, not in registry, `utils/metrics/aggregate.py`):
+- **AUC Top-K** (`auc_top_k`): Normalised area under the top-k mean curve across rounds — primary sample-efficiency ranking metric, computed automatically by `DesignTask` at experiment end
+
+**Acquisition Batch Metrics** (`utils/metrics/acquisition_batch.py`):
+- **Intra-Batch Diversity** (`intra_batch_diversity`): Average pairwise dissimilarity within an acquired batch (normalised Levenshtein distance for sequences, cosine distance for embeddings/tabular)
+- **Recall** (`compute_recall`): Fraction of acquired candidates in the top-percentile or top-N of the full candidate pool
+- **Regret** (`compute_regret`): Gap between the best possible label and the best acquired label
+
+**Regression — Acquisition Performance Metrics** (variance required):
 - **Regret UCB Alpha**: UCB acquisition regret comparing selected vs optimal candidates
 - **Regret UCB Alpha Sweep**: UCB regret computed across multiple alpha exploration parameters
 
-All metrics accept predictions (means, variances, targets) and return a dictionary of computed values. Metrics requiring variance will validate that uncertainty estimates are provided.
+**Classification Metrics** (`utils/metrics/classification.py`):
+- **Accuracy**: Fraction of correctly classified samples
+- **F1**: Macro-averaged F1 score
+- **Precision**: Macro-averaged precision
+- **Recall**: Macro-averaged recall
+- **AUC-ROC**: Area under the ROC curve (binary or multiclass one-vs-rest)
+
+All classification metrics accept `(probs, targets)` where `probs` has shape `(n_samples, num_classes)`.
+Regression metrics accept predictions (means, variances, targets) and return a dictionary of
+computed values. Metrics requiring variance will validate that uncertainty estimates are provided.
 
 > **Normalisation and metrics:** When `standardise_outputs=True` in the model's train config,
 > predictions are inverse-transformed back to the original label scale before metrics are computed.
 > Metrics therefore always reflect performance in original label units, regardless of whether
 > output standardisation was used during training.
+
+### Classification Metrics (`ProblemType.BINARY` and `ProblemType.MULTICLASS`)
+
+- **Accuracy**: Classification accuracy (fraction of correct predictions)
+- **F1**: Macro-averaged F1 score
+- **Precision**: Macro-averaged precision
+- **Recall**: Macro-averaged recall
+- **AUC-ROC**: Area under the ROC curve (binary or one-vs-rest for multiclass)
+
+Classification metrics accept class probability arrays (shape `(n_samples, n_classes)`) and
+integer target labels.

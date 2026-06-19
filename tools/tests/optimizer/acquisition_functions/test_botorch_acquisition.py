@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,9 +15,12 @@
 """Tests for generic BoTorch acquisition function wrapper."""
 
 import math
+from typing import get_args
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
+import torch
 from alf_core import (
     BaseDatasetConfig,
     Candidate,
@@ -28,9 +31,14 @@ from alf_core import (
 )
 from alf_core.dataclasses.state import State
 from alf_core.dataset.base_dataset import BaseDataset
-from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
+from alf_tools.models.gp import FeaturizerConfig, GPModel, GPTrainConfig
+from alf_tools.models.utils.botorch_model_wrapper import (
+    resolve_botorch_model,
+)
 from alf_tools.optimizer.acquisition_functions.botorch_acquisition import (
+    AcquisitionType,
     BoTorchAcquisition,
+    BoTorchAcquisitionOptConfig,
 )
 from alf_tools.optimizer.acquisition_functions.botorch_samplers import (
     BoTorchMCSampler,
@@ -120,7 +128,11 @@ def trained_surrogate(simple_dataset: _InlineBraninDataset) -> Surrogate:
     Returns:
         Surrogate: A trained GP surrogate model.
     """
-    gp_model = BoTorchGPModel(num_iterations=50, learning_rate=0.1)
+    gp_model = GPModel(
+        train_config=GPTrainConfig(num_iterations=50, learning_rate=0.1),
+        featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+        device="cpu",
+    )
     surrogate = Surrogate(model=gp_model)
     surrogate.fit(simple_dataset.train_dataset, simple_dataset.validation_dataset)
     return surrogate
@@ -209,17 +221,6 @@ def test_initialization_invalid_acquisition_type():
             acquisition_type="invalid",  # type: ignore
             bounds=[[0.0, 1.0], [0.0, 1.0]],
         )
-
-
-def test_initialization_qkg_not_implemented():
-    """Test that qKG raises NotImplementedError when creating acquisition function."""
-    acq_fn = BoTorchAcquisition(
-        acquisition_type="qKG",
-        bounds=[[0.0, 1.0], [0.0, 1.0]],
-    )
-
-    # Initialization should work, but calling it should raise NotImplementedError
-    assert acq_fn.acquisition_type == "qKG"
 
 
 # =============================================================================
@@ -379,6 +380,41 @@ def test_optimization_mode_qnei(task_state, simple_dataset):
     assert all(np.isfinite(labelled.labels))
 
 
+def test_optimization_mode_qucb_gpmodel(simple_dataset, trained_gp_model):
+    """Continuous optimisation works for a plain ALF GPModel surrogate.
+
+    A trained `GPModel` is not itself a native BoTorch model but exposes a trained
+    `botorch_model`. `_optimize_continuous` resolves it to that inner model (for
+    analytic gradients) via the shared `resolve_botorch_model` capability check,
+    then optimises.
+    """
+    gp_model = trained_gp_model.model
+    # The GPModel is joint-capable: it resolves to a trained inner BoTorch model.
+    assert resolve_botorch_model(gp_model) is not None
+
+    surrogate = Surrogate(model=gp_model)
+    state = State(dataset=simple_dataset, surrogate=surrogate)
+
+    # GPModel was trained on 2-feature candidates in the unit square.
+    bounds = [[0.0, 1.0], [0.0, 1.0]]
+    acq_fn = BoTorchAcquisition(
+        acquisition_type="qUCB",
+        bounds=bounds,
+        beta=0.3,
+        batch_size=2,
+        num_restarts=2,
+        raw_samples=64,
+    )
+
+    labelled = acq_fn(search_candidates=[], state=state)
+
+    assert len(labelled) == 2
+    assert all(np.isfinite(labelled.labels))
+    for candidate in labelled.candidates:
+        assert np.all(candidate.data >= np.array([b[0] for b in bounds]))
+        assert np.all(candidate.data <= np.array([b[1] for b in bounds]))
+
+
 def test_optimization_mode_without_bounds_raises_error(task_state):
     """Test that optimization mode without bounds raises ValueError."""
     acq_fn = BoTorchAcquisition(acquisition_type="qEI", batch_size=3)
@@ -452,7 +488,12 @@ def test_requires_trained_surrogate(simple_dataset):
 
     # State requires a Surrogate at construction time (beartype-enforced); set to None
     # afterward so the acquisition function's own guard is what raises the error.
-    placeholder = Surrogate(model=BoTorchGPModel())
+    placeholder = Surrogate(
+        model=GPModel(
+            featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+            device="cpu",
+        )
+    )
     state = State(dataset=simple_dataset, surrogate=placeholder)
     state.surrogate = None  # type: ignore
 
@@ -462,21 +503,6 @@ def test_requires_trained_surrogate(simple_dataset):
 
     with pytest.raises(RuntimeError, match="Surrogate model is required"):
         acq_fn(search_candidates=test_candidates, state=state)
-
-
-def test_qkg_raises_not_implemented(task_state):
-    """Test that qKG raises NotImplementedError."""
-    acq_fn = BoTorchAcquisition(
-        acquisition_type="qKG",
-        bounds=[[0.0, 1.0], [0.0, 1.0]],
-    )
-
-    test_candidates = [
-        Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR),
-    ]
-
-    with pytest.raises(NotImplementedError, match="qKG.*not yet implemented"):
-        acq_fn(search_candidates=test_candidates, state=task_state)
 
 
 # =============================================================================
@@ -551,7 +577,11 @@ def test_high_dimensional_input(trained_surrogate):
     dataset.setup()
 
     # Train surrogate
-    gp_model = BoTorchGPModel(num_iterations=50)
+    gp_model = GPModel(
+        train_config=GPTrainConfig(num_iterations=50),
+        featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+        device="cpu",
+    )
     surrogate = Surrogate(model=gp_model)
     surrogate.fit(dataset.train_dataset, dataset.validation_dataset)
 
@@ -662,3 +692,193 @@ def test_optimization_produces_reasonable_candidates(task_state, simple_dataset)
     # Both should produce finite predictions
     assert all(np.isfinite(pred_optimized.means))
     assert all(np.isfinite(pred_random.means))
+
+
+# =============================================================================
+# Analytic acquisition type tests
+# =============================================================================
+
+
+def test_analytic_ei_scores_candidates(task_state):
+    """LogExpectedImprovement returns finite scores for each candidate."""
+    acq_fn = BoTorchAcquisition(acquisition_type="log_expected_improvement", batch_size=1)
+    candidates = [
+        Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR),
+        Candidate(data=np.array([0.1, 0.9]), modality=Modality.TABULAR),
+    ]
+    labelled = acq_fn(search_candidates=candidates, state=task_state)
+    assert len(labelled) == 2
+    assert all(np.isfinite(labelled.labels))
+
+
+def test_analytic_ucb_scores_candidates(task_state):
+    """UpperConfidenceBound returns finite scores for each candidate."""
+    acq_fn = BoTorchAcquisition(acquisition_type="upper_confidence_bound", beta=2.0, batch_size=1)
+    candidates = [Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR)]
+    labelled = acq_fn(search_candidates=candidates, state=task_state)
+    assert len(labelled) == 1
+    assert np.isfinite(labelled.labels[0])
+
+
+def test_analytic_pi_scores_candidates(task_state):
+    """ProbabilityOfImprovement returns finite scores for each candidate."""
+    acq_fn = BoTorchAcquisition(acquisition_type="probability_of_improvement", batch_size=1)
+    candidates = [Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR)]
+    labelled = acq_fn(search_candidates=candidates, state=task_state)
+    assert len(labelled) == 1
+    assert np.isfinite(labelled.labels[0])
+
+
+def test_log_noisy_ei_scores_candidates(task_state):
+    """QLogNoisyExpectedImprovement returns finite scores for each candidate."""
+    acq_fn = BoTorchAcquisition(acquisition_type="log_noisy_expected_improvement", batch_size=1)
+    candidates = [Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR)]
+    labelled = acq_fn(search_candidates=candidates, state=task_state)
+    assert len(labelled) == 1
+    assert np.isfinite(labelled.labels[0])
+
+
+def test_invalid_acquisition_type_rejects_new_names():
+    """New analytic type names are accepted; an unrecognised name still raises ValueError."""
+    BoTorchAcquisition(acquisition_type="log_expected_improvement")
+    BoTorchAcquisition(acquisition_type="upper_confidence_bound")
+    BoTorchAcquisition(acquisition_type="probability_of_improvement")
+    BoTorchAcquisition(acquisition_type="log_noisy_expected_improvement")
+
+    with pytest.raises(ValueError, match="Unsupported acquisition_type"):
+        BoTorchAcquisition(acquisition_type="banana")  # type: ignore
+
+
+# =============================================================================
+# Model wrapping tests (migrated from test_botorch_acquisition_function.py)
+# =============================================================================
+
+
+def test_score_candidates_skips_wrapper_for_native_botorch_model(task_state, botorch_gp_model):
+    """_score_candidates does not wrap a native BotorchModel in BotorchModelWrapper."""
+    task_state.surrogate.model = botorch_gp_model
+
+    acq_fn = BoTorchAcquisition(acquisition_type="qEI", batch_size=1)
+    candidates = [Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR)]
+
+    mock_acq_fn = MagicMock()
+    mock_acq_fn.return_value = torch.tensor([0.5])
+
+    with (
+        patch(
+            "alf_tools.optimizer.acquisition_functions.botorch_acquisition.BotorchModelWrapper"
+        ) as mock_wrapper,
+        patch.object(acq_fn, "_create_acquisition_function", return_value=mock_acq_fn),
+    ):
+        acq_fn(search_candidates=candidates, state=task_state)
+        mock_wrapper.assert_not_called()
+
+
+def test_score_candidates_wraps_alf_model(mock_alf_model_with_variances):
+    """_score_candidates wraps an ALF BaseModel in BotorchModelWrapper."""
+    surrogate = MagicMock()
+    surrogate.model = mock_alf_model_with_variances
+
+    state = MagicMock()
+    state.surrogate = surrogate
+    state.dataset.train_dataset.labels.max.return_value = 1.0
+
+    acq_fn = BoTorchAcquisition(acquisition_type="qUCB", beta=2.0, batch_size=1)
+    candidates = [Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR)]
+
+    result = acq_fn(search_candidates=candidates, state=state)
+    assert len(result.labels) == 1
+    assert all(np.isfinite(result.labels))
+
+
+def test_batch_size_gt_one_marginal_only_raises(mock_alf_model_with_variances):
+    """batch_size>1 on a marginal-only model raises a pointed error (scoring mode)."""
+    surrogate = MagicMock()
+    surrogate.model = mock_alf_model_with_variances
+    state = MagicMock()
+    state.surrogate = surrogate
+    state.dataset.train_dataset.labels.max.return_value = 1.0
+
+    acq_fn = BoTorchAcquisition(acquisition_type="qUCB", beta=2.0, batch_size=2)
+    candidates = [
+        Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR),
+        Candidate(data=np.array([0.2, 0.8]), modality=Modality.TABULAR),
+    ]
+    with pytest.raises(ValueError, match="joint posterior"):
+        acq_fn(search_candidates=candidates, state=state)
+
+
+def test_analytic_acquisition_marginal_only_succeeds(mock_alf_model_with_variances):
+    """Analytic acquisitions work on marginal-only models (single-point)."""
+    surrogate = MagicMock()
+    surrogate.model = mock_alf_model_with_variances
+    state = MagicMock()
+    state.surrogate = surrogate
+    state.dataset.train_dataset.labels.max.return_value = 1.0
+
+    acq_fn = BoTorchAcquisition(acquisition_type="upper_confidence_bound", beta=2.0, batch_size=1)
+    candidates = [Candidate(data=np.array([0.5, 0.5]), modality=Modality.TABULAR)]
+    result = acq_fn(search_candidates=candidates, state=state)
+    assert len(result.labels) == 1
+    assert all(np.isfinite(result.labels))
+
+
+def test_batch_size_gt_one_marginal_only_raises_optimisation_mode(mock_alf_model_with_variances):
+    """batch_size>1 on a marginal-only model raises in continuous optimisation mode."""
+    surrogate = MagicMock()
+    surrogate.model = mock_alf_model_with_variances
+    state = MagicMock()
+    state.surrogate = surrogate
+    state.dataset.train_dataset.labels.max.return_value = 1.0
+
+    acq_fn = BoTorchAcquisition(
+        acquisition_type="qUCB", beta=2.0, batch_size=2, bounds=[[0.0, 1.0], [0.0, 1.0]]
+    )
+    with pytest.raises(ValueError, match="joint posterior"):
+        acq_fn(search_candidates=[], state=state)
+
+
+# =============================================================================
+# AcquisitionType / _VALID_TYPES consistency
+# =============================================================================
+
+
+def test_acquisition_type_in_sync_with_valid_types():
+    """AcquisitionType Literal and the runtime get_args list must stay identical."""
+    valid = set(get_args(AcquisitionType))
+    # Ensure the type alias includes all expected families and no extras.
+    assert "qEI" in valid
+    assert "qLogEI" in valid
+    assert "qNEI" in valid
+    assert "qUCB" in valid
+    assert "log_expected_improvement" in valid
+    assert "upper_confidence_bound" in valid
+    assert "probability_of_improvement" in valid
+    assert "log_noisy_expected_improvement" in valid
+
+
+# =============================================================================
+# BoTorchAcquisitionOptConfig configurability
+# =============================================================================
+
+
+def test_custom_optimization_config(task_state, simple_dataset):
+    """Custom BoTorchAcquisitionOptConfig is respected during continuous optimization."""
+    bounds = [[b[0], b[1]] for b in simple_dataset.bounds.T]
+    opt_cfg = BoTorchAcquisitionOptConfig(maxiter=10, batch_limit=8)
+
+    acq_fn = BoTorchAcquisition(
+        acquisition_type="qEI",
+        bounds=bounds,
+        batch_size=1,
+        num_restarts=2,
+        raw_samples=32,
+        optimization_config=opt_cfg,
+    )
+
+    assert acq_fn.optimization_config.maxiter == 10
+    assert acq_fn.optimization_config.batch_limit == 8
+
+    labelled = acq_fn(search_candidates=[], state=task_state)
+    assert len(labelled) == 1
+    assert np.isfinite(labelled.labels[0])

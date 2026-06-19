@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions
@@ -36,8 +36,10 @@ class BaseTrainConfig:
     Args:
         learning_rate: Learning rate for the optimizer.
         log_frequency: How often (in epochs/iterations) to log training metrics.
-        normalise_inputs: Whether to apply min-max normalisation to input
-            features before training. Defaults to False.
+        normalise_inputs_strategy: Which input normalisation to apply before
+            training: `minmax` (scale features to [0, 1]) or `zscore` (zero
+            mean, unit variance). None disables input normalisation. Defaults
+            to None.
         standardise_outputs: Whether to apply Z-score standardisation to
             outputs before training. Defaults to False.
         label_dtype: dtype for label tensors during training. None means each
@@ -47,7 +49,7 @@ class BaseTrainConfig:
 
     learning_rate: float = 1e-3
     log_frequency: int = 10
-    normalise_inputs: bool = False
+    normalise_inputs_strategy: Literal["minmax", "zscore"] | None = None
     standardise_outputs: bool = False
     label_dtype: "TorchDtype | None" = None
 
@@ -77,13 +79,14 @@ class BaseModel(abc.ABC):
     def train(
         self,
         train_data: LabelledCandidates,
-        val_data: LabelledCandidates,
+        val_data: LabelledCandidates | None = None,
     ) -> None:
         """Train the model on the provided training and validation data.
 
         Args:
             train_data: Labeled candidates for training.
-            val_data: Labeled candidates for validation.
+            val_data: Labeled candidates for validation. When None, the model
+                should skip validation metrics or handle the absence gracefully.
         """
         pass
 
@@ -133,7 +136,7 @@ class BaseModel(abc.ABC):
         """
         return []
 
-    def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
+    def get_training_summary_metrics(self) -> dict[str, float | int | np.number]:
         """Get summary metrics from the most recent training run.
 
         Returns:

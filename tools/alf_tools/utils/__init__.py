@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from alf_tools.utils.botorch_utils import (
+from alf_tools.models.utils.botorch_utils import (
     candidates_to_tensor,
     get_bounds_tensor,
     predictions_to_posterior,

@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,29 +14,46 @@
 
 """Data transformation utilities for ALF model implementations."""
 
+from typing import Literal
+
 import numpy as np
 import torch
-from alf_core.model.normaliser import InputNormaliser, OutputStandardiser
+from alf_core.model.normaliser import (
+    InputNormaliser,
+    InputStandardiser,
+    OutputStandardiser,
+    make_input_transform,
+)
 from torch import dtype as TorchDtype
 
 
 def transform_data(
     train_x: torch.Tensor,
     labels: np.ndarray,
-    normalise_inputs: bool,
+    normalise_inputs_strategy: Literal["minmax", "zscore"] | None,
     standardise_outputs: bool,
     label_dtype: TorchDtype,
     device: torch.device,
-) -> tuple[torch.Tensor, torch.Tensor, InputNormaliser | None, OutputStandardiser | None]:
+    feature_dtype: TorchDtype | None = None,
+) -> tuple[
+    torch.Tensor,
+    torch.Tensor,
+    InputNormaliser | InputStandardiser | None,
+    OutputStandardiser | None,
+]:
     """Apply input normalisation and output standardisation to training data.
 
     Args:
         train_x: Training features tensor.
         labels: Training labels array.
-        normalise_inputs: Whether to apply min-max normalisation to input features.
+        normalise_inputs_strategy: Which input normalisation to apply: `minmax`,
+            `zscore`, or None to disable input normalisation.
         standardise_outputs: Whether to apply Z-score standardisation to output labels.
         label_dtype: Data type for the output labels.
         device: Device to move tensors to.
+        feature_dtype: Data type for the input features. `None` (the default)
+            preserves the input dtype of `train_x`, except in the normalised
+            branch where the numpy round-trip casts to float32.
 
     Returns:
         Transformed training features, training labels, and the fitted normalisers.
@@ -44,12 +61,14 @@ def transform_data(
     input_normaliser = None
     output_standardiser = None
 
-    if normalise_inputs:
+    if normalise_inputs_strategy is not None:
         train_x_np = train_x.cpu().numpy()
-        input_normaliser = InputNormaliser()
+        input_normaliser = make_input_transform(normalise_inputs_strategy)
         input_normaliser.fit(train_x_np)
         train_x_np = input_normaliser.transform(train_x_np)
-        train_x = torch.tensor(train_x_np, dtype=torch.float32).to(device)
+        train_x = torch.tensor(train_x_np, dtype=feature_dtype or torch.float32).to(device)
+    elif feature_dtype is not None:
+        train_x = train_x.to(device=device, dtype=feature_dtype)
     else:
         train_x = train_x.to(device)
 

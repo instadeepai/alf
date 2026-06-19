@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,18 +14,20 @@
 
 from alf_tools.optimizer.acquisition_functions.botorch_acquisition import (
     BoTorchAcquisition,
+    BoTorchAcquisitionOptConfig,
 )
 from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
-from alf_tools.optimizer.acquisition_functions.expected_improvement import (
-    ExpectedImprovement,
-)
+from alf_tools.optimizer.acquisition_functions.core_set import CoreSet
+from alf_tools.optimizer.acquisition_functions.expected_improvement import ExpectedImprovement
 from alf_tools.optimizer.acquisition_functions.greedy import Greedy
 from alf_tools.optimizer.acquisition_functions.thompson_sampling import ThompsonSampling
 from alf_tools.optimizer.acquisition_functions.ucb import UCB
 
 __all__ = [
     "BoTorchAcquisition",
+    "BoTorchAcquisitionOptConfig",
     "BoTorchMCSampler",
+    "CoreSet",
     "ExpectedImprovement",
     "Greedy",
     "ThompsonSampling",

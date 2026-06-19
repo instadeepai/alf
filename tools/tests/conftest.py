@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,32 +14,28 @@
 
 """Shared pytest fixtures for tools tests.
 
-This module provides fixtures for BoTorch GP model, acquisition, dataset,
-and integration tests.
+This module provides fixtures needed by the data-conversion utility tests
+(test_botorch_utils.py) and GP model tests (test_gp.py,
+test_botorch_model_wrapper.py). Acquisition and dataset fixtures are added
+in later PRs.
 """
 
+import math
+from dataclasses import dataclass
 from typing import Union
 
 import numpy as np
 import pytest
 import torch
 from alf_core import (
-    BaseDatasetConfig,
     Candidate,
     LabelledCandidates,
     Modality,
-    Optimizer,
-    Oracle,
     Predictions,
-    State,
     Surrogate,
 )
 from alf_core.model.base_model import BaseModel
-from alf_tools.datasets.botorch_synthetic_dataset import BoTorchSyntheticDataset
-from alf_tools.models.botorch_exact_gp_model import BoTorchGPModel
-from alf_tools.optimizer.acquisition_functions.botorch_acquisition import BoTorchAcquisition
-from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMCSampler
-from alf_tools.optimizer.search.botorch_search_functions import ContinuousSearch
+from alf_tools.models.gp import FeaturizerConfig, GPModel, GPTrainConfig
 from botorch.models import SingleTaskGP
 
 
@@ -271,7 +267,43 @@ def botorch_gp_model(simple_train_data):
         Trained SingleTaskGP model.
     """
     train_X, train_Y = simple_train_data
-    return SingleTaskGP(train_X, train_Y)
+    return SingleTaskGP(train_X.double(), train_Y.double())
+
+
+# =============================================================================
+# ALF GP Model Fixtures
+# =============================================================================
+
+
+@dataclass
+class _TrainedGPModel:
+    """Container for a trained GPModel and the candidates it was trained on."""
+
+    model: GPModel
+    train_candidates: list[Candidate]
+
+
+@pytest.fixture
+def trained_gp_model():
+    """Train a GPModel on a handful of 2-feature tabular candidates.
+
+    Returns:
+        _TrainedGPModel with `model` (a trained GPModel exposing a
+        `botorch_model` property) and `train_candidates` (the training
+        candidates, e.g. for building an `X_baseline`).
+    """
+    X_train = np.array([[0.1, 0.2], [0.4, 0.5], [0.7, 0.8], [0.3, 0.6]], dtype=np.float64)
+    y_train = np.array([1.0, 2.0, 1.5, 1.8])
+    candidates = [Candidate(data=x, modality=Modality.TABULAR) for x in X_train]
+    train_data = LabelledCandidates(candidates=candidates, labels=y_train)
+
+    model = GPModel(
+        train_config=GPTrainConfig(num_iterations=10),
+        featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+        device="cpu",
+    )
+    model.train(train_data)
+    return _TrainedGPModel(model=model, train_candidates=candidates)
 
 
 # =============================================================================
@@ -279,38 +311,64 @@ def botorch_gp_model(simple_train_data):
 # =============================================================================
 
 
-@pytest.fixture
-def branin_dataset():
-    """Create a Branin BoTorchSyntheticDataset for GP training and e2e tests.
+@dataclass
+class _SimpleBraninDataset:
+    """Minimal dataset container with train and test splits for GP tests."""
 
-    Generates 500 random evaluations of the Branin function, split into:
-    - train: ~40 points  (train_ratio=0.1, validation_frac=0.2)
-    - validation: ~10 points
-    - test: ~200 points  (test_ratio=0.4, enough for discrete pool tests up to 120)
-    - candidate_pool: remainder
+    train_dataset: LabelledCandidates
+    test_dataset: LabelledCandidates
+
+
+def _branin(x1: float, x2: float) -> float:
+    """Evaluate the Branin function at (x1, x2).
+
+    Args:
+        x1: First input, typically in [-5, 10].
+        x2: Second input, typically in [0, 15].
 
     Returns:
-        BoTorchSyntheticDataset with train/validation/test splits ready for use.
+        Branin function value.
     """
-    config = BaseDatasetConfig(
-        name="branin",
-        modality=Modality.TABULAR,
-        seed=42,
-        train_ratio=0.1,
-        validation_frac=0.2,
-        test_ratio=0.4,
-        split_type="random",
-        problem_type="regression",
+    return (
+        (x2 - (5.1 / (4 * math.pi**2)) * x1**2 + (5 / math.pi) * x1 - 6) ** 2
+        + 10 * (1 - 1 / (8 * math.pi)) * math.cos(x1)
+        + 10
     )
-    dataset = BoTorchSyntheticDataset(
-        config=config,
-        function_name="branin",
-        noise_std=0.0,
-        n_initial_samples=500,
-        negate=True,
+
+
+@pytest.fixture
+def branin_dataset():
+    """Create inline Branin evaluations for GP training tests.
+
+    Generates 20 evaluations on a grid spanning the Branin domain
+    (x1 in [-5, 10], x2 in [0, 15]) without using BoTorchSyntheticDataset.
+
+    Returns:
+        _SimpleBraninDataset with train_dataset (25 points) and
+        test_dataset (10 points), both as LabelledCandidates.
+    """
+    x1_train = np.linspace(-5.0, 10.0, 5)
+    x2_train = np.linspace(0.0, 15.0, 5)
+    inputs = [(x1, x2) for x1 in x1_train for x2 in x2_train]  # 25 train points
+
+    x1_test = np.linspace(-4.0, 9.0, 5)
+    x2_test = np.linspace(1.0, 14.0, 5)
+    test_inputs = [(x1, x2) for x1, x2 in zip(x1_test, x2_test)] + [
+        (x1, x2) for x1, x2 in zip(x1_test, reversed(x2_test))
+    ]  # 10 test points
+
+    def make_labelled(pts: list[tuple[float, float]]) -> LabelledCandidates:
+        candidates = [
+            Candidate(data=np.array([x1, x2], dtype=np.float32), modality=Modality.TABULAR)
+            for x1, x2 in pts
+        ]
+        labels = np.array([_branin(x1, x2) for x1, x2 in pts], dtype=np.float32)
+        return LabelledCandidates(candidates=candidates, labels=labels)
+
+    return _SimpleBraninDataset(
+        train_dataset=make_labelled(inputs),
+        test_dataset=make_labelled(test_inputs),
     )
-    dataset.setup()
-    return dataset
 
 
 # =============================================================================
@@ -326,80 +384,13 @@ def trained_surrogate(branin_dataset):
         branin_dataset: Fixture providing a Branin dataset.
 
     Returns:
-        Surrogate with trained BoTorchGPModel.
+        Surrogate with trained GPModel.
     """
-    gp_model = BoTorchGPModel(num_iterations=50, learning_rate=0.1)
+    gp_model = GPModel(
+        featurizer_config=FeaturizerConfig(featurizer_type="precomputed"),
+        train_config=GPTrainConfig(num_iterations=50, learning_rate=0.1),
+        device="cpu",
+    )
     surrogate = Surrogate(model=gp_model)
     surrogate.fit(branin_dataset.train_dataset, branin_dataset.test_dataset)
     return surrogate
-
-
-@pytest.fixture
-def gp_surrogate():
-    """Create an untrained GP surrogate for design task e2e tests.
-
-    Returns:
-        Surrogate wrapping an untrained BoTorchGPModel (model attribute is None).
-    """
-    gp_model = BoTorchGPModel(num_iterations=50, learning_rate=0.1)
-    return Surrogate(model=gp_model)
-
-
-@pytest.fixture
-def botorch_optimizer(branin_dataset):
-    """Create a BoTorch optimizer for continuous Branin optimization.
-
-    Uses qEI with Sobol sampler and ContinuousSearch (empty candidate pool),
-    triggering gradient-based acquisition optimization in the Branin bounds.
-
-    Args:
-        branin_dataset: Fixture providing the Branin dataset (for bounds).
-
-    Returns:
-        Optimizer with BoTorchAcquisition (qEI, batch_size=2) and ContinuousSearch.
-    """
-    # Build [[lower_i, upper_i], ...] from branin_dataset.bounds shape (2, dim)
-    bounds = [
-        [float(branin_dataset.bounds[0][i]), float(branin_dataset.bounds[1][i])]
-        for i in range(branin_dataset.dim)
-    ]
-    sampler = BoTorchMCSampler(sampler_type="sobol", num_samples=64, seed=42)
-    acq = BoTorchAcquisition(
-        acquisition_type="qEI",
-        sampler=sampler,
-        bounds=bounds,
-        batch_size=2,
-        num_restarts=3,
-        raw_samples=64,
-    )
-    return Optimizer(acquisition_fn=acq, search_fn=ContinuousSearch())
-
-
-@pytest.fixture
-def branin_oracle(branin_dataset):
-    """Create an oracle that evaluates candidates on the Branin function.
-
-    Args:
-        branin_dataset: Fixture providing the Branin dataset (used as scorer).
-
-    Returns:
-        Oracle wrapping the BoTorchSyntheticDataset query method.
-    """
-    return Oracle(scorer=branin_dataset)
-
-
-@pytest.fixture
-def state(branin_dataset, trained_surrogate):
-    """Create a task State with the Branin dataset and a trained GP surrogate.
-
-    Used by TestBoTorchAcquisitionDiscreteScoring tests that call
-    acquisition_fn(candidates, state) directly.
-
-    Args:
-        branin_dataset: Fixture providing the Branin dataset.
-        trained_surrogate: Fixture providing a trained GP surrogate.
-
-    Returns:
-        State with dataset and trained surrogate (round=0, acq_batch_size=0).
-    """
-    return State(dataset=branin_dataset, surrogate=trained_surrogate)
