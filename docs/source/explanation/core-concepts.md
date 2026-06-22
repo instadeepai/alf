@@ -24,7 +24,7 @@ threads a single **State** object through every step.
 
 ## How one round flows
 
-A round is exactly the `ask` then `tell` of the [Optimizer](intro-to-active-learning.md):
+A round is exactly the `ask` then `tell` of the {py:class}`Optimizer <alf_core.optimizer.optimizer.Optimizer>`:
 
 ```text
 ask(state):
