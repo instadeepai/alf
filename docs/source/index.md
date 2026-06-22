@@ -19,8 +19,10 @@ This project is under active development.
 
 In scientific discovery, the bottleneck is rarely compute—it's the **experiment**. Each label
 costs a wet-lab assay, a simulation, or a measurement, and you can only afford a handful of
-rounds. ALF runs the full active-learning loop: train a surrogate on what you've measured, use an
-acquisition function to select the most informative next batch, score it, and repeat—all with
+rounds. ALF runs the full {term}`active-learning loop <Active learning>`: train a
+{py:class}`surrogate <alf_core.surrogate.surrogate.Surrogate>` on what you've measured, use an
+{py:class}`acquisition function <alf_core.optimizer.acquisition_function.AcquisitionFunction>` to
+select the most informative next batch, score it, and repeat—all with
 modular, swappable components so you can change any one part without rewriting the rest.
 
 → See [Why ALF?](explanation/why-alf.md) for the full motivation and design rationale.
@@ -85,10 +87,10 @@ bring your own dataset, model, acquisition function, or oracle.
 
 What each component does:
 
-- **`Dataset`** — holds your candidates and their labels; handles train/candidate-pool splits
-- **`Surrogate`** — wraps a model that is cheaply re-trained each round to predict labels and uncertainty
-- **`Optimizer`** — scores the candidate pool with an acquisition function and selects the next batch
-- **`Oracle`** — evaluates selected candidates (wet-lab assay, simulation, or held-out dataset)
+- **{py:class}`Dataset <alf_core.dataset.base_dataset.BaseDataset>`** — holds your candidates and their labels; handles train/candidate-pool splits
+- **{py:class}`Surrogate <alf_core.surrogate.surrogate.Surrogate>`** — wraps a model that is cheaply re-trained each round to predict labels and uncertainty
+- **{py:class}`Optimizer <alf_core.optimizer.optimizer.Optimizer>`** — scores the candidate pool with an acquisition function and selects the next batch
+- **{py:class}`Oracle <alf_core.oracle.oracle.Oracle>`** — evaluates selected candidates (wet-lab assay, simulation, or held-out dataset)
 
 ```python
 from alf_core import (

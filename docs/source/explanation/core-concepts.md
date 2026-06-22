@@ -56,7 +56,7 @@ experiment
 └── zero-shot   → ZeroShotTask    score with a pretrained model, no surrogate training
 ```
 
-Within a family, an experiment is further specified by **modality** (e.g. protein sequence,
+Within a family, an experiment is further specified by **{term}`modality <Modality>`** (e.g. protein sequence,
 small-molecule SMILES), **dataset**, and **mode** (`Offline` or `Online`). The full
 cross-product, `dataset × surrogate × acquisition × search × oracle × seed`, is exactly what the
 ALF benchmark suite sweeps over; see [Why ALF?](why-alf.md).

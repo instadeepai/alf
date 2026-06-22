@@ -1,7 +1,7 @@
 # Add your own model
 
-Plug a new predictor into ALF by subclassing `BaseModel`. Once wrapped in a `Surrogate` (or an
-`Oracle`), it slots into the loop with no other changes.
+Plug a new predictor into ALF by subclassing `BaseModel`. Once wrapped in a {py:class}`Surrogate <alf_core.surrogate.surrogate.Surrogate>` (or an
+{py:class}`Oracle <alf_core.oracle.oracle.Oracle>`), it slots into the loop with no other changes.
 
 **Base class:** `BaseModel`. **Key methods:** `featurise`, `train`, `predict`, `sample`.
 
@@ -13,7 +13,7 @@ a `Surrogate` (needs `train` + `predict`), an `Oracle` (needs `predict`), or a g
 
 1. Subclass `BaseModel` under `tools/alf_tools/models/`.
 2. Implement `featurise`, `train`, `predict`, and `sample` as needed for the role.
-3. Wrap it in a `Surrogate` (or `Oracle`) and pass it to a `Task`.
+3. Wrap it in a `Surrogate` (or `Oracle`) and pass it to a {py:class}`Task <alf_core.tasks.base_task.BaseTask>`.
 4. Add tests and run the build / pre-commit checks.
 
 ## Reference notebooks

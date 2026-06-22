@@ -6,14 +6,14 @@ exploitation against exploration. Subclass `AcquisitionFunction` to add a new sc
 
 **Base class:** `AcquisitionFunction`. **Key method:** `__call__`.
 
-It scores the pool produced by a `Search function`; the `Optimizer` bundles the two and
+It scores the pool produced by a {py:class}`Search function <alf_core.optimizer.search.BaseSearch>`; the {py:class}`Optimizer <alf_core.optimizer.optimizer.Optimizer>` bundles the two and
 selects the top batch. See [Core Concepts](../explanation/core-concepts.md) for how one round flows.
 
 ## Steps
 
 1. Subclass `AcquisitionFunction` under `tools/alf_tools/optimizer/acquisition_functions/`.
 2. Implement `__call__` to score candidates given the surrogate's predictions and uncertainty.
-3. Drop it into an `Optimizer` and run a `Task`.
+3. Drop it into an `Optimizer` and run a {py:class}`Task <alf_core.tasks.base_task.BaseTask>`.
 4. Add tests and run the build / pre-commit checks.
 
 ## Reference notebook
