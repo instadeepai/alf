@@ -346,8 +346,17 @@ def _read_metrics(metrics_path: Path, init_best: float) -> pd.DataFrame:
 
     Returns:
         DataFrame with the original columns plus `best_found_so_far`.
+
+    Raises:
+        ValueError: If `metrics.csv` has no `round` column (i.e. it predates the
+            explicit-round schema written by the current `FileStateLogger`).
     """
     df = pd.read_csv(metrics_path)
+    if "round" not in df.columns:
+        raise ValueError(
+            f"{metrics_path} has no 'round' column; regenerate it with the current "
+            "FileStateLogger (metrics.csv schema changed to carry an explicit round)."
+        )
     running, current = [], init_best
     round_max = (
         df["acquired_candidates/round_max"] if "acquired_candidates/round_max" in df else None
@@ -460,8 +469,8 @@ def summarise_final(
         row = {}
         for display, col in columns.items():
             if all(col in d.columns for d in per_seed):
-                # Last NON-NaN value: metrics.csv ends with a final eval row whose
-                # acquisition metrics (regret/recall) are NaN — take the last real round.
+                # Last NON-NaN value: per-round columns (regret/recall) are NaN before
+                # the first acquisition, so drop NaNs and take the last populated round.
                 finals = []
                 for d in per_seed:
                     valid = d[col].dropna()

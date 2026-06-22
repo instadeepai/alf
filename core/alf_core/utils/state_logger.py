@@ -199,20 +199,14 @@ class FileStateLogger(StateLogger):
             training_history_dir / f"round_{round_num}.csv", index=False
         )
 
-    def _log_metrics(self, metrics: dict[str, float], round_num: int | None = None) -> None:
-        """Log metrics to file.
-
-        If `round_num` is provided it is written as the first column (`round`)
-        so that `metrics.csv` carries an explicit per-round index.
+    def _log_metrics(self, metrics: dict[str, float], round_num: int) -> None:
+        """Log per-round metrics to `metrics.csv` with `round` as the first column.
 
         Args:
             metrics: Dictionary of metrics to log.
-            round_num: Round number to record. `None` when called from
-                `_log_summary_metrics`, which routes to a separate file.
+            round_num: Round number, written as the leading `round` column.
         """
-        row: dict[str, object] = {}
-        if round_num is not None:
-            row["round"] = round_num
+        row: dict[str, object] = {"round": round_num}
         row.update(metrics)
         metrics_df = pd.DataFrame.from_records([row])
         if (self.output_path / "metrics.csv").exists():
