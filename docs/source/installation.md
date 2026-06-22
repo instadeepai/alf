@@ -1,7 +1,5 @@
 # ALF Installation Guide
 
----
-
 ## Package Installation
 
 Use this when you want to use ALF in your own projects. This is what most users need.

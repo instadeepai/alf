@@ -28,7 +28,7 @@ Candidate
   carrying features and a label. Represented by `Candidate` / `LabelledCandidates` in `alf_core`.
 
 Coverage
-  The fraction of the truly high-value region that a experiment has discovered. Distinguishes finding
+  The fraction of the truly high-value region that an experiment has discovered. Distinguishes finding
   *the* peak from finding *all* the good designs; related to `Recall`.
 
 Dataset
