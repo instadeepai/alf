@@ -89,13 +89,20 @@ def _load_model_from_zip(model_type: type, load_path: str) -> ForceField:
 
     Delegates to `mlip.models.model_io.load_model_from_zip`, which handles both
     legacy (v1) and current model archives.
+
+    Returns:
+        The loaded ForceField.
     """
     model_path = Path(__file__).parent / "models" / Path(load_path)
     return load_model_from_zip(model_type, model_path)
 
 
 def _candidate_to_chemical_system(candidate: Candidate, energy: float) -> ChemicalSystem:
-    """Convert a Candidate wrapping ASE Atoms to a ChemicalSystem."""
+    """Convert a Candidate wrapping ASE Atoms to a ChemicalSystem.
+
+    Returns:
+        The ChemicalSystem built from the candidate's atoms and energy.
+    """
     atoms = candidate.data
     forces = candidate.features.get("forces") if candidate.features else None
     return ChemicalSystem(
@@ -114,7 +121,11 @@ def _candidate_to_chemical_system(candidate: Candidate, energy: float) -> Chemic
 
 
 def _labeled_candidates_to_systems(data: LabelledCandidates) -> list[ChemicalSystem]:
-    """Convert LabelledCandidates to a list of ChemicalSystems."""
+    """Convert LabelledCandidates to a list of ChemicalSystems.
+
+    Returns:
+        A list of ChemicalSystems, one per candidate.
+    """
     return [
         _candidate_to_chemical_system(candidate, energy)
         for candidate, energy in zip(data.candidates, data.labels)
@@ -122,7 +133,11 @@ def _labeled_candidates_to_systems(data: LabelledCandidates) -> list[ChemicalSys
 
 
 def _filter_valid_graphs(graphs: list) -> list:
-    """Drop graphs that are None or have no edges (single-atom or cutoff too small)."""
+    """Drop graphs that are None or have no edges (single-atom or cutoff too small).
+
+    Returns:
+        The graphs that are non-None and have at least one edge.
+    """
     return [g for g in graphs if g is not None and int(g.n_edge.sum()) > 0]
 
 
@@ -146,7 +161,14 @@ def _build_graphs(
     cutoff: float,
     name: str,
 ) -> list:
-    """Build and filter graphs from chemical systems, raising if none are valid."""
+    """Build and filter graphs from chemical systems, raising if none are valid.
+
+    Returns:
+        The list of valid graphs.
+
+    Raises:
+        ValueError: If no valid graphs are produced.
+    """
     graphs = [Graph.from_chemical_system(system, cutoff) for system in systems]
     filtered = _filter_valid_graphs(graphs)
     if len(filtered) == 0:
@@ -162,7 +184,11 @@ def _compute_batching_limits(
     graphs: list,
     batch_size: int,
 ) -> tuple[int, int]:
-    """Compute max_n_node and max_n_edge for batching a GraphDataset."""
+    """Compute max_n_node and max_n_edge for batching a GraphDataset.
+
+    Returns:
+        Tuple of (max_n_node, max_n_edge).
+    """
     n_atoms = [len(s.atomic_numbers) for s in systems]
     median_n_atoms = int(np.median(n_atoms))
     max_n_atoms = int(np.max(n_atoms))
@@ -192,6 +218,9 @@ def compute_e0s_from_labeled_candidates(
 
     Returns:
         Dictionary mapping atomic number to average energy contribution.
+
+    Raises:
+        ValueError: If no valid graphs are produced from the data.
     """
     systems = _labeled_candidates_to_systems(data)
 
@@ -202,12 +231,13 @@ def compute_e0s_from_labeled_candidates(
         raise ValueError("No valid graphs produced from data for E0 computation")
 
     squeezed_graphs = []
-    for g in valid_graphs:
-        if g.globals.energy is not None:
-            energy = g.globals.energy
+    for graph in valid_graphs:
+        squeezed = graph
+        if graph.globals.energy is not None:
+            energy = graph.globals.energy
             if hasattr(energy, "shape") and len(energy.shape) > 0:
-                g = g.replace_globals(energy=np.squeeze(energy))
-        squeezed_graphs.append(g)
+                squeezed = graph.replace_globals(energy=np.squeeze(energy))
+        squeezed_graphs.append(squeezed)
 
     return compute_average_e0s_from_graphs(squeezed_graphs)
 
@@ -235,6 +265,7 @@ class MLIPModel(BaseModel):
         seed: int = 42,
         precomputed_e0s: Optional[dict[int, float]] = None,
     ):
+        """Initialise the model, loading the pretrained force field if configured."""
         self.model_config = model_config
         self.train_config = train_config
         self.seed = seed
@@ -302,11 +333,19 @@ class MLIPModel(BaseModel):
         return batch_size, lr, epochs
 
     def featurise(self, inputs: list[Candidate]) -> Any:
-        """No-op: data is already ASE Atoms objects used directly by the model."""
+        """No-op: data is already ASE Atoms objects used directly by the model.
+
+        Returns:
+            The inputs unchanged.
+        """
         return inputs
 
     def _squeeze_graph_energies(self, graphs: list) -> list:
-        """Remove batch dimension from graph energies if present."""
+        """Remove batch dimension from graph energies if present.
+
+        Returns:
+            The graphs with squeezed energies.
+        """
         if len(graphs) > 0 and graphs[0].globals.energy is not None:
             sample_energy = graphs[0].globals.energy
             if hasattr(sample_energy, "shape") and len(sample_energy.shape) > 0:
@@ -314,7 +353,11 @@ class MLIPModel(BaseModel):
         return graphs
 
     def _compute_e0s_from_graphs(self, graphs: list) -> dict[int, float]:
-        """Compute average E0s from graphs, handling batch dimension."""
+        """Compute average E0s from graphs, handling batch dimension.
+
+        Returns:
+            Dictionary mapping atomic number to average energy contribution.
+        """
         squeezed = self._squeeze_graph_energies(graphs)
         return compute_average_e0s_from_graphs(squeezed)
 
@@ -331,6 +374,9 @@ class MLIPModel(BaseModel):
 
         Returns:
             ForceField with pretrained parameters transferred to new E0 configuration.
+
+        Raises:
+            ValueError: If no pretrained force field is available.
         """
         pretrained = self._pretrained_force_field
         if pretrained is None:
@@ -396,6 +442,10 @@ class MLIPModel(BaseModel):
             reference_train_data: Optional larger dataset used only for computing E0s
                 and batching limits (e.g. when train_data is a subset of a full dataset).
                 Defaults to train_data.
+
+        Raises:
+            ValueError: If a pretrained force field is missing during finetuning, or
+                if any data split produces no valid graphs.
         """
         is_finetuning = self._pretrained_force_field is not None
         current_train_size = len(train_data)
@@ -614,7 +664,11 @@ class MLIPModel(BaseModel):
         }
 
     def _compute_and_log_per_reaction_metrics(self) -> dict:
-        """Compute and log per-reaction energy (and forces) metrics on the test set."""
+        """Compute and log per-reaction energy (and forces) metrics on the test set.
+
+        Returns:
+            Dictionary of per-reaction metrics (empty if no test data or reactions).
+        """
         if self._test_data is None or self._test_labels is None:
             return {}
 
@@ -652,7 +706,7 @@ class MLIPModel(BaseModel):
                 true_forces = true_forces_list
                 batch_size, max_n_node, max_n_edge = self._safe_batching_limits(structures)
                 old_stdout = sys.stdout
-                sys.stdout = open(os.devnull, "w")
+                sys.stdout = open(os.devnull, "w", encoding="utf-8")
                 try:
                     mlip_preds = run_batched_inference(
                         structures=structures,
@@ -711,6 +765,9 @@ class MLIPModel(BaseModel):
 
         Returns:
             Tuple of (batch_size, max_n_node, max_n_edge).
+
+        Raises:
+            RuntimeError: If the model has not been trained yet.
         """
         force_field = self.force_field
         if force_field is None:
@@ -743,12 +800,15 @@ class MLIPModel(BaseModel):
 
         Returns:
             Predictions with means as predicted energies.
+
+        Raises:
+            RuntimeError: If the model has not been trained yet.
         """
         structures = [c.data for c in candidate_points]
         batch_size, max_n_node, max_n_edge = self._safe_batching_limits(structures)
 
         old_stdout = sys.stdout
-        sys.stdout = open(os.devnull, "w")
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
         try:
             force_field = self.force_field
             if force_field is None:
@@ -776,12 +836,15 @@ class MLIPModel(BaseModel):
 
         Returns:
             Tuple of (Predictions with energy means, list of force arrays per structure).
+
+        Raises:
+            RuntimeError: If the model has not been trained yet.
         """
         structures = [c.data for c in candidate_points]
         batch_size, max_n_node, max_n_edge = self._safe_batching_limits(structures)
 
         old_stdout = sys.stdout
-        sys.stdout = open(os.devnull, "w")
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
         try:
             force_field = self.force_field
             if force_field is None:
@@ -806,6 +869,9 @@ class MLIPModel(BaseModel):
 
         Returns:
             Predictions with energy means, or None if no test graphs are cached.
+
+        Raises:
+            RuntimeError: If the model has not been trained yet.
         """
         if self._test_graphs is None or self._test_batching is None:
             return None
