@@ -334,22 +334,20 @@ def run_al_experiment(
 
 
 def _read_metrics(metrics_path: Path, init_best: float) -> pd.DataFrame:
-    """Parse a FileStateLogger metrics.csv defensively into a per-round DataFrame.
+    """Parse a FileStateLogger `metrics.csv` into a per-round DataFrame.
 
-    metrics.csv has no explicit round column and a ragged initial row (acquisition
-    metrics are NaN before the first acquisition). We add an explicit ``round`` index
-    (0 = initial) and a ``best_found_so_far`` column seeded with the initial train max.
+    `metrics.csv` carries an explicit `round` column (written by `FileStateLogger`).
+    A `best_found_so_far` column is derived from `acquired_candidates/round_max`
+    when present, otherwise seeded from `init_best`.
 
     Args:
-        metrics_path: Path to the run's metrics.csv.
+        metrics_path: Path to the run's `metrics.csv`.
         init_best: Max label in the initial training set (round-0 best-found seed).
 
     Returns:
-        DataFrame with the original columns plus ``round`` and ``best_found_so_far``.
+        DataFrame with the original columns plus `best_found_so_far`.
     """
-    df = pd.read_csv(metrics_path).reset_index(drop=True)
-    df["round"] = range(len(df))
-
+    df = pd.read_csv(metrics_path)
     running, current = [], init_best
     round_max = (
         df["acquired_candidates/round_max"] if "acquired_candidates/round_max" in df else None
