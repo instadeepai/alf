@@ -13,38 +13,25 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 
 ### Optional Extras
 
-Some models require additional dependencies. Append one or more extras to the package URL.
-Per-model extras (`esm2`, `esmfold`, `chemprop`, `guacamol`) install exactly one model's
-dependencies; workflow umbrellas (`protein`, `molecule`) group the extras you are likely to use
-together.
+Some models require additional dependencies. Append one or more extras to the package URL:
 
 ```bash
 # ESM2 — protein language model (for ESM2Model)
 pip install "alf_tools[esm2] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
 
-# ESMFold — structure-prediction oracle (for ESMFoldModel)
-pip install "alf_tools[esmfold] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
-
 # Chemprop — small-molecule MPNN (for ChempropModel)
 pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
 
-# GuacaMol — RDKit-based small-molecule dataset/scoring
-pip install "alf_tools[guacamol] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
-
-# Workflow umbrellas: protein (esm2 + esmfold) or molecule (chemprop + guacamol)
-pip install "alf_tools[protein] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
-pip install "alf_tools[molecule] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+# Both extras together
+pip install "alf_tools[esm2,chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
 ```
 
-For development installs from the cloned repository, these extras are re-exposed as dependency
-groups, so pass `--group` flags to `uv sync`:
+For development installs, pass `--extra` flags to `uv sync`:
 
 ```bash
-uv sync --group esm2
-uv sync --group chemprop
-uv sync --group protein              # esm2 + esmfold
-uv sync --group molecule             # chemprop + guacamol
-uv sync --group esm2 --group chemprop
+uv sync --extra esm2
+uv sync --extra chemprop
+uv sync --extra esm2 --extra chemprop
 ```
 
 ## What's Included

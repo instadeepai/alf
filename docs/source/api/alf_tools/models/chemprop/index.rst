@@ -28,7 +28,7 @@ Key properties:
 
    .. code-block:: bash
 
-      pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+      pip install "git+https://github.com/instadeepai/alf.git#subdirectory=tools[mpnn]"
 
 .. automodule:: alf_tools.models.chemprop
    :members:
