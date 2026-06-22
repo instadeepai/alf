@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from bench import _read_metrics  # noqa: E402
+from bench import _read_metrics  # noqa: E402, PLC2701
 
 
 def test_read_metrics_uses_round_column(tmp_path: Path) -> None:

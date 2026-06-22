@@ -108,7 +108,7 @@ class TestFileStateLogger:
         assert "ask_time" in df.columns
 
     def test_log_writes_round_column(self, tmp_path: Any) -> None:
-        """round column must be written as the first column in metrics.csv."""
+        """Round column must be written as the first column in metrics.csv."""
         fl = FileStateLogger(output_path=tmp_path)
         state = make_state_stub(round_val=2, metrics={"tell_time": 1.0})
         fl.log(state, round_name="round_2")
