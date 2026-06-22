@@ -63,6 +63,7 @@ transformers = ["alf_tools[transformers]"]
 esm2 = ["alf_tools[esm2]"]
 esmfold = ["alf_tools[esmfold]"]
 chemprop = ["alf_tools[chemprop]"]
+mlip = ["alf_tools[mlip]"]
 
 # Workflow umbrellas (mirror the alf_tools extras of the same name).
 protein = ["alf_tools[protein]"]

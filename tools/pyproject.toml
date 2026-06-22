@@ -36,7 +36,7 @@ esmfold = [
 ]
 guacamol = ["rdkit>=2022.9.0"]
 mlip = [
-    "mlip @ git+https://github.com/instadeepai/mlip-jax.git@f6d5cb8b38f5869d25d1acc216a9235539ef44ae",
+    "mlip @ git+https://github.com/instadeepai/mlip.git@3acfc3bd67dd5821decb9e7719ea60527079b7ad",
 ]
 
 # Workflow umbrellas — install everything for an expected workflow at once.
