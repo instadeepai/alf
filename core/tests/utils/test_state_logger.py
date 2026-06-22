@@ -176,19 +176,24 @@ class TestFileStateLogger:
         fl.log(state, round_name="round_1")
         assert not (tmp_path / "training_history").exists()
 
-    def test_log_summary_appends_metrics_to_metrics_csv(self, tmp_path: Any) -> None:
-        """log_summary must append the summary metrics as a row in metrics.csv."""
+    def test_log_summary_writes_to_summary_csv(self, tmp_path: Any) -> None:
+        """log_summary must write to summary.csv, not metrics.csv."""
         fl = FileStateLogger(output_path=tmp_path)
-        state = make_state_stub(round_val=1, metrics={"tell_time": 1.0})
-        fl.log(state, round_name="round_1")
         fl.log_summary({"auc_top_k": 0.75}, round_name="experiment_summary")
-        df = pd.read_csv(tmp_path / "metrics.csv")
+        assert (tmp_path / "summary.csv").exists()
+        df = pd.read_csv(tmp_path / "summary.csv")
         assert "auc_top_k" in df.columns
-        assert df["auc_top_k"].dropna().iloc[-1] == pytest.approx(0.75)
+        assert df["auc_top_k"].iloc[0] == pytest.approx(0.75)
 
-    def test_log_summary_writes_only_metrics_csv(self, tmp_path: Any) -> None:
-        """log_summary must not write acquisition batches, predictions, or training history."""
+    def test_log_summary_does_not_write_to_metrics_csv(self, tmp_path: Any) -> None:
+        """log_summary must not touch metrics.csv."""
         fl = FileStateLogger(output_path=tmp_path)
         fl.log_summary({"auc_top_k": 0.75}, round_name="experiment_summary")
-        written = {p.name for p in tmp_path.iterdir()}
-        assert written == {"metrics.csv"}
+        assert not (tmp_path / "metrics.csv").exists()
+
+    def test_log_summary_does_not_write_round_column(self, tmp_path: Any) -> None:
+        """summary.csv must not contain a round column — summary rows have no round."""
+        fl = FileStateLogger(output_path=tmp_path)
+        fl.log_summary({"auc_top_k": 0.75}, round_name="experiment_summary")
+        df = pd.read_csv(tmp_path / "summary.csv")
+        assert "round" not in df.columns

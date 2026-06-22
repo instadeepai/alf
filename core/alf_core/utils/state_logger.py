@@ -220,6 +220,19 @@ class FileStateLogger(StateLogger):
             metrics_df = pd.concat([saved_df, metrics_df])
         metrics_df.to_csv(self.output_path / "metrics.csv", index=False)
 
+    def _log_summary_metrics(self, metrics: dict[str, float]) -> None:
+        """Append summary metrics to `summary.csv`.
+
+        Args:
+            metrics: Mapping of summary metric name to value.
+        """
+        summary_df = pd.DataFrame.from_records([metrics])
+        summary_path = self.output_path / "summary.csv"
+        if summary_path.exists():
+            saved_df = pd.read_csv(summary_path)
+            summary_df = pd.concat([saved_df, summary_df])
+        summary_df.to_csv(summary_path, index=False)
+
     def _log_acquisition_batch(self, acq_batch: LabelledCandidates, acq_round: int) -> None:
         """Log the acquisition batch to file.
 
@@ -285,14 +298,20 @@ class FileStateLogger(StateLogger):
             self.upload_function(self.output_path)
 
     def log_summary(self, metrics: dict[str, float], round_name: str) -> None:
-        """Append summary metrics to metrics.csv.
+        """Write summary metrics to `summary.csv`.
+
+        Unlike :meth:`log`, this does not add a `round` column because
+        summary rows are not associated with a specific acquisition round.
+        Summary metrics are written to a separate file so `metrics.csv`
+        stays single-schema (one round per row).
 
         Args:
             metrics: Mapping of summary metric name to value.
-            round_name: Label for the summary entry; unused by the file logger
-                but kept for interface symmetry with the terminal logger.
+            round_name: Label for the summary entry; unused by the file
+                logger but kept for interface symmetry with
+                `TerminalStateLogger`.
         """
-        self._log_metrics(metrics)
+        self._log_summary_metrics(metrics)
 
         if self.upload_function is not None:
             self.upload_function(self.output_path)
