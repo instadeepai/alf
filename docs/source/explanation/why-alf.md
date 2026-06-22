@@ -16,7 +16,7 @@ should we measure *next* to reach a good design in as few rounds as possible?"
 ALF (Active Learning Framework) runs the full **{term}`active-learning loop <Active learning>`** for you: train a
 {py:class}`surrogate <alf_core.surrogate.surrogate.Surrogate>` on what you've measured, use an {py:class}`acquisition function <alf_core.optimizer.acquisition_function.AcquisitionFunction>` to score candidates
 by their expected value, select a batch, score it with an {py:class}`oracle <alf_core.oracle.oracle.Oracle>`, and repeat. It provides
-modular, swappable components ({py:class}`Dataset <alf_core.dataset.base_dataset.BaseDataset>`, {py:class}`Model <alf_core.model.base_model.BaseModel>`, `Acquisition function`,
+modular, swappable components ({py:class}`Dataset <alf_core.dataset.base_dataset.BaseDataset>`, {py:class}`Model <alf_core.model.base_model.BaseModel>`, {py:class}`Acquisition function <alf_core.optimizer.acquisition_function.AcquisitionFunction>`,
 and {py:class}`Search function <alf_core.optimizer.search.BaseSearch>` objects), so you can compose an
 experiment from parts and change any one of them without rewriting the rest.
 

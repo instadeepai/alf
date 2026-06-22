@@ -19,9 +19,9 @@ This project is under active development.
 
 In scientific discovery, the bottleneck is rarely compute—it's the **experiment**. Each label
 costs a wet-lab assay, a simulation, or a measurement, and you can only afford a handful of
-rounds. ALF runs the full {term}`active-learning loop <Active learning>`: train a
-{py:class}`surrogate <alf_core.surrogate.surrogate.Surrogate>` on what you've measured, use an
-{py:class}`acquisition function <alf_core.optimizer.acquisition_function.AcquisitionFunction>` to
+rounds. ALF runs the full active-learning loop: train a
+{term}`surrogate <Surrogate>` on what you've measured, use an
+{term}`acquisition function <Acquisition function>` to
 select the most informative next batch, score it, and repeat—all with
 modular, swappable components so you can change any one part without rewriting the rest.
 
