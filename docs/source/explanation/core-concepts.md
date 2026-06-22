@@ -8,15 +8,15 @@ single round of the [ask/tell loop](intro-to-active-learning.md). All of these l
 
 | Object | Role | Base class |
 |--------|------|------------|
-| `Dataset` | The candidate pool and its labels; train/validation splits and a query interface | `BaseDataset` |
-| `Model` | A learnable predictor with `featurise` / `train` / `predict` / `sample` | `BaseModel` |
-| `Surrogate` | Wraps a model; the *cheap* approximation retrained each round on acquired data | `Surrogate` |
-| `Oracle` | Wraps a scorer (a model **or** a dataset); returns the *true* label for a batch | `Oracle` |
-| `Acquisition function` | Scores candidates by expected value (e.g. Greedy, UCB, EI, Thompson, CoreSet) | `AcquisitionFunction` |
-| `Search function` | Generates the candidate pool to score (e.g. from a dataset or a generator) | `BaseSearch` |
-| `Optimizer` | Bundles an acquisition + search function; implements `ask` and `tell` | `Optimizer` |
-| `Task` | Orchestrates the loop end to end (`setup` → `run`) | `BaseTask` |
-| `State` | The carrier passed through the loop: dataset, surrogate, round, history, metrics | `State` |
+| `Dataset` | The candidate pool and its labels; train/validation splits and a query interface | {py:class}`BaseDataset <alf_core.dataset.base_dataset.BaseDataset>` |
+| `Model` | A learnable predictor with `featurise` / `train` / `predict` / `sample` | {py:class}`BaseModel <alf_core.model.base_model.BaseModel>` |
+| `Surrogate` | Wraps a model; the *cheap* approximation retrained each round on acquired data | {py:class}`Surrogate <alf_core.surrogate.surrogate.Surrogate>` |
+| `Oracle` | Wraps a scorer (a model **or** a dataset); returns the *true* label for a batch | {py:class}`Oracle <alf_core.oracle.oracle.Oracle>` |
+| `Acquisition function` | Scores candidates by expected value (e.g. Greedy, UCB, EI, Thompson, CoreSet) | {py:class}`AcquisitionFunction <alf_core.optimizer.acquisition_function.AcquisitionFunction>` |
+| `Search function` | Generates the candidate pool to score (e.g. from a dataset or a generator) | {py:class}`BaseSearch <alf_core.optimizer.search.BaseSearch>` |
+| `Optimizer` | Bundles an acquisition + search function; implements `ask` and `tell` | {py:class}`Optimizer <alf_core.optimizer.optimizer.Optimizer>` |
+| `Task` | Orchestrates the loop end to end (`setup` → `run`) | {py:class}`BaseTask <alf_core.tasks.base_task.BaseTask>` |
+| `State` | The carrier passed through the loop: dataset, surrogate, round, history, metrics | {py:class}`State <alf_core.dataclasses.state.State>` |
 
 The key relationships: a **Surrogate wraps a Model**, an **Oracle wraps a scorer**, and an
 **Optimizer bundles an acquisition function and a search function**. The **Task** owns the loop and
@@ -24,7 +24,7 @@ threads a single **State** object through every step.
 
 ## How one round flows
 
-A round is exactly the `ask` then `tell` of the [Optimizer](intro-to-active-learning.md):
+A round is exactly the `ask` then `tell` of the {py:class}`Optimizer <alf_core.optimizer.optimizer.Optimizer>`:
 
 ```text
 ask(state):
@@ -56,7 +56,7 @@ experiment
 └── zero-shot   → ZeroShotTask    score with a pretrained model, no surrogate training
 ```
 
-Within a family, an experiment is further specified by **modality** (e.g. protein sequence,
+Within a family, an experiment is further specified by **{term}`modality <Modality>`** (e.g. protein sequence,
 small-molecule SMILES), **dataset**, and **mode** (`Offline` or `Online`). The full
 cross-product, `dataset × surrogate × acquisition × search × oracle × seed`, is exactly what the
 ALF benchmark suite sweeps over; see [Why ALF?](why-alf.md).

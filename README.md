@@ -13,7 +13,7 @@ as protein sequences and small molecules.
 
 ## Why ALF?
 
-In scientific discovery, the bottleneck is rarely compute—it's the **experiment**. Each label costs a wet-lab assay, a simulation, or a measurement, and you can only afford a handful of rounds. ALF runs the full active-learning loop for you: train a surrogate on what you've measured, use an acquisition function to select the most informative next batch, score it, and repeat—all with modular, swappable components so you can change any one part without rewriting the rest.
+In scientific discovery, the bottleneck is rarely compute—it's the **experiment**. Each label costs a wet-lab assay, a simulation, or a measurement, and you can only afford a handful of rounds. ALF runs the full active-learning loop for you: train a [surrogate](https://instadeepai.github.io/alf/reference/glossary.html#term-Surrogate) on what you've measured, use an [acquisition function](https://instadeepai.github.io/alf/reference/glossary.html#term-Acquisition-function) to select the most informative next batch, score it, and repeat—all with modular, swappable components so you can change any one part without rewriting the rest.
 
 → [Full motivation and design rationale](https://instadeepai.github.io/alf/explanation/why-alf.html)
 
