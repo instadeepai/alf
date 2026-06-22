@@ -38,7 +38,18 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 
 ### Optional Extras
 
-Some models require additional dependencies not installed by default:
+Heavy ML dependencies (`transformers`, `rdkit`, `chemprop`) are **not** installed by default. Install
+only what a given model needs via per-model extras, or grab a whole workflow at once with a workflow
+umbrella:
+
+| Extra | Installs | For |
+|-------|----------|-----|
+| `esm2` | `transformers` | `ESM2Model` |
+| `esmfold` | `transformers`, `accelerate` | `ESMFoldModel` |
+| `chemprop` | `chemprop` | `ChempropModel` |
+| `guacamol` | `rdkit` | GuacaMol dataset/scoring |
+| `protein` | `esm2` + `esmfold` | protein workflow |
+| `molecule` | `chemprop` + `guacamol` | small-molecule workflow |
 
 ```bash
 # ESM2 — protein language model (for ESM2Model)
@@ -47,7 +58,10 @@ pip install "alf_tools[esm2] @ git+https://github.com/instadeepai/alf.git#subdir
 # Chemprop — small-molecule MPNN (for ChempropModel)
 pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
 
-# Both extras together
+# Whole protein workflow (esm2 + esmfold)
+pip install "alf_tools[protein] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+
+# Several extras together
 pip install "alf_tools[esm2,chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
 ```
 
@@ -123,8 +137,13 @@ torch = [
 
 ### Optional Extras (Development)
 
+In the cloned repository the `alf_tools` extras are re-exposed as dependency groups, so install them
+with `--group` (not `--extra`):
+
 ```bash
-uv sync --extra esm2
-uv sync --extra chemprop
-uv sync --extra esm2 --extra chemprop
+uv sync --group esm2
+uv sync --group chemprop
+uv sync --group protein              # esm2 + esmfold
+uv sync --group molecule             # chemprop + guacamol
+uv sync --group esm2 --group chemprop
 ```
