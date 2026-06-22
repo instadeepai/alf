@@ -199,13 +199,22 @@ class FileStateLogger(StateLogger):
             training_history_dir / f"round_{round_num}.csv", index=False
         )
 
-    def _log_metrics(self, metrics: dict[str, float]) -> None:
+    def _log_metrics(self, metrics: dict[str, float], round_num: int | None = None) -> None:
         """Log metrics to file.
 
+        If `round_num` is provided it is written as the first column (`round`)
+        so that `metrics.csv` carries an explicit per-round index.
+
         Args:
-            metrics: Dictionary of metrics to log
+            metrics: Dictionary of metrics to log.
+            round_num: Round number to record. `None` when called from
+                `_log_summary_metrics`, which routes to a separate file.
         """
-        metrics_df = pd.DataFrame.from_records([metrics])
+        row: dict[str, object] = {}
+        if round_num is not None:
+            row["round"] = round_num
+        row.update(metrics)
+        metrics_df = pd.DataFrame.from_records([row])
         if (self.output_path / "metrics.csv").exists():
             saved_df = pd.read_csv(self.output_path / "metrics.csv")
             metrics_df = pd.concat([saved_df, metrics_df])
@@ -257,7 +266,7 @@ class FileStateLogger(StateLogger):
         if round_name is None:
             round_name = "round_" + str(state.round_metrics.round)
 
-        self._log_metrics(state.round_metrics.metrics)
+        self._log_metrics(state.round_metrics.metrics, round_num=state.round_metrics.round)
         self._log_training_history(state.round_metrics.training_history, state.round_metrics.round)
 
         if state.round_predictions is not None:
