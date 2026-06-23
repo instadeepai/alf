@@ -89,6 +89,11 @@ def _candidate_to_chemical_system(candidate: Candidate, energy: float) -> Chemic
     """
     atoms = candidate.data
     forces = candidate.features.get("forces") if candidate.features else None
+    charge = None
+    if candidate.features:
+        charge = candidate.features.get("charge", None)
+    if charge is None:
+        charge = 0  # default to neutral; required by models with total_charge_embedding
     return ChemicalSystem(
         atomic_numbers=np.asarray(atoms.numbers),
         positions=np.asarray(atoms.get_positions()),
@@ -99,7 +104,7 @@ def _candidate_to_chemical_system(candidate: Candidate, energy: float) -> Chemic
         pbc=tuple(atoms.get_pbc()),
         weight=1.0,
         partial_charges=None,
-        charge=None,
+        charge=int(charge),
         dipole_moment=None,
     )
 

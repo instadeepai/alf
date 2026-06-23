@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 from alf_core import BaseModel, BaseTrainConfig, Candidate, LabelledCandidates, Predictions
 from mlip.data import ChemicalSystem, DatasetInfo
@@ -281,6 +282,7 @@ class MLIPModel(BaseModel):
             graph_cutoff_angstrom=pretrained.dataset_info.graph_cutoff_angstrom,
             avg_num_neighbors=pretrained.dataset_info.avg_num_neighbors,
             avg_r_min_angstrom=pretrained.dataset_info.avg_r_min_angstrom,
+            total_charge_set=pretrained.dataset_info.total_charge_set,
             scaling_mean=0.0,
             scaling_stdev=1.0,
         )
@@ -418,14 +420,14 @@ class MLIPModel(BaseModel):
             effective_batch_size,
             max_n_node,
             max_n_edge,
-            should_shuffle=False,
+            shuffle=False,
         )
         val_set = GraphDataset(
             val_graphs,
             effective_batch_size,
             val_max_n_node,
             val_max_n_edge,
-            should_shuffle=False,
+            shuffle=False,
         )
 
         if is_finetuning:
@@ -464,8 +466,8 @@ class MLIPModel(BaseModel):
             flip_epoch = self.train_config.flip_epoch or int(effective_epochs * 0.7)
             logger.info(f"  Using weight flip at epoch {flip_epoch}")
             loss_fn = HuberLoss(
-                energy_weight_schedule=lambda epoch: 40.0 if epoch < flip_epoch else 1000.0,
-                forces_weight_schedule=lambda epoch: 1000.0 if epoch < flip_epoch else 40.0,
+                energy_weight_schedule=lambda epoch: jnp.where(epoch < flip_epoch, 40.0, 1000.0),
+                forces_weight_schedule=lambda epoch: jnp.where(epoch < flip_epoch, 1000.0, 40.0),
                 extended_metrics=True,
             )
         else:
@@ -508,7 +510,10 @@ class MLIPModel(BaseModel):
         )
 
         if has_valid_params:
-            self.force_field = best_model
+            # jax.device_get in best_model produces numpy arrays; convert back to JAX
+            # arrays so that run_batched_inference can JIT-compile correctly.
+            jax_params = jax.device_put(best_model.params)
+            self.force_field = ForceField(best_model.predictor, jax_params)
 
             if test_graphs is not None and len(test_graphs) > 0:
                 cached_test_systems = self._valid_test_systems
@@ -522,7 +527,7 @@ class MLIPModel(BaseModel):
                     effective_batch_size,
                     test_max_n_node,
                     test_max_n_edge,
-                    should_shuffle=False,
+                    shuffle=False,
                 )
                 training_loop.test(test_set)
                 self._test_graphs = test_graphs
@@ -755,7 +760,7 @@ class MLIPModel(BaseModel):
 
         batch_size, max_n_node, max_n_edge = self._test_batching
         test_set = GraphDataset(
-            self._test_graphs, batch_size, max_n_node, max_n_edge, should_shuffle=False
+            self._test_graphs, batch_size, max_n_node, max_n_edge, shuffle=False
         )
 
         force_field = self.force_field
