@@ -1,8 +1,10 @@
 Results
 =======
 
-The ``Results`` dataclass aggregates the outcomes of an active learning experiment, storing
-per-round metrics and summary statistics. It is the primary return value of a completed
+The ``Results`` dataclass aggregates the metrics computed on a surrogate's predictions
+relative to the targets (for example, accuracy, precision, recall), storing
+per-round metrics and summary statistics. The metrics computed depend on whether the
+task is classification or regression. It is the primary return value of a completed
 ALF experiment and is used to evaluate and compare experiment runs.
 
 .. automodule:: alf_core.dataclasses.results
