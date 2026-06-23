@@ -12,4 +12,6 @@ data between components and tracking experiment progress.
    Labelled Candidates <labelled_candidates/index>
    Predictions <predictions/index>
    Results <results/index>
+   Round Metrics <round_metrics/index>
    State <state/index>
+   Surrogate Epoch Metrics <surrogate_epoch_metrics/index>
