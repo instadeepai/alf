@@ -19,8 +19,11 @@ dependencies = [
 
 [project.optional-dependencies]
 # ESM-2 tutorial needs transformers, exposed via alf_tools' esm2 extra.
-# Install with: uv sync --group esm2
+# Install with: uv sync --extra esm2
 esm2 = ["alf_tools[esm2]"]
+# MLIP tutorial needs the mlip package, exposed via alf_tools' mlip extra.
+# Install with: uv sync --extra mlip
+mlip = ["alf_tools[mlip]"]
 
 [tool.setuptools]
 packages = []  # No Python packages, just notebooks
