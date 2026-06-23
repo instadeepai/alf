@@ -15,6 +15,7 @@
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -96,7 +97,7 @@ class Predictions:
         is_classification = problem_type in [ProblemType.BINARY, ProblemType.MULTICLASS]
 
         for i in range(len(self.means)):
-            record_i: dict[str, str | float | np.floating | list[float] | np.ndarray] = {
+            record_i: dict[str, Any] = {
                 "data": candidates[i].data,
                 "targets": targets[i],
             }

@@ -252,12 +252,16 @@ class Candidate:
 
         elif self.modality == Modality.STRUCTURE:
             # Strings are passed through to support serialised representations
-            # (e.g. JSON-encoded crystal structures); arrays/tensors are converted to numpy
+            # (e.g. JSON-encoded crystal structures); arrays/tensors are converted to numpy;
+            # other objects (e.g. ASE Atoms) fall back to their string representation.
             if isinstance(self.data, str):
                 return self.data
-            return self._convert_data_to_npy(
-                "STRUCTURE modality data must be a string, numpy array, or torch tensor."
-            )
+            if isinstance(self.data, np.ndarray):
+                return self.data
+            if HAS_TORCH and isinstance(self.data, torch.Tensor):
+                return self.data.cpu().numpy()
+            # Fallback: convert to string (e.g. ASE Atoms objects)
+            return str(self.data)
 
         elif self.modality in (Modality.IMAGE, Modality.EMBEDDING):
             # Convert arrays/tensors to compact format
