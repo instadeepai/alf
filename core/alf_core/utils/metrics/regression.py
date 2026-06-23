@@ -405,7 +405,7 @@ def residual_spearman(
 ) -> dict[str, float]:
     """Compute Spearman correlation between residuals and variances.
 
-    Computes absolute residuals (|targets - means|) and measures their Spearman
+    Computes absolute residuals (`|targets - means|`) and measures their Spearman
     correlation with predicted variances. Higher correlation indicates better
     uncertainty estimation.
 
@@ -430,7 +430,7 @@ def residual_pearson(
 ) -> dict[str, float]:
     """Compute Pearson correlation between residuals and standard deviations.
 
-    Computes absolute residuals (|targets - means|) and measures their Pearson
+    Computes absolute residuals (`|targets - means|`) and measures their Pearson
     correlation with predicted standard deviations (sqrt(variances)). Higher
     correlation indicates better uncertainty estimation.
 

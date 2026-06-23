@@ -1,7 +1,7 @@
 Predictions
 ===========
 
-The ``Predictions`` dataclass stores model predictions including mean predictions and uncertainty
+The :class:`~alf_core.dataclasses.predictions.Predictions` dataclass stores model predictions including mean predictions and uncertainty
 estimates. This is returned by surrogate models and used for acquisition scoring.
 
 The ``to_dataframe()`` method requires a ``problem_type`` argument to determine the output

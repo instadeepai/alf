@@ -1,10 +1,10 @@
 Tasks
 =====
 
-The task classes define different experiment types in ALF. The ``DesignTask`` runs a multi-round
-active learning optimization loop, the ``SupervisedTask`` trains and evaluates models on fixed data
-splits, and the ``ZeroShotTask`` evaluates pre-trained models without additional training. All tasks
-inherit from ``BaseTask`` which provides the common interface.
+The task classes define different experiment types in ALF. The :class:`~alf_core.tasks.design_task.DesignTask` runs a multi-round
+active learning optimisation loop, the :class:`~alf_core.tasks.supervised_task.SupervisedTask` trains and evaluates models on fixed data
+splits, and the :class:`~alf_core.tasks.zeroshot_task.ZeroShotTask` evaluates pre-trained models without additional training. All tasks
+inherit from :class:`~alf_core.tasks.base_task.BaseTask` which provides the common interface.
 
 .. toctree::
    :maxdepth: 1

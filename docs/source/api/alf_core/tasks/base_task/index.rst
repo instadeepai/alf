@@ -1,7 +1,7 @@
 Base Task
 =========
 
-The ``BaseTask`` class is an abstract base class that defines the common interface for all task types
+The :class:`~alf_core.tasks.base_task.BaseTask` class is an abstract base class that defines the common interface for all task types
 in the framework. It provides the basic structure for setting up experiments, running tasks, and
 managing task state.
 
