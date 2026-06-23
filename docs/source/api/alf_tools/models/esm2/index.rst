@@ -19,7 +19,7 @@ selected via ``ESM2TrainConfig.mode`` together with ``freeze_backbone``:
     with a warning. ``predict()`` returns the argmax class index as a float.
 
   Call ``train()`` to fit the head on labelled data (``loss_fn`` must be set). Sequence
-  embeddings can also be extracted via ``embed()`` for use with downstream models.
+  embeddings can also be extracted via :meth:`~alf_tools.models.esm2.ESM2Model.embed` for use with downstream models.
 - **mode='likelihoods'** with ``freeze_backbone=True``: zero-shot scoring. ``predict()``
   returns per-sequence pseudo-log-likelihood (PLL) scores — each non-special token is masked
   one at a time and the log-probability of the correct residue at that position is accumulated,
@@ -30,7 +30,7 @@ selected via ``ESM2TrainConfig.mode`` together with ``freeze_backbone``:
   ``loss_fn`` must be ``'mlm'``. Masking is controlled by ``mask_probability`` (fraction of
   eligible tokens masked per sequence) and ``mask_splitting`` (the ``(p_mask, p_random,
   p_unchanged)`` 3-way replacement probabilities, which must sum to 1.0). Labels in
-  ``train_data`` are ignored, but ``LabelledCandidates`` still requires them — pass placeholder
+  ``train_data`` are ignored, but :class:`~alf_core.dataclasses.labelled_candidates.LabelledCandidates` still requires them — pass placeholder
   values. After fine-tuning, ``predict()`` returns updated PLL scores. Training reports
   ``perplexity`` and ``token_accuracy`` over masked positions; validation masking is seeded
   from ``ESM2ModelConfig.seed`` so metrics are comparable across epochs.
@@ -43,11 +43,11 @@ Key properties:
 - **Sampling**: Not supported — raises ``NotImplementedError``
 - **Tokenisation**: ``featurise()`` converts sequences to ``input_ids`` and
   ``attention_mask`` tensors for the ESM-2 tokeniser. It does **not** produce embeddings —
-  use ``embed()`` for that.
+  use :meth:`~alf_tools.models.esm2.ESM2Model.embed` for that.
 
 .. note::
 
-   This model requires the optional ``esm2`` dependency. Install it with the ``[esm2]`` extra:
+   This model requires the optional :mod:`alf_tools.models.esm2` dependency. Install it with the ``[esm2]`` extra:
 
    .. code-block:: bash
 

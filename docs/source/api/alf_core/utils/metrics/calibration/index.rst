@@ -2,8 +2,8 @@ Calibration Metrics
 ===================
 
 Uncertainty-calibration metrics for surrogate model predictions.
-``expected_calibration_error`` and ``rank_expected_calibration_error`` are
-registered in ``regression_metric_registry`` via ``@register_requires_variance``.
+:func:`~alf_core.utils.metrics.calibration.expected_calibration_error` and :func:`~alf_core.utils.metrics.calibration.rank_expected_calibration_error` are
+registered in ``regression_metric_registry`` via :func:`@register_requires_variance <alf_core.utils.metrics.regression.register_requires_variance>`.
 
 .. automodule:: alf_core.utils.metrics.calibration
    :members:
