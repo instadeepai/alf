@@ -47,7 +47,7 @@ Key properties:
 
 .. note::
 
-   This model requires the optional :mod:`alf_tools.models.esm2` dependency. Install it with the ``[esm2]`` extra:
+   This model requires the optional ``esm2`` dependency. Install it with the ``[esm2]`` extra:
 
    .. code-block:: bash
 

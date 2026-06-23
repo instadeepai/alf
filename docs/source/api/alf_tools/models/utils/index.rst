@@ -15,7 +15,7 @@ method or ALF's ``predict()`` depending on the model type.
 from a serialisable ``_target_`` config dict, enabling fully configuration-driven kernel setup.
 
 The :mod:`alf_tools.models.utils.botorch_utils` module provides conversion utilities between ALF's data structures
-(``Candidate``, :class:`~alf_core.dataclasses.predictions.Predictions`) and BoTorch's expected formats (tensors, posteriors).
+(:class:`~alf_core.dataclasses.candidate.Candidate`, :class:`~alf_core.dataclasses.predictions.Predictions`) and BoTorch's expected formats (tensors, posteriors).
 
 .. automodule:: alf_tools.models.utils.data_utils
    :members:

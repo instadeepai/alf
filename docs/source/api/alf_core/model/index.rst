@@ -2,8 +2,8 @@ Model
 =====
 
 The :class:`~alf_core.model.base_model.BaseModel` is an abstract base class that defines the interface for all models in the framework.
-Models can serve multiple roles: as surrogate models (wrapped by ``Surrogate`` to approximate expensive
-experimental evaluations), as oracle models (wrapped by ``Oracle`` for online evaluation), or as
+Models can serve multiple roles: as surrogate models (wrapped by :class:`~alf_core.surrogate.surrogate.Surrogate` to approximate expensive
+experimental evaluations), as oracle models (wrapped by :class:`~alf_core.oracle.oracle.Oracle` for online evaluation), or as
 generator models (wrapped by :class:`~alf_core.optimizer.search.GeneratorSearch` to sample candidate sequences).
 
 All concrete model implementations must inherit from :class:`~alf_core.model.base_model.BaseModel` and implement the abstract methods:
