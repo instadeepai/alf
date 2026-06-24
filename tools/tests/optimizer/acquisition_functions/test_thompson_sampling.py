@@ -24,15 +24,17 @@ from alf_core.dataclasses.round_metrics import RoundMetrics
 from alf_core.dataclasses.state import State
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.surrogate.surrogate import Surrogate
-from alf_tools.optimizer.acquisition_functions.thompson_sampling import ThompsonSampling
+from alf_tools.optimizer.acquisition_functions.thompson_sampling import (
+    ThompsonSampling,
+    ThompsonSamplingConfig,
+)
 
 
-def _make_state(predictions: Predictions, seed: int | None, round_num: int = 1) -> State:
+def _make_state(predictions: Predictions, round_num: int = 1) -> State:
     """Build a State wired to a stub surrogate for acquisition testing.
 
     Args:
         predictions: Predictions the stub surrogate returns from `predict`.
-        seed: Experiment seed stored on the state.
         round_num: Round number recorded in `round_metrics`.
 
     Returns:
@@ -40,7 +42,7 @@ def _make_state(predictions: Predictions, seed: int | None, round_num: int = 1) 
     """
     surrogate = MagicMock(spec=Surrogate)
     surrogate.predict.return_value = predictions
-    state = State(dataset=MagicMock(spec=BaseDataset), surrogate=surrogate, seed=seed)
+    state = State(dataset=MagicMock(spec=BaseDataset), surrogate=surrogate)
     state.round_metrics = RoundMetrics(round=round_num)
     return state
 
@@ -61,9 +63,9 @@ def test_gp_path_preserves_direction() -> None:
     """With zero variance the GP samples equal the means, so higher mean wins."""
     means = np.array([0.0, 10.0, 20.0])
     predictions = Predictions(means=means, variances=np.zeros_like(means))
-    candidates = _candidates(3)
+    acquisition = ThompsonSampling(ThompsonSamplingConfig(seed=0))
 
-    result = ThompsonSampling()(candidates, _make_state(predictions, seed=0))
+    result = acquisition(_candidates(3), _make_state(predictions))
 
     # Zero variance -> samples collapse to the means, so direction is preserved.
     np.testing.assert_allclose(result.labels, means)
@@ -75,14 +77,18 @@ def test_gp_path_is_reproducible_for_same_seed_and_round() -> None:
     predictions = Predictions(means=np.zeros(5), variances=np.ones(5))
     candidates = _candidates(5)
 
-    first = ThompsonSampling()(candidates, _make_state(predictions, seed=7, round_num=2))
-    second = ThompsonSampling()(candidates, _make_state(predictions, seed=7, round_num=2))
+    first = ThompsonSampling(ThompsonSamplingConfig(seed=7))(
+        candidates, _make_state(predictions, 2)
+    )
+    second = ThompsonSampling(ThompsonSamplingConfig(seed=7))(
+        candidates, _make_state(predictions, 2)
+    )
 
     np.testing.assert_array_equal(first.labels, second.labels)
 
 
 def test_gp_path_decorrelates_across_seeds() -> None:
-    """Different experiment seeds at the same round draw different samples.
+    """Different configured seeds at the same round draw different samples.
 
     This is the regression guard for the bug where the GP path seeded only on
     the round, so every seed replication shared one standard-normal vector.
@@ -90,8 +96,12 @@ def test_gp_path_decorrelates_across_seeds() -> None:
     predictions = Predictions(means=np.zeros(5), variances=np.ones(5))
     candidates = _candidates(5)
 
-    seed_a = ThompsonSampling()(candidates, _make_state(predictions, seed=1, round_num=3))
-    seed_b = ThompsonSampling()(candidates, _make_state(predictions, seed=2, round_num=3))
+    seed_a = ThompsonSampling(ThompsonSamplingConfig(seed=1))(
+        candidates, _make_state(predictions, 3)
+    )
+    seed_b = ThompsonSampling(ThompsonSamplingConfig(seed=2))(
+        candidates, _make_state(predictions, 3)
+    )
 
     assert not np.allclose(seed_a.labels, seed_b.labels)
 
@@ -100,11 +110,24 @@ def test_gp_path_decorrelates_across_rounds() -> None:
     """The same seed draws different samples on different rounds."""
     predictions = Predictions(means=np.zeros(5), variances=np.ones(5))
     candidates = _candidates(5)
+    acquisition = ThompsonSampling(ThompsonSamplingConfig(seed=4))
 
-    round_1 = ThompsonSampling()(candidates, _make_state(predictions, seed=4, round_num=1))
-    round_2 = ThompsonSampling()(candidates, _make_state(predictions, seed=4, round_num=2))
+    round_1 = acquisition(candidates, _make_state(predictions, 1))
+    round_2 = acquisition(candidates, _make_state(predictions, 2))
 
     assert not np.allclose(round_1.labels, round_2.labels)
+
+
+def test_gp_path_unseeded_is_nondeterministic() -> None:
+    """The default (unseeded) config draws from fresh entropy each call."""
+    predictions = Predictions(means=np.zeros(5), variances=np.ones(5))
+    candidates = _candidates(5)
+    acquisition = ThompsonSampling()  # default config: seed=None
+
+    first = acquisition(candidates, _make_state(predictions, 1))
+    second = acquisition(candidates, _make_state(predictions, 1))
+
+    assert not np.allclose(first.labels, second.labels)
 
 
 def test_ensemble_path_ranks_higher_predictions_higher() -> None:
@@ -112,9 +135,8 @@ def test_ensemble_path_ranks_higher_predictions_higher() -> None:
     # Rows = candidates, columns = ensemble members; candidate 2 dominates.
     empirical_dist = np.array([[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]])
     predictions = Predictions(means=empirical_dist.mean(axis=1), empirical_dist=empirical_dist)
-    candidates = _candidates(3)
 
-    result = ThompsonSampling()(candidates, _make_state(predictions, seed=0))
+    result = ThompsonSampling()(_candidates(3), _make_state(predictions))
 
     assert int(np.argmax(result.labels)) == 2
     assert result.labels[2] >= result.labels[0]
@@ -123,7 +145,6 @@ def test_ensemble_path_ranks_higher_predictions_higher() -> None:
 def test_raises_when_no_distribution_or_variance() -> None:
     """Means-only predictions cannot be Thompson sampled."""
     predictions = Predictions(means=np.array([1.0, 2.0]))
-    candidates = _candidates(2)
 
     with pytest.raises(ValueError, match="empirical_dist"):
-        ThompsonSampling()(candidates, _make_state(predictions, seed=0))
+        ThompsonSampling()(_candidates(2), _make_state(predictions))

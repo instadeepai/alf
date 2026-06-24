@@ -13,8 +13,26 @@
 # limitations under the License.
 
 
+from dataclasses import dataclass
+
 import numpy as np
 from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
+
+
+@dataclass
+class ThompsonSamplingConfig:
+    """Configuration for Thompson Sampling.
+
+    Args:
+        seed: Base random seed for the Gaussian-process sampling path. It is
+            combined with the acquisition round so that draws decorrelate across
+            rounds while staying reproducible; pass a distinct seed per
+            experiment replication so the replications themselves decorrelate.
+            None (the default) draws from fresh OS entropy on every round
+            (non-reproducible). Unused by the ensemble (`empirical_dist`) path.
+    """
+
+    seed: int | None = None
 
 
 class ThompsonSampling(AcquisitionFunction):
@@ -31,11 +49,20 @@ class ThompsonSampling(AcquisitionFunction):
     For a Gaussian-process surrogate (per-candidate `means`/`variances` but no
     `empirical_dist`), we draw one posterior sample per candidate from
     `N(mean, std)` and use the sample as the acquisition value (higher is better).
-    The sampling RNG is seeded by combining the experiment seed (`state.seed`)
-    with the round, so seed replications decorrelate while staying reproducible.
+    The sampling RNG is seeded by combining the configured `seed` with the round,
+    so seed replications decorrelate while staying reproducible.
 
     This is a maximising acquisition function.
     """
+
+    def __init__(self, config: ThompsonSamplingConfig | None = None) -> None:
+        """Initialise Thompson Sampling.
+
+        Args:
+            config: Sampling configuration. Defaults to `ThompsonSamplingConfig()`
+                (unseeded), which only affects the Gaussian-process path.
+        """
+        self.config = config or ThompsonSamplingConfig()
 
     def __call__(self, search_candidates: list[Candidate], state: State) -> LabelledCandidates:
         """Compute Thompson Sampling acquisition values for unlabelled candidates.
@@ -57,9 +84,12 @@ class ThompsonSampling(AcquisitionFunction):
             acquisition_values = ranks.max(-1)
         elif predictions.variances is not None:
             # GP path: draw one posterior sample per candidate from N(mean, std).
-            # Seed on (experiment seed, round) so each seed replication draws an
-            # independent standard-normal vector, instead of sharing one across runs.
-            rng = np.random.default_rng((state.seed or 0, state.round_metrics.round))
+            # Seed on (config seed, round) so each replication draws an independent
+            # standard-normal vector instead of sharing one across runs; an unset
+            # seed falls back to fresh OS entropy.
+            seed = self.config.seed
+            entropy = (seed, state.round_metrics.round) if seed is not None else None
+            rng = np.random.default_rng(entropy)
             acquisition_values = rng.normal(
                 loc=predictions.means, scale=np.sqrt(np.maximum(predictions.variances, 0.0))
             )

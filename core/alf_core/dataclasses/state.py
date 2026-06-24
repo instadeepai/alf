@@ -30,10 +30,6 @@ class State:
         dataset: The dataset containing train/validation/test splits and candidate pool.
         surrogate: The surrogate model used for predictions.
         round: Current round number in the active learning loop.
-        seed: Experiment-level random seed for this run, or None if unseeded.
-            Stochastic acquisition functions (e.g. Thompson Sampling on a GP)
-            combine it with the round so seed replications decorrelate while
-            staying reproducible.
         acq_batch_size: Number of candidates to acquire per round.
         history: List of LabelledCandidates acquired in each round.
         round_metrics: RoundMetrics instance holding scalar metrics and per-epoch
@@ -45,7 +41,6 @@ class State:
     dataset: BaseDataset
     surrogate: Surrogate
     round: int = 0
-    seed: int | None = None
     acq_batch_size: int = 0
     history: list = field(default_factory=list)
     round_metrics: RoundMetrics = field(default_factory=lambda: RoundMetrics(round=0))

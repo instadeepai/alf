@@ -323,7 +323,7 @@ def run_al_experiment(
 
     workdir.mkdir(parents=True, exist_ok=True)
     task = DesignTask(num_acq_rounds=num_rounds, acq_batch_size=batch_size)
-    state = task.setup(dataset=dataset, surrogate=surrogate, seed=seed)
+    state = task.setup(dataset=dataset, surrogate=surrogate)
     task.run(
         state=state,
         state_loggers=[FileStateLogger(output_path=workdir)],
