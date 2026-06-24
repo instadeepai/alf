@@ -161,7 +161,7 @@ class MLIPModel(BaseModel):
         self._test_data: LabelledCandidates | None = None
         self._test_labels: np.ndarray | None = None
 
-        self._last_training_metrics: dict = {}
+        self._last_training_metrics: dict[str, float | int | np.number] = {}
 
         self._validate_config()
         self._load_pretrained_model()
@@ -504,8 +504,10 @@ class MLIPModel(BaseModel):
         training_config = TrainingLoop.Config(num_epochs=effective_epochs)
 
         if self.train_config.use_weight_flip:
-            flip_epoch = self.train_config.flip_epoch or int(
-                effective_epochs * _WEIGHT_FLIP_EPOCH_FRACTION
+            flip_epoch = (
+                self.train_config.flip_epoch
+                if self.train_config.flip_epoch is not None
+                else int(effective_epochs * _WEIGHT_FLIP_EPOCH_FRACTION)
             )
             logger.info(f"  Using weight flip at epoch {flip_epoch}")
             loss_fn = HuberLoss(
@@ -739,6 +741,8 @@ class MLIPModel(BaseModel):
 
         Raises:
             RuntimeError: If the model has not been trained yet.
+            ValueError: If any candidate is a single-atom system (unsupported by
+                mlip's batched inference).
         """
         if not candidate_points:
             return Predictions(means=np.array([]))
@@ -762,6 +766,8 @@ class MLIPModel(BaseModel):
 
         Raises:
             RuntimeError: If the model has not been trained yet.
+            ValueError: If any candidate is a single-atom system (unsupported by
+                mlip's batched inference).
         """
         if not candidate_points:
             return np.array([]), []
@@ -780,11 +786,12 @@ class MLIPModel(BaseModel):
         """
         raise NotImplementedError("Sampling is not implemented for MLIPModel")
 
-    def get_training_summary_metrics(self) -> dict[str, float]:
+    def get_training_summary_metrics(self) -> dict[str, float | int | np.number]:
         """Return summary metrics from the most recent train() call.
 
         Returns:
-            Dictionary with training metadata and per-reaction test metrics.
+            Dictionary with training metadata and per-reaction test metrics. Values
+            are a mix of ints (sizes, epochs) and floats (learning rate, metrics).
         """
         return self._last_training_metrics
 

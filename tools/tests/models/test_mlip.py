@@ -188,3 +188,90 @@ class TestPredictWithForces:
         np.testing.assert_array_equal(energies, np.array([1.0, 2.0]))
         assert len(forces) == 2
         np.testing.assert_array_equal(forces[0], np.array([[0.1, 0.0, 0.0]]))
+
+
+class TestPerReactionMetrics:
+    """Tests for _compute_and_log_per_reaction_metrics index alignment."""
+
+    def test_energy_and_force_metrics_per_reaction(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Per-reaction energy/forces metrics align predictions, labels, and masks."""
+        model = _scratch_model()
+        candidates = [
+            Candidate(
+                data=_water(),
+                modality="structure",
+                features={"reaction_id": rid, "forces": np.zeros((3, 3))},
+            )
+            for rid in (0, 0, 1, 1)
+        ]
+        true_energies = np.array([1.0, 2.0, 3.0, 4.0])
+        model._test_data = LabelledCandidates(candidates=candidates, labels=true_energies)
+        model._test_labels = true_energies
+
+        pred_energies = np.array([1.3, 2.0, 2.7, 4.0])
+        pred_forces = [np.full((3, 3), 0.1) for _ in range(4)]
+        monkeypatch.setattr(model, "predict_with_forces", lambda c: (pred_energies, pred_forces))
+
+        metrics = model._compute_and_log_per_reaction_metrics()
+
+        # rxn 0 (3-atom systems): per-atom energy errors = [0.3/3, 0.0/3] = [0.1, 0.0].
+        assert metrics["rxn00000/energy_rmse_per_atom"] == pytest.approx(np.sqrt(0.005))
+        assert metrics["rxn00000/energy_mae_per_atom"] == pytest.approx(0.05)
+        # Constant 0.1 force error everywhere.
+        assert metrics["rxn00000/force_rmse"] == pytest.approx(0.1)
+        assert metrics["rxn00000/force_mae"] == pytest.approx(0.1)
+        # Both reactions reported.
+        assert "rxn00001/energy_rmse_per_atom" in metrics
+        assert "rxn00001/force_rmse" in metrics
+
+    def test_returns_empty_without_reactions(self) -> None:
+        """No reaction_id features yields an empty metrics dict."""
+        model = _scratch_model()
+        candidates = [Candidate(data=_water(), modality="structure")]
+        model._test_data = LabelledCandidates(candidates=candidates, labels=np.array([1.0]))
+        model._test_labels = np.array([1.0])
+        assert model._compute_and_log_per_reaction_metrics() == {}
+
+
+class TestTrainPredictFromScratch:
+    """End-to-end smoke test: train a tiny from-scratch model and predict."""
+
+    def _labelled(self, n: int) -> LabelledCandidates:
+        """Build n water candidates with random forces and energies.
+
+        Returns:
+            LabelledCandidates of n 3-atom water systems.
+        """
+        rng = np.random.default_rng(0)
+        candidates = [
+            Candidate(
+                data=_water(),
+                modality="structure",
+                features={"forces": rng.normal(size=(3, 3))},
+            )
+            for _ in range(n)
+        ]
+        labels = rng.normal(size=n)
+        return LabelledCandidates(candidates=candidates, labels=labels)
+
+    def test_train_then_predict(self) -> None:
+        """Training one epoch from scratch yields a force field that predicts energies."""
+        model = MLIPModel(
+            model_config=MLIPModelConfig(model_path=None, num_channels=4),
+            train_config=MLIPTrainConfig(
+                epochs=1,
+                batch_size=2,
+                use_weight_flip=False,
+                energy_weight=1.0,
+                forces_weight=1.0,
+            ),
+        )
+        train_data = self._labelled(4)
+        val_data = self._labelled(2)
+
+        model.train(train_data, val_data=val_data)
+        assert model.force_field is not None
+
+        preds = model.predict(train_data.candidates)
+        assert preds.means.shape == (4,)
+        assert np.all(np.isfinite(preds.means))
