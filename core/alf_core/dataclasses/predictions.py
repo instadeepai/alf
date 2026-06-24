@@ -97,7 +97,7 @@ class Predictions:
         is_classification = problem_type in [ProblemType.BINARY, ProblemType.MULTICLASS]
 
         for i in range(len(self.means)):
-            record_i: dict[str, Any] = {
+            record_i: dict[str, Any] = {  # noqa: ANN401
                 "data": candidates[i].data,
                 "targets": targets[i],
             }
