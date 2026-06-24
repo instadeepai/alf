@@ -86,10 +86,10 @@ uv sync --group esm2 --group chemprop
   no hand-crafted features required. Requires the `[chemprop]` optional extra:
   `pip install "alf-tools[chemprop]"`
 - **MLIPModel** - Machine-learned interatomic potential built on the `mlip-jax` MACE force field.
-  Accepts ASE `Atoms` objects directly and predicts per-structure energies (and atomic forces via
-  `predict_with_forces()`). Finetunes from a pretrained foundation model by default, or trains from
+  Accepts ASE `Atoms` objects directly and predicts per-structure energies.
+  Finetunes from a pretrained foundation model by default, or trains from
   scratch when `model_path=None`; supports dynamic training-set-aware hyperparameters and an
-  energy→forces weight-flip loss schedule. Requires the `[mlip]` optional extra:
+  forces→energy weight-flip loss schedule. Requires the `[mlip]` optional extra:
   `pip install "alf-tools[mlip]"`
 - **PyRosetta** - Rosetta energy function for protein design (requires PyRosetta installation)
 - **EnsembleWrapper** - Generic wrapper composing N `BaseModel` instances into a seed ensemble,

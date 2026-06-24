@@ -18,6 +18,7 @@ import pytest
 pytest.importorskip("mlip", reason="mlip not installed; install alf_tools[mlip]")
 
 from alf_core import Candidate  # noqa: E402
+from alf_core.dataclasses.labelled_candidates import LabelledCandidates  # noqa: E402
 from alf_tools.models.mlip import MLIPModel, MLIPModelConfig, MLIPTrainConfig  # noqa: E402
 from alf_tools.models.utils.mlip_utils import (  # noqa: E402
     _candidate_to_chemical_system,  # noqa: PLC2701
@@ -140,3 +141,50 @@ class TestGraphHelpers:
         max_n_node, max_n_edge = _compute_batching_limits([water, water], [graph, graph], 2)
         assert max_n_node >= 1
         assert max_n_edge >= 1
+
+
+class TestTrainValDataRequired:
+    """Tests for the val_data contract on train."""
+
+    def test_train_rejects_none_val_data(self) -> None:
+        """Train raises ValueError when val_data is None (BaseModel-conforming signature)."""
+        model = _scratch_model()
+        train_data = LabelledCandidates(candidates=[], labels=np.array([]))
+        with pytest.raises(ValueError, match="requires val_data"):
+            model.train(train_data, val_data=None)
+
+
+class TestPredictWithForces:
+    """Tests for predict_with_forces."""
+
+    def test_empty_candidates_returns_empty(self) -> None:
+        """No candidates yields an empty energy array and an empty force list."""
+        model = _scratch_model()
+        energies, forces = model.predict_with_forces([])
+        assert energies.shape == (0,)
+        assert forces == []
+
+    def test_unpacks_energies_and_forces(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Energies and per-structure forces are extracted from each prediction."""
+        model = _scratch_model()
+
+        class _Pred:
+            def __init__(self, energy: float, forces: np.ndarray) -> None:
+                self.energy = energy
+                self.forces = forces
+
+        fake = [
+            _Pred(1.0, np.array([[0.1, 0.0, 0.0]])),
+            _Pred(2.0, np.array([[0.0, 0.2, 0.0]])),
+        ]
+        monkeypatch.setattr(model, "_run_inference", lambda structures: fake)
+
+        candidates = [
+            Candidate(data=_water(), modality="structure"),
+            Candidate(data=_water(), modality="structure"),
+        ]
+        energies, forces = model.predict_with_forces(candidates)
+
+        np.testing.assert_array_equal(energies, np.array([1.0, 2.0]))
+        assert len(forces) == 2
+        np.testing.assert_array_equal(forces[0], np.array([[0.1, 0.0, 0.0]]))

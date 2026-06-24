@@ -603,6 +603,7 @@ class MLIPModel(BaseModel):
         if not has_rxn:
             return {}
 
+        pred_forces: list[np.ndarray] | None
         try:
             pred_energies, pred_forces = self.predict_with_forces(self._test_data.candidates)
         except Exception:

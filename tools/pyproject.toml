@@ -35,13 +35,11 @@ esmfold = [
     "accelerate>=0.26.0",
 ]
 guacamol = ["rdkit>=2022.9.0"]
-mlip = [
-    "mlip @ git+https://github.com/instadeepai/mlip.git@3acfc3bd67dd5821decb9e7719ea60527079b7ad",
-]
+mlip = ["mlip>=0.2.0"]
 
 # Workflow umbrellas — install everything for an expected workflow at once.
 protein = ["alf_tools[esm2,esmfold]"]
-molecule = ["alf_tools[chemprop,guacamol]"]
+molecule = ["alf_tools[chemprop,guacamol,mlip]"]
 
 [tool.setuptools.packages.find]
 where = ["."]
