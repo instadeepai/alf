@@ -134,7 +134,8 @@ def compute_recall(
 
     Args:
         init_candidate_pool: Initial candidate pool before acquisition.
-        acquired_candidates: Candidates that were acquired during optimization.
+        acquired_candidates: Candidates acquired during optimization, excluding
+            the initial labelled seed.
         top_percentile: Percentile threshold (e.g., 0.1 for top 10%). Defaults to 0.1.
         top_n: Number of top candidates to consider. Defaults to 100.
 
@@ -188,7 +189,8 @@ def compute_regret(
 
     Args:
         init_candidate_pool: Initial candidate pool before acquisition.
-        acquired_candidates: Candidates that were acquired during optimization.
+        acquired_candidates: Candidates acquired during optimization, excluding
+            the initial labelled seed.
 
     Returns:
         Dictionary containing:
