@@ -384,10 +384,9 @@ class MLIPModel(BaseModel):
             f"  Epochs: {effective_epochs}, Batch size: {effective_batch_size}, LR: {effective_lr}"
         )
 
-        if is_finetuning:
-            if self._pretrained_force_field is None:
-                raise ValueError("Pretrained force field missing during finetuning")
-            cutoff = self._pretrained_force_field.dataset_info.graph_cutoff_angstrom
+        pretrained = self._pretrained_force_field
+        if pretrained is not None:
+            cutoff = pretrained.dataset_info.graph_cutoff_angstrom
         else:
             cutoff = self.model_config.graph_cutoff_angstrom
 
