@@ -49,12 +49,15 @@ class BaseTask(abc.ABC):
         self.num_acq_rounds = num_acq_rounds
         self.save_round_predictions = save_round_predictions
 
-    def setup(self, dataset: BaseDataset, surrogate: Surrogate) -> State:
+    def setup(self, dataset: BaseDataset, surrogate: Surrogate, seed: int | None = None) -> State:
         """Setup the task with dataset and surrogate model.
 
         Args:
             dataset: The dataset containing train/validation/test splits.
             surrogate: The surrogate model to use for predictions.
+            seed: Experiment-level random seed for this run, stored on the state
+                so stochastic acquisition functions can decorrelate seed
+                replications. Defaults to None (unseeded).
 
         Raises:
             RuntimeError: If dataset.setup() has not been called before this method.
@@ -71,6 +74,7 @@ class BaseTask(abc.ABC):
         return State(
             dataset=dataset,
             surrogate=surrogate,
+            seed=seed,
             acq_batch_size=self.acq_batch_size,
         )
 

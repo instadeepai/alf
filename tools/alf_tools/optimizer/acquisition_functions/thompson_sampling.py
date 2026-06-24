@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+import numpy as np
 from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
 
 
@@ -21,11 +22,18 @@ class ThompsonSampling(AcquisitionFunction):
 
     A generalisation of Thompson Sampling to the case where batch size > num posterior samples.
 
-    For each point, we find its maximum rank under any ensemble member,
-    when predictions are sorted in ascending order.
-    (Higher predictions correspond to higher ranks)
+    For an ensemble surrogate (`empirical_dist`), each point is scored by its maximum rank
+    under any ensemble member, when predictions are sorted in ascending order.
+    (Higher predictions correspond to higher ranks.)
     We return the maximum rank for each candidate as an acquisition value, so that higher
     is better.
+
+    For a Gaussian-process surrogate (per-candidate `means`/`variances` but no
+    `empirical_dist`), we draw one posterior sample per candidate from
+    `N(mean, std)` and use the sample as the acquisition value (higher is better).
+    The sampling RNG is seeded by combining the experiment seed (`state.seed`)
+    with the round, so seed replications decorrelate while staying reproducible.
+
     This is a maximising acquisition function.
     """
 
@@ -37,7 +45,7 @@ class ThompsonSampling(AcquisitionFunction):
             state: The task state containing the current datasets and surrogate model.
 
         Raises:
-            ValueError: If `empirical_dist` or `variances` is not found in predictions.
+            ValueError: If neither `empirical_dist` nor `variances` is found in predictions.
 
         Returns:
             LabelledCandidates with Thompson Sampling acquisition values.
@@ -48,11 +56,12 @@ class ThompsonSampling(AcquisitionFunction):
             ranks = samples.argsort(axis=0).argsort(axis=0) + 1
             acquisition_values = ranks.max(-1)
         elif predictions.variances is not None:
-            # NOTE: This needs to be implemented for GP
-            raise NotImplementedError(
-                "Thompson Sampling via variances-only (without "
-                "empirical_dist) is not yet implemented. "
-                "Use an ensemble model that populates predictions.empirical_dist."
+            # GP path: draw one posterior sample per candidate from N(mean, std).
+            # Seed on (experiment seed, round) so each seed replication draws an
+            # independent standard-normal vector, instead of sharing one across runs.
+            rng = np.random.default_rng((state.seed or 0, state.round_metrics.round))
+            acquisition_values = rng.normal(
+                loc=predictions.means, scale=np.sqrt(np.maximum(predictions.variances, 0.0))
             )
         else:
             raise ValueError(
