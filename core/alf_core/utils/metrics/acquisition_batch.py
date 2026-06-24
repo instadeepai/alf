@@ -131,8 +131,6 @@ def compute_recall(
 
     Measures how many of the acquired candidates are in the top performers of
     the initial candidate pool, using both percentile-based and top-N thresholds.
-    The acquired candidates must exclude the initial labelled seed, otherwise
-    seed labels clearing a pool threshold would inflate the recall.
 
     Args:
         init_candidate_pool: Initial candidate pool before acquisition.
@@ -187,9 +185,7 @@ def compute_regret(
     """Compute regret of acquired candidates relative to the best possible candidate.
 
     Regret is the difference between the best possible label in the initial pool
-    and the best label found in the acquired candidates. The acquired candidates
-    must exclude the initial labelled seed, otherwise a seed label exceeding the
-    pool's best would yield a negative regret.
+    and the best label found in the acquired candidates.
 
     Args:
         init_candidate_pool: Initial candidate pool before acquisition.
