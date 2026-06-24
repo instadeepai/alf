@@ -13,6 +13,7 @@ prediction, and sampling.
    GP Model <gp/index>
    ESM2 Model <esm2/index>
    Chemprop Model <chemprop/index>
+   MLIP Model <mlip/index>
    PyRosetta Model <pyrosetta/index>
    Ensemble Wrapper <ensemble/index>
    Utilities <utils/index>

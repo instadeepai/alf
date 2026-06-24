@@ -18,14 +18,14 @@ Implements the ALF BaseModel interface around the mlip-jax MACE force-field,
 supporting both training from scratch and finetuning from a pretrained model.
 """
 
+import contextlib
 import copy
+import io
 import logging
-import os
-import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import jax
 import jax.numpy as jnp
@@ -53,11 +53,17 @@ from alf_tools.models.utils.mlip_utils import (
     _build_graphs,
     _compute_batching_limits,
     _download_model,
-    _labeled_candidates_to_systems,
+    _labelled_candidates_to_systems,
     _load_model_from_zip,
 )
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("alf-tools")
+
+# Loss-weight schedule for the energy/forces weight-flip strategy. Before the flip
+# epoch the loss is energy-weighted; afterwards it becomes forces-weighted.
+_WEIGHT_FLIP_EPOCH_FRACTION = 0.7
+_LOW_LOSS_WEIGHT = 40.0
+_HIGH_LOSS_WEIGHT = 1000.0
 
 
 @dataclass
@@ -76,7 +82,7 @@ class MLIPModelConfig:
             model's cutoff is used.
     """
 
-    model_path: Optional[str] = "fine_tuning/mlip-1416.zip"
+    model_path: str | None = "fine_tuning/mlip-1416.zip"
     num_channels: int = 128
     correlation: int = 3
     graph_cutoff_angstrom: float = 5.0
@@ -99,6 +105,7 @@ class MLIPTrainConfig(BaseTrainConfig):
     Args:
         epochs: Number of training epochs. Ignored when dynamic_training=True.
         batch_size: Batch size for training. Ignored when dynamic_training=True.
+        inference_batch_size: Batch size for prediction. Defaults to batch_size when None.
         learning_rate: Learning rate for the optimizer. Ignored when dynamic_training=True.
         dynamic_training: Automatically tune batch_size, learning_rate, and epochs
             based on training set size to maintain ~1000 gradient updates.
@@ -112,10 +119,11 @@ class MLIPTrainConfig(BaseTrainConfig):
 
     epochs: int = 50
     batch_size: int = 8
+    inference_batch_size: int | None = None
     learning_rate: float = 1e-3
     dynamic_training: bool = False
     use_weight_flip: bool = True
-    flip_epoch: Optional[int] = None
+    flip_epoch: int | None = None
     energy_weight: float = 1.0
     forces_weight: float = 1.0
 
@@ -141,7 +149,7 @@ class MLIPModel(BaseModel):
         model_config: MLIPModelConfig,
         train_config: MLIPTrainConfig,
         seed: int = 42,
-        precomputed_e0s: Optional[dict[int, float]] = None,
+        precomputed_e0s: dict[int, float] | None = None,
     ):
         """Initialise the model, loading the pretrained force field if configured."""
         self.model_config = model_config
@@ -149,18 +157,43 @@ class MLIPModel(BaseModel):
         self.seed = seed
         self._precomputed_e0s = precomputed_e0s
 
-        self.force_field: Optional[ForceField] = None
-        self._pretrained_force_field: Optional[ForceField] = None
-        self._test_data: Optional[LabelledCandidates] = None
+        self.force_field: ForceField | None = None
+        self._pretrained_force_field: ForceField | None = None
+        self._test_data: LabelledCandidates | None = None
 
-        self._test_graphs: Optional[list] = None
-        self._test_batching: Optional[tuple[int, int, int]] = None
-        self._test_labels: Optional[np.ndarray] = None
-        self._valid_test_systems: Optional[list] = None
+        self._test_graphs: list | None = None
+        self._test_batching: tuple[int, int, int] | None = None
+        self._test_labels: np.ndarray | None = None
+        self._valid_test_systems: list | None = None
 
         self._last_training_metrics: dict = {}
 
+        self._validate_config()
         self._load_pretrained_model()
+
+    def _validate_config(self) -> None:
+        """Validate configuration parameters before any expensive setup (e.g. downloads).
+
+        Raises:
+            ValueError: If any architecture or training parameter is non-positive.
+        """
+        if self.model_config.num_channels <= 0:
+            raise ValueError(f"num_channels must be positive, got {self.model_config.num_channels}")
+        if self.model_config.correlation <= 0:
+            raise ValueError(f"correlation must be positive, got {self.model_config.correlation}")
+        if self.model_config.graph_cutoff_angstrom <= 0:
+            raise ValueError(
+                "graph_cutoff_angstrom must be positive, got "
+                f"{self.model_config.graph_cutoff_angstrom}"
+            )
+        if self.train_config.epochs <= 0:
+            raise ValueError(f"epochs must be positive, got {self.train_config.epochs}")
+        if self.train_config.batch_size <= 0:
+            raise ValueError(f"batch_size must be positive, got {self.train_config.batch_size}")
+        if self.train_config.learning_rate <= 0:
+            raise ValueError(
+                f"learning_rate must be positive, got {self.train_config.learning_rate}"
+            )
 
     def _load_pretrained_model(self) -> None:
         """Load pretrained model from disk (downloading from S3 if needed)."""
@@ -308,8 +341,8 @@ class MLIPModel(BaseModel):
         self,
         train_data: LabelledCandidates,
         val_data: LabelledCandidates,
-        metrics_collector: Optional[Any] = None,
-        reference_train_data: Optional[LabelledCandidates] = None,
+        metrics_collector: Any | None = None,
+        reference_train_data: LabelledCandidates | None = None,
     ) -> None:
         """Train or finetune the model on the provided data.
 
@@ -358,9 +391,9 @@ class MLIPModel(BaseModel):
         else:
             cutoff = self.model_config.graph_cutoff_angstrom
 
-        train_systems = _labeled_candidates_to_systems(train_data)
-        reference_train_systems = _labeled_candidates_to_systems(reference_train_data)
-        val_systems = _labeled_candidates_to_systems(val_data)
+        train_systems = _labelled_candidates_to_systems(train_data)
+        reference_train_systems = _labelled_candidates_to_systems(reference_train_data)
+        val_systems = _labelled_candidates_to_systems(val_data)
 
         train_graphs = _build_graphs(train_systems, cutoff, name="train")
         reference_train_graphs = (
@@ -372,7 +405,7 @@ class MLIPModel(BaseModel):
 
         test_graphs = None
         if self._test_data is not None and len(self._test_data) > 0:
-            test_systems = _labeled_candidates_to_systems(self._test_data)
+            test_systems = _labelled_candidates_to_systems(self._test_data)
             original_test_graphs = [Graph.from_chemical_system(s, cutoff) for s in test_systems]
             test_graphs = []
             valid_test_systems = []
@@ -410,7 +443,7 @@ class MLIPModel(BaseModel):
 
         # Shuffle with model seed so committee members (identical pretrained init)
         # see different batch orderings from the first epoch.
-        rng = np.random.RandomState(self.seed)
+        rng = np.random.default_rng(self.seed)
         shuffle_indices = rng.permutation(len(train_graphs))
         train_graphs_shuffled = [train_graphs[i] for i in shuffle_indices]
         logger.info(f"  Shuffled {len(train_graphs)} training graphs with seed={self.seed}")
@@ -463,11 +496,17 @@ class MLIPModel(BaseModel):
         training_config = TrainingLoop.Config(num_epochs=effective_epochs)
 
         if self.train_config.use_weight_flip:
-            flip_epoch = self.train_config.flip_epoch or int(effective_epochs * 0.7)
+            flip_epoch = self.train_config.flip_epoch or int(
+                effective_epochs * _WEIGHT_FLIP_EPOCH_FRACTION
+            )
             logger.info(f"  Using weight flip at epoch {flip_epoch}")
             loss_fn = HuberLoss(
-                energy_weight_schedule=lambda epoch: jnp.where(epoch < flip_epoch, 40.0, 1000.0),
-                forces_weight_schedule=lambda epoch: jnp.where(epoch < flip_epoch, 1000.0, 40.0),
+                energy_weight_schedule=lambda epoch: jnp.where(
+                    epoch < flip_epoch, _LOW_LOSS_WEIGHT, _HIGH_LOSS_WEIGHT
+                ),
+                forces_weight_schedule=lambda epoch: jnp.where(
+                    epoch < flip_epoch, _HIGH_LOSS_WEIGHT, _LOW_LOSS_WEIGHT
+                ),
                 extended_metrics=True,
             )
         else:
@@ -502,12 +541,7 @@ class MLIPModel(BaseModel):
         logger.info(f"Training completed in {elapsed:.2f}s")
 
         best_model = training_loop.best_model
-        has_valid_params = (
-            best_model is not None
-            and best_model.params is not None
-            and hasattr(training_loop, "_best_params")
-            and training_loop._best_params is not None
-        )
+        has_valid_params = best_model is not None and best_model.params is not None
 
         if has_valid_params:
             # jax.device_get in best_model produces numpy arrays; convert back to JAX
@@ -575,33 +609,24 @@ class MLIPModel(BaseModel):
         ])
         n_atoms = np.array([len(c.data) for c in self._test_data.candidates], dtype=float)
 
+        structures = [c.data for c in self._test_data.candidates]
+        true_forces_list = [
+            np.asarray(c.features["forces"])
+            for c in self._test_data.candidates
+            if c.features and c.features.get("forces") is not None
+        ]
         pred_forces = None
         true_forces = None
         try:
-            structures = [c.data for c in self._test_data.candidates]
-            true_forces_list = [
-                np.asarray(c.features["forces"])
-                for c in self._test_data.candidates
-                if c.features and c.features.get("forces") is not None
-            ]
             if len(true_forces_list) == len(structures):
                 true_forces = true_forces_list
-                batch_size, max_n_node, max_n_edge = self._safe_batching_limits(structures)
-                old_stdout = sys.stdout
-                sys.stdout = open(os.devnull, "w", encoding="utf-8")
-                try:
-                    mlip_preds = run_batched_inference(
-                        structures=structures,
-                        force_field=self.force_field,
-                        batch_size=batch_size,
-                        max_n_node=max_n_node,
-                        max_n_edge=max_n_edge,
-                    )
-                finally:
-                    sys.stdout.close()
-                    sys.stdout = old_stdout
+                mlip_preds = self._run_inference(structures)
                 pred_forces = [np.array(p.forces) for p in mlip_preds]
         except Exception:
+            logger.warning(
+                "Force prediction for per-reaction metrics failed; reporting energy metrics only",
+                exc_info=True,
+            )
             pred_forces = None
             true_forces = None
 
@@ -667,12 +692,38 @@ class MLIPModel(BaseModel):
             for s in structures
         ]
 
-        batch_size = self.train_config.batch_size
+        batch_size = self.train_config.inference_batch_size or self.train_config.batch_size
         max_n_atoms = max(int(g.n_node.sum()) for g in graphs)
         max_n_edges = max(int(g.n_edge.sum()) for g in graphs)
         max_n_node = max(1, int(np.ceil(max_n_atoms / batch_size)))
         max_n_edge = max(1, int(np.ceil(max_n_edges / (2 * batch_size))))
         return batch_size, max_n_node, max_n_edge
+
+    def _run_inference(self, structures: list) -> list:
+        """Run batched inference over ASE Atoms structures, silencing mlip's stdout.
+
+        Args:
+            structures: List of ASE Atoms objects.
+
+        Returns:
+            The list of per-structure mlip prediction objects (energy and forces).
+
+        Raises:
+            RuntimeError: If the model has not been trained yet.
+        """
+        force_field = self.force_field
+        if force_field is None:
+            raise RuntimeError("Model must be trained before prediction")
+
+        batch_size, max_n_node, max_n_edge = self._safe_batching_limits(structures)
+        with contextlib.redirect_stdout(io.StringIO()):
+            return run_batched_inference(
+                structures=structures,
+                force_field=force_field,
+                batch_size=batch_size,
+                max_n_node=max_n_node,
+                max_n_edge=max_n_edge,
+            )
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
         """Predict energies for the given candidates.
@@ -686,26 +737,11 @@ class MLIPModel(BaseModel):
         Raises:
             RuntimeError: If the model has not been trained yet.
         """
+        if not candidate_points:
+            return Predictions(means=np.array([]))
+
         structures = [c.data for c in candidate_points]
-        batch_size, max_n_node, max_n_edge = self._safe_batching_limits(structures)
-
-        old_stdout = sys.stdout
-        sys.stdout = open(os.devnull, "w", encoding="utf-8")
-        try:
-            force_field = self.force_field
-            if force_field is None:
-                raise RuntimeError("Model must be trained before prediction")
-            mlip_predictions = run_batched_inference(
-                structures=structures,
-                force_field=force_field,
-                batch_size=batch_size,
-                max_n_node=max_n_node,
-                max_n_edge=max_n_edge,
-            )
-        finally:
-            sys.stdout.close()
-            sys.stdout = old_stdout
-
+        mlip_predictions = self._run_inference(structures)
         return Predictions(means=np.array([p.energy for p in mlip_predictions]))
 
     def predict_with_forces(
@@ -722,31 +758,16 @@ class MLIPModel(BaseModel):
         Raises:
             RuntimeError: If the model has not been trained yet.
         """
+        if not candidate_points:
+            return Predictions(means=np.array([])), []
+
         structures = [c.data for c in candidate_points]
-        batch_size, max_n_node, max_n_edge = self._safe_batching_limits(structures)
-
-        old_stdout = sys.stdout
-        sys.stdout = open(os.devnull, "w", encoding="utf-8")
-        try:
-            force_field = self.force_field
-            if force_field is None:
-                raise RuntimeError("Model must be trained before prediction")
-            mlip_predictions = run_batched_inference(
-                structures=structures,
-                force_field=force_field,
-                batch_size=batch_size,
-                max_n_node=max_n_node,
-                max_n_edge=max_n_edge,
-            )
-        finally:
-            sys.stdout.close()
-            sys.stdout = old_stdout
-
+        mlip_predictions = self._run_inference(structures)
         energies = np.array([p.energy for p in mlip_predictions])
         forces = [np.array(p.forces) for p in mlip_predictions]
         return Predictions(means=energies), forces
 
-    def evaluate_test(self) -> Optional[Predictions]:
+    def evaluate_test(self) -> Predictions | None:
         """Run inference on the cached test graphs.
 
         Returns:

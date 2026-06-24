@@ -82,3 +82,16 @@ if _esm2_available:
     from alf_tools.models.esm2 import ESM2Model, ESM2ModelConfig, ESM2TrainConfig
 
     __all__ += ["ESM2Model", "ESM2ModelConfig", "ESM2TrainConfig"]
+
+_mlip_available = False
+try:
+    import mlip as _mlip  # noqa: F401
+
+    _mlip_available = True
+except ImportError:
+    pass
+
+if _mlip_available:
+    from alf_tools.models.mlip import MLIPModel, MLIPModelConfig, MLIPTrainConfig
+
+    __all__ += ["MLIPModel", "MLIPModelConfig", "MLIPTrainConfig"]

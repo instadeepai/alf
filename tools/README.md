@@ -14,7 +14,7 @@ pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
 ### Optional Extras
 
 Some models require additional dependencies. Append one or more extras to the package URL.
-Per-model extras (`esm2`, `esmfold`, `chemprop`, `guacamol`) install exactly one model's
+Per-model extras (`esm2`, `esmfold`, `chemprop`, `guacamol`, `mlip`) install exactly one model's
 dependencies; workflow umbrellas (`protein`, `molecule`) group the extras you are likely to use
 together.
 
@@ -30,6 +30,9 @@ pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#su
 
 # GuacaMol — RDKit-based small-molecule dataset/scoring
 pip install "alf_tools[guacamol] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+
+# MLIP — MACE force field for atomistic systems (for MLIPModel)
+pip install "alf_tools[mlip] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
 
 # Workflow umbrellas: protein (esm2 + esmfold) or molecule (chemprop + guacamol)
 pip install "alf_tools[protein] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
@@ -82,6 +85,12 @@ uv sync --group esm2 --group chemprop
   backed by [Chemprop v2.x](https://chemprop.readthedocs.io/). Accepts SMILES strings directly;
   no hand-crafted features required. Requires the `[chemprop]` optional extra:
   `pip install "alf-tools[chemprop]"`
+- **MLIPModel** - Machine-learned interatomic potential built on the `mlip-jax` MACE force field.
+  Accepts ASE `Atoms` objects directly and predicts per-structure energies (and atomic forces via
+  `predict_with_forces()`). Finetunes from a pretrained foundation model by default, or trains from
+  scratch when `model_path=None`; supports dynamic training-set-aware hyperparameters and an
+  energy→forces weight-flip loss schedule. Requires the `[mlip]` optional extra:
+  `pip install "alf-tools[mlip]"`
 - **PyRosetta** - Rosetta energy function for protein design (requires PyRosetta installation)
 - **EnsembleWrapper** - Generic wrapper composing N `BaseModel` instances into a seed ensemble,
   MC dropout ensemble, or combined (seed + dropout) ensemble for uncertainty quantification.

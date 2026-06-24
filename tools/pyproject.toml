@@ -41,7 +41,7 @@ mlip = [
 
 # Workflow umbrellas — install everything for an expected workflow at once.
 protein = ["alf_tools[esm2,esmfold]"]
-molecule = ["alf_tools[chemprop,guacamol,mlip]"]
+molecule = ["alf_tools[chemprop,guacamol]"]
 
 [tool.setuptools.packages.find]
 where = ["."]

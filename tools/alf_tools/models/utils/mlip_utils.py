@@ -26,22 +26,16 @@ import fsspec
 import numpy as np
 from alf_core import Candidate, LabelledCandidates
 from mlip.data import ChemicalSystem
-from mlip.data.helpers.atomic_energies import compute_average_e0s_from_graphs
 from mlip.graph import Graph
 from mlip.models import ForceField
 from mlip.models.model_io import load_model_from_zip
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("alf-tools")
 
 _DEFAULT_MODEL_BUCKET = "mlip-jax-2420d80efc6f4f6b-inputs"
 
 # Models live in the package's models/ directory (sibling of this utils/ package).
 _MODELS_DIR = Path(__file__).parent.parent / "models"
-
-_mlipjax_fs = fsspec.filesystem(
-    "s3",
-    client_kwargs={"endpoint_url": os.getenv("FSSPEC_S3_ENDPOINT_URL")},
-)
 
 
 def _download_model(load_path: Path | str) -> None:
@@ -63,7 +57,11 @@ def _download_model(load_path: Path | str) -> None:
     file_path.parent.mkdir(parents=True, exist_ok=True)
     bucket_path = bucket_name / key_path
     logger.info(f"Downloading model from S3: {bucket_path}")
-    with _mlipjax_fs.open(bucket_path, "rb") as f:
+    fs = fsspec.filesystem(
+        "s3",
+        client_kwargs={"endpoint_url": os.getenv("FSSPEC_S3_ENDPOINT_URL")},
+    )
+    with fs.open(bucket_path, "rb") as f:
         with open(file_path, "wb") as f_out:
             f_out.write(f.read())
 
@@ -109,7 +107,7 @@ def _candidate_to_chemical_system(candidate: Candidate, energy: float) -> Chemic
     )
 
 
-def _labeled_candidates_to_systems(data: LabelledCandidates) -> list[ChemicalSystem]:
+def _labelled_candidates_to_systems(data: LabelledCandidates) -> list[ChemicalSystem]:
     """Convert LabelledCandidates to a list of ChemicalSystems.
 
     Returns:
@@ -191,41 +189,3 @@ def _compute_batching_limits(
         max_n_edge = int(np.ceil(max_total_edges / (2 * batch_size)))
 
     return max_n_node, max_n_edge
-
-
-def compute_e0s_from_labeled_candidates(
-    data: LabelledCandidates,
-    cutoff: float,
-) -> dict[int, float]:
-    """Compute E0s (average atomic energies) from LabelledCandidates.
-
-    Uses least-squares regression to estimate per-atom energy contributions.
-
-    Args:
-        data: LabelledCandidates containing structures and energies.
-        cutoff: Graph cutoff distance in Angstrom.
-
-    Returns:
-        Dictionary mapping atomic number to average energy contribution.
-
-    Raises:
-        ValueError: If no valid graphs are produced from the data.
-    """
-    systems = _labeled_candidates_to_systems(data)
-
-    graphs = [Graph.from_chemical_system(s, cutoff) for s in systems]
-    valid_graphs = _filter_valid_graphs(graphs)
-
-    if len(valid_graphs) == 0:
-        raise ValueError("No valid graphs produced from data for E0 computation")
-
-    squeezed_graphs = []
-    for graph in valid_graphs:
-        squeezed = graph
-        if graph.globals.energy is not None:
-            energy = graph.globals.energy
-            if hasattr(energy, "shape") and len(energy.shape) > 0:
-                squeezed = graph.replace_globals(energy=np.squeeze(energy))
-        squeezed_graphs.append(squeezed)
-
-    return compute_average_e0s_from_graphs(squeezed_graphs)

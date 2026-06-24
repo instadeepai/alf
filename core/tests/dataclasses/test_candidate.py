@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
+
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -462,9 +464,29 @@ class TestCandidateToSerializable:
         candidate = Candidate(data={"key": "value"}, modality=Modality.STRUCTURE)
         with pytest.raises(
             TypeError,
-            match="STRUCTURE modality data must be a string, numpy array, or torch tensor",
+            match="STRUCTURE modality data must be a string, numpy array, "
+            "torch tensor, or ASE Atoms",
         ):
             candidate.to_serializable()
+
+    def test_to_serializable_structure_ase_atoms_roundtrip(self):
+        """Test to_serializable with structure modality serialises ASE Atoms losslessly."""
+        ase = pytest.importorskip("ase")
+        ase_io = pytest.importorskip("ase.io")
+        atoms = ase.Atoms(
+            "H2O",
+            positions=[[0, 0, 0], [0, 0, 1], [0, 1, 0]],
+            cell=[5, 5, 5],
+            pbc=True,
+        )
+        candidate = Candidate(data=atoms, modality=Modality.STRUCTURE)
+        result = candidate.to_serializable()
+
+        assert isinstance(result, str)
+        restored = ase_io.read(io.StringIO(result), format="json")
+        assert list(restored.symbols) == list(atoms.symbols)
+        assert np.allclose(restored.get_positions(), atoms.get_positions())
+        assert np.allclose(restored.get_cell(), atoms.get_cell())
 
     def test_to_serializable_embedding_modality(self):
         """Test to_serializable with embedding modality returns raw embedding data."""

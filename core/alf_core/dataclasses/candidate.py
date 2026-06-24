@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+import io
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any, TypeAlias, Union
@@ -36,6 +37,14 @@ try:
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False
+
+try:
+    from ase import Atoms as _AseAtoms
+    from ase.io import write as _ase_write
+
+    HAS_ASE = True
+except ImportError:
+    HAS_ASE = False
 
 
 class Modality(Enum):
@@ -186,7 +195,7 @@ class Candidate:
         - IMAGE: Converts torch tensors to numpy arrays; other types to numpy arrays
         - STRUCTURE: Converts torch tensors/arrays to numpy arrays; strings are passed
           through as-is to support serialised representations (e.g. JSON-encoded crystal
-          structures)
+          structures); ASE Atoms are serialised losslessly to a JSON string
         - EMBEDDING: Converts torch tensors to numpy arrays; other types to numpy arrays
         - GRAPH: Not yet supported (raises NotImplementedError)
 
@@ -197,7 +206,8 @@ class Candidate:
         Raises:
             NotImplementedError: If modality is GRAPH (not yet supported).
             ValueError: If modality is unknown or not recognized.
-            TypeError: If TABULAR modality data is not a supported DataFrame-compatible type.
+            TypeError: If TABULAR or STRUCTURE modality data is not a supported
+                DataFrame-compatible type.
 
         Examples:
             >>> # Sequence modality
@@ -253,15 +263,20 @@ class Candidate:
         elif self.modality == Modality.STRUCTURE:
             # Strings are passed through to support serialised representations
             # (e.g. JSON-encoded crystal structures); arrays/tensors are converted to numpy;
-            # other objects (e.g. ASE Atoms) fall back to their string representation.
+            # ASE Atoms are serialised losslessly to a JSON string.
             if isinstance(self.data, str):
                 return self.data
             if isinstance(self.data, np.ndarray):
                 return self.data
             if HAS_TORCH and isinstance(self.data, torch.Tensor):
                 return self.data.cpu().numpy()
-            # Fallback: convert to string (e.g. ASE Atoms objects)
-            return str(self.data)
+            if HAS_ASE and isinstance(self.data, _AseAtoms):
+                buffer = io.StringIO()
+                _ase_write(buffer, self.data, format="json")
+                return buffer.getvalue()
+            raise TypeError(
+                "STRUCTURE modality data must be a string, numpy array, torch tensor, or ASE Atoms."
+            )
 
         elif self.modality in (Modality.IMAGE, Modality.EMBEDDING):
             # Convert arrays/tensors to compact format

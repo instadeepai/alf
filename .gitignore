@@ -149,3 +149,6 @@ tools/pytest-tools.xml
 tools/coverage-tools.xml
 core/pytest-tools.xml
 core/coverage-tools.xml
+
+# MLIP pretrained-model download cache
+tools/alf_tools/models/models/
