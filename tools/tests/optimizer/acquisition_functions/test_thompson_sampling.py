@@ -137,3 +137,9 @@ def test_raises_when_no_distribution_or_variance() -> None:
 
     with pytest.raises(ValueError, match="empirical_dist"):
         ThompsonSampling()(_candidates(2), _make_state(predictions))
+
+
+def test_negative_seed_rejected_at_construction() -> None:
+    """A negative seed fails fast with a clear message, not a deferred numpy error."""
+    with pytest.raises(ValueError, match="non-negative"):
+        ThompsonSampling(seed=-1)

@@ -31,8 +31,9 @@ class ThompsonSampling(AcquisitionFunction):
     For a Gaussian-process surrogate (per-candidate `means`/`variances` but no
     `empirical_dist`), we draw one posterior sample per candidate from
     `N(mean, std)` and use the sample as the acquisition value (higher is better).
-    The sampling RNG is seeded by combining the `seed` argument with the round,
-    so seed replications decorrelate while staying reproducible.
+    When a `seed` is set, the sampling RNG is seeded by combining it with the round,
+    so seed replications decorrelate while staying reproducible; an unset seed draws
+    fresh entropy each round (non-reproducible).
 
     This is a maximising acquisition function.
     """
@@ -41,13 +42,19 @@ class ThompsonSampling(AcquisitionFunction):
         """Initialise Thompson Sampling.
 
         Args:
-            seed: Base random seed for the Gaussian-process sampling path. It is
-                combined with the acquisition round so that draws decorrelate
-                across rounds while staying reproducible; pass a distinct seed per
-                experiment replication so the replications themselves decorrelate.
-                None (the default) draws from fresh OS entropy on every round
-                (non-reproducible). Unused by the ensemble (`empirical_dist`) path.
+            seed: Non-negative base random seed for the Gaussian-process sampling
+                path. It is combined with the acquisition round so that draws
+                decorrelate across rounds while staying reproducible; pass a
+                distinct seed per experiment replication so the replications
+                themselves decorrelate. None (the default) draws from fresh OS
+                entropy on every round (non-reproducible). Unused by the ensemble
+                (`empirical_dist`) path.
+
+        Raises:
+            ValueError: If `seed` is negative.
         """
+        if seed is not None and seed < 0:
+            raise ValueError(f"seed must be non-negative, got {seed}.")
         self.seed = seed
 
     def __call__(self, search_candidates: list[Candidate], state: State) -> LabelledCandidates:
@@ -81,6 +88,6 @@ class ThompsonSampling(AcquisitionFunction):
         else:
             raise ValueError(
                 "Expected either `empirical_dist` or `variances` in predictions, "
-                "but neither was found. Cannot perform Thomson Sampling."
+                "but neither was found. Cannot perform Thompson Sampling."
             )
         return LabelledCandidates(candidates=search_candidates, labels=acquisition_values)
