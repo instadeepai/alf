@@ -24,10 +24,7 @@ from alf_core.dataclasses.round_metrics import RoundMetrics
 from alf_core.dataclasses.state import State
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.surrogate.surrogate import Surrogate
-from alf_tools.optimizer.acquisition_functions.thompson_sampling import (
-    ThompsonSampling,
-    ThompsonSamplingConfig,
-)
+from alf_tools.optimizer.acquisition_functions.thompson_sampling import ThompsonSampling
 
 
 def _make_state(predictions: Predictions, round_num: int = 1) -> State:
@@ -63,7 +60,7 @@ def test_gp_path_preserves_direction() -> None:
     """With zero variance the GP samples equal the means, so higher mean wins."""
     means = np.array([0.0, 10.0, 20.0])
     predictions = Predictions(means=means, variances=np.zeros_like(means))
-    acquisition = ThompsonSampling(ThompsonSamplingConfig(seed=0))
+    acquisition = ThompsonSampling(seed=0)
 
     result = acquisition(_candidates(3), _make_state(predictions))
 
@@ -77,12 +74,8 @@ def test_gp_path_is_reproducible_for_same_seed_and_round() -> None:
     predictions = Predictions(means=np.zeros(5), variances=np.ones(5))
     candidates = _candidates(5)
 
-    first = ThompsonSampling(ThompsonSamplingConfig(seed=7))(
-        candidates, _make_state(predictions, 2)
-    )
-    second = ThompsonSampling(ThompsonSamplingConfig(seed=7))(
-        candidates, _make_state(predictions, 2)
-    )
+    first = ThompsonSampling(seed=7)(candidates, _make_state(predictions, 2))
+    second = ThompsonSampling(seed=7)(candidates, _make_state(predictions, 2))
 
     np.testing.assert_array_equal(first.labels, second.labels)
 
@@ -96,12 +89,8 @@ def test_gp_path_decorrelates_across_seeds() -> None:
     predictions = Predictions(means=np.zeros(5), variances=np.ones(5))
     candidates = _candidates(5)
 
-    seed_a = ThompsonSampling(ThompsonSamplingConfig(seed=1))(
-        candidates, _make_state(predictions, 3)
-    )
-    seed_b = ThompsonSampling(ThompsonSamplingConfig(seed=2))(
-        candidates, _make_state(predictions, 3)
-    )
+    seed_a = ThompsonSampling(seed=1)(candidates, _make_state(predictions, 3))
+    seed_b = ThompsonSampling(seed=2)(candidates, _make_state(predictions, 3))
 
     assert not np.allclose(seed_a.labels, seed_b.labels)
 
@@ -110,7 +99,7 @@ def test_gp_path_decorrelates_across_rounds() -> None:
     """The same seed draws different samples on different rounds."""
     predictions = Predictions(means=np.zeros(5), variances=np.ones(5))
     candidates = _candidates(5)
-    acquisition = ThompsonSampling(ThompsonSamplingConfig(seed=4))
+    acquisition = ThompsonSampling(seed=4)
 
     round_1 = acquisition(candidates, _make_state(predictions, 1))
     round_2 = acquisition(candidates, _make_state(predictions, 2))
@@ -122,7 +111,7 @@ def test_gp_path_unseeded_is_nondeterministic() -> None:
     """The default (unseeded) config draws from fresh entropy each call."""
     predictions = Predictions(means=np.zeros(5), variances=np.ones(5))
     candidates = _candidates(5)
-    acquisition = ThompsonSampling()  # default config: seed=None
+    acquisition = ThompsonSampling()  # default: seed=None
 
     first = acquisition(candidates, _make_state(predictions, 1))
     second = acquisition(candidates, _make_state(predictions, 1))
