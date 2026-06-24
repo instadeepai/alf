@@ -107,16 +107,15 @@ def test_gp_path_decorrelates_across_rounds() -> None:
     assert not np.allclose(round_1.labels, round_2.labels)
 
 
-def test_gp_path_unseeded_is_nondeterministic() -> None:
-    """The default (unseeded) config draws from fresh entropy each call."""
+def test_gp_path_default_seed_is_deterministic() -> None:
+    """The default seed (0) is reproducible, not random, across instances."""
     predictions = Predictions(means=np.zeros(5), variances=np.ones(5))
     candidates = _candidates(5)
-    acquisition = ThompsonSampling()  # default: seed=None
 
-    first = acquisition(candidates, _make_state(predictions, 1))
-    second = acquisition(candidates, _make_state(predictions, 1))
+    first = ThompsonSampling()(candidates, _make_state(predictions, 1))
+    second = ThompsonSampling()(candidates, _make_state(predictions, 1))
 
-    assert not np.allclose(first.labels, second.labels)
+    np.testing.assert_array_equal(first.labels, second.labels)
 
 
 def test_ensemble_path_ranks_higher_predictions_higher() -> None:

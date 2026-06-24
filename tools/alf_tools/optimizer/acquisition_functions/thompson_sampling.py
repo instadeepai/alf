@@ -31,29 +31,27 @@ class ThompsonSampling(AcquisitionFunction):
     For a Gaussian-process surrogate (per-candidate `means`/`variances` but no
     `empirical_dist`), we draw one posterior sample per candidate from
     `N(mean, std)` and use the sample as the acquisition value (higher is better).
-    When a `seed` is set, the sampling RNG is seeded by combining it with the round,
-    so seed replications decorrelate while staying reproducible; an unset seed draws
-    fresh entropy each round (non-reproducible).
+    The sampling RNG is seeded by combining the `seed` argument with the round, so
+    seed replications decorrelate while staying reproducible.
 
     This is a maximising acquisition function.
     """
 
-    def __init__(self, seed: int | None = None) -> None:
+    def __init__(self, seed: int = 0) -> None:
         """Initialise Thompson Sampling.
 
         Args:
             seed: Non-negative base random seed for the Gaussian-process sampling
-                path. It is combined with the acquisition round so that draws
-                decorrelate across rounds while staying reproducible; pass a
+                path (default 0). It is combined with the acquisition round so that
+                draws decorrelate across rounds while staying reproducible; pass a
                 distinct seed per experiment replication so the replications
-                themselves decorrelate. None (the default) draws from fresh OS
-                entropy on every round (non-reproducible). Unused by the ensemble
-                (`empirical_dist`) path.
+                themselves decorrelate. Unused by the ensemble (`empirical_dist`)
+                path.
 
         Raises:
             ValueError: If `seed` is negative.
         """
-        if seed is not None and seed < 0:
+        if seed < 0:
             raise ValueError(f"seed must be non-negative, got {seed}.")
         self.seed = seed
 
@@ -78,10 +76,8 @@ class ThompsonSampling(AcquisitionFunction):
         elif predictions.variances is not None:
             # GP path: draw one posterior sample per candidate from N(mean, std).
             # Seed on (seed, round) so each replication draws an independent
-            # standard-normal vector instead of sharing one across runs; an unset
-            # seed falls back to fresh OS entropy.
-            entropy = (self.seed, state.round_metrics.round) if self.seed is not None else None
-            rng = np.random.default_rng(entropy)
+            # standard-normal vector instead of sharing one across runs.
+            rng = np.random.default_rng((self.seed, state.round_metrics.round))
             acquisition_values = rng.normal(
                 loc=predictions.means, scale=np.sqrt(np.maximum(predictions.variances, 0.0))
             )
