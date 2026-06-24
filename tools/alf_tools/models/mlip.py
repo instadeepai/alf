@@ -36,7 +36,6 @@ from mlip.data.dataset_info import compute_dataset_info_from_graphs
 from mlip.data.graph_dataset import GraphDataset
 from mlip.data.helpers.atomic_energies import compute_average_e0s_from_graphs
 from mlip.graph import Graph
-from mlip.graph.mask_helpers import get_graph_padding_mask
 from mlip.inference.batched_inference import run_batched_inference
 from mlip.models import ForceField
 from mlip.models.loss import HuberLoss
@@ -60,7 +59,7 @@ from alf_tools.models.utils.mlip_utils import (
 logger = logging.getLogger("alf-tools")
 
 # Loss-weight schedule for the energy/forces weight-flip strategy. Before the flip
-# epoch the loss is energy-weighted; afterwards it becomes forces-weighted.
+# epoch the loss is forces-weighted; afterwards it becomes energy-weighted.
 _WEIGHT_FLIP_EPOCH_FRACTION = 0.7
 _LOW_LOSS_WEIGHT = 40.0
 _HIGH_LOSS_WEIGHT = 1000.0
@@ -109,8 +108,8 @@ class MLIPTrainConfig(BaseTrainConfig):
         learning_rate: Learning rate for the optimizer. Ignored when dynamic_training=True.
         dynamic_training: Automatically tune batch_size, learning_rate, and epochs
             based on training set size to maintain ~1000 gradient updates.
-        use_weight_flip: Use a piecewise schedule that starts energy-weighted and
-            switches to forces-weighted at flip_epoch.
+        use_weight_flip: Use a piecewise schedule that starts forces-weighted and
+            switches to energy-weighted at flip_epoch.
         flip_epoch: Epoch at which to flip the energy/forces loss weights.
             Defaults to 70% of total epochs when None.
         energy_weight: Energy loss weight. Only used when use_weight_flip=False.
@@ -160,11 +159,7 @@ class MLIPModel(BaseModel):
         self.force_field: ForceField | None = None
         self._pretrained_force_field: ForceField | None = None
         self._test_data: LabelledCandidates | None = None
-
-        self._test_graphs: list | None = None
-        self._test_batching: tuple[int, int, int] | None = None
         self._test_labels: np.ndarray | None = None
-        self._valid_test_systems: list | None = None
 
         self._last_training_metrics: dict = {}
 
@@ -316,8 +311,15 @@ class MLIPModel(BaseModel):
             avg_num_neighbors=pretrained.dataset_info.avg_num_neighbors,
             avg_r_min_angstrom=pretrained.dataset_info.avg_r_min_angstrom,
             total_charge_set=pretrained.dataset_info.total_charge_set,
-            scaling_mean=0.0,
-            scaling_stdev=1.0,
+            # `scaling_mean`/`scaling_stdev` are a non-learnable affine transform
+            # applied to raw node energies (see mlip AtomicEnergiesBlock), not part
+            # of the transferred weights. The library always builds models with the
+            # identity (0.0/1.0) and folds the output scale into the readout weights,
+            # which `transfer_params` carries through. Pass the pretrained values
+            # through explicitly so this stays correct even if a model ever ships
+            # with non-identity scaling, rather than silently discarding it.
+            scaling_mean=pretrained.dataset_info.scaling_mean,
+            scaling_stdev=pretrained.dataset_info.scaling_stdev,
         )
         updated_config = pretrained.config.model_copy(
             update={
@@ -340,7 +342,7 @@ class MLIPModel(BaseModel):
     def train(
         self,
         train_data: LabelledCandidates,
-        val_data: LabelledCandidates,
+        val_data: LabelledCandidates | None = None,
         metrics_collector: Any | None = None,
         reference_train_data: LabelledCandidates | None = None,
     ) -> None:
@@ -348,7 +350,9 @@ class MLIPModel(BaseModel):
 
         Args:
             train_data: Training structures and energies/forces.
-            val_data: Validation structures and energies/forces.
+            val_data: Validation structures and energies/forces. Required by this
+                model — it is declared optional only to conform to `BaseModel.train`,
+                and a `ValueError` is raised when it is `None`.
             metrics_collector: Optional callable(category, metrics, epoch, head_id) for
                 external metric logging.
             reference_train_data: Optional larger dataset used only for computing E0s
@@ -356,9 +360,12 @@ class MLIPModel(BaseModel):
                 Defaults to train_data.
 
         Raises:
-            ValueError: If a pretrained force field is missing during finetuning, or
-                if any data split produces no valid graphs.
+            ValueError: If `val_data` is None, if a pretrained force field is missing
+                during finetuning, or if any data split produces no valid graphs.
         """
+        if val_data is None:
+            raise ValueError("MLIPModel requires val_data; received None.")
+
         is_finetuning = self._pretrained_force_field is not None
         current_train_size = len(train_data)
         reference_train_data = train_data if reference_train_data is None else reference_train_data
@@ -403,6 +410,7 @@ class MLIPModel(BaseModel):
         val_graphs = _build_graphs(val_systems, cutoff, name="val")
 
         test_graphs = None
+        valid_test_systems = None
         if self._test_data is not None and len(self._test_data) > 0:
             test_systems = _labelled_candidates_to_systems(self._test_data)
             original_test_graphs = [Graph.from_chemical_system(s, cutoff) for s in test_systems]
@@ -431,7 +439,6 @@ class MLIPModel(BaseModel):
                 labels=np.array(valid_test_labels),
             )
             self._test_labels = np.array([s.energy for s in valid_test_systems])
-            self._valid_test_systems = valid_test_systems
 
         max_n_node, max_n_edge = _compute_batching_limits(
             reference_train_systems, reference_train_graphs, effective_batch_size
@@ -453,6 +460,7 @@ class MLIPModel(BaseModel):
             max_n_node,
             max_n_edge,
             shuffle=False,
+            raise_exc_if_graphs_discarded=True,
         )
         val_set = GraphDataset(
             val_graphs,
@@ -460,6 +468,7 @@ class MLIPModel(BaseModel):
             val_max_n_node,
             val_max_n_edge,
             shuffle=False,
+            raise_exc_if_graphs_discarded=True,
         )
 
         if is_finetuning:
@@ -549,11 +558,10 @@ class MLIPModel(BaseModel):
             self.force_field = ForceField(best_model.predictor, jax_params)
 
             if test_graphs is not None and len(test_graphs) > 0:
-                cached_test_systems = self._valid_test_systems
-                if cached_test_systems is None:
+                if valid_test_systems is None:
                     raise ValueError("valid_test_systems missing for test evaluation")
                 test_max_n_node, test_max_n_edge = _compute_batching_limits(
-                    cached_test_systems, test_graphs, effective_batch_size
+                    valid_test_systems, test_graphs, effective_batch_size
                 )
                 test_set = GraphDataset(
                     test_graphs,
@@ -561,10 +569,9 @@ class MLIPModel(BaseModel):
                     test_max_n_node,
                     test_max_n_edge,
                     shuffle=False,
+                    raise_exc_if_graphs_discarded=True,
                 )
                 training_loop.test(test_set)
-                self._test_graphs = test_graphs
-                self._test_batching = (effective_batch_size, test_max_n_node, test_max_n_edge)
                 self._compute_and_log_per_reaction_metrics()
         else:
             logger.warning("Training loop returned invalid model, keeping previous model")
@@ -596,11 +603,17 @@ class MLIPModel(BaseModel):
         if not has_rxn:
             return {}
 
-        preds = self.evaluate_test()
-        if preds is None:
+        try:
+            pred_energies, pred_forces = self.predict_with_forces(self._test_data.candidates)
+        except Exception:
+            logger.warning(
+                "Test inference for per-reaction metrics failed; skipping",
+                exc_info=True,
+            )
+            return {}
+        if pred_energies.size == 0:
             return {}
 
-        pred_energies = preds.means
         true_energies = self._test_labels
         reaction_ids = np.array([
             c.features.get("reaction_id", -1) if c.features else -1
@@ -608,26 +621,16 @@ class MLIPModel(BaseModel):
         ])
         n_atoms = np.array([len(c.data) for c in self._test_data.candidates], dtype=float)
 
-        structures = [c.data for c in self._test_data.candidates]
         true_forces_list = [
             np.asarray(c.features["forces"])
             for c in self._test_data.candidates
             if c.features and c.features.get("forces") is not None
         ]
-        pred_forces = None
         true_forces = None
-        try:
-            if len(true_forces_list) == len(structures):
-                true_forces = true_forces_list
-                mlip_preds = self._run_inference(structures)
-                pred_forces = [np.array(p.forces) for p in mlip_preds]
-        except Exception:
-            logger.warning(
-                "Force prediction for per-reaction metrics failed; reporting energy metrics only",
-                exc_info=True,
-            )
+        if len(true_forces_list) == len(self._test_data.candidates):
+            true_forces = true_forces_list
+        else:
             pred_forces = None
-            true_forces = None
 
         metrics: dict = {}
         logger.info("  Per-reaction test metrics:")
@@ -745,58 +748,28 @@ class MLIPModel(BaseModel):
 
     def predict_with_forces(
         self, candidate_points: list[Candidate]
-    ) -> tuple[Predictions, list[np.ndarray]]:
-        """Predict energies and forces for the given candidates.
+    ) -> tuple[np.ndarray, list[np.ndarray]]:
+        """Predict energies and per-atom forces for the given candidates.
 
         Args:
             candidate_points: Candidates whose .data are ASE Atoms objects.
 
         Returns:
-            Tuple of (Predictions with energy means, list of force arrays per structure).
+            Tuple of (energies, forces): a 1-D array of per-structure energies and a
+            list of per-structure force arrays. Both are empty when no candidates are
+            given.
 
         Raises:
             RuntimeError: If the model has not been trained yet.
         """
         if not candidate_points:
-            return Predictions(means=np.array([])), []
+            return np.array([]), []
 
         structures = [c.data for c in candidate_points]
         mlip_predictions = self._run_inference(structures)
         energies = np.array([p.energy for p in mlip_predictions])
         forces = [np.array(p.forces) for p in mlip_predictions]
-        return Predictions(means=energies), forces
-
-    def evaluate_test(self) -> Predictions | None:
-        """Run inference on the cached test graphs.
-
-        Returns:
-            Predictions with energy means, or None if no test graphs are cached.
-
-        Raises:
-            RuntimeError: If the model has not been trained yet.
-        """
-        if self._test_graphs is None or self._test_batching is None:
-            return None
-
-        batch_size, max_n_node, max_n_edge = self._test_batching
-        test_set = GraphDataset(
-            self._test_graphs, batch_size, max_n_node, max_n_edge, shuffle=False
-        )
-
-        force_field = self.force_field
-        if force_field is None:
-            raise RuntimeError("Model must be trained before test evaluation")
-        jitted_force_field = jax.jit(force_field)
-
-        energies = []
-        for batch in test_set:
-            output = jitted_force_field(batch)
-            mask = get_graph_padding_mask(batch)
-            for i in range(output.energy.shape[0]):
-                if mask[i]:
-                    energies.append(float(output.energy[i]))
-
-        return Predictions(means=np.array(energies))
+        return energies, forces
 
     def sample(self, condition: Any = None) -> list[Candidate]:
         """Not implemented.
