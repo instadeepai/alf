@@ -64,12 +64,36 @@ class TestDatasetSearchRegret:
 
         assert metrics["optimizer/regret"] == pytest.approx(0.0)
 
-    def test_regret_omitted_before_any_acquisition(self, dummy_dataset, dummy_surrogate):
-        """No regret is reported until at least one candidate has been acquired."""
+
+class TestDatasetSearchRecall:
+    """Recall wiring in DatasetSearch.get_metrics uses acquired-only labels."""
+
+    def test_recall_excludes_seed(self, dummy_dataset, dummy_surrogate):
+        """A top-pool label held only by the seed does not count towards recall.
+
+        The pool best (10.0) sits in the train split (seed) but was never
+        acquired, so top-percentile recall is zero.
+        """
+        pool = _labelled([float(i) for i in range(1, 11)])  # 1.0 .. 10.0
+        train = _labelled([10.0])  # seed holds the pool optimum
+        history = [_labelled([5.0])]  # only a mid-ranked candidate acquired
+        state = _state(dummy_dataset, dummy_surrogate, pool, train, history)
+
+        metrics = DatasetSearch().get_metrics(state)
+
+        # top 10% -> 1 candidate (>= 10.0); the seed's 10.0 must not count -> 0/1
+        assert metrics["optimizer/top_10pc_recall"] == pytest.approx(0.0)
+
+
+class TestDatasetSearchMetricGuards:
+    """Behaviour before any acquisition has occurred."""
+
+    def test_metrics_omitted_before_any_acquisition(self, dummy_dataset, dummy_surrogate):
+        """No recall or regret is reported until at least one candidate is acquired."""
         pool = _labelled([1.0, 5.0, 10.0])
         train = _labelled([2.0])
         state = _state(dummy_dataset, dummy_surrogate, pool, train, [])
 
         metrics = DatasetSearch().get_metrics(state)
 
-        assert "optimizer/regret" not in metrics
+        assert metrics == {}

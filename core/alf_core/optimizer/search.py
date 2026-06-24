@@ -123,7 +123,7 @@ class DatasetSearch(BaseSearch):
     def get_metrics(self, state: State) -> dict[str, float]:
         """Return recall and regret metrics for the dataset search method.
 
-        Regret compares the candidate pool's best label against the best label
+        Both metrics compare the initial candidate pool against the candidates
         acquired during the loop. The acquired-only set is reconstructed from
         `state.history` so the initial labelled seed (which is not part of the
         candidate pool) does not enter the comparison.
@@ -133,17 +133,17 @@ class DatasetSearch(BaseSearch):
 
         Returns:
             Dictionary containing recall and regret metrics comparing the initial
-            candidate pool to acquired candidates. The regret metric is omitted
+            candidate pool to the acquired candidates. The metrics are omitted
             until at least one candidate has been acquired.
         """
-        init_candidate_pool = state.dataset.init_candidate_pool
-        recall_metrics = compute_recall(init_candidate_pool, state.dataset.train_dataset)
         if not state.history:
-            return {**recall_metrics}
+            return {}
+        init_candidate_pool = state.dataset.init_candidate_pool
         acquired_candidates = LabelledCandidates(
             candidates=[c for acquired in state.history for c in acquired.candidates],
             labels=np.concatenate([acquired.labels for acquired in state.history]),
         )
+        recall_metrics = compute_recall(init_candidate_pool, acquired_candidates)
         regret_metrics = compute_regret(init_candidate_pool, acquired_candidates)
         return {**recall_metrics, **regret_metrics}
 

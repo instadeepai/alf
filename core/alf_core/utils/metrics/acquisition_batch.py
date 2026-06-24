@@ -131,10 +131,13 @@ def compute_recall(
 
     Measures how many of the acquired candidates are in the top performers of
     the initial candidate pool, using both percentile-based and top-N thresholds.
+    The acquired candidates must exclude the initial labelled seed, otherwise
+    seed labels clearing a pool threshold would inflate the recall.
 
     Args:
         init_candidate_pool: Initial candidate pool before acquisition.
-        acquired_candidates: Candidates that were acquired during optimization.
+        acquired_candidates: Candidates acquired during optimization, excluding
+            the initial labelled seed.
         top_percentile: Percentile threshold (e.g., 0.1 for top 10%). Defaults to 0.1.
         top_n: Number of top candidates to consider. Defaults to 100.
 
