@@ -184,11 +184,14 @@ def compute_regret(
     """Compute regret of acquired candidates relative to the best possible candidate.
 
     Regret is the difference between the best possible label in the initial pool
-    and the best label found in the acquired candidates.
+    and the best label found in the acquired candidates. The acquired candidates
+    must exclude the initial labelled seed, otherwise a seed label exceeding the
+    pool's best would yield a negative regret.
 
     Args:
         init_candidate_pool: Initial candidate pool before acquisition.
-        acquired_candidates: Candidates that were acquired during optimization.
+        acquired_candidates: Candidates acquired during optimization, excluding
+            the initial labelled seed.
 
     Returns:
         Dictionary containing:
