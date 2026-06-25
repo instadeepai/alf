@@ -13,7 +13,6 @@ dependencies = [
     "matplotlib>=3.3.0",
     "umap-learn>=0.5.0",
     "ipykernel>=6.25.0",
-    "seaborn>=0.12.0",
 ]
 
 [tool.setuptools]
@@ -34,6 +33,6 @@ dev = [
 # Example: `uv sync --group esm2` for the ESM-2 tutorial.
 esm2 = ["alf_tools[esm2]"]
 chemprop = ["alf_tools[chemprop]"]
-guacamol = ["alf_tools[guacamol]"]
+guacamol = ["alf_tools[guacamol]", "seaborn>=0.12.0"]  # seaborn: only the GuacaMol tutorial plots need it
 protein = ["alf_tools[protein]"]    # esm2 + esmfold
 molecule = ["alf_tools[molecule]"]  # chemprop + guacamol
