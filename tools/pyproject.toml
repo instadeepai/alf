@@ -20,12 +20,6 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
-[project.urls]
-Homepage = "https://instadeepai.github.io/alf/"
-Repository = "https://github.com/instadeepai/alf"
-Documentation = "https://instadeepai.github.io/alf/"
-"Bug Tracker" = "https://github.com/instadeepai/alf/issues"
-
 dependencies = [
     "alf_core",
     "requests>=2.25.0",
@@ -37,6 +31,12 @@ dependencies = [
     "scipy>=1.9.0",
     "botorch>=0.17.0,<1.0",
 ]
+
+[project.urls]
+Homepage = "https://instadeepai.github.io/alf/"
+Repository = "https://github.com/instadeepai/alf"
+Documentation = "https://instadeepai.github.io/alf/"
+"Bug Tracker" = "https://github.com/instadeepai/alf/issues"
 
 [project.optional-dependencies]
 # Shared base extra — single source of truth for the transformers pin, reused
