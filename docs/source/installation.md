@@ -7,17 +7,6 @@ Use this when you want to use ALF in your own projects. This is what most users 
 ### Prerequisites
 
 - Python 3.12 or higher
-- GitHub access token for authentication (ALF is hosted on a private GitHub repository)
-
-### Authentication Setup
-
-Create a `.netrc` file in your home directory with your GitHub credentials:
-
-```
-machine github.com login <USERNAME> password <TOKEN>
-```
-
-For more information on creating personal access tokens, see [GitHub's documentation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
 
 ### Install Packages
 
