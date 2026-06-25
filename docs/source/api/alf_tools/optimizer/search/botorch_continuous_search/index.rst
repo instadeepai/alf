@@ -1,8 +1,8 @@
 Botorch Continuous Search
 =========================
 
-``BotorchContinuousSearch`` is a search function for continuous optimisation with BoTorch.
-It returns an empty candidate list, which signals ``BoTorchAcquisition`` to generate
+:class:`~alf_tools.optimizer.search.botorch_continuous_search.BotorchContinuousSearch` is a search function for continuous optimisation with BoTorch.
+It returns an empty candidate list, which signals :class:`~alf_tools.optimizer.acquisition_functions.botorch_acquisition.BoTorchAcquisition` to generate
 candidates by optimising the acquisition function directly in continuous space
 (via ``optimize_acqf``) rather than scoring a discrete pool.
 

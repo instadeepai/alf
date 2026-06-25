@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+import numpy as np
 from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
 
 
@@ -21,13 +22,38 @@ class ThompsonSampling(AcquisitionFunction):
 
     A generalisation of Thompson Sampling to the case where batch size > num posterior samples.
 
-    For each point, we find its maximum rank under any ensemble member,
-    when predictions are sorted in ascending order.
-    (Higher predictions correspond to higher ranks)
+    For an ensemble surrogate (`empirical_dist`), each point is scored by its maximum rank
+    under any ensemble member, when predictions are sorted in ascending order.
+    (Higher predictions correspond to higher ranks.)
     We return the maximum rank for each candidate as an acquisition value, so that higher
     is better.
+
+    For a Gaussian-process surrogate (per-candidate `means`/`variances` but no
+    `empirical_dist`), we draw one posterior sample per candidate from
+    `N(mean, std)` and use the sample as the acquisition value (higher is better).
+    The sampling RNG is seeded by combining the `seed` argument with the round, so
+    seed replications decorrelate while staying reproducible.
+
     This is a maximising acquisition function.
     """
+
+    def __init__(self, seed: int = 0) -> None:
+        """Initialise Thompson Sampling.
+
+        Args:
+            seed: Non-negative base random seed for the Gaussian-process sampling
+                path (default 0). It is combined with the acquisition round so that
+                draws decorrelate across rounds while staying reproducible; pass a
+                distinct seed per experiment replication so the replications
+                themselves decorrelate. Unused by the ensemble (`empirical_dist`)
+                path.
+
+        Raises:
+            ValueError: If `seed` is negative.
+        """
+        if seed < 0:
+            raise ValueError(f"seed must be non-negative, got {seed}.")
+        self.seed = seed
 
     def __call__(self, search_candidates: list[Candidate], state: State) -> LabelledCandidates:
         """Compute Thompson Sampling acquisition values for unlabelled candidates.
@@ -37,7 +63,7 @@ class ThompsonSampling(AcquisitionFunction):
             state: The task state containing the current datasets and surrogate model.
 
         Raises:
-            ValueError: If `empirical_dist` or `variances` is not found in predictions.
+            ValueError: If neither `empirical_dist` nor `variances` is found in predictions.
 
         Returns:
             LabelledCandidates with Thompson Sampling acquisition values.
@@ -48,15 +74,16 @@ class ThompsonSampling(AcquisitionFunction):
             ranks = samples.argsort(axis=0).argsort(axis=0) + 1
             acquisition_values = ranks.max(-1)
         elif predictions.variances is not None:
-            # NOTE: This needs to be implemented for GP
-            raise NotImplementedError(
-                "Thompson Sampling via variances-only (without "
-                "empirical_dist) is not yet implemented. "
-                "Use an ensemble model that populates predictions.empirical_dist."
+            # GP path: draw one posterior sample per candidate from N(mean, std).
+            # Seed on (seed, round) so each replication draws an independent
+            # standard-normal vector instead of sharing one across runs.
+            rng = np.random.default_rng((self.seed, state.round_metrics.round))
+            acquisition_values = rng.normal(
+                loc=predictions.means, scale=np.sqrt(np.maximum(predictions.variances, 0.0))
             )
         else:
             raise ValueError(
                 "Expected either `empirical_dist` or `variances` in predictions, "
-                "but neither was found. Cannot perform Thomson Sampling."
+                "but neither was found. Cannot perform Thompson Sampling."
             )
         return LabelledCandidates(candidates=search_candidates, labels=acquisition_values)
