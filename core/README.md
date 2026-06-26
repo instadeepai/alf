@@ -49,7 +49,14 @@ subclasses (or install [alf-tools](https://github.com/instadeepai/alf/blob/main/
 for ready-made ones), then wire them into the active-learning loop.
 
 ```python
-from alf_core import DatasetSearch, DesignTask, Optimizer, Oracle, Surrogate
+from alf_core import (
+    DatasetSearch,
+    DesignTask,
+    Optimizer,
+    Oracle,
+    Surrogate,
+    TerminalStateLogger,
+)
 
 # Bring your own BaseDataset, BaseModel, and AcquisitionFunction subclasses
 dataset = MyDataset(...)
@@ -60,7 +67,12 @@ oracle = Oracle(scorer=dataset)
 # Run the active-learning loop for 5 rounds, acquiring 100 candidates per round
 task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
 state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, optimizer=optimizer, oracle=oracle)
+task.run(
+    state=state,
+    state_loggers=[TerminalStateLogger()],
+    optimizer=optimizer,
+    oracle=oracle,
+)
 ```
 
 For a complete, runnable `alf-core`-only example (a bootstrap-ensemble surrogate and a

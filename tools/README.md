@@ -134,13 +134,31 @@ uv sync --group esm2 --group chemprop
 ## Quick Example
 
 ```python
-from alf_core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask
+from alf_core import (
+    BaseDatasetConfig,
+    DatasetSearch,
+    DesignTask,
+    Optimizer,
+    Oracle,
+    Surrogate,
+    TerminalStateLogger,
+)
 from alf_tools.datasets import GFP
 from alf_tools.models import CNNModel
 from alf_tools.optimizer.acquisition_functions import Greedy
 
-# Load dataset and initialize components
-dataset = GFP(name="gfp", modality="sequence", seed=42)
+# Configure and load the dataset
+config = BaseDatasetConfig(
+    name="gfp",
+    modality="sequence",
+    seed=42,
+    train_ratio=0.1,
+    validation_frac=0.5,
+    test_ratio=0.2,
+    split_type="random",
+    problem_type="regression",
+)
+dataset = GFP(config)
 surrogate = Surrogate(model=CNNModel())
 optimizer = Optimizer(acquisition_fn=Greedy(), search_fn=DatasetSearch())
 oracle = Oracle(scorer=dataset)
@@ -148,7 +166,12 @@ oracle = Oracle(scorer=dataset)
 # Run active learning
 task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
 state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, optimizer=optimizer, oracle=oracle)
+task.run(
+    state=state,
+    state_loggers=[TerminalStateLogger()],
+    optimizer=optimizer,
+    oracle=oracle,
+)
 ```
 
 ### Diversity-based Selection with CoreSet
