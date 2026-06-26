@@ -280,9 +280,8 @@ class TestDesignGPSinusoidalSurrogate:
 
         metrics = pd.read_csv(metrics_file)
 
-        # 5 rows: round 0 + 3 acquisition rounds + 1 trailing experiment_summary
-        # row (carries only auc_top_k, leaving per-round columns NaN).
-        assert len(metrics) == 5, f"Expected 5 rows, got {len(metrics)}"
+        # 4 rows: round 0 + 3 acquisition rounds. Summary goes to summary.csv.
+        assert len(metrics) == 4, f"Expected 4 rows, got {len(metrics)}"
 
         # Required columns — surrogate/test_ece is the error metric present
         # in the CSV when the surrogate produces variances (GP always does).
@@ -300,7 +299,6 @@ class TestDesignGPSinusoidalSurrogate:
         # validation_frac=0.0 — all acquired candidates go to train.
         acq_batch_size = 5
         expected_num_train = [initial_num_train + i * acq_batch_size for i in range(4)]
-        # dropna() drops the trailing experiment_summary row (num_train is NaN there).
         actual_num_train = metrics["dataset/num_train"].dropna().astype(int).tolist()
         assert actual_num_train == expected_num_train, (
             f"Expected num_train={expected_num_train}, got {actual_num_train}"
