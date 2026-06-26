@@ -22,20 +22,6 @@ pip install alf-tools
 This installs PyTorch and the core dependencies. Some models need additional dependencies —
 see [Optional Extras](#optional-extras) below.
 
-<details>
-<summary>Latest / development version</summary>
-
-Install the unreleased version directly from the repository:
-
-```bash
-pip install "git+https://github.com/instadeepai/alf.git#subdirectory=tools"
-```
-
-If the repository is private, add your GitHub credentials to `~/.netrc` (see the main
-[README](https://github.com/instadeepai/alf/blob/main/README.md#-installation)).
-
-</details>
-
 ### Optional Extras
 
 Some models require additional dependencies. Append one or more extras to the package name.
@@ -71,6 +57,14 @@ uv sync --group protein              # esm2 + esmfold
 uv sync --group molecule             # chemprop + guacamol
 uv sync --group esm2 --group chemprop
 ```
+
+## Documentation
+
+For detailed API documentation and tutorials, see:
+- **Full documentation:** [instadeepai.github.io/alf](https://instadeepai.github.io/alf/)
+- **Core framework:** [alf-core](https://github.com/instadeepai/alf/blob/main/core/README.md)
+- **Installation guide:** [instadeepai.github.io/alf/installation.html](https://instadeepai.github.io/alf/installation.html)
+- **Tutorials:** [tutorials/](https://github.com/instadeepai/alf/tree/main/tutorials)
 
 ## What's Included
 
@@ -189,14 +183,6 @@ Candidates are ranked by their greedy k-centres selection order; the first chose
 candidate receives the highest score and unselected candidates receive 0. Because
 `CoreSet` calls `surrogate.featurise()` internally — not `predict()` — it works with
 any model and requires no uncertainty estimates.
-
-## Documentation
-
-For detailed API documentation and tutorials, see:
-- **Full documentation:** [instadeepai.github.io/alf](https://instadeepai.github.io/alf/)
-- **Core framework:** [alf-core](https://github.com/instadeepai/alf/blob/main/core/README.md)
-- **Installation guide:** [https://instadeepai.github.io/alf/installation.html](https://instadeepai.github.io/alf/installation.html)
-- **Tutorials:** [tutorials/](https://github.com/instadeepai/alf/tree/main/tutorials)
 
 ## Normalisation
 

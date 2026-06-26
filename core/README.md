@@ -25,22 +25,11 @@ datasets, and acquisition functions, install
 pip install alf-core
 ```
 
-<details>
-<summary>Latest / development version</summary>
+## Documentation
 
-Install the unreleased version directly from the repository:
-
-```bash
-pip install "git+https://github.com/instadeepai/alf.git#subdirectory=core"
-```
-
-If the repository is private, add your GitHub credentials to `~/.netrc`:
-
-```
-machine github.com login <USERNAME> password <TOKEN>
-```
-
-</details>
+- **Full documentation:** [instadeepai.github.io/alf](https://instadeepai.github.io/alf/)
+- **Ready-to-use tools:** [alf-tools](https://github.com/instadeepai/alf/blob/main/tools/README.md)
+- **Tutorials:** [tutorials/](https://github.com/instadeepai/alf/tree/main/tutorials)
 
 ## Quick start
 
@@ -78,12 +67,6 @@ task.run(
 For a complete, runnable `alf-core`-only example (a bootstrap-ensemble surrogate and a
 Probability of Improvement acquisition function built from scratch with numpy/scipy), see the
 [ALF Core Quickstart notebook](https://github.com/instadeepai/alf/blob/main/tutorials/alf_core_quickstart.ipynb).
-
-## Documentation
-
-- **Full documentation:** [instadeepai.github.io/alf](https://instadeepai.github.io/alf/)
-- **Ready-to-use tools:** [alf-tools](https://github.com/instadeepai/alf/blob/main/tools/README.md)
-- **Tutorials:** [tutorials/](https://github.com/instadeepai/alf/tree/main/tutorials)
 
 ---
 
