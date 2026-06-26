@@ -1,7 +1,5 @@
 # Changelog
 
-## [Unreleased]
-
 ## Release 0.1.0
 
 - Releasing ALF as an open-source project under the Apache 2.0 license.
@@ -34,5 +32,3 @@
 - Publishing comprehensive documentation including installation guide, API reference,
   conceptual explanations, how-to recipes, and tutorials following the Diátaxis
   structure.
-
-[Unreleased]: https://github.com/instadeepai/alf/compare/HEAD...HEAD
