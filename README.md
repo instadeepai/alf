@@ -91,6 +91,19 @@ task.run(
 
 New to active learning? Start with [Why ALF?](https://instadeepai.github.io/alf/explanation/why-alf.html), then work through the [Tutorials](https://instadeepai.github.io/alf/tutorials/index.html).
 
+## 🐳 Run with Docker
+
+Prefer a zero-setup environment? The repository ships a `Dockerfile` that bundles the tutorials
+and benchmark examples with CPU PyTorch:
+
+```bash
+docker build -t alf .
+docker run --rm -p 8888:8888 alf   # JupyterLab with the tutorials at http://localhost:8888
+```
+
+See the [Run with Docker](https://instadeepai.github.io/alf/how-to/run-with-docker.html) guide
+for benchmark examples, volume mounts, and GPU support.
+
 ## 🎓 Tutorials
 
 ### Start with an experiment
