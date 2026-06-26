@@ -17,7 +17,7 @@ datasets, and acquisition functions, install
 [alf-tools](https://github.com/instadeepai/alf/blob/main/tools/README.md).
 
 <div align="center">
-  <img src="https://instadeepai.github.io/alf/_static/alf_components.svg" alt="ALF Components" width="70%">
+  <img src="https://raw.githubusercontent.com/instadeepai/alf/main/docs/imgs/alf_components.svg" alt="ALF Components" width="70%">
 </div>
 
 ## Installation
