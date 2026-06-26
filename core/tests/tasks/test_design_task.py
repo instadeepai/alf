@@ -112,7 +112,10 @@ class TestDesignTask:
         self._assert_dataset_metrics(metrics, expected_metrics["dataset"])
 
         # Test the end-of-experiment summary metric is emitted and well-formed
-        self._assert_experiment_summary(metrics)
+        summary_file = save_path / "summary.csv"
+        assert summary_file.exists(), "summary.csv should be created after experiment"
+        summary = pd.read_csv(summary_file)
+        self._assert_experiment_summary(summary)
 
         # State keeps one RoundMetrics per round: initial train round + 5 acquisition
         # rounds. The experiment_summary entry is not part of the history.
@@ -121,8 +124,6 @@ class TestDesignTask:
     def _assert_acquired_candidates_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert acquired candidates metrics."""
         for metric_name, expected_value in expected.items():
-            # Get the last populated round value; the trailing experiment_summary
-            # row only carries auc_top_k, leaving these columns NaN.
             actual_value = metrics[f"acquired_candidates/{metric_name}"].dropna().iloc[-1]
             assert np.isclose(actual_value, expected_value, atol=1e-5), (
                 f"Acquired candidates metric {metric_name} mismatch: "
@@ -159,11 +160,11 @@ class TestDesignTask:
                 f"expected {expected_value}, got {actual_value}"
             )
 
-    def _assert_experiment_summary(self, metrics: pd.DataFrame):
+    def _assert_experiment_summary(self, summary: pd.DataFrame):
         """Assert the end-of-experiment auc_top_k summary metric is emitted and in range."""
-        assert "auc_top_k" in metrics.columns, (
+        assert "auc_top_k" in summary.columns, (
             "experiment_summary row with auc_top_k should be logged after all rounds"
         )
-        auc = metrics["auc_top_k"].dropna()
+        auc = summary["auc_top_k"].dropna()
         assert len(auc) == 1, "auc_top_k should be logged exactly once, at experiment end"
         assert 0.0 <= auc.iloc[-1] <= 1.0, f"auc_top_k out of range: {auc.iloc[-1]}"
