@@ -1,39 +1,64 @@
-# ALF Tools
+# alf-tools
 
-Ready-to-use implementations for the ALF framework. This package provides example datasets, models, acquisition functions, and search strategies to get you started quickly.
+[![PyPI](https://img.shields.io/pypi/v/alf-tools.svg)](https://pypi.org/project/alf-tools/)
+[![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](https://github.com/instadeepai/alf/blob/main/LICENSE)
+[![Docs](https://img.shields.io/badge/docs-instadeepai.github.io%2Falf-blue)](https://instadeepai.github.io/alf/)
+
+**Ready-to-use models, datasets, and acquisition functions for ALF (Active Learning Framework).**
+
+`alf-tools` builds on [alf-core](https://github.com/instadeepai/alf/blob/main/core/README.md)
+to give you everything needed to run active-learning experiments out of the box — example
+datasets (GFP, ProteinGym, FLIP, GuacaMol), models (CNN, Gaussian Process, ESM-2, Chemprop),
+acquisition functions, and search strategies. Use it for quick-start and prototyping; reach for
+`alf-core` alone when you want the lightweight framework with no ML-framework dependencies.
 
 ## Installation
 
 ```bash
-# Install tools package (includes PyTorch)
-pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
+pip install alf-tools
 ```
 
-**Note:** Requires authentication via `.netrc` file (see main [README](../README.md#authentication))
+This installs PyTorch and the core dependencies. Some models need additional dependencies —
+see [Optional Extras](#optional-extras) below.
+
+<details>
+<summary>Latest / development version</summary>
+
+Install the unreleased version directly from the repository:
+
+```bash
+pip install "git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+```
+
+If the repository is private, add your GitHub credentials to `~/.netrc` (see the main
+[README](https://github.com/instadeepai/alf/blob/main/README.md#-installation)).
+
+</details>
 
 ### Optional Extras
 
-Some models require additional dependencies. Append one or more extras to the package URL.
+Some models require additional dependencies. Append one or more extras to the package name.
 Per-model extras (`esm2`, `esmfold`, `chemprop`, `guacamol`) install exactly one model's
 dependencies; workflow umbrellas (`protein`, `molecule`) group the extras you are likely to use
 together.
 
 ```bash
 # ESM2 — protein language model (for ESM2Model)
-pip install "alf_tools[esm2] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf-tools[esm2]"
 
 # ESMFold — structure-prediction oracle (for ESMFoldModel)
-pip install "alf_tools[esmfold] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf-tools[esmfold]"
 
 # Chemprop — small-molecule MPNN (for ChempropModel)
-pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf-tools[chemprop]"
 
 # GuacaMol — RDKit-based small-molecule dataset/scoring
-pip install "alf_tools[guacamol] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf-tools[guacamol]"
 
 # Workflow umbrellas: protein (esm2 + esmfold) or molecule (chemprop + guacamol)
-pip install "alf_tools[protein] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
-pip install "alf_tools[molecule] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf-tools[protein]"
+pip install "alf-tools[molecule]"
 ```
 
 For development installs from the cloned repository, these extras are re-exposed as dependency
@@ -115,7 +140,7 @@ from alf_tools.models import CNNModel
 from alf_tools.optimizer.acquisition_functions import Greedy
 
 # Load dataset and initialize components
-dataset = GFP(name="gfp", modality="sequence", seed=42, split_config=split_config)
+dataset = GFP(name="gfp", modality="sequence", seed=42)
 surrogate = Surrogate(model=CNNModel())
 optimizer = Optimizer(acquisition_fn=Greedy(), search_fn=DatasetSearch())
 oracle = Oracle(scorer=dataset)
@@ -146,9 +171,9 @@ any model and requires no uncertainty estimates.
 
 For detailed API documentation and tutorials, see:
 - **Full documentation:** [instadeepai.github.io/alf](https://instadeepai.github.io/alf/)
-- **Core framework:** [../core/README.md](../core/README.md)
+- **Core framework:** [alf-core](https://github.com/instadeepai/alf/blob/main/core/README.md)
 - **Installation guide:** [https://instadeepai.github.io/alf/installation.html](https://instadeepai.github.io/alf/installation.html)
-- **Tutorials:** [../tutorials/](../tutorials/)
+- **Tutorials:** [tutorials/](https://github.com/instadeepai/alf/tree/main/tutorials)
 
 ## Normalisation
 
@@ -182,8 +207,8 @@ from alf_tools.models.gp import GPModel, GPTrainConfig
 model = GPModel(train_config=GPTrainConfig(normalise_inputs_strategy=None, standardise_outputs=False))
 ```
 
-For implementation details see [`alf_core.model.normaliser`](../core/alf_core/model/normaliser.py)
-and the [Core README normalisation section](../core/README.md#9-normalisation-inputnormaliser-outputstandardiser).
+For implementation details see [`alf_core.model.normaliser`](https://github.com/instadeepai/alf/blob/main/core/alf_core/model/normaliser.py)
+and the [Core README normalisation section](https://github.com/instadeepai/alf/blob/main/core/README.md#9-normalisation-inputnormaliser-inputstandardiser-outputstandardiser).
 
 ## Creating Custom Components
 
@@ -193,4 +218,4 @@ All components extend base classes from `alf_core`:
 - Acquisition functions extend `AcquisitionFunction`
 - Search strategies extend `BaseSearch`
 
-See the [core documentation](../core/README.md) for implementation details.
+See the [core documentation](https://github.com/instadeepai/alf/blob/main/core/README.md) for implementation details.

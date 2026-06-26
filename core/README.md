@@ -1,12 +1,82 @@
-# ALF Core
+# alf-core
 
-This document provides an overview of the core components in the ALF (Active Learning
-Framework) library, describes the different task types, and explains how components
-interact during execution.
+[![PyPI](https://img.shields.io/pypi/v/alf-core.svg)](https://pypi.org/project/alf-core/)
+[![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](https://github.com/instadeepai/alf/blob/main/LICENSE)
+[![Docs](https://img.shields.io/badge/docs-instadeepai.github.io%2Falf-blue)](https://instadeepai.github.io/alf/)
+
+**The lightweight, dependency-minimal foundation of ALF (Active Learning Framework).**
+
+`alf-core` provides the base classes, core data structures, and the active-learning loop
+for iterative optimisation in computational science — optimising high-dimensional,
+combinatorially vast search spaces where each label is expensive (wet-lab assays,
+simulations, measurements). It ships with no ML-framework dependencies (only numpy,
+pandas, scipy), so it is standalone and domain-agnostic. For ready-to-use models,
+datasets, and acquisition functions, install
+[alf-tools](https://github.com/instadeepai/alf/blob/main/tools/README.md).
 
 <div align="center">
-  <img src="../docs/imgs/alf_components.svg" alt="ALF Components" width="70%">
+  <img src="https://raw.githubusercontent.com/instadeepai/alf/main/docs/imgs/alf_components.svg" alt="ALF Components" width="70%">
 </div>
+
+## Installation
+
+```bash
+pip install alf-core
+```
+
+<details>
+<summary>Latest / development version</summary>
+
+Install the unreleased version directly from the repository:
+
+```bash
+pip install "git+https://github.com/instadeepai/alf.git#subdirectory=core"
+```
+
+If the repository is private, add your GitHub credentials to `~/.netrc`:
+
+```
+machine github.com login <USERNAME> password <TOKEN>
+```
+
+</details>
+
+## Quick start
+
+`alf-core` is the framework layer: you supply your own `BaseDataset` and `BaseModel`
+subclasses (or install [alf-tools](https://github.com/instadeepai/alf/blob/main/tools/README.md)
+for ready-made ones), then wire them into the active-learning loop.
+
+```python
+from alf_core import DatasetSearch, DesignTask, Optimizer, Oracle, Surrogate
+
+# Bring your own BaseDataset, BaseModel, and AcquisitionFunction subclasses
+dataset = MyDataset(...)
+surrogate = Surrogate(model=MyModel())
+optimizer = Optimizer(acquisition_fn=MyAcquisition(), search_fn=DatasetSearch())
+oracle = Oracle(scorer=dataset)
+
+# Run the active-learning loop for 5 rounds, acquiring 100 candidates per round
+task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
+state = task.setup(dataset=dataset, surrogate=surrogate)
+task.run(state=state, optimizer=optimizer, oracle=oracle)
+```
+
+For a complete, runnable `alf-core`-only example (a bootstrap-ensemble surrogate and a
+Probability of Improvement acquisition function built from scratch with numpy/scipy), see the
+[ALF Core Quickstart notebook](https://github.com/instadeepai/alf/blob/main/tutorials/alf_core_quickstart.ipynb).
+
+## Documentation
+
+- **Full documentation:** [instadeepai.github.io/alf](https://instadeepai.github.io/alf/)
+- **Ready-to-use tools:** [alf-tools](https://github.com/instadeepai/alf/blob/main/tools/README.md)
+- **Tutorials:** [tutorials/](https://github.com/instadeepai/alf/tree/main/tutorials)
+
+---
+
+The rest of this document is a reference for the core components, task types, and
+evaluation utilities.
 
 ## Overview
 
