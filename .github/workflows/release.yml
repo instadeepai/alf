@@ -43,7 +43,7 @@ jobs:
           cd core
           uv build
           uv publish --token ${{secrets.PYPI_TOKEN}}
-          
+
           cd ../tools
           uv build
           uv publish --token ${{secrets.PYPI_TOKEN}}
