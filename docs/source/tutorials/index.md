@@ -15,7 +15,7 @@ Run the full ask/tell loop end to end:
 
 If you want to explore ALF's core abstractions with minimal dependencies, start here:
 
-- [ALF Core Quickstart](https://github.com/instadeepai/alf/blob/main/tutorials/alf_core_quickstart.ipynb): a synthetic optimisation loop built entirely on `alf-core` using numpy and scipy. Implements a bootstrap ensemble surrogate and Probability of Improvement acquisition function — both custom, neither available in `alf-tools` — to show how to bring your own components.
+- [ALF Core Quickstart](https://github.com/instadeepai/alf/blob/main/tutorials/alf_core_quickstart.ipynb): an active learning loop on MNIST digit classification, built entirely on `alf-core` using numpy and scipy. Implements a softmax-regression surrogate and an uncertainty-sampling acquisition function — both custom, neither available in `alf-tools` — to show how to bring your own components.
 
 ## 🤖 Go deeper on models
 

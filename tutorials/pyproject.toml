@@ -21,6 +21,9 @@ dependencies = [
 # ESM-2 tutorial needs transformers, exposed via alf_tools' esm2 extra.
 # Install with: uv sync --group esm2
 esm2 = ["alf_tools[esm2]"]
+# Chemprop tutorial needs the chemprop package, exposed via alf_tools' chemprop extra.
+# Install with: uv sync --extra chemprop
+chemprop = ["alf_tools[chemprop]"]
 
 [tool.setuptools]
 packages = []  # No Python packages, just notebooks
