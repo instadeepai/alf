@@ -9,7 +9,7 @@ description = "A Python package for performing active learning experiments."
 readme = "README.md"
 requires-python = ">=3.12,<3.14.1"
 license = {text = "Apache-2.0"}
-authors = [{name = "InstaDeep Ltd", email = "oss@instadeep.com"}]
+authors = [{name = "InstaDeep Ltd"}]
 keywords = ["active learning", "bayesian optimization", "machine learning", "scientific discovery"]
 classifiers = [
     "Development Status :: 3 - Alpha",
