@@ -1,0 +1,20 @@
+# Keep the build context small and reproducible.
+.git
+.venv
+**/.venv
+**/__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+.coverage.*
+coverage.xml
+docs/build
+docs/_build
+benchmark_examples/outputs
+data
+results
+.idea
+.vscode
+.DS_Store
