@@ -4,8 +4,8 @@
 
 - Releasing ALF as an open-source project under the Apache 2.0 license.
 - Introducing `alf_core`, a lightweight framework package providing base classes,
-  core data structures (`CandidateSet`, `LabelledCandidates`, `Predictions`,
-  `ALFState`), and an active learning loop abstraction with no ML-framework
+  core data structures (`Candidate`, `LabelledCandidates`, `Predictions`,
+  `State`), and an active learning loop abstraction with no ML-framework
   dependencies.
 - Introducing `alf_tools`, a ready-to-use package of surrogate models, datasets,
   and acquisition functions built on top of `alf_core` with PyTorch.
