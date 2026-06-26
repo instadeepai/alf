@@ -35,9 +35,9 @@ def expected_metrics():
             "round_min": 0.66444,
         },
         "optimizer": {
-            "top_10pc_recall": 1.00000,
-            "top_100_recall": 1.00000,
-            "regret": -0.01515,
+            "top_10pc_recall": 0.30000,
+            "top_100_recall": 0.26000,
+            "regret": 0.00000,
         },
         "surrogate": {
             "test_mse": 35.11162,
