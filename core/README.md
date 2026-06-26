@@ -92,7 +92,7 @@ evaluation utilities.
 
 ## Overview
 
-This README is organized into the following sections:
+This README is organised into the following sections:
 
 ### Core Components
 - **[1. Dataset (`BaseDataset`)](#1-dataset-basedataset)** - Data loading, splitting, and querying
@@ -318,7 +318,7 @@ distance space and benefit from standardised targets.
 
 ### 1. Design Task (`DesignTask`)
 
-The design task implements a multi-round active learning loop for optimizing sequences:
+The design task implements a multi-round active learning loop for optimising sequences:
 
 **Workflow:**
 1. **Initialization**: Setup dataset and surrogate
@@ -455,7 +455,7 @@ the dataset's `problem_type`.
 - **Rank ECE**: ECE computed in rank space using Monte Carlo ranking
 - **Coverage**: Percentage of targets falling within confidence intervals at a given alpha level
 - **Rank Coverage**: Coverage computed in rank space
-- **Width**: Average confidence interval width normalized by dataset range
+- **Width**: Average confidence interval width normalised by dataset range
 - **Rank Width**: Width computed in rank space
 
 **Regression — Uncertainty Quantification (UQ) Metrics** (variance required):

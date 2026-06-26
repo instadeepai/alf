@@ -54,6 +54,7 @@ For GPU support, optional extras (ESM2, Chemprop), and development setup, see th
 
 ```python
 from alf_core import (
+    BaseDatasetConfig,
     DatasetSearch,
     DesignTask,
     Optimizer,
@@ -65,8 +66,19 @@ from alf_tools.datasets.gfp import GFP
 from alf_tools.models.cnn import CNNModel
 from alf_tools.optimizer.acquisition_functions.greedy import Greedy
 
-# A dataset wraps your candidates and their known labels
-dataset = GFP(name="gfp", modality="sequence", seed=42)
+# A dataset wraps your candidates and their known labels. A small train_ratio
+# leaves a large candidate pool for the active-learning loop to acquire from.
+config = BaseDatasetConfig(
+    name="gfp",
+    modality="sequence",
+    seed=42,
+    train_ratio=0.1,
+    validation_frac=0.5,
+    test_ratio=0.2,
+    split_type="random",
+    problem_type="regression",
+)
+dataset = GFP(config)
 
 # The surrogate is a cheap probabilistic model trained on observed labels
 surrogate = Surrogate(model=CNNModel())
