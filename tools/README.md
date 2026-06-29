@@ -1,15 +1,31 @@
-# ALF Tools
+# alf-tools
 
-Ready-to-use implementations for the ALF framework. This package provides example datasets, models, acquisition functions, and search strategies to get you started quickly.
+[![PyPI](https://img.shields.io/pypi/v/alf-tools.svg)](https://pypi.org/project/alf-tools/)
+[![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](https://github.com/instadeepai/alf/blob/main/LICENSE)
+[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/surana01/25ce4b64d5b9cda177203366146f5bf0/raw/alf-tools-coverage.json)](https://github.com/instadeepai/alf/tree/main/tools)
+[![Docs](https://img.shields.io/badge/docs-instadeepai.github.io%2Falf-blue)](https://instadeepai.github.io/alf/)
+
+**Ready-to-use models, datasets, and acquisition functions for ALF (Active Learning Framework).**
+
+`alf-tools` builds on [alf-core](https://github.com/instadeepai/alf/blob/main/core/README.md)
+to give you everything needed to run active-learning experiments out of the box — example
+datasets (GFP, ProteinGym, FLIP, GuacaMol), models (CNN, Gaussian Process, ESM-2, Chemprop),
+acquisition functions, and search strategies. Use it for quick-start and prototyping; reach for
+`alf-core` alone when you want the lightweight framework with no ML-framework dependencies.
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/instadeepai/alf/main/docs/imgs/alf_main_figure.png" alt="ALF active-learning loop overview" width="70%">
+</div>
 
 ## Installation
 
 ```bash
-# Install tools package (includes PyTorch)
-pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
+pip install alf-tools
 ```
 
-**Note:** Requires authentication via `.netrc` file (see main [README](../README.md#authentication))
+This installs PyTorch and the core dependencies. Some models need additional dependencies —
+see [Optional Extras](#optional-extras) below.
 
 ### Optional Extras
 
@@ -19,44 +35,32 @@ dependencies; workflow umbrellas (`protein`, `molecule`) group the extras you ar
 together.
 
 ```bash
-# ESM2 — protein language model (for ESM2Model)
-pip install "alf_tools[esm2] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf-tools[esm2]"      # ESM-2 protein language model (ESM2Model)
+pip install "alf-tools[esmfold]"   # ESMFold structure-prediction oracle (ESMFoldModel)
+pip install "alf-tools[chemprop]"  # Chemprop small-molecule MPNN (ChempropModel)
+pip install "alf-tools[guacamol]"  # GuacaMol RDKit-based dataset/scoring
+pip install "alf_tools[mlip]       # MLIP — MACE force field for atomistic systems (for MLIPModel)
 
-# ESMFold — structure-prediction oracle (for ESMFoldModel)
-pip install "alf_tools[esmfold] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
-
-# Chemprop — small-molecule MPNN (for ChempropModel)
-pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
-
-# GuacaMol — RDKit-based small-molecule dataset/scoring
-pip install "alf_tools[guacamol] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
-
-# MLIP — MACE force field for atomistic systems (for MLIPModel)
-pip install "alf_tools[mlip] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
-
-# Workflow umbrellas: protein (esm2 + esmfold) or molecule (chemprop + guacamol)
-pip install "alf_tools[protein] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
-pip install "alf_tools[molecule] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf-tools[protein]"   # umbrella: esm2 + esmfold
+pip install "alf-tools[molecule]"  # umbrella: chemprop + guacamol
 ```
 
-For development installs from the cloned repository, these extras are re-exposed as dependency
-groups, so pass `--group` flags to `uv sync`:
+## Documentation
 
-```bash
-uv sync --group esm2
-uv sync --group chemprop
-uv sync --group protein              # esm2 + esmfold
-uv sync --group molecule             # chemprop + guacamol
-uv sync --group esm2 --group chemprop
-```
+- **Full documentation:** [instadeepai.github.io/alf](https://instadeepai.github.io/alf/)
+- **API reference:** [alf-tools API](https://instadeepai.github.io/alf/api/alf_tools/index.html)
+- **Installation guide:** [instadeepai.github.io/alf/installation.html](https://instadeepai.github.io/alf/installation.html)
+- **Core framework:** [alf-core](https://github.com/instadeepai/alf/blob/main/core/README.md)
+- **Tutorials:** [tutorials/](https://github.com/instadeepai/alf/tree/main/tutorials)
 
-## What's Included
+## What's included
 
-### Datasets
-- **GFP** - Green Fluorescent Protein fitness dataset
-- **ProteinGym** - Protein sequence datasets from ProteinGym benchmark
-- **FLIP** - Fitness Landscape Inference for Proteins benchmark (AAV, GB1, Meltome, SCL, SAV)
-- **GuacaMol** - ~1.6 M drug-like SMILES from ChEMBL with 10 RDKit physicochemical properties (MolLogP, TPSA, QED, etc.)
+`alf-tools` bundles example datasets (GFP, ProteinGym, FLIP, GuacaMol), surrogate and oracle
+models (CNN, Gaussian Process, ESM-2, ESMFold, Chemprop, PyRosetta, plus an ensemble wrapper),
+acquisition functions (Greedy, UCB, Expected Improvement, Thompson Sampling, CoreSet, and a
+BoTorch wrapper), and search strategies. See the
+[API reference](https://instadeepai.github.io/alf/api/alf_tools/index.html) for the full
+catalogue and configuration options.
 
 ### Models
 - **CNNModel** - Convolutional neural network for sequence modeling. Supports `ProblemType.REGRESSION`, `ProblemType.BINARY`, and `ProblemType.MULTICLASS`; output shape and activation are determined automatically from the dataset's `problem_type`
@@ -121,13 +125,31 @@ uv sync --group esm2 --group chemprop
 ## Quick Example
 
 ```python
-from alf_core import Optimizer, DatasetSearch, Oracle, Surrogate, DesignTask
+from alf_core import (
+    BaseDatasetConfig,
+    DatasetSearch,
+    DesignTask,
+    Optimizer,
+    Oracle,
+    Surrogate,
+    TerminalStateLogger,
+)
 from alf_tools.datasets import GFP
 from alf_tools.models import CNNModel
 from alf_tools.optimizer.acquisition_functions import Greedy
 
-# Load dataset and initialize components
-dataset = GFP(name="gfp", modality="sequence", seed=42, split_config=split_config)
+# Configure and load the dataset
+config = BaseDatasetConfig(
+    name="gfp",
+    modality="sequence",
+    seed=42,
+    train_ratio=0.1,
+    validation_frac=0.5,
+    test_ratio=0.2,
+    split_type="random",
+    problem_type="regression",
+)
+dataset = GFP(config)
 surrogate = Surrogate(model=CNNModel())
 optimizer = Optimizer(acquisition_fn=Greedy(), search_fn=DatasetSearch())
 oracle = Oracle(scorer=dataset)
@@ -135,74 +157,28 @@ oracle = Oracle(scorer=dataset)
 # Run active learning
 task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
 state = task.setup(dataset=dataset, surrogate=surrogate)
-task.run(state=state, optimizer=optimizer, oracle=oracle)
+task.run(
+    state=state,
+    state_loggers=[TerminalStateLogger()],
+    optimizer=optimizer,
+    oracle=oracle,
+)
 ```
-
-### Diversity-based Selection with CoreSet
-
-`CoreSet` selects candidates that maximise coverage of the input space rather than
-predicted fitness. It is a drop-in replacement for any other acquisition function:
-
-```python
-from alf_tools.optimizer.acquisition_functions import CoreSet
-
-optimizer = Optimizer(acquisition_fn=CoreSet(), search_fn=DatasetSearch())
-```
-
-Candidates are ranked by their greedy k-centres selection order; the first chosen
-candidate receives the highest score and unselected candidates receive 0. Because
-`CoreSet` calls `surrogate.featurise()` internally — not `predict()` — it works with
-any model and requires no uncertainty estimates.
-
-## Documentation
-
-For detailed API documentation and tutorials, see:
-- **Full documentation:** [instadeepai.github.io/alf](https://instadeepai.github.io/alf/)
-- **Core framework:** [../core/README.md](../core/README.md)
-- **Installation guide:** [https://instadeepai.github.io/alf/installation.html](https://instadeepai.github.io/alf/installation.html)
-- **Tutorials:** [../tutorials/](../tutorials/)
 
 ## Normalisation
 
-Models in `alf-tools` support input normalisation and output standardisation via their train
-configs (see `alf_core.model.base_model.BaseTrainConfig`).
+Models support input normalisation and output standardisation through their train configs
+(`BaseTrainConfig`). `GPModel` enables both by default (`minmax` inputs, standardised outputs);
+the other models default to neither. See the
+[API reference](https://instadeepai.github.io/alf/api/alf_tools/index.html) for per-model
+defaults and configuration.
 
-| Model | `normalise_inputs_strategy` default | `standardise_outputs` default |
-|-------|-------------------------------------|-------------------------------|
-| `CNNModel` | `None` | `False` |
-| `GPModel` | `"minmax"` | `True` |
-| `ESM2Model` | `None` | `False` |
-| `ChempropModel` | `None` | `False` |
+## Creating custom components
 
-**`GPTrainConfig`** defaults to `normalise_inputs_strategy="minmax"` and `standardise_outputs=True`:
-- `"minmax"`: min-max scales features to [0, 1] — GP kernels measure distances and benefit from
-  inputs on a common scale.
-- `standardise_outputs=True`: Z-score standardises labels before training — improves marginal
-  log-likelihood optimisation. Predictions are inverse-transformed back to the original label
-  scale before being returned, so **all metrics are computed on the original label scale**.
+All components subclass the `alf_core` base classes (`BaseDataset`, `BaseModel`,
+`AcquisitionFunction`, `BaseSearch`). See the
+[how-to guides](https://instadeepai.github.io/alf/how-to/index.html) for step-by-step instructions.
 
-The `"zscore"` strategy (`InputStandardiser`) zero-centres continuous features and is generally
-preferred for deep neural networks. It is **not** enabled by default for `CNNModel`, whose one-hot
-sequence inputs are degraded by standardisation; set `normalise_inputs_strategy="zscore"` explicitly
-when feeding a CNN continuous features.
+## License
 
-To disable input normalisation for a GP, pass an explicit config:
-
-```python
-from alf_tools.models.gp import GPModel, GPTrainConfig
-
-model = GPModel(train_config=GPTrainConfig(normalise_inputs_strategy=None, standardise_outputs=False))
-```
-
-For implementation details see [`alf_core.model.normaliser`](../core/alf_core/model/normaliser.py)
-and the [Core README normalisation section](../core/README.md#9-normalisation-inputnormaliser-outputstandardiser).
-
-## Creating Custom Components
-
-All components extend base classes from `alf_core`:
-- Datasets extend `BaseDataset`
-- Models extend `BaseModel`
-- Acquisition functions extend `AcquisitionFunction`
-- Search strategies extend `BaseSearch`
-
-See the [core documentation](../core/README.md) for implementation details.
+Apache License 2.0 — see [LICENSE](https://github.com/instadeepai/alf/blob/main/LICENSE).
