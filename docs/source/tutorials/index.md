@@ -31,6 +31,7 @@ and what its uncertainty estimates look like.
 ## 🗄️ Go deeper on datasets
 
 - [GuacaMol Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/datasets/guacamol_tutorial.ipynb): exploring the GuacaMol drug-like molecule corpus—download, property analysis, and SMILES querying. A good starting point for small-molecule experiments.
+- [ProteinGym Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/datasets/proteingym_tutorial.ipynb): the offline design loop applied to a ProteinGym deep-mutational-scanning (DMS) fitness benchmark. Best read after the Offline Design Tutorial, which it mirrors on a real protein-fitness dataset.
 
 To add your own model, dataset, acquisition or search function, see the
 [How-to / Recipes](../how-to/index.md).
