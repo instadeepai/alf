@@ -22,7 +22,7 @@ Key properties:
 
    .. code-block:: bash
 
-      pip install "alf_tools[chemprop]"
+      pip install "alf-tools[chemprop]"
 
 .. automodule:: alf_tools.models.chemprop
    :members:

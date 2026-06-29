@@ -66,10 +66,10 @@ API reference generated from docstrings, plus a glossary of ALF terms.
 
 ```bash
 # Core package (minimal dependencies, no PyTorch required)
-pip install alf_core
+pip install alf-core
 
 # Tools package (includes PyTorch, models, and datasets)
-pip install alf_tools
+pip install alf-tools
 ```
 
 For GPU support, optional extras, and development setup, see the

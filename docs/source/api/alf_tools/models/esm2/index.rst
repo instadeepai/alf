@@ -51,7 +51,7 @@ Key properties:
 
    .. code-block:: bash
 
-      pip install "alf_tools[esm2]"
+      pip install "alf-tools[esm2]"
 
 .. automodule:: alf_tools.models.esm2
    :members:

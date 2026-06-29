@@ -41,10 +41,10 @@ ALF is split into two packages:
 
 ```bash
 # Core package only (no PyTorch required)
-pip install alf_core
+pip install alf-core
 
 # Tools package (includes PyTorch, models, and datasets)
-pip install alf_tools
+pip install alf-tools
 ```
 
 For GPU support, optional extras (ESM2, Chemprop), and development setup, see the [Installation Guide](https://instadeepai.github.io/alf/installation.html).
