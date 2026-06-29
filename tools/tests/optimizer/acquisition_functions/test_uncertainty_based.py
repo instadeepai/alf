@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for the UncertaintySampling (maximum-variance) acquisition function."""
+"""Tests for the UncertaintyBased (maximum-variance) acquisition function."""
 
 from unittest.mock import MagicMock
 
@@ -24,7 +24,7 @@ from alf_core.dataclasses.round_metrics import RoundMetrics
 from alf_core.dataclasses.state import State
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.surrogate.surrogate import Surrogate
-from alf_tools.optimizer.acquisition_functions.uncertainty_sampling import UncertaintySampling
+from alf_tools.optimizer.acquisition_functions.uncertainty_based import UncertaintyBased
 
 
 def _make_state(predictions: Predictions, round_num: int = 1) -> State:
@@ -61,7 +61,7 @@ def test_scores_are_the_variances() -> None:
     variances = np.array([0.1, 5.0, 2.0])
     predictions = Predictions(means=np.zeros_like(variances), variances=variances)
 
-    result = UncertaintySampling()(_candidates(3), _make_state(predictions))
+    result = UncertaintyBased()(_candidates(3), _make_state(predictions))
 
     np.testing.assert_allclose(result.labels, variances)
 
@@ -73,7 +73,7 @@ def test_argmax_is_the_most_uncertain_candidate() -> None:
     means = np.array([100.0, 0.0, 50.0])
     predictions = Predictions(means=means, variances=variances)
 
-    result = UncertaintySampling()(_candidates(3), _make_state(predictions))
+    result = UncertaintyBased()(_candidates(3), _make_state(predictions))
 
     assert int(np.argmax(result.labels)) == 1
 
@@ -86,14 +86,14 @@ def test_uses_ensemble_variances() -> None:
         means=empirical_dist.mean(axis=1), variances=variances, empirical_dist=empirical_dist
     )
 
-    result = UncertaintySampling()(_candidates(3), _make_state(predictions))
+    result = UncertaintyBased()(_candidates(3), _make_state(predictions))
 
     np.testing.assert_allclose(result.labels, variances)
 
 
 def test_raises_when_no_variances() -> None:
-    """Means-only predictions cannot be scored by UncertaintySampling."""
+    """Means-only predictions cannot be scored by UncertaintyBased."""
     predictions = Predictions(means=np.array([1.0, 2.0]))
 
     with pytest.raises(ValueError, match="variances"):
-        UncertaintySampling()(_candidates(2), _make_state(predictions))
+        UncertaintyBased()(_candidates(2), _make_state(predictions))

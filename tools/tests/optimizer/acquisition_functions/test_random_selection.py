@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Tests for the RandomSampling baseline."""
+"""Tests for the RandomSelection baseline."""
 
 from unittest.mock import MagicMock
 
@@ -23,7 +23,7 @@ from alf_core.dataclasses.round_metrics import RoundMetrics
 from alf_core.dataclasses.state import State
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_core.surrogate.surrogate import Surrogate
-from alf_tools.optimizer.acquisition_functions.random_sampling import RandomSampling
+from alf_tools.optimizer.acquisition_functions.random_selection import RandomSelection
 
 
 def _make_state(round_num: int = 1) -> State:
@@ -55,7 +55,7 @@ def _candidates(n: int) -> list[Candidate]:
 def test_scores_are_in_unit_interval_and_match_length() -> None:
     """Every candidate gets one score in [0, 1)."""
     candidates = _candidates(6)
-    result = RandomSampling(seed=0)(candidates, _make_state())
+    result = RandomSelection(seed=0)(candidates, _make_state())
 
     assert len(result.labels) == len(candidates)
     assert result.labels.min() >= 0.0
@@ -65,7 +65,7 @@ def test_scores_are_in_unit_interval_and_match_length() -> None:
 def test_does_not_call_the_surrogate() -> None:
     """The baseline ignores the surrogate entirely."""
     state = _make_state()
-    RandomSampling(seed=0)(_candidates(4), state)
+    RandomSelection(seed=0)(_candidates(4), state)
     state.surrogate.predict.assert_not_called()
 
 
@@ -73,8 +73,8 @@ def test_reproducible_for_same_seed_and_round() -> None:
     """Identical (seed, round) draws the same scores."""
     candidates = _candidates(5)
 
-    first = RandomSampling(seed=7)(candidates, _make_state(2))
-    second = RandomSampling(seed=7)(candidates, _make_state(2))
+    first = RandomSelection(seed=7)(candidates, _make_state(2))
+    second = RandomSelection(seed=7)(candidates, _make_state(2))
 
     np.testing.assert_array_equal(first.labels, second.labels)
 
@@ -82,7 +82,7 @@ def test_reproducible_for_same_seed_and_round() -> None:
 def test_decorrelates_across_rounds() -> None:
     """The same seed draws different scores on different rounds."""
     candidates = _candidates(5)
-    acquisition = RandomSampling(seed=4)
+    acquisition = RandomSelection(seed=4)
 
     round_1 = acquisition(candidates, _make_state(1))
     round_2 = acquisition(candidates, _make_state(2))
@@ -94,8 +94,8 @@ def test_decorrelates_across_seeds() -> None:
     """Different seeds at the same round draw different scores."""
     candidates = _candidates(5)
 
-    seed_a = RandomSampling(seed=1)(candidates, _make_state(3))
-    seed_b = RandomSampling(seed=2)(candidates, _make_state(3))
+    seed_a = RandomSelection(seed=1)(candidates, _make_state(3))
+    seed_b = RandomSelection(seed=2)(candidates, _make_state(3))
 
     assert not np.allclose(seed_a.labels, seed_b.labels)
 
@@ -103,4 +103,4 @@ def test_decorrelates_across_seeds() -> None:
 def test_negative_seed_rejected_at_construction() -> None:
     """A negative seed fails fast with a clear message."""
     with pytest.raises(ValueError, match="non-negative"):
-        RandomSampling(seed=-1)
+        RandomSelection(seed=-1)

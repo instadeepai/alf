@@ -17,8 +17,8 @@ import numpy as np
 from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
 
 
-class RandomSampling(AcquisitionFunction):
-    """Random-sampling acquisition baseline.
+class RandomSelection(AcquisitionFunction):
+    """Random-selection acquisition baseline.
 
     Scores every candidate uniformly at random, ignoring the surrogate entirely. It is the
     standard control for demonstrating that an informed acquisition function actually helps.
@@ -27,7 +27,7 @@ class RandomSampling(AcquisitionFunction):
     """
 
     def __init__(self, seed: int = 0) -> None:
-        """Initialise the random-sampling baseline.
+        """Initialise the random-selection baseline.
 
         Args:
             seed: Non-negative base random seed (default 0). It is combined with the

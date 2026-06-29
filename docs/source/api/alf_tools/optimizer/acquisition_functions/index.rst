@@ -13,7 +13,7 @@ promising for evaluation.
    CoreSet <core_set/index>
    Expected Improvement <expected_improvement/index>
    Greedy <greedy/index>
-   Random Sampling <random_sampling/index>
+   Random Selection <random_selection/index>
    Thompson Sampling <thompson_sampling/index>
-   Uncertainty Sampling <uncertainty_sampling/index>
+   Uncertainty-Based <uncertainty_based/index>
    Upper Confidence Bound (UCB) <ucb/index>

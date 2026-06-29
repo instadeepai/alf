@@ -16,19 +16,19 @@
 from alf_core import AcquisitionFunction, Candidate, LabelledCandidates, State
 
 
-class UncertaintySampling(AcquisitionFunction):
-    """Uncertainty-sampling (maximum-variance) acquisition function.
+class UncertaintyBased(AcquisitionFunction):
+    """Uncertainty-based (maximum-variance) acquisition function.
 
     Scores each candidate by its predictive variance, ignoring the mean: the candidates the
     surrogate is least certain about score highest. This is the natural acquisition for
-    *reducing model error* (query-by-committee / uncertainty sampling), as opposed to the
-    maximising acquisitions (`Greedy`, `UCB`, `ExpectedImprovement`, ...) that chase a high
-    predicted target value. It requires an uncertainty-aware surrogate, for example an
-    ensemble (`EnsembleWrapper`) or a Gaussian process, whose `predict` populates `variances`.
+    *reducing model error* (query-by-committee), as opposed to the maximising acquisitions
+    (`Greedy`, `UCB`, `ExpectedImprovement`, ...) that chase a high predicted target value.
+    It requires an uncertainty-aware surrogate, for example an ensemble (`EnsembleWrapper`)
+    or a Gaussian process, whose `predict` populates `variances`.
     """
 
     def __call__(self, search_candidates: list[Candidate], state: State) -> LabelledCandidates:
-        """Compute uncertainty-sampling acquisition values for unlabelled candidates.
+        """Compute uncertainty-based acquisition values for unlabelled candidates.
 
         Args:
             search_candidates: List of unlabelled candidates to score.
@@ -44,7 +44,7 @@ class UncertaintySampling(AcquisitionFunction):
         predictions = state.surrogate.predict(search_candidates)
         if predictions.variances is None:
             raise ValueError(
-                "Expected `variances` in predictions, but none were found. UncertaintySampling "
+                "Expected `variances` in predictions, but none were found. UncertaintyBased "
                 "requires an uncertainty-aware surrogate (e.g. an ensemble or a GP)."
             )
         return LabelledCandidates(candidates=search_candidates, labels=predictions.variances)
