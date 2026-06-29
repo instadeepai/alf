@@ -11,6 +11,10 @@
 **ALF** is an active learning framework for iterative optimisation in computational science, designed to optimize high-dimensional and combinatorially vast search spaces where data acquisition is expensive, from wet-lab experiments and physical measurements to costly simulations. ALF accelerates discovery of optimal designs (proteins, molecules, materials) through intelligent candidate selection, adaptive modelling, and efficient evaluation strategies. It provides modular components for candidate search, surrogate modelling, and acquisition, enabling efficient discovery across expensive, high-dimensional search spaces such
 as protein sequences and small molecules.
 
+<div align="center">
+  <img src="docs/imgs/alf_main_figure.png" alt="ALF active-learning loop overview" width="70%">
+</div>
+
 ## Why ALF?
 
 In scientific discovery, the bottleneck is rarely compute—it's the **experiment**. Each label costs a wet-lab assay, a simulation, or a measurement, and you can only afford a handful of rounds. ALF runs the full active-learning loop for you: train a [surrogate](https://instadeepai.github.io/alf/reference/glossary.html#term-Surrogate) on what you've measured, use an [acquisition function](https://instadeepai.github.io/alf/reference/glossary.html#term-Acquisition-function) to select the most informative next batch, score it, and repeat—all with modular, swappable components so you can change any one part without rewriting the rest.
@@ -54,6 +58,7 @@ For GPU support, optional extras (ESM2, Chemprop), and development setup, see th
 
 ```python
 from alf_core import (
+    BaseDatasetConfig,
     DatasetSearch,
     DesignTask,
     Optimizer,
@@ -65,8 +70,19 @@ from alf_tools.datasets.gfp import GFP
 from alf_tools.models.cnn import CNNModel
 from alf_tools.optimizer.acquisition_functions.greedy import Greedy
 
-# A dataset wraps your candidates and their known labels
-dataset = GFP(name="gfp", modality="sequence", seed=42)
+# A dataset wraps your candidates and their known labels. A small train_ratio
+# leaves a large candidate pool for the active-learning loop to acquire from.
+config = BaseDatasetConfig(
+    name="gfp",
+    modality="sequence",
+    seed=42,
+    train_ratio=0.1,
+    validation_frac=0.5,
+    test_ratio=0.2,
+    split_type="random",
+    problem_type="regression",
+)
+dataset = GFP(config)
 
 # The surrogate is a cheap probabilistic model trained on observed labels
 surrogate = Surrogate(model=CNNModel())
