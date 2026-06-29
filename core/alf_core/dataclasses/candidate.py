@@ -39,20 +39,23 @@ except ImportError:
 
 
 class Modality(Enum):
-    """The *domain* a candidate belongs to — what the data represents, not how it is stored.
+    """The *kind* of candidate — used to match datasets with compatible models and metrics.
 
-    Modality answers "what kind of problem is this?" (a protein sequence, a molecule,
-    a row of features) and is used to match datasets with compatible models and to pick
-    domain-appropriate metrics. It deliberately does **not** describe the physical
-    representation of the data: a protein sequence and a SMILES string are both Python
-    ``str`` objects, but they are different domains (``SEQUENCE`` vs ``MOLECULE``).
-    Representation is inferred from ``type(data)`` where it matters (see
-    :meth:`Candidate.to_serializable`).
+    Modality answers "what kind of thing is this candidate?" so the framework can pair a
+    dataset with models that can consume it and pick an appropriate diversity metric. For
+    candidates that have a meaningful domain this is that domain (a protein sequence, a
+    molecule); for unstructured numeric inputs it is the representation itself (a feature
+    vector). It deliberately does **not** describe how the data is *stored*: a protein
+    sequence and a SMILES string are both Python ``str`` objects but are different
+    modalities (``SEQUENCE`` vs ``MOLECULE``). The storage type is inferred separately from
+    ``type(data)`` where it matters (see :meth:`Candidate.to_serializable`).
 
     Members:
         SEQUENCE: Biological sequences (protein / nucleotide), stored as strings.
         MOLECULE: Small molecules, stored as SMILES strings.
-        TABULAR: Fixed-length numeric feature vectors (arrays, tensors, scalars, dicts).
+        TABULAR: The domain-agnostic case — fixed-length numeric feature vectors
+            (arrays, tensors, scalars, dicts), e.g. for synthetic or pre-featurised
+            continuous optimization with no richer domain.
     """
 
     SEQUENCE = "sequence"
