@@ -250,8 +250,9 @@ class TestDesignGFPRandomSurrogate:
     def _assert_dataset_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert dataset metrics."""
         for metric_name, expected_values in expected.items():
-            # Drop the trailing experiment_summary row, which only carries
-            # auc_top_k and leaves per-round columns NaN.
+            # Per-round values only; summary metrics (auc_top_k) live in
+            # summary.csv, not metrics.csv. dropna() guards against any
+            # round that does not populate this column.
             actual_values = metrics[f"dataset/{metric_name}"].dropna().tolist()
             assert np.isclose(actual_values, expected_values, atol=1e-10).all(), (
                 f"Dataset metric {metric_name} mismatch: expected {expected_values}, "
@@ -261,8 +262,8 @@ class TestDesignGFPRandomSurrogate:
     def _assert_acquired_candidates_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert acquired candidates metrics."""
         for metric_name, expected_values in expected.items():
-            # dropna() removes both round 0 (no acquisition) and the trailing
-            # experiment_summary row, leaving one value per acquisition round.
+            # dropna() removes round 0 (no acquisition yet), leaving one
+            # value per acquisition round.
             actual_values = metrics[f"acquired_candidates/{metric_name}"].dropna().tolist()
             assert np.isclose(actual_values, expected_values, atol=1e-10).all(), (
                 f"Acquired candidates metric {metric_name} mismatch: expected {expected_values}, "
@@ -272,7 +273,8 @@ class TestDesignGFPRandomSurrogate:
     def _assert_surrogate_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert surrogate model performance metrics."""
         for metric_name, expected_values in expected.items():
-            # Drop the trailing experiment_summary row (auc_top_k only).
+            # Per-round values only; summary metrics (auc_top_k) live in
+            # summary.csv, not metrics.csv.
             actual_values = metrics[f"surrogate/{metric_name}"].dropna().tolist()
             assert np.isclose(actual_values, expected_values, atol=1e-10).all(), (
                 f"Surrogate metric {metric_name} mismatch: expected {expected_values}, "
