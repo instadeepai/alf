@@ -40,13 +40,10 @@ ECE
   predicted confidence and observed accuracy across confidence bins.
 
 Modality
-  The *kind* of a candidate — used to match datasets with compatible `Model`s and to pick
-  an appropriate metric, **not** a description of how the data is stored. Where a candidate
-  has a meaningful domain this is that domain (`SEQUENCE` for a protein/nucleotide sequence,
-  `MOLECULE` for a small molecule); `TABULAR` is the domain-agnostic case for raw numeric
-  feature vectors. A protein sequence and a SMILES string are both Python strings but are
-  different modalities. The storage type (used for serialisation) is inferred separately
-  from `type(data)`.
+  The *kind* of a candidate — used to match datasets with compatible `Model`s and to pick a
+  metric, not how the data is stored. It is the data's domain where one exists (`SEQUENCE`,
+  `MOLECULE`), with `TABULAR` the domain-agnostic case for raw numeric feature vectors.
+  Storage type (used for serialisation) is inferred separately from `type(data)`.
 
 Model
   A learnable predictor with a common interface: `featurise`, `train`, `predict`, `sample`. Base

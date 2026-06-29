@@ -41,21 +41,14 @@ except ImportError:
 class Modality(Enum):
     """The *kind* of candidate — used to match datasets with compatible models and metrics.
 
-    Modality answers "what kind of thing is this candidate?" so the framework can pair a
-    dataset with models that can consume it and pick an appropriate diversity metric. For
-    candidates that have a meaningful domain this is that domain (a protein sequence, a
-    molecule); for unstructured numeric inputs it is the representation itself (a feature
-    vector). It deliberately does **not** describe how the data is *stored*: a protein
-    sequence and a SMILES string are both Python ``str`` objects but are different
-    modalities (``SEQUENCE`` vs ``MOLECULE``). The storage type is inferred separately from
-    ``type(data)`` where it matters (see :meth:`Candidate.to_serializable`).
+    It is the data's domain where one exists, not how the data is stored (a protein
+    sequence and a SMILES string are both ``str`` but differ here). Storage type is
+    inferred from ``type(data)`` (see :meth:`Candidate.to_serializable`).
 
     Members:
-        SEQUENCE: Biological sequences (protein / nucleotide), stored as strings.
-        MOLECULE: Small molecules, stored as SMILES strings.
-        TABULAR: The domain-agnostic case — fixed-length numeric feature vectors
-            (arrays, tensors, scalars, dicts), e.g. for synthetic or pre-featurised
-            continuous optimization with no richer domain.
+        SEQUENCE: Biological sequences (protein / nucleotide), as strings.
+        MOLECULE: Small molecules, as SMILES strings.
+        TABULAR: Domain-agnostic numeric feature vectors (arrays, tensors, scalars, dicts).
     """
 
     SEQUENCE = "sequence"
