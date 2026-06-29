@@ -248,9 +248,9 @@ class TestMLPModelFeaturise:
         with pytest.raises(ValueError, match="TABULAR"):
             mlp_model.featurise(candidates)
 
-    def test_featurise_rejects_structure_modality(self, mlp_model):
-        """STRUCTURE modality must raise ValueError."""
-        candidates = [Candidate(data=np.zeros((3, 4), dtype=np.float32), modality="structure")]
+    def test_featurise_rejects_molecule_modality(self, mlp_model):
+        """MOLECULE modality must raise ValueError."""
+        candidates = [Candidate(data="CCO", modality="molecule")]
         with pytest.raises(ValueError, match="TABULAR"):
             mlp_model.featurise(candidates)
 

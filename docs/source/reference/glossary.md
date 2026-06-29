@@ -40,8 +40,12 @@ ECE
   predicted confidence and observed accuracy across confidence bins.
 
 Modality
-  The representation of a candidate, e.g. a protein `sequence` or a small-molecule SMILES string.
-  Determines which `Model` and `Dataset` implementations are compatible.
+  The *domain* a candidate belongs to — what its data represents (e.g. `SEQUENCE` for a
+  protein/nucleotide sequence, `MOLECULE` for a small molecule, `TABULAR` for a feature
+  vector), **not** how it is stored. A protein sequence and a SMILES string are both
+  Python strings but are different modalities. Modality determines which `Model` and
+  `Dataset` implementations are compatible; the storage type (used for serialisation) is
+  inferred separately from `type(data)`.
 
 Model
   A learnable predictor with a common interface: `featurise`, `train`, `predict`, `sample`. Base

@@ -103,14 +103,19 @@ class TestIntraBatchDiversityEdgeCases:
         with pytest.raises(ValueError, match="same modality"):
             intra_batch_diversity(mixed)
 
-    def test_unsupported_modality_raises(self):
-        """Unsupported modality raises ValueError."""
-        candidates = [
-            Candidate(data=np.zeros((4, 4)), modality=Modality.STRUCTURE),
-            Candidate(data=np.zeros((4, 4)), modality=Modality.STRUCTURE),
+    def test_molecule_uses_string_distance(self):
+        """MOLECULE candidates use the (placeholder) string edit-distance path."""
+        identical = [
+            Candidate(data="CCO", modality=Modality.MOLECULE),
+            Candidate(data="CCO", modality=Modality.MOLECULE),
         ]
-        with pytest.raises(ValueError, match="does not support"):
-            intra_batch_diversity(candidates)
+        assert intra_batch_diversity(identical)["intra_batch_diversity"] == 0.0
+
+        differing = [
+            Candidate(data="CCO", modality=Modality.MOLECULE),
+            Candidate(data="c1ccccc1", modality=Modality.MOLECULE),
+        ]
+        assert intra_batch_diversity(differing)["intra_batch_diversity"] > 0.0
 
     def test_zero_vector_embedding_raises(self):
         """All-zero embedding raises ValueError (cosine distance undefined)."""

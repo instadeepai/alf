@@ -54,10 +54,11 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
 
     Dissimilarity is computed as follows depending on candidate modality:
 
-    - **SEQUENCE**: normalised Levenshtein distance.
-      `dissimilarity = levenshtein(a, b) / max(len(a), len(b))`,
-      yielding 0 for identical sequences and 1 when every character must
-      be substituted or the sequences differ by their full length.
+    - **SEQUENCE** / **MOLECULE**: normalised Levenshtein distance over the
+      string representation. `dissimilarity = levenshtein(a, b) / max(len(a), len(b))`,
+      yielding 0 for identical strings and 1 when every character must be
+      substituted or the strings differ by their full length. (For MOLECULE this is
+      a placeholder; fingerprint-based Tanimoto distance is a planned follow-up.)
     - **TABULAR**: cosine distance computed via
       :func:`scipy.spatial.distance.pdist`.  Candidates are flattened to 1-D
       feature vectors before comparison.
@@ -76,7 +77,7 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
 
     Raises:
         ValueError: If candidates span multiple modalities, if the modality
-            is not one of SEQUENCE or TABULAR, or if any candidate
+            is not one of SEQUENCE, MOLECULE, or TABULAR, or if any candidate
             has an all-zero feature vector (cosine distance undefined).
     """
     if len(candidates) < 2:
@@ -91,7 +92,7 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
 
     modality = candidates[0].modality
 
-    if modality == Modality.SEQUENCE:
+    if modality in (Modality.SEQUENCE, Modality.MOLECULE):
         pairs = []
         for ci, cj in combinations(candidates, 2):
             a, b = str(ci.data), str(cj.data)
@@ -117,7 +118,7 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
 
     raise ValueError(
         f"intra_batch_diversity does not support modality '{modality}'. "
-        f"Supported modalities: SEQUENCE, TABULAR."
+        f"Supported modalities: SEQUENCE, MOLECULE, TABULAR."
     )
 
 
