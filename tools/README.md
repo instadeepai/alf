@@ -101,6 +101,9 @@ uv sync --group esm2 --group chemprop
 - **UCB** - Upper Confidence Bound for exploration-exploitation
 - **ExpectedImprovement** - Expected improvement over current best
 - **ThompsonSampling** - Bayesian sampling for exploration
+- **UncertaintySampling** - Select the highest-variance candidates to reduce model error
+  (maximum-variance / query-by-committee); requires an uncertainty-aware surrogate (ensemble or GP)
+- **RandomSampling** - Uniform random baseline for comparing against informed acquisitions
 - **CoreSet** - Greedy k-centres selection for input-space diversity (coverage-based); uses
   `surrogate.featurise()` rather than predictions, so it is compatible with any model and
   does not require uncertainty estimates
