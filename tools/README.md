@@ -6,34 +6,32 @@ Ready-to-use implementations for the ALF framework. This package provides exampl
 
 ```bash
 # Install tools package (includes PyTorch)
-pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
+pip install alf_tools
 ```
-
-**Note:** Requires authentication via `.netrc` file (see main [README](../README.md#authentication))
 
 ### Optional Extras
 
-Some models require additional dependencies. Append one or more extras to the package URL.
+Some models require additional dependencies. Append one or more extras to the package name.
 Per-model extras (`esm2`, `esmfold`, `chemprop`, `guacamol`) install exactly one model's
 dependencies; workflow umbrellas (`protein`, `molecule`) group the extras you are likely to use
 together.
 
 ```bash
 # ESM2 — protein language model (for ESM2Model)
-pip install "alf_tools[esm2] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf_tools[esm2]"
 
 # ESMFold — structure-prediction oracle (for ESMFoldModel)
-pip install "alf_tools[esmfold] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf_tools[esmfold]"
 
 # Chemprop — small-molecule MPNN (for ChempropModel)
-pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf_tools[chemprop]"
 
 # GuacaMol — RDKit-based small-molecule dataset/scoring
-pip install "alf_tools[guacamol] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf_tools[guacamol]"
 
 # Workflow umbrellas: protein (esm2 + esmfold) or molecule (chemprop + guacamol)
-pip install "alf_tools[protein] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
-pip install "alf_tools[molecule] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf_tools[protein]"
+pip install "alf_tools[molecule]"
 ```
 
 For development installs from the cloned repository, these extras are re-exposed as dependency
@@ -72,7 +70,7 @@ uv sync --group esm2 --group chemprop
   `train()` still takes `LabelledCandidates` — placeholder labels are fine) and then returns
   PLL scores.
   Embeddings can be extracted via `embed()`. Requires the `[esm2]` optional extra:
-  `pip install "alf-tools[esm2]"`
+  `pip install "alf_tools[esm2]"`
 - **ESMFoldModel** - ESMFold protein structure prediction oracle; returns a scalar confidence score per candidate. Use as `Oracle(scorer=ESMFoldModel(ESMFoldModelConfig(...)))`. Requires `transformers>=4.36.0` and `accelerate>=0.26.0`.
   Three scoring metrics are supported (all in **[0, 1]**, higher is better):
   - `ptm` *(default)* — global fold confidence (pTM). > 0.5 = confident fold; < 0.1 = disordered / very short peptide.
@@ -81,7 +79,7 @@ uv sync --group esm2 --group chemprop
 - **ChempropModel** - Message Passing Neural Network (MPNN) for small-molecule fitness prediction,
   backed by [Chemprop v2.x](https://chemprop.readthedocs.io/). Accepts SMILES strings directly;
   no hand-crafted features required. Requires the `[chemprop]` optional extra:
-  `pip install "alf-tools[chemprop]"`
+  `pip install "alf_tools[chemprop]"`
 - **PyRosetta** - Rosetta energy function for protein design (requires PyRosetta installation)
 - **EnsembleWrapper** - Generic wrapper composing N `BaseModel` instances into a seed ensemble,
   MC dropout ensemble, or combined (seed + dropout) ensemble for uncertainty quantification.

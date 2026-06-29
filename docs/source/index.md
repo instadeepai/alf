@@ -66,16 +66,10 @@ API reference generated from docstrings, plus a glossary of ALF terms.
 
 ```bash
 # Core package (minimal dependencies, no PyTorch required)
-pip install git+https://github.com/instadeepai/alf.git#subdirectory=core
+pip install alf_core
 
 # Tools package (includes PyTorch, models, and datasets)
-pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
-```
-
-Add your GitHub credentials to `~/.netrc` for authentication:
-
-```text
-machine github.com login <USERNAME> password <TOKEN>
+pip install alf_tools
 ```
 
 For GPU support, optional extras, and development setup, see the

@@ -12,10 +12,10 @@ Use this when you want to use ALF in your own projects. This is what most users 
 
 ```bash
 # Install the core package only (minimal dependencies, no PyTorch required)
-pip install git+https://github.com/instadeepai/alf.git#subdirectory=core
+pip install alf_core
 
 # Install the tools package (includes PyTorch, models, and datasets)
-pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
+pip install alf_tools
 ```
 
 **What each package provides:**
@@ -40,16 +40,16 @@ umbrella:
 
 ```bash
 # ESM2 — protein language model (for ESM2Model)
-pip install "alf_tools[esm2] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf_tools[esm2]"
 
 # Chemprop — small-molecule MPNN (for ChempropModel)
-pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf_tools[chemprop]"
 
 # Whole protein workflow (esm2 + esmfold)
-pip install "alf_tools[protein] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf_tools[protein]"
 
 # Several extras together
-pip install "alf_tools[esm2,chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf_tools[esm2,chemprop]"
 ```
 
 ### GPU Support
@@ -57,7 +57,7 @@ pip install "alf_tools[esm2,chemprop] @ git+https://github.com/instadeepai/alf.g
 By default, `alf_tools` installs CPU-optimised PyTorch. To use a GPU build:
 
 ```bash
-pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
+pip install alf_tools
 pip install torch --index-url https://download.pytorch.org/whl/cu128
 ```
 

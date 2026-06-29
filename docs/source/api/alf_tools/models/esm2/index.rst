@@ -51,7 +51,7 @@ Key properties:
 
    .. code-block:: bash
 
-      pip install "alf_tools[esm2] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+      pip install "alf_tools[esm2]"
 
 .. automodule:: alf_tools.models.esm2
    :members:
