@@ -15,7 +15,6 @@
 import networkx as nx
 import numpy as np
 import pytest
-import torch
 from alf_core.dataclasses.candidate import Candidate, Modality
 from alf_core.dataclasses.labelled_candidates import LabelledCandidates
 
@@ -401,11 +400,9 @@ def test_labelled_candidates_length_consistency(n_candidates):
     "modality,data_factory",
     [
         (Modality.SEQUENCE, lambda: "ATCGATCG"),
-        (Modality.IMAGE, lambda: np.random.rand(32, 32, 3)),
         (Modality.GRAPH, lambda: nx.path_graph(5)),
         (Modality.STRUCTURE, lambda: np.random.rand(10, 3)),
         (Modality.TABULAR, lambda: {"feature1": 1, "feature2": 2}),
-        (Modality.EMBEDDING, lambda: torch.randn(10, 5)),
     ],
 )
 def test_labelled_candidates_modality_consistency(modality, data_factory):
@@ -474,13 +471,13 @@ class TestLabelledCandidatesEquality:
         """Test equality when candidates have numpy arrays as data."""
         img1 = np.random.rand(3, 32, 32).astype(np.float32)
         img2 = np.random.rand(3, 32, 32).astype(np.float32)
-        c1 = Candidate(data=img1, modality=Modality.IMAGE)
-        c2 = Candidate(data=img2, modality=Modality.IMAGE)
+        c1 = Candidate(data=img1, modality=Modality.TABULAR)
+        c2 = Candidate(data=img2, modality=Modality.TABULAR)
         lc1 = LabelledCandidates(candidates=[c1, c2], labels=np.array([0.5, 1.5]))
 
         # Create copies
-        c1_copy = Candidate(data=img1.copy(), modality=Modality.IMAGE)
-        c2_copy = Candidate(data=img2.copy(), modality=Modality.IMAGE)
+        c1_copy = Candidate(data=img1.copy(), modality=Modality.TABULAR)
+        c2_copy = Candidate(data=img2.copy(), modality=Modality.TABULAR)
         lc2 = LabelledCandidates(candidates=[c1_copy, c2_copy], labels=np.array([0.5, 1.5]))
 
         assert lc1 == lc2
@@ -563,15 +560,15 @@ class TestLabelledCandidatesEquality:
         assert c2 not in lc.candidates
         np.testing.assert_array_equal(lc.labels, np.array([0.1, 0.9]))
 
-    def test_remove_with_image_data_candidates(self):
-        """Test remove() with candidates containing numpy array data (IMAGE modality)."""
+    def test_remove_with_array_data_candidates(self):
+        """Test remove() with candidates containing numpy array data (TABULAR modality)."""
         img1 = np.random.rand(3, 32, 32).astype(np.float32)
         img2 = np.random.rand(3, 32, 32).astype(np.float32)
         img3 = np.random.rand(3, 32, 32).astype(np.float32)
 
-        c1 = Candidate(data=img1, modality=Modality.IMAGE)
-        c2 = Candidate(data=img2, modality=Modality.IMAGE)
-        c3 = Candidate(data=img3, modality=Modality.IMAGE)
+        c1 = Candidate(data=img1, modality=Modality.TABULAR)
+        c2 = Candidate(data=img2, modality=Modality.TABULAR)
+        c3 = Candidate(data=img3, modality=Modality.TABULAR)
 
         lc = LabelledCandidates(candidates=[c1, c2, c3], labels=np.array([0.1, 0.5, 0.9]))
 

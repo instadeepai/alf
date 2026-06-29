@@ -25,7 +25,7 @@ def _seq(s: str) -> Candidate:
 
 
 def _emb(arr: np.ndarray) -> Candidate:
-    return Candidate(data=arr, modality=Modality.EMBEDDING)
+    return Candidate(data=arr, modality=Modality.TABULAR)
 
 
 class TestIntraBatchDiversitySequence:
@@ -60,8 +60,8 @@ class TestIntraBatchDiversitySequence:
         assert isinstance(result["intra_batch_diversity"], float)
 
 
-class TestIntraBatchDiversityEmbedding:
-    """Tests for intra_batch_diversity with EMBEDDING candidates."""
+class TestIntraBatchDiversityTabular:
+    """Tests for intra_batch_diversity with TABULAR candidates."""
 
     def test_identical_embeddings_zero_cosine_distance(self):
         """Identical embeddings give 0.0 cosine distance."""
@@ -106,8 +106,8 @@ class TestIntraBatchDiversityEdgeCases:
     def test_unsupported_modality_raises(self):
         """Unsupported modality raises ValueError."""
         candidates = [
-            Candidate(data=np.zeros((4, 4)), modality=Modality.IMAGE),
-            Candidate(data=np.zeros((4, 4)), modality=Modality.IMAGE),
+            Candidate(data=np.zeros((4, 4)), modality=Modality.STRUCTURE),
+            Candidate(data=np.zeros((4, 4)), modality=Modality.STRUCTURE),
         ]
         with pytest.raises(ValueError, match="does not support"):
             intra_batch_diversity(candidates)

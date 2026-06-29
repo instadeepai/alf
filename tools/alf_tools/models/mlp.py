@@ -164,7 +164,7 @@ class MLP(nn.Module):
 class MLPModel(BaseModel):
     """Surrogate model wrapping MLP for pre-computed vector inputs.
 
-    Featurisation is a passthrough — inputs must arrive as TABULAR or EMBEDDING
+    Featurisation is a passthrough — inputs must arrive as TABULAR
     candidates whose data is a numpy array or torch tensor.
     """
 
@@ -186,7 +186,7 @@ class MLPModel(BaseModel):
         self._epoch_metrics: list[SurrogateEpochMetrics] = []
 
     def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> torch.Tensor:
-        """Convert TABULAR or EMBEDDING candidates to a float32 tensor.
+        """Convert TABULAR candidates to a float32 tensor.
 
         Args:
             inputs: Either LabelledCandidates or a list of Candidates. Each
@@ -204,10 +204,8 @@ class MLPModel(BaseModel):
             candidates = inputs
 
         for c in candidates:
-            if c.modality not in (Modality.TABULAR, Modality.EMBEDDING):
-                raise ValueError(
-                    f"MLPModel only supports TABULAR and EMBEDDING modalities, got {c.modality}"
-                )
+            if c.modality != Modality.TABULAR:
+                raise ValueError(f"MLPModel only supports TABULAR modality, got {c.modality}")
 
         arrays = []
         for c in candidates:
