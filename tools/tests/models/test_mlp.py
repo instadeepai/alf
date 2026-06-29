@@ -33,13 +33,6 @@ def tabular_candidates():
 
 
 @pytest.fixture
-def embedding_candidates():
-    """Return 8 random vector Candidates with feature dimension 4."""
-    rng = np.random.RandomState(1)
-    return [Candidate(data=rng.randn(4).astype(np.float32), modality="tabular") for _ in range(8)]
-
-
-@pytest.fixture
 def labelled_tabular(tabular_candidates):
     """Return LabelledCandidates wrapping tabular_candidates with random labels."""
     rng = np.random.RandomState(2)
@@ -228,12 +221,6 @@ class TestMLPModelFeaturise:
     def test_featurise_tabular_list(self, mlp_model, tabular_candidates):
         """List of TABULAR candidates must produce a (8, 4) float32 tensor."""
         x = mlp_model.featurise(tabular_candidates)
-        assert x.shape == (8, 4)
-        assert x.dtype == torch.float32
-
-    def test_featurise_embedding_list(self, mlp_model, embedding_candidates):
-        """List of EMBEDDING candidates must produce a (8, 4) float32 tensor."""
-        x = mlp_model.featurise(embedding_candidates)
         assert x.shape == (8, 4)
         assert x.dtype == torch.float32
 
