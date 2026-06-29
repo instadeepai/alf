@@ -7,26 +7,15 @@ Use this when you want to use ALF in your own projects. This is what most users 
 ### Prerequisites
 
 - Python 3.12 or higher
-- GitHub access token for authentication (ALF is hosted on a private GitHub repository)
-
-### Authentication Setup
-
-Create a `.netrc` file in your home directory with your GitHub credentials:
-
-```
-machine github.com login <USERNAME> password <TOKEN>
-```
-
-For more information on creating personal access tokens, see [GitHub's documentation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
 
 ### Install Packages
 
 ```bash
 # Install the core package only (minimal dependencies, no PyTorch required)
-pip install git+https://github.com/instadeepai/alf.git#subdirectory=core
+pip install alf-core
 
 # Install the tools package (includes PyTorch, models, and datasets)
-pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
+pip install alf-tools
 ```
 
 **What each package provides:**
@@ -51,16 +40,16 @@ umbrella:
 
 ```bash
 # ESM2 — protein language model (for ESM2Model)
-pip install "alf_tools[esm2] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf-tools[esm2]"
 
 # Chemprop — small-molecule MPNN (for ChempropModel)
-pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf-tools[chemprop]"
 
 # Whole protein workflow (esm2 + esmfold)
-pip install "alf_tools[protein] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf-tools[protein]"
 
 # Several extras together
-pip install "alf_tools[esm2,chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
+pip install "alf-tools[esm2,chemprop]"
 ```
 
 ### GPU Support
@@ -68,7 +57,7 @@ pip install "alf_tools[esm2,chemprop] @ git+https://github.com/instadeepai/alf.g
 By default, `alf_tools` installs CPU-optimised PyTorch. To use a GPU build:
 
 ```bash
-pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
+pip install alf-tools
 pip install torch --index-url https://download.pytorch.org/whl/cu128
 ```
 

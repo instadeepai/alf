@@ -24,12 +24,6 @@ Key properties:
 
       pip install "alf-tools[chemprop]"
 
-   or from source:
-
-   .. code-block:: bash
-
-      pip install "alf_tools[chemprop] @ git+https://github.com/instadeepai/alf.git#subdirectory=tools"
-
 .. automodule:: alf_tools.models.chemprop
    :members:
    :show-inheritance:
