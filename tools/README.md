@@ -14,6 +14,10 @@ datasets (GFP, ProteinGym, FLIP, GuacaMol), models (CNN, Gaussian Process, ESM-2
 acquisition functions, and search strategies. Use it for quick-start and prototyping; reach for
 `alf-core` alone when you want the lightweight framework with no ML-framework dependencies.
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/instadeepai/alf/main/docs/imgs/alf_main_figure.png" alt="ALF active-learning loop overview" width="70%">
+</div>
+
 ## Installation
 
 ```bash
