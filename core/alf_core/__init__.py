@@ -13,6 +13,8 @@
 # limitations under the License.
 
 # This file makes alf_core a Python package
+import importlib.metadata
+
 from alf_core.dataclasses import (
     Candidate,
     LabelledCandidates,
@@ -52,3 +54,5 @@ from alf_core.utils.state_logger import (
     StateLogger,
     TerminalStateLogger,
 )
+
+__version__ = importlib.metadata.version("alf-core")
