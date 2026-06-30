@@ -16,11 +16,6 @@ dependencies = [
     "seaborn>=0.12.0",
 ]
 
-[project.optional-dependencies]
-# ESM-2 tutorial needs transformers, exposed via alf_tools' esm2 extra.
-# Install with: uv sync --extra esm2
-esm2 = ["alf_tools[esm2]"]
-
 [tool.setuptools]
 packages = []  # No Python packages, just notebooks
 

@@ -37,6 +37,7 @@ try:
 except ImportError:
     HAS_TORCH = False
 
+
 class Modality(Enum):
     """The *kind* of candidate — used to match datasets with compatible models and metrics.
 
