@@ -42,7 +42,6 @@ from mlip.training.training_loggers import log_metrics_to_line
 from alf_tools.models.utils.mlip_utils import (
     MLIPModelConfig,
     MLIPTrainConfig,
-    MODEL_TYPES,
     build_finetuning_graph_datasets,
     build_graph_dataset,
     build_graph_datasets,
@@ -96,15 +95,13 @@ class MLIPModel(BaseModel):
             )
             self.force_field = None
             logger.info(f"Loaded pretrained model from {self.model_config.model_path}")
-            atomic_energies_map = (
-                self._pretrained_force_field.dataset_info.atomic_energies_map
-            )
+            atomic_energies_map = self._pretrained_force_field.dataset_info.atomic_energies_map
             if isinstance(atomic_energies_map, dict):
                 z_table = sorted(atomic_energies_map)
             else:
-                z_table = sorted(
-                    {atomic_number for e0s in atomic_energies_map for atomic_number in e0s}
-                )
+                z_table = sorted({
+                    atomic_number for e0s in atomic_energies_map for atomic_number in e0s
+                })
             logger.info(f"  z_table: {z_table}")
         else:
             self._pretrained_force_field = None
@@ -130,7 +127,11 @@ class MLIPModel(BaseModel):
         self,
         dataset_info: DatasetInfo,
     ) -> ForceField:
-        """Return a pretrained force field whose static dataset info is retargeted."""
+        """Return a pretrained force field whose static dataset info is retargeted.
+
+        Raises:
+            ValueError: If no pretrained force field is configured.
+        """
         pretrained = self._pretrained_force_field
         if pretrained is None:
             raise ValueError("Pretrained force field is required for finetuning")
@@ -200,9 +201,7 @@ class MLIPModel(BaseModel):
         systems_by_split = {"train": train_systems, "valid": val_systems}
 
         if self._test_data is not None and len(self._test_data) > 0:
-            systems_by_split["test"] = labelled_candidates_to_chemical_systems(
-                self._test_data
-            )
+            systems_by_split["test"] = labelled_candidates_to_chemical_systems(self._test_data)
 
         if pretrained_dataset_info is None:
             datasets, dataset_info = build_graph_datasets(
@@ -223,9 +222,7 @@ class MLIPModel(BaseModel):
         if is_finetuning:
             self.force_field = self._initialise_finetuning_force_field(dataset_info)
         else:
-            network_config = (
-                self.model_config.network_config or self._mlip_model_cls.Config()
-            )
+            network_config = self.model_config.network_config or self._mlip_model_cls.Config()
             mlip_network = self._mlip_model_cls(network_config, dataset_info)
             self.force_field = ForceField.from_mlip_network(mlip_network, seed=self.seed)
 

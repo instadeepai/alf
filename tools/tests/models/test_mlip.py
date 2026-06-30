@@ -14,6 +14,7 @@
 
 from dataclasses import dataclass
 from types import SimpleNamespace
+from typing import Any
 
 import numpy as np
 import pytest
@@ -27,9 +28,9 @@ from alf_tools.models.mlip import (  # noqa: E402
     MLIPModel,
     MLIPModelConfig,
     MLIPTrainConfig,
-    MODEL_TYPES,
 )
 from alf_tools.models.utils.mlip_utils import (  # noqa: E402
+    MODEL_TYPES,
     build_finetuning_graph_datasets,
     build_graph_dataset,
     build_graph_datasets,
@@ -157,7 +158,7 @@ class TestCandidateToChemicalSystem:
         )
 
     def test_load_extxyz_as_labelled_candidates(self, tmp_path) -> None:
-        """extxyz loading delegates to mlip's reader and returns ALF data."""
+        """Extxyz loading delegates to mlip's reader and returns ALF data."""
         atoms = Atoms("H2", positions=[[0, 0, 0], [0, 0, 1]])
         atoms.calc = SinglePointCalculator(
             atoms,
@@ -184,9 +185,7 @@ class TestGraphDatasetConstruction:
 
     def test_build_graph_dataset_uses_mlip_builder(self) -> None:
         """GraphDataset construction delegates graph creation and batching to mlip."""
-        water = candidate_to_chemical_system(
-            Candidate(data=_water(), modality="tabular"), 0.0
-        )
+        water = candidate_to_chemical_system(Candidate(data=_water(), modality="tabular"), 0.0)
         dataset = build_graph_dataset([water, water], cutoff=5.0, batch_size=2)
 
         assert dataset.max_n_node >= 1
@@ -195,9 +194,7 @@ class TestGraphDatasetConstruction:
 
     def test_build_graph_datasets_defaults_missing_charges_to_zero(self) -> None:
         """Training graph builder normalises missing total charges to neutral."""
-        water = candidate_to_chemical_system(
-            Candidate(data=_water(), modality="tabular"), 0.0
-        )
+        water = candidate_to_chemical_system(Candidate(data=_water(), modality="tabular"), 0.0)
         datasets, dataset_info = build_graph_datasets(
             {"train": [water, water], "valid": [water]},
             cutoff=5.0,
@@ -356,7 +353,7 @@ class TestModelTypeConfig:
     ) -> None:
         """Configured pretrained zip paths are delegated to mlip's model IO."""
         model_path = tmp_path / "model.zip"
-        captured: dict[str, object] = {}
+        captured: dict[str, Any] = {}
         fake_force_field = SimpleNamespace(
             dataset_info=SimpleNamespace(atomic_energies_map={1: -1.0}),
         )
@@ -366,9 +363,7 @@ class TestModelTypeConfig:
             captured["load_path"] = load_path
             return fake_force_field
 
-        monkeypatch.setattr(
-            mlip_module, "load_mlip_force_field", fake_load_mlip_force_field
-        )
+        monkeypatch.setattr(mlip_module, "load_mlip_force_field", fake_load_mlip_force_field)
 
         model = MLIPModel(
             model_config=MLIPModelConfig(model_path=model_path, model_type="mace"),
@@ -460,7 +455,7 @@ class TestTrainFromScratch:
             ),
         )
         dataset_info = SimpleNamespace(graph_cutoff_angstrom=5.0)
-        captured: dict[str, object] = {}
+        captured: dict[str, Any] = {}
 
         class FakeNetwork:
             def __init__(self, config, dataset_info_arg) -> None:
@@ -563,7 +558,7 @@ class TestTrainFromScratch:
                 training_loop_config=training_loop_config,
             ),
         )
-        captured: dict[str, object] = {}
+        captured: dict[str, Any] = {}
 
         class FakeNetwork:
             def __init__(self, config, dataset_info_arg) -> None:
@@ -621,13 +616,12 @@ class TestFinetuning:
         base = _water()
         if atomic_numbers is not None:
             base = base | {"atomic_numbers": atomic_numbers}
+        atomic_numbers_array = np.asarray(base["atomic_numbers"])
         candidates = [
             Candidate(
                 data=base,
                 modality="tabular",
-                features={
-                    "forces": rng.normal(size=(len(base["atomic_numbers"]), 3))
-                },
+                features={"forces": rng.normal(size=(len(atomic_numbers_array), 3))},
             )
             for _ in range(n)
         ]
@@ -638,7 +632,7 @@ class TestFinetuning:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Finetuning uses the retargeted DatasetInfo with loaded parameter shapes."""
-        captured: dict[str, object] = {}
+        captured: dict[str, Any] = {}
 
         pretrained_info = DatasetInfo(
             atomic_energies_map={1: -1.0, 6: -6.0, 8: -8.0},
@@ -673,7 +667,7 @@ class TestFinetuning:
             model_config=MLIPModelConfig(model_path=None),
             train_config=MLIPTrainConfig(
                 optimizer_config=OptimizerConfig(),
-                training_loop_config=mlip_module.TrainingLoop.Config(num_epochs=1)
+                training_loop_config=mlip_module.TrainingLoop.Config(num_epochs=1),
             ),
         )
         model._pretrained_force_field = pretrained
@@ -749,6 +743,4 @@ class TestFinetuning:
         assert captured["training_loop_kwargs"]["optimizer"] == "optimizer"
         assert captured["training_loop_ran"] is True
         assert model.force_field.params == {"trained": True}
-        assert model.force_field.dataset_info.atomic_energies_map[1] == pytest.approx(
-            1.0
-        )
+        assert model.force_field.dataset_info.atomic_energies_map[1] == pytest.approx(1.0)

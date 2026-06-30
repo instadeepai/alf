@@ -20,7 +20,6 @@ from typing import Any
 from mlip.models import Esen, ForceField, Mace, Nequip, Visnet
 from mlip.models.model_io import load_model_from_zip
 
-
 MODEL_TYPES: dict[str, type[Any]] = {
     "esen": Esen,
     "mace": Mace,
@@ -30,17 +29,24 @@ MODEL_TYPES: dict[str, type[Any]] = {
 
 
 def resolve_mlip_model_cls(model_type: str) -> type[Any]:
-    """Return the mlip model class for a configured model type."""
+    """Return the mlip model class for a configured model type.
+
+    Raises:
+        ValueError: If the model type is unsupported.
+    """
     try:
         return MODEL_TYPES[model_type]
     except KeyError as exc:
         supported = ", ".join(sorted(MODEL_TYPES))
         raise ValueError(
-            f"Unsupported MLIP model_type {model_type!r}; "
-            f"supported values are: {supported}"
+            f"Unsupported MLIP model_type {model_type!r}; supported values are: {supported}"
         ) from exc
 
 
 def load_mlip_force_field(model_type: str, model_path: str | Path) -> ForceField:
-    """Load a pretrained mlip force field from a zip file."""
+    """Load a pretrained mlip force field from a zip file.
+
+    Returns:
+        The loaded force field.
+    """
     return load_model_from_zip(resolve_mlip_model_cls(model_type), model_path)

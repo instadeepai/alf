@@ -29,7 +29,6 @@ from mlip.data.chemical_systems_readers.extxyz_reader import ExtxyzReader
 from mlip.data.dataset_info import DatasetInfo
 from mlip.data.graph_dataset import GraphDataset
 
-
 _REPLAY_DATASET_KEY = "replay"
 _TARGET_DATASET_KEY = "target"
 
@@ -43,7 +42,11 @@ def candidate_to_chemical_system(
     candidate: Candidate,
     energy: float | None = None,
 ) -> ChemicalSystem:
-    """Convert an ALF structure candidate into an mlip ChemicalSystem."""
+    """Convert an ALF structure candidate into an mlip ChemicalSystem.
+
+    Returns:
+        The corresponding mlip ChemicalSystem.
+    """
     system_kwargs = dict(candidate.data)
     if energy is not None:
         system_kwargs["energy"] = float(energy)
@@ -56,7 +59,11 @@ def chemical_system_to_candidate(
     system: ChemicalSystem,
     modality: str = "tabular",
 ) -> Candidate:
-    """Convert an mlip ChemicalSystem into an ALF Candidate."""
+    """Convert an mlip ChemicalSystem into an ALF Candidate.
+
+    Returns:
+        The corresponding ALF candidate.
+    """
     data = system.model_dump(exclude_none=True)
     data.pop("energy", None)
     forces = data.pop("forces", None)
@@ -69,7 +76,11 @@ def chemical_system_to_candidate(
 def labelled_candidates_to_chemical_systems(
     data: LabelledCandidates,
 ) -> list[ChemicalSystem]:
-    """Convert ALF labelled candidates into mlip ChemicalSystems."""
+    """Convert ALF labelled candidates into mlip ChemicalSystems.
+
+    Returns:
+        ChemicalSystems with labels copied into their energy fields.
+    """
     return [
         candidate_to_chemical_system(candidate, energy)
         for candidate, energy in zip(data.candidates, data.labels)
@@ -80,7 +91,14 @@ def chemical_systems_to_labelled_candidates(
     systems: list[ChemicalSystem],
     modality: str = "tabular",
 ) -> LabelledCandidates:
-    """Convert labelled mlip ChemicalSystems into ALF LabelledCandidates."""
+    """Convert labelled mlip ChemicalSystems into ALF LabelledCandidates.
+
+    Returns:
+        ALF labelled candidates built from the ChemicalSystem energies.
+
+    Raises:
+        ValueError: If any ChemicalSystem is missing an energy value.
+    """
     missing_energy = [i for i, system in enumerate(systems) if system.energy is None]
     if missing_energy:
         raise ValueError(
@@ -88,9 +106,7 @@ def chemical_systems_to_labelled_candidates(
             f"indices {missing_energy}"
         )
     return LabelledCandidates(
-        candidates=[
-            chemical_system_to_candidate(system, modality=modality) for system in systems
-        ],
+        candidates=[chemical_system_to_candidate(system, modality=modality) for system in systems],
         labels=np.asarray([system.energy for system in systems], dtype=float),
     )
 
@@ -100,7 +116,11 @@ def load_extxyz_as_labelled_candidates(
     modality: str = "tabular",
     property_name_mapping: dict[str, str] | None = None,
 ) -> LabelledCandidates:
-    """Load an extxyz file into ALF LabelledCandidates via mlip's ExtxyzReader."""
+    """Load an extxyz file into ALF LabelledCandidates via mlip's ExtxyzReader.
+
+    Returns:
+        Labelled candidates parsed from the extxyz file.
+    """
     systems = ExtxyzReader(
         filepaths=xyz_path,
         property_name_mapping=property_name_mapping,
@@ -113,7 +133,14 @@ def build_graph_datasets(
     cutoff: float,
     batch_size: int,
 ) -> tuple[dict[str, GraphDataset], DatasetInfo]:
-    """Build graph datasets and dataset info with mlip's dataset builder."""
+    """Build graph datasets and dataset info with mlip's dataset builder.
+
+    Returns:
+        A mapping of split names to graph datasets and the inferred DatasetInfo.
+
+    Raises:
+        ValueError: If mlip does not return a scalar DatasetInfo.
+    """
     readers = {
         split: _reader_from_systems(systems)
         for split, systems in systems_by_split.items()
@@ -141,7 +168,15 @@ def build_finetuning_graph_datasets(
     pretrained_dataset_info: DatasetInfo,
     batch_size: int,
 ) -> tuple[dict[str, GraphDataset], DatasetInfo]:
-    """Build finetuning datasets and scalar target DatasetInfo via mlip MULTI mode."""
+    """Build finetuning datasets and scalar target DatasetInfo via mlip MULTI mode.
+
+    Returns:
+        A mapping of split names to graph datasets and the retargeted DatasetInfo.
+
+    Raises:
+        ValueError: If the pretrained DatasetInfo is unsupported or target species
+            are absent from the pretrained z-table.
+    """
     pretrained_e0s = pretrained_dataset_info.atomic_energies_map
     if not isinstance(pretrained_e0s, dict):
         raise ValueError(
@@ -206,7 +241,14 @@ def build_graph_dataset(
     dataset_info: DatasetInfo | bool = False,
     long_range_cutoff: float | None = None,
 ) -> GraphDataset:
-    """Build a GraphDataset from ChemicalSystems using mlip's dataset builder."""
+    """Build a GraphDataset from ChemicalSystems using mlip's dataset builder.
+
+    Returns:
+        A graph dataset ready for mlip inference.
+
+    Raises:
+        ValueError: If any input system has a single atom.
+    """
     if any(len(system.atomic_numbers) <= 1 for system in systems):
         raise ValueError("Single atom systems are not supported yet.")
 
