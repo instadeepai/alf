@@ -42,11 +42,9 @@ class Modality(Enum):
     """Enum for different data modalities."""
 
     SEQUENCE = "sequence"
-    IMAGE = "image"
     GRAPH = "graph"
     STRUCTURE = "structure"
     TABULAR = "tabular"
-    EMBEDDING = "embedding"
 
 
 @dataclass(eq=False, unsafe_hash=False)
@@ -55,7 +53,7 @@ class Candidate:
 
     Attributes:
         data: The raw data of the candidate (e.g., sequence string, graph, image).
-        modality: The type/modality of the data (e.g., "sequence", "graph", "image").
+        modality: The type/modality of the data (e.g., "sequence", "graph").
         features: Optional dictionary of precomputed features for the candidate.
     """
 
@@ -183,11 +181,9 @@ class Candidate:
         - SEQUENCE: Returns stringified data for efficient string storage
         - TABULAR: Validates and returns data (scalar, dict, numpy array, pandas Series,
           list, tuple, or torch tensor). Torch tensors are converted to numpy arrays.
-        - IMAGE: Converts torch tensors to numpy arrays; other types to numpy arrays
         - STRUCTURE: Converts torch tensors/arrays to numpy arrays; strings are passed
           through as-is to support serialised representations (e.g. JSON-encoded crystal
           structures)
-        - EMBEDDING: Converts torch tensors to numpy arrays; other types to numpy arrays
         - GRAPH: Not yet supported (raises NotImplementedError)
 
         Returns:
@@ -204,13 +200,6 @@ class Candidate:
             >>> candidate = Candidate(data="ACDEFG", modality=Modality.SEQUENCE)
             >>> candidate.to_serializable()
             'ACDEFG'
-
-            >>> # Image modality with numpy array
-            >>> img = np.random.rand(3, 64, 64)
-            >>> candidate = Candidate(data=img, modality=Modality.IMAGE)
-            >>> result = candidate.to_serializable()
-            >>> isinstance(result, np.ndarray)
-            True
 
             >>> # Structure modality with JSON-encoded crystal structure
             >>> json_str = '{"lattice": [[3.84, 0, 0], [0, 3.84, 0], [0, 0, 3.84]]}'
@@ -257,12 +246,6 @@ class Candidate:
                 return self.data
             return self._convert_data_to_npy(
                 "STRUCTURE modality data must be a string, numpy array, or torch tensor."
-            )
-
-        elif self.modality in (Modality.IMAGE, Modality.EMBEDDING):
-            # Convert arrays/tensors to compact format
-            return self._convert_data_to_npy(
-                "IMAGE and EMBEDDING modality data must be a numpy array or torch tensor."
             )
 
         elif self.modality == Modality.GRAPH:

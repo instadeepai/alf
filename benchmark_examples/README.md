@@ -26,7 +26,7 @@ Each writes a comparison PNG and `summary.csv` under `--output-dir`
 (default `benchmark_examples/outputs/<script>/`).
 
 > **Note:** these scripts run from a source checkout with `uv run`, so they require a
-> [development installation](../docs/INSTALLATION.md#development-installation) of the repo.
+> [development installation](https://instadeepai.github.io/alf/installation.html#development-setup) of the repo.
 
 ## Flags
 
