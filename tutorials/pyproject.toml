@@ -12,6 +12,7 @@ dependencies = [
     "alf_tools",
     "matplotlib>=3.3.0",
     "umap-learn>=0.5.0",
+    "llvmlite>=0.39.0",
     "ipykernel>=6.25.0",
     "pyrosetta-installer",
     "seaborn>=0.12.0",
@@ -21,9 +22,6 @@ dependencies = [
 # ESM-2 tutorial needs transformers, exposed via alf_tools' esm2 extra.
 # Install with: uv sync --extra esm2
 esm2 = ["alf_tools[esm2]"]
-# MLIP tutorial needs the mlip package, exposed via alf_tools' mlip extra.
-# Install with: uv sync --extra mlip
-mlip = ["alf_tools[mlip]"]
 
 [tool.setuptools]
 packages = []  # No Python packages, just notebooks
@@ -37,3 +35,8 @@ dev = [
     "jupyter>=1.1.1",
     "nbconvert>=7.17.1",
 ]
+
+# Optional extras for individual tutorials, mirroring the alf_tools extras so the
+# `uv sync --group <name>` commands in the tutorials also work from `tutorials/`.
+# MLIP tutorial needs the mlip package (MACE force field). Install with: uv sync --group mlip
+mlip = ["alf_tools[mlip]"]

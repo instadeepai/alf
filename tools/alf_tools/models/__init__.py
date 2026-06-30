@@ -92,6 +92,10 @@ except ImportError:
     pass
 
 if _mlip_available:
-    from alf_tools.models.mlip import MLIPModel, MLIPModelConfig, MLIPTrainConfig
+    from alf_tools.models.mlip import (
+        MLIPModel,
+        MLIPModelConfig,
+        MLIPTrainConfig,
+    )
 
     __all__ += ["MLIPModel", "MLIPModelConfig", "MLIPTrainConfig"]
