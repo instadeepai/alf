@@ -9,8 +9,7 @@
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 [![Tests and Linters 🧪](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml/badge.svg?branch=main)](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml)
 
-**ALF** is an active learning framework for iterative optimisation in computational science, designed to optimize high-dimensional and combinatorially vast search spaces where data acquisition is expensive, from wet-lab experiments and physical measurements to costly simulations. ALF accelerates discovery of optimal designs (proteins, molecules, materials) through intelligent candidate selection, adaptive modelling, and efficient evaluation strategies. It provides modular components for candidate search, surrogate modelling, and acquisition, enabling efficient discovery across expensive, high-dimensional search spaces such
-as protein sequences and small molecules.
+**ALF** is an active learning framework for optimising expensive, high-dimensional search spaces in computational science — settings where every label costs a wet-lab experiment, a physical measurement, or a long simulation, and the candidate space (protein sequences, small molecules, materials) is far too large to screen exhaustively. It runs the full loop of search, surrogate modelling, and acquisition through modular components you can swap independently.
 
 <div align="center">
   <img src="docs/imgs/alf_main_figure.png" alt="ALF active-learning loop overview" width="70%">
