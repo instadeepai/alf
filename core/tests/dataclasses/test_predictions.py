@@ -350,7 +350,7 @@ class TestPredictionsToDataframeSerialisation:
             pbc=True,
         )
         preds = Predictions(means=np.array([-1.5]))
-        candidates = [Candidate(data=atoms, modality=Modality.STRUCTURE)]
+        candidates = [Candidate(data=atoms, modality=Modality.MOLECULE)]
         df = preds.to_dataframe(candidates, np.array([-1.4]), problem_type=ProblemType.REGRESSION)
 
         serialised = df["data"].iloc[0]

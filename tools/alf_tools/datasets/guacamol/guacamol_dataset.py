@@ -25,6 +25,7 @@ from alf_core import (
     BaseDatasetConfig,
     Candidate,
     LabelledCandidates,
+    Modality,
     ProblemType,
 )
 from pydantic import Field, computed_field, model_validator
@@ -67,6 +68,7 @@ class GuacaMolConfig(BaseDatasetConfig):
         data_dir: Directory where SMILES files are cached. Defaults to the package data dir.
     """
 
+    modality: Modality = Modality.MOLECULE
     problem_type: ProblemType = ProblemType.REGRESSION
     target_property: GuacaMolPropertyName | GuacaMolTaskName
     computed_properties: list[GuacaMolPropertyName] | None = None

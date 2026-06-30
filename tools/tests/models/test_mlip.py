@@ -97,7 +97,7 @@ class TestCandidateToChemicalSystem:
 
     def test_charge_defaults_to_neutral(self) -> None:
         """A candidate with no charge feature defaults to charge 0."""
-        candidate = Candidate(data=_water(), modality="structure")
+        candidate = Candidate(data=_water(), modality="molecule")
         system = _candidate_to_chemical_system(candidate, energy=-1.5)
         assert system.charge == 0
         assert system.energy == -1.5
@@ -108,7 +108,7 @@ class TestCandidateToChemicalSystem:
         """Charge and forces features are forwarded to the ChemicalSystem."""
         forces = np.zeros((3, 3))
         candidate = Candidate(
-            data=_water(), modality="structure", features={"charge": 2, "forces": forces}
+            data=_water(), modality="molecule", features={"charge": 2, "forces": forces}
         )
         system = _candidate_to_chemical_system(candidate, energy=0.0)
         assert system.charge == 2
@@ -122,9 +122,9 @@ class TestGraphHelpers:
     def test_filter_drops_empty_and_none_graphs(self) -> None:
         """Single-atom (edgeless) graphs and None entries are filtered out."""
         single = _candidate_to_chemical_system(
-            Candidate(data=Atoms("H", positions=[[0, 0, 0]]), modality="structure"), 0.0
+            Candidate(data=Atoms("H", positions=[[0, 0, 0]]), modality="molecule"), 0.0
         )
-        water = _candidate_to_chemical_system(Candidate(data=_water(), modality="structure"), 0.0)
+        water = _candidate_to_chemical_system(Candidate(data=_water(), modality="molecule"), 0.0)
         g_single = Graph.from_chemical_system(single, 5.0)
         g_water = Graph.from_chemical_system(water, 5.0)
         assert int(g_single.n_edge.sum()) == 0
@@ -136,7 +136,7 @@ class TestGraphHelpers:
 
     def test_compute_batching_limits_positive(self) -> None:
         """Batching limits are positive and cover the provided systems."""
-        water = _candidate_to_chemical_system(Candidate(data=_water(), modality="structure"), 0.0)
+        water = _candidate_to_chemical_system(Candidate(data=_water(), modality="molecule"), 0.0)
         graph = Graph.from_chemical_system(water, 5.0)
         max_n_node, max_n_edge = _compute_batching_limits([water, water], [graph, graph], 2)
         assert max_n_node >= 1
@@ -180,8 +180,8 @@ class TestPredictWithForces:
         monkeypatch.setattr(model, "_run_inference", lambda structures: fake)
 
         candidates = [
-            Candidate(data=_water(), modality="structure"),
-            Candidate(data=_water(), modality="structure"),
+            Candidate(data=_water(), modality="molecule"),
+            Candidate(data=_water(), modality="molecule"),
         ]
         energies, forces = model.predict_with_forces(candidates)
 
@@ -199,7 +199,7 @@ class TestPerReactionMetrics:
         candidates = [
             Candidate(
                 data=_water(),
-                modality="structure",
+                modality="molecule",
                 features={"reaction_id": rid, "forces": np.zeros((3, 3))},
             )
             for rid in (0, 0, 1, 1)
@@ -227,7 +227,7 @@ class TestPerReactionMetrics:
     def test_returns_empty_without_reactions(self) -> None:
         """No reaction_id features yields an empty metrics dict."""
         model = _scratch_model()
-        candidates = [Candidate(data=_water(), modality="structure")]
+        candidates = [Candidate(data=_water(), modality="molecule")]
         model._test_data = LabelledCandidates(candidates=candidates, labels=np.array([1.0]))
         model._test_labels = np.array([1.0])
         assert model._compute_and_log_per_reaction_metrics() == {}
@@ -246,7 +246,7 @@ class TestTrainPredictFromScratch:
         candidates = [
             Candidate(
                 data=_water(),
-                modality="structure",
+                modality="molecule",
                 features={"forces": rng.normal(size=(3, 3))},
             )
             for _ in range(n)
