@@ -54,13 +54,14 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
 
     Dissimilarity is computed as follows depending on candidate modality:
 
-    - **SEQUENCE** / **MOLECULE**: normalised Levenshtein distance over the
-      string representation. `dissimilarity = levenshtein(a, b) / max(len(a), len(b))`,
-      yielding 0 for identical strings and 1 when every character must be
-      substituted or the strings differ by their full length. (For MOLECULE this is
-      a placeholder: edit distance is computed on the raw SMILES string, so two
-      strings denoting the *same* molecule — e.g. ``"CCO"`` and ``"OCC"`` — can score
-      as dissimilar. Fingerprint-based Tanimoto distance is a planned follow-up.)
+    - **SEQUENCE**: normalised Levenshtein distance over the string representation.
+      `dissimilarity = levenshtein(a, b) / max(len(a), len(b))`, yielding 0 for
+      identical strings and 1 when every character must be substituted or the strings
+      differ by their full length.
+    - **MOLECULE**: not yet supported (raises :class:`NotImplementedError`). Edit
+      distance over raw SMILES is not chemically meaningful — two strings denoting the
+      *same* molecule (e.g. ``"CCO"`` and ``"OCC"``) would score as dissimilar.
+      Fingerprint-based Tanimoto distance is a planned follow-up.
     - **TABULAR**: cosine distance computed via
       :func:`scipy.spatial.distance.pdist`.  Candidates are flattened to 1-D
       feature vectors before comparison.
@@ -81,6 +82,7 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
         ValueError: If candidates span multiple modalities, if the modality
             is not one of SEQUENCE, MOLECULE, or TABULAR, or if any candidate
             has an all-zero feature vector (cosine distance undefined).
+        NotImplementedError: If the modality is MOLECULE (not yet supported).
     """
     if len(candidates) < 2:
         return {}
@@ -94,7 +96,15 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
 
     modality = candidates[0].modality
 
-    if modality in (Modality.SEQUENCE, Modality.MOLECULE):
+    if modality == Modality.MOLECULE:
+        raise NotImplementedError(
+            "intra_batch_diversity does not yet support MOLECULE candidates. A "
+            "fingerprint-based Tanimoto distance is a planned follow-up; edit distance "
+            "over raw SMILES is not chemically meaningful (e.g. 'CCO' and 'OCC' denote "
+            "the same molecule but would score as dissimilar)."
+        )
+
+    if modality == Modality.SEQUENCE:
         pairs = []
         for ci, cj in combinations(candidates, 2):
             a, b = str(ci.data), str(cj.data)
