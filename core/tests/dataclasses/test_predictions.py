@@ -315,24 +315,3 @@ class TestPredictionsToDataframeClassification:
         assert "prob_class_1" not in df.columns
         # mean should be the array
         assert len(df["mean"].iloc[0]) == 2  # array of length 2
-
-
-class TestPredictionsToDataframeSerialisation:
-    """to_dataframe() stores candidate data via Candidate.to_serializable().
-
-    Regression tests for the switch from raw `candidate.data` to
-    `candidate.to_serializable()`, so supported non-string payloads use the same
-    serialization path as direct candidate exports.
-    """
-
-    def test_string_data_passes_through_unchanged(self):
-        """Sequence/string data is stored verbatim, matching pre-change behaviour."""
-        preds = Predictions(means=np.array([1.0, 2.0]))
-        candidates = [
-            Candidate(data="seqA", modality=Modality.SEQUENCE),
-            Candidate(data="seqB", modality=Modality.SEQUENCE),
-        ]
-        df = preds.to_dataframe(
-            candidates, np.array([1.0, 2.0]), problem_type=ProblemType.REGRESSION
-        )
-        assert df["data"].tolist() == ["seqA", "seqB"]
