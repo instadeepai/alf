@@ -58,7 +58,7 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
       `dissimilarity = levenshtein(a, b) / max(len(a), len(b))`,
       yielding 0 for identical sequences and 1 when every character must
       be substituted or the sequences differ by their full length.
-    - **EMBEDDING** / **TABULAR**: cosine distance computed via
+    - **TABULAR**: cosine distance computed via
       :func:`scipy.spatial.distance.pdist`.  Candidates are flattened to 1-D
       feature vectors before comparison.
 
@@ -76,7 +76,7 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
 
     Raises:
         ValueError: If candidates span multiple modalities, if the modality
-            is not one of SEQUENCE, EMBEDDING, or TABULAR, or if any candidate
+            is not one of SEQUENCE or TABULAR, or if any candidate
             has an all-zero feature vector (cosine distance undefined).
     """
     if len(candidates) < 2:
@@ -100,7 +100,7 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
             pairs.append(dist)
         return {"intra_batch_diversity": float(np.mean(pairs))}
 
-    if modality in (Modality.EMBEDDING, Modality.TABULAR):
+    if modality == Modality.TABULAR:
         try:
             features = np.stack([np.asarray(c.data).flatten().astype(float) for c in candidates])
         except Exception as exc:
@@ -117,7 +117,7 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
 
     raise ValueError(
         f"intra_batch_diversity does not support modality '{modality}'. "
-        f"Supported modalities: SEQUENCE, EMBEDDING, TABULAR."
+        f"Supported modalities: SEQUENCE, TABULAR."
     )
 
 
