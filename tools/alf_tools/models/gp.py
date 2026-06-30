@@ -36,12 +36,6 @@ from alf_core import (
     Results,
     SurrogateEpochMetrics,
 )
-from botorch.fit import fit_gpytorch_mll
-from botorch.models import SingleTaskGP
-from botorch.optim.core import OptimizationResult
-from botorch.optim.fit import fit_gpytorch_mll_scipy
-from jaxtyping import Float
-
 from alf_tools.models.utils import (
     build_from_target,
     create_char_to_idx_mapping,
@@ -52,6 +46,11 @@ from alf_tools.models.utils import (
 )
 from alf_tools.models.utils.botorch_utils import KernelTypes, _build_kernel, candidates_to_tensor
 from alf_tools.utils.constants import PROTEIN_ALPHABET
+from botorch.fit import fit_gpytorch_mll
+from botorch.models import SingleTaskGP
+from botorch.optim.core import OptimizationResult
+from botorch.optim.fit import fit_gpytorch_mll_scipy
+from jaxtyping import Float
 
 logger = logging.getLogger("alf-tools")
 

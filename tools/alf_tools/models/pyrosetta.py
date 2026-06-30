@@ -19,7 +19,6 @@ from typing import Any, Dict, List, Tuple, Union
 import numpy as np
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
 from alf_core.utils.enums import ProblemType
-
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 logger = logging.getLogger("alf-tools")

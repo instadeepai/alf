@@ -31,9 +31,8 @@ from alf_core import (
 )
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
 from alf_core.utils.enums import ProblemType
-from torch.utils.data import DataLoader, TensorDataset
-
 from alf_tools.models.utils import get_device
+from torch.utils.data import DataLoader, TensorDataset
 
 logger = logging.getLogger("alf-tools")
 

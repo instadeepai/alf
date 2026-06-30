@@ -17,7 +17,6 @@ from dataclasses import dataclass
 from typing import Union
 
 import numpy as np
-
 from alf_core.dataclasses.predictions import Predictions
 from alf_core.utils.enums import ProblemType
 from alf_core.utils.metrics import classification_metric_registry, regression_metric_registry
