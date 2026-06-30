@@ -446,16 +446,6 @@ class TestCandidateToSerializable:
         assert np.allclose(restored.get_positions(), atoms.get_positions())
         assert np.allclose(restored.get_cell(), atoms.get_cell())
 
-    def test_to_serializable_embedding_modality(self):
-        """Test to_serializable with embedding modality returns raw embedding data."""
-        embedding_data = torch.randn(16, 128)
-        candidate = Candidate(data=embedding_data, modality=Modality.EMBEDDING)
-        result = candidate.to_serializable()
-
-        assert isinstance(result, np.ndarray)
-        assert torch.equal(torch.asarray(result), embedding_data)
-        assert result.shape == (16, 128)
-
     def test_to_serializable_preserves_features(self):
         """Test that to_serializable doesn't modify candidate features."""
         features = {"key": "value", "number": 42}

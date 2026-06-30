@@ -29,7 +29,7 @@ see [Optional Extras](#optional-extras) below.
 
 ### Optional Extras
 
-Some models require additional dependencies. Append one or more extras to the package URL.
+Some models require additional dependencies. Append one or more extras to the package name.
 Per-model extras (`esm2`, `esmfold`, `chemprop`, `guacamol`, `mlip`) install exactly one model's
 dependencies; workflow umbrellas (`protein`, `molecule`) group the extras you are likely to use
 together.
@@ -39,10 +39,9 @@ pip install "alf-tools[esm2]"      # ESM-2 protein language model (ESM2Model)
 pip install "alf-tools[esmfold]"   # ESMFold structure-prediction oracle (ESMFoldModel)
 pip install "alf-tools[chemprop]"  # Chemprop small-molecule MPNN (ChempropModel)
 pip install "alf-tools[guacamol]"  # GuacaMol RDKit-based dataset/scoring
-pip install "alf_tools[mlip]       # MLIP — MACE force field for atomistic systems (for MLIPModel)
-
+pip install "alf-tools[mlip]"      # MLIP MACE force field for atomistic systems (MLIPModel)
 pip install "alf-tools[protein]"   # umbrella: esm2 + esmfold
-pip install "alf-tools[molecule]"  # umbrella: chemprop + guacamol
+pip install "alf-tools[molecule]"  # umbrella: chemprop + guacamol + mlip
 ```
 
 ## Documentation
@@ -56,9 +55,9 @@ pip install "alf-tools[molecule]"  # umbrella: chemprop + guacamol
 ## What's included
 
 `alf-tools` bundles example datasets (GFP, ProteinGym, FLIP, GuacaMol), surrogate and oracle
-models (CNN, Gaussian Process, ESM-2, ESMFold, Chemprop, PyRosetta, plus an ensemble wrapper),
-acquisition functions (Greedy, UCB, Expected Improvement, Thompson Sampling, CoreSet, and a
-BoTorch wrapper), and search strategies. See the
+models (CNN, Gaussian Process, ESM-2, ESMFold, Chemprop, MLIP, PyRosetta, plus an ensemble
+wrapper), acquisition functions (Greedy, UCB, Expected Improvement, Thompson Sampling,
+UncertaintyBased, RandomSelection, CoreSet, and a BoTorch wrapper), and search strategies. See the
 [API reference](https://instadeepai.github.io/alf/api/alf_tools/index.html) for the full
 catalogue and configuration options.
 
