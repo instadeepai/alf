@@ -18,6 +18,7 @@ from typing import Any
 import numpy as np
 import torch
 from alf_core import Predictions
+
 from alf_tools.models.esm_utils.loss import special_tokens_mask
 
 logger = logging.getLogger("alf-tools")

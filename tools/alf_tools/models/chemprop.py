@@ -32,7 +32,6 @@ from alf_core import (
     Results,
 )
 from alf_core.dataclasses.surrogate_epoch_metrics import SurrogateEpochMetrics
-from alf_tools.models.utils import get_device
 from chemprop.data import (
     BatchMolGraph,
     MoleculeDatapoint,
@@ -42,6 +41,8 @@ from chemprop.data import (
 from chemprop.nn import BondMessagePassing, MeanAggregation, NormAggregation, SumAggregation
 from chemprop.nn.predictors import RegressionFFN
 from torch.utils.data import DataLoader
+
+from alf_tools.models.utils import get_device
 
 logger = logging.getLogger("alf-tools")
 

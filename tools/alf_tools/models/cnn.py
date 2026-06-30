@@ -30,6 +30,9 @@ from alf_core.model.normaliser import (
     OutputStandardiser,
 )
 from alf_core.utils.enums import ProblemType
+from jaxtyping import Float
+from torch.utils.data import DataLoader, TensorDataset
+
 from alf_tools.models.utils import (
     create_char_to_idx_mapping,
     get_device,
@@ -37,8 +40,6 @@ from alf_tools.models.utils import (
     transform_data,
 )
 from alf_tools.utils.constants import PROTEIN_ALPHABET
-from jaxtyping import Float
-from torch.utils.data import DataLoader, TensorDataset
 
 logger = logging.getLogger("alf-tools")
 
