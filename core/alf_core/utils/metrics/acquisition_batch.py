@@ -58,7 +58,9 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
       string representation. `dissimilarity = levenshtein(a, b) / max(len(a), len(b))`,
       yielding 0 for identical strings and 1 when every character must be
       substituted or the strings differ by their full length. (For MOLECULE this is
-      a placeholder; fingerprint-based Tanimoto distance is a planned follow-up.)
+      a placeholder: edit distance is computed on the raw SMILES string, so two
+      strings denoting the *same* molecule — e.g. ``"CCO"`` and ``"OCC"`` — can score
+      as dissimilar. Fingerprint-based Tanimoto distance is a planned follow-up.)
     - **TABULAR**: cosine distance computed via
       :func:`scipy.spatial.distance.pdist`.  Candidates are flattened to 1-D
       feature vectors before comparison.

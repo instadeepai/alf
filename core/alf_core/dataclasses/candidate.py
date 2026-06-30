@@ -41,9 +41,11 @@ except ImportError:
 class Modality(Enum):
     """The *kind* of candidate — used to match datasets with compatible models and metrics.
 
-    It is the data's domain where one exists, not how the data is stored (a protein
-    sequence and a SMILES string are both ``str`` but differ here). Storage type is
-    inferred from ``type(data)`` (see :meth:`Candidate.to_serializable`).
+    It is the data's domain where one exists, not how the data is stored. This is why a
+    protein sequence and a SMILES string are distinct modalities (``SEQUENCE`` vs
+    ``MOLECULE``) even though both are stored as ``str``: they pair with different models
+    and metrics. Storage type is never encoded here — it is inferred from ``type(data)``
+    (see :meth:`Candidate.to_serializable`).
 
     Members:
         SEQUENCE: Biological sequences (protein / nucleotide), as strings.
@@ -174,8 +176,9 @@ class Candidate:
 
         - ``str`` (sequences, SMILES, JSON-encoded payloads): returned unchanged.
         - ``torch.Tensor``: converted to a numpy array for compact storage.
-        - numpy array, scalar (``int``/``float``/``bool``), ``dict``, ``list``, ``tuple``,
-          pandas ``Series``: returned unchanged.
+        - numpy array, scalar (Python ``int``/``float``/``bool`` or a numpy scalar such
+          as ``np.int64``), ``dict``, ``list``, ``tuple``, pandas ``Series``: returned
+          unchanged.
         - ``None``: returned as ``None``.
 
         Returns:
@@ -207,8 +210,9 @@ class Candidate:
         # Torch tensors are converted to numpy arrays for compact storage.
         if HAS_TORCH and isinstance(data, torch.Tensor):
             return data.cpu().numpy()
-        # numpy arrays, scalars, and standard containers are stored as-is.
-        if isinstance(data, (int, float, bool, dict, np.ndarray, list, tuple)):
+        # numpy arrays, scalars (incl. numpy scalars like np.int64), and standard
+        # containers are stored as-is.
+        if isinstance(data, (int, float, bool, np.generic, dict, np.ndarray, list, tuple)):
             return data
         # pandas Series (checked without importing pandas).
         if data.__class__.__name__ == "Series":

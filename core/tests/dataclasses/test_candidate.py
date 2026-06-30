@@ -389,6 +389,14 @@ class TestCandidateToSerializable:
         assert isinstance(result, str)
         assert result == smiles
 
+    def test_to_serializable_numpy_scalar(self):
+        """A numpy scalar (e.g. np.int64) passes through unchanged."""
+        value = np.int64(7)
+        candidate = Candidate(data=value, modality=Modality.TABULAR)
+        result = candidate.to_serializable()
+
+        assert result == value
+
     def test_to_serializable_unsupported_type(self):
         """A data type that is not DataFrame-compatible raises TypeError."""
         candidate = Candidate(data={1, 2, 3}, modality=Modality.TABULAR)  # set is unsupported
