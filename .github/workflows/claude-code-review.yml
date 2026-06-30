@@ -2,7 +2,7 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened, labeled]
+    types: [opened, synchronize, ready_for_review, reopened]
     # Optional: Only run on specific file changes
     # paths:
     #   - "src/**/*.ts"
@@ -12,13 +12,17 @@ on:
 
 jobs:
   claude-review:
-    if: contains(github.event.pull_request.labels.*.name, 'claude-review')
+    # Optional: Filter by PR author
+    # if: |
+    #   github.event.pull_request.user.login == 'external-contributor' ||
+    #   github.event.pull_request.user.login == 'new-developer' ||
+    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
 
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
-      issues: write
+      pull-requests: read
+      issues: read
       id-token: write
 
     steps:
@@ -32,82 +36,8 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: --model opus
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
-          track_progress: ${{ github.event.action != 'labeled' }}
-          prompt: |
-            REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
-
-            Review this PR for the mlip-jax research codebase. Focus on:
-
-            **Code Quality:**
-            - Potential bugs or logic errors
-            - JAX/Flax patterns: proper pmap, jit, pytrees usage
-            - Framework mixing: correct JAX ↔ NumPy ↔ PyTorch conversions
-            - Code smells: redundant code, overly complex functions, etc.
-
-            **Research Quality:**
-            - Reproducibility: seed handling, deterministic behavior
-            - Test coverage: are critical paths tested?
-            - Hydra configs: correct structure in experiments/config/
-            - Repository structure: logical organization of files and modules
-              with clear separation of files by type (data files, test files, etc.)
-
-            **Security & Best Practices:**
-            - Security vulnerabilities (input validation, auth, etc.)
-            - MLflow logging: appropriate tracking of experiments
-            - Type annotations: type hints are present
-
-            **Documentation:**
-            - Are .claude/CLAUDE.md and README.md up to date with changes?
-            - Complex logic has explanatory comments
-            - Public APIs have docstrings
-            - All license headers are present and correct
-            - Only single backticks in docstrings for code references
-
+          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-
-      - name: Collapse outdated Claude reviews
-        if: always() && steps.claude-review.outcome == 'success'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { repository } = await github.graphql(
-              `query($owner: String!, $name: String!, $number: Int!) {
-                 repository(owner: $owner, name: $name) {
-                   pullRequest(number: $number) {
-                     comments(first: 100) {
-                       nodes {
-                         id
-                         isMinimized
-                         createdAt
-                         author { login }
-                       }
-                     }
-                   }
-                 }
-               }`,
-              {
-                owner: context.repo.owner,
-                name: context.repo.repo,
-                number: context.payload.pull_request.number,
-              }
-            );
-            const claude = repository.pullRequest.comments.nodes
-              .filter(c => c.author?.login === 'claude' && !c.isMinimized)
-              .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-            const toMinimize = claude.slice(1, -1);
-            core.info(`Found ${claude.length} visible Claude comments; minimizing ${toMinimize.length}`);
-            for (const c of toMinimize) {
-              await github.graphql(
-                `mutation($id: ID!) {
-                   minimizeComment(input: {subjectId: $id, classifier: OUTDATED}) {
-                     minimizedComment { isMinimized }
-                   }
-                 }`,
-                { id: c.id }
-              );
-            }
