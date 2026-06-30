@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
-
-import networkx as nx
 import numpy as np
 import pandas as pd
 import pytest
@@ -68,34 +65,12 @@ class TestCandidateDataModalities:
         assert candidate.modality == Modality.SEQUENCE
         assert len(candidate.data) == 20
 
-    def test_image_modality_numpy(self):
-        """Test Candidate with image data (NumPy array)."""
-        img_data = np.random.rand(3, 64, 64).astype(np.float32)  # RGB image
-        candidate = Candidate(data=img_data, modality=Modality.IMAGE)
-        assert isinstance(candidate.data, np.ndarray)
-        assert candidate.data.shape == (3, 64, 64)
-        assert candidate.data.dtype == np.float32
-
-    def test_image_modality_torch(self):
-        """Test Candidate with image data (PyTorch tensor)."""
-        img_data = torch.randn(3, 64, 64, dtype=torch.float32)
-        candidate = Candidate(data=img_data, modality=Modality.IMAGE)
-        assert isinstance(candidate.data, torch.Tensor)
-        assert candidate.data.shape == (3, 64, 64)
-
-    def test_graph_modality(self):
-        """Test Candidate with graph data (NetworkX graph)."""
-        G = nx.erdos_renyi_graph(n=10, p=0.3)
-        candidate = Candidate(data=G, modality=Modality.GRAPH)
-        assert isinstance(candidate.data, nx.Graph)
-        assert candidate.data.number_of_nodes() == 10
-
-    def test_structure_modality(self):
-        """Test Candidate with 3D structure data."""
-        coords = np.random.rand(50, 3)  # 50 atoms, (x,y,z)
-        candidate = Candidate(data=coords, modality=Modality.STRUCTURE)
-        assert isinstance(candidate.data, np.ndarray)
-        assert candidate.data.shape == (50, 3)
+    def test_molecule_modality(self):
+        """Test Candidate with molecule data (SMILES string)."""
+        smiles = "CC(=O)Oc1ccccc1C(=O)O"  # aspirin
+        candidate = Candidate(data=smiles, modality=Modality.MOLECULE)
+        assert isinstance(candidate.data, str)
+        assert candidate.modality == Modality.MOLECULE
 
     def test_tabular_modality_pandas(self):
         """Test Candidate with tabular data (pandas Series)."""
@@ -110,13 +85,6 @@ class TestCandidateDataModalities:
         candidate = Candidate(data=row, modality=Modality.TABULAR)
         assert isinstance(candidate.data, dict)
         assert candidate.data["age"] == 32
-
-    def test_embedding_modality(self):
-        """Test Candidate with embedding data (PyTorch tensor)."""
-        tensor_data = torch.randn(16, 128)  # sequence embeddings
-        candidate = Candidate(data=tensor_data, modality=Modality.EMBEDDING)
-        assert isinstance(candidate.data, torch.Tensor)
-        assert candidate.data.shape == (16, 128)
 
 
 class TestCandidateEdgeCases:
@@ -220,7 +188,7 @@ class TestCandidateEquality:
     def test_equality_different_modality(self):
         """Test that candidates with different modalities are not equal."""
         c1 = Candidate(data="test", modality=Modality.SEQUENCE)
-        c2 = Candidate(data="test", modality=Modality.EMBEDDING)
+        c2 = Candidate(data="test", modality=Modality.TABULAR)
         assert c1 != c2
 
     def test_equality_with_numpy_array_in_features(self):
@@ -245,24 +213,24 @@ class TestCandidateEquality:
         assert c1 != c2
 
     def test_equality_with_numpy_array_in_data(self):
-        """Test equality when data is a numpy array (IMAGE modality)."""
-        img_data = np.random.rand(3, 64, 64).astype(np.float32)
-        c1 = Candidate(data=img_data, modality=Modality.IMAGE)
-        c2 = Candidate(data=img_data.copy(), modality=Modality.IMAGE)
+        """Test equality when data is a numpy array (TABULAR modality)."""
+        arr_data = np.random.rand(3, 64, 64).astype(np.float32)
+        c1 = Candidate(data=arr_data, modality=Modality.TABULAR)
+        c2 = Candidate(data=arr_data.copy(), modality=Modality.TABULAR)
         assert c1 == c2
 
     def test_equality_with_numpy_array_in_data_different_values(self):
         """Test inequality when data contains different numpy arrays."""
-        c1 = Candidate(data=np.array([[1, 2], [3, 4]]), modality=Modality.STRUCTURE)
-        c2 = Candidate(data=np.array([[1, 2], [3, 5]]), modality=Modality.STRUCTURE)
+        c1 = Candidate(data=np.array([[1, 2], [3, 4]]), modality=Modality.TABULAR)
+        c2 = Candidate(data=np.array([[1, 2], [3, 5]]), modality=Modality.TABULAR)
         assert c1 != c2
 
     def test_equality_with_nested_list_of_numpy_arrays_in_data(self):
         """Test equality with nested list containing numpy arrays."""
         arr1 = np.array([1, 2, 3])
         arr2 = np.array([4, 5, 6])
-        c1 = Candidate(data=[arr1, arr2], modality=Modality.EMBEDDING)
-        c2 = Candidate(data=[arr1.copy(), arr2.copy()], modality=Modality.EMBEDDING)
+        c1 = Candidate(data=[arr1, arr2], modality=Modality.TABULAR)
+        c2 = Candidate(data=[arr1.copy(), arr2.copy()], modality=Modality.TABULAR)
         assert c1 == c2
 
     def test_equality_with_nested_dict_of_numpy_arrays_in_features(self):
@@ -412,91 +380,28 @@ class TestCandidateToSerializable:
         assert isinstance(result, np.ndarray)
         assert np.array_equal(result, tabular_data)
 
-    def test_to_serializable_image_modality_numpy(self):
-        """Test to_serializable with image modality returns raw numpy array data."""
-        img_data = np.random.rand(3, 64, 64).astype(np.float32)
-        candidate = Candidate(data=img_data, modality=Modality.IMAGE)
-        result = candidate.to_serializable()
-
-        assert isinstance(result, np.ndarray)
-        assert np.array_equal(result, img_data)
-        assert result.shape == (3, 64, 64)
-
-    def test_to_serializable_image_modality_torch(self):
-        """Test to_serializable with image modality converts torch tensor to numpy array."""
-        img_data = torch.randn(3, 64, 64, dtype=torch.float32)
-        candidate = Candidate(data=img_data, modality=Modality.IMAGE)
-        result = candidate.to_serializable()
-
-        assert isinstance(result, np.ndarray)
-        assert np.array_equal(result, img_data.cpu().numpy())
-        assert result.shape == (3, 64, 64)
-
-    def test_to_serializable_graph_modality(self):
-        """Test to_serializable with graph modality raises NotImplementedError."""
-        graph_data = nx.erdos_renyi_graph(n=10, p=0.3)
-        candidate = Candidate(data=graph_data, modality=Modality.GRAPH)
-
-        with pytest.raises(NotImplementedError, match="Graph datatype not supported yet"):
-            candidate.to_serializable()
-
-    def test_to_serializable_structure_modality(self):
-        """Test to_serializable with structure modality returns raw structure data."""
-        coords = np.random.rand(50, 3)
-        candidate = Candidate(data=coords, modality=Modality.STRUCTURE)
-        result = candidate.to_serializable()
-
-        assert isinstance(result, np.ndarray)
-        assert np.array_equal(result, coords)
-        assert result.shape == (50, 3)
-
-    def test_to_serializable_structure_string(self):
-        """Test to_serializable with structure modality as JSON-encoded string passes through."""
-        json_structure = '{"lattice": [[3.84, 0, 0], [0, 3.84, 0], [0, 0, 3.84]], "sites": []}'
-        candidate = Candidate(data=json_structure, modality=Modality.STRUCTURE)
+    def test_to_serializable_molecule_modality(self):
+        """SMILES strings (MOLECULE) pass through unchanged."""
+        smiles = "CC(=O)Oc1ccccc1C(=O)O"  # aspirin
+        candidate = Candidate(data=smiles, modality=Modality.MOLECULE)
         result = candidate.to_serializable()
 
         assert isinstance(result, str)
-        assert result == json_structure
+        assert result == smiles
 
-    def test_to_serializable_structure_invalid_type(self):
-        """Test to_serializable with structure modality raises TypeError for unsupported types."""
-        candidate = Candidate(data={"key": "value"}, modality=Modality.STRUCTURE)
-        with pytest.raises(
-            TypeError,
-            match="STRUCTURE modality data must be a string, numpy array, "
-            "torch tensor, or ASE Atoms",
-        ):
+    def test_to_serializable_numpy_scalar(self):
+        """A numpy scalar (e.g. np.int64) passes through unchanged."""
+        value = np.int64(7)
+        candidate = Candidate(data=value, modality=Modality.TABULAR)
+        result = candidate.to_serializable()
+
+        assert result == value
+
+    def test_to_serializable_unsupported_type(self):
+        """A data type that is not DataFrame-compatible raises TypeError."""
+        candidate = Candidate(data={1, 2, 3}, modality=Modality.TABULAR)  # set is unsupported
+        with pytest.raises(TypeError, match="Cannot serialise candidate data of type set"):
             candidate.to_serializable()
-
-    def test_to_serializable_structure_ase_atoms_roundtrip(self):
-        """Test to_serializable with structure modality serialises ASE Atoms losslessly."""
-        ase = pytest.importorskip("ase")
-        ase_io = pytest.importorskip("ase.io")
-        atoms = ase.Atoms(
-            "H2O",
-            positions=[[0, 0, 0], [0, 0, 1], [0, 1, 0]],
-            cell=[5, 5, 5],
-            pbc=True,
-        )
-        candidate = Candidate(data=atoms, modality=Modality.STRUCTURE)
-        result = candidate.to_serializable()
-
-        assert isinstance(result, str)
-        restored = ase_io.read(io.StringIO(result), format="json")
-        assert list(restored.symbols) == list(atoms.symbols)
-        assert np.allclose(restored.get_positions(), atoms.get_positions())
-        assert np.allclose(restored.get_cell(), atoms.get_cell())
-
-    def test_to_serializable_embedding_modality(self):
-        """Test to_serializable with embedding modality returns raw embedding data."""
-        embedding_data = torch.randn(16, 128)
-        candidate = Candidate(data=embedding_data, modality=Modality.EMBEDDING)
-        result = candidate.to_serializable()
-
-        assert isinstance(result, np.ndarray)
-        assert torch.equal(torch.asarray(result), embedding_data)
-        assert result.shape == (16, 128)
 
     def test_to_serializable_preserves_features(self):
         """Test that to_serializable doesn't modify candidate features."""
@@ -508,8 +413,8 @@ class TestCandidateToSerializable:
         assert candidate.features == features
 
     def test_to_serializable_none_data(self):
-        """Test to_serializable with None data for non-sequence modality."""
-        candidate = Candidate(data=None, modality=Modality.IMAGE)
+        """Test to_serializable with None data."""
+        candidate = Candidate(data=None, modality=Modality.MOLECULE)
         result = candidate.to_serializable()
 
         assert result is None
@@ -519,37 +424,24 @@ class TestCandidateToSerializable:
     "modality,data_factory,expected_type",
     [
         (Modality.SEQUENCE, lambda: "ATCGATCG", str),
+        (Modality.MOLECULE, lambda: "CC(=O)O", str),
         (Modality.TABULAR, lambda: {"col1": 1, "col2": 2}, dict),
         (Modality.TABULAR, lambda: np.array([1, 2, 3]), np.ndarray),
-        (Modality.IMAGE, lambda: np.random.rand(32, 32, 3), np.ndarray),
-        (Modality.STRUCTURE, lambda: np.random.rand(10, 3), np.ndarray),
-        (Modality.EMBEDDING, lambda: torch.randn(10, 5), np.ndarray),
+        (Modality.TABULAR, lambda: torch.tensor([1.0, 2.0]), np.ndarray),
     ],
 )
 def test_to_serializable_modality_types(modality, data_factory, expected_type):
-    """Parametrized test for to_serializable with different modalities."""
+    """Serialisation is driven by the data's type, independent of modality."""
     data = data_factory()
     candidate = Candidate(data=data, modality=modality)
     result = candidate.to_serializable()
 
     assert isinstance(result, expected_type)
 
-    # For sequence, result should be stringified
-    if modality == Modality.SEQUENCE:
-        assert result == data
-    # For tabular and other modalities, result should be raw data
-    elif modality == Modality.TABULAR:
-        if isinstance(data, np.ndarray):
-            assert np.array_equal(result, data)
-        elif isinstance(data, dict):
-            assert result == data
+    if isinstance(data, np.ndarray):
+        assert np.array_equal(result, data)
+    elif isinstance(data, torch.Tensor):
+        # Torch tensors are converted to numpy arrays
+        assert np.array_equal(result, data.cpu().numpy())
     else:
-        # For IMAGE, STRUCTURE, EMBEDDING modalities
-        if isinstance(data, np.ndarray):
-            assert np.array_equal(result, data)
-        elif isinstance(data, torch.Tensor):
-            # Torch tensors are converted to numpy arrays
-            assert isinstance(result, np.ndarray)
-            assert np.array_equal(result, data.cpu().numpy())
-        else:
-            assert result is data
+        assert result == data

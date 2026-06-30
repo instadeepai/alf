@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
-
 import numpy as np
 import pytest
 import torch
@@ -323,8 +321,8 @@ class TestPredictionsToDataframeSerialisation:
     """to_dataframe() stores candidate data via Candidate.to_serializable().
 
     Regression tests for the switch from raw `candidate.data` to
-    `candidate.to_serializable()`, which lets non-CSV-friendly payloads (e.g.
-    ASE Atoms) round-trip through the predictions log.
+    `candidate.to_serializable()`, so supported non-string payloads use the same
+    serialization path as direct candidate exports.
     """
 
     def test_string_data_passes_through_unchanged(self):
@@ -338,23 +336,3 @@ class TestPredictionsToDataframeSerialisation:
             candidates, np.array([1.0, 2.0]), problem_type=ProblemType.REGRESSION
         )
         assert df["data"].tolist() == ["seqA", "seqB"]
-
-    def test_structure_ase_atoms_serialised_to_roundtrippable_json(self):
-        """ASE Atoms structure data is serialised to a JSON string that round-trips."""
-        ase = pytest.importorskip("ase")
-        ase_io = pytest.importorskip("ase.io")
-        atoms = ase.Atoms(
-            "H2O",
-            positions=[[0, 0, 0], [0, 0, 1], [0, 1, 0]],
-            cell=[5, 5, 5],
-            pbc=True,
-        )
-        preds = Predictions(means=np.array([-1.5]))
-        candidates = [Candidate(data=atoms, modality=Modality.STRUCTURE)]
-        df = preds.to_dataframe(candidates, np.array([-1.4]), problem_type=ProblemType.REGRESSION)
-
-        serialised = df["data"].iloc[0]
-        assert isinstance(serialised, str)
-        restored = ase_io.read(io.StringIO(serialised), format="json")
-        assert list(restored.symbols) == list(atoms.symbols)
-        np.testing.assert_allclose(restored.get_positions(), atoms.get_positions())

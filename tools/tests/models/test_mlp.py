@@ -34,9 +34,9 @@ def tabular_candidates():
 
 @pytest.fixture
 def embedding_candidates():
-    """Return 8 random embedding Candidates with feature dimension 4."""
+    """Return 8 random vector Candidates with feature dimension 4."""
     rng = np.random.RandomState(1)
-    return [Candidate(data=rng.randn(4).astype(np.float32), modality="embedding") for _ in range(8)]
+    return [Candidate(data=rng.randn(4).astype(np.float32), modality="tabular") for _ in range(8)]
 
 
 @pytest.fixture
@@ -245,13 +245,13 @@ class TestMLPModelFeaturise:
     def test_featurise_rejects_sequence_modality(self, mlp_model):
         """SEQUENCE modality must raise ValueError."""
         candidates = [Candidate(data="ACGT", modality="sequence")]
-        with pytest.raises(ValueError, match="TABULAR and EMBEDDING"):
+        with pytest.raises(ValueError, match="TABULAR"):
             mlp_model.featurise(candidates)
 
-    def test_featurise_rejects_image_modality(self, mlp_model):
-        """IMAGE modality must raise ValueError."""
-        candidates = [Candidate(data=np.zeros((3, 4), dtype=np.float32), modality="image")]
-        with pytest.raises(ValueError, match="TABULAR and EMBEDDING"):
+    def test_featurise_rejects_molecule_modality(self, mlp_model):
+        """MOLECULE modality must raise ValueError."""
+        candidates = [Candidate(data="CCO", modality="molecule")]
+        with pytest.raises(ValueError, match="TABULAR"):
             mlp_model.featurise(candidates)
 
     def test_featurise_tensor_data(self, mlp_model):

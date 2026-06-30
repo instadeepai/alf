@@ -12,7 +12,7 @@ This guide will help you get started with extending the framework and contributi
 
 Before you begin, ensure you have:
 
-- **Python 3.10+** installed on your system
+- **Python 3.12+** installed on your system
 - **Git** for version control
 - **SSH key** configured for GitHub ([guide](https://docs.github.com/en/authentication/connecting-to-github-with-ssh))
 - **uv** package manager ([installation guide](https://github.com/astral-sh/uv))

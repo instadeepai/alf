@@ -115,7 +115,7 @@ LARGE_FIXTURE = FIXTURES / "large.smiles"
 def _base_config(**overrides) -> GuacaMolConfig:
     defaults = dict(
         name="guacamol",
-        modality="sequence",
+        modality="molecule",
         seed=42,
         train_ratio=0.6,
         validation_frac=0.1,
@@ -445,7 +445,7 @@ PAPER_TEST_SMILES = ["c1ccc2ccccc2c1", "c1ccncc1"]
 def _paper_config(**overrides) -> GuacaMolConfig:
     defaults = dict(
         name="guacamol",
-        modality="sequence",
+        modality="molecule",
         seed=42,
         train_ratio=0.6,
         validation_frac=0.1,
@@ -584,7 +584,7 @@ class TestGuacaMolQuery:
     def test_query_novel_smiles_computes_label_via_rdkit(self, tmp_path):
         """Querying a novel SMILES string computes its label on the fly via RDKit."""
         dataset = self._loaded_dataset(tmp_path)
-        novel = Candidate(data="c1ccncc1", modality=Modality.SEQUENCE)  # pyridine, not in corpus
+        novel = Candidate(data="c1ccncc1", modality=Modality.MOLECULE)  # pyridine, not in corpus
         result = dataset.query([novel])
         assert len(result) == 1
         expected = _compute_properties("c1ccncc1", ["TPSA"])["TPSA"]
@@ -593,7 +593,7 @@ class TestGuacaMolQuery:
     def test_query_novel_smiles_populates_features_when_empty(self, tmp_path):
         """Novel candidate with empty features gets computed properties in returned Candidate."""
         dataset = self._loaded_dataset(tmp_path)
-        novel = Candidate(data="c1ccncc1", modality=Modality.SEQUENCE)  # pyridine, not in corpus
+        novel = Candidate(data="c1ccncc1", modality=Modality.MOLECULE)  # pyridine, not in corpus
         result = dataset.query([novel])
         assert len(result) == 1
         returned = result.candidates[0]
@@ -605,7 +605,7 @@ class TestGuacaMolQuery:
         """Querying a mix of corpus and novel candidates returns labels for all."""
         dataset = self._loaded_dataset(tmp_path)
         known = dataset._raw_dataset.candidates[0]
-        novel = Candidate(data="c1ccncc1", modality=Modality.SEQUENCE)
+        novel = Candidate(data="c1ccncc1", modality=Modality.MOLECULE)
         result = dataset.query([known, novel])
         assert len(result) == 2
         assert result.labels.ndim == 1
@@ -617,7 +617,7 @@ class TestGuacaMolQuery:
         corpus_smiles = dataset._raw_dataset.candidates[0].data
         caller_candidate = Candidate(
             data=corpus_smiles,
-            modality=Modality.SEQUENCE,
+            modality=Modality.MOLECULE,
             features={"custom_tag": 999.0},
         )
         result = dataset.query([caller_candidate])
@@ -630,8 +630,8 @@ class TestGuacaMolQuery:
         dataset = self._loaded_dataset(tmp_path)
         # "CCO" (ethanol, canonical) is in VALID_SMILES_LINES; "OCC" is the same molecule
         # written differently.  Both should resolve to the same corpus label.
-        canonical_candidate = Candidate(data="CCO", modality=Modality.SEQUENCE)
-        non_canonical_candidate = Candidate(data="OCC", modality=Modality.SEQUENCE)
+        canonical_candidate = Candidate(data="CCO", modality=Modality.MOLECULE)
+        non_canonical_candidate = Candidate(data="OCC", modality=Modality.MOLECULE)
         result_canonical = dataset.query([canonical_candidate])
         result_non_canonical = dataset.query([non_canonical_candidate])
         assert result_canonical.labels[0] == pytest.approx(result_non_canonical.labels[0], rel=1e-9)
@@ -943,7 +943,7 @@ class TestGuacaMolEdgeCases:
         shutil.copy(VALID_FIXTURE, tmp_path / FILENAME_ALL)
         config = _base_config(data_dir=tmp_path, target_property="MolWt")
         dataset = GuacaMol(config)
-        bad = Candidate(data="not_a_smiles!!!", modality="sequence")
+        bad = Candidate(data="not_a_smiles!!!", modality="molecule")
         with pytest.raises(ValueError, match="invalid SMILES"):
             dataset.query([bad])
 
@@ -1593,7 +1593,7 @@ class TestGuacaMolBenchmarkTaskLoad:
         dataset = GuacaMol(config)
         celecoxib = Candidate(
             data="CC1=CC=C(C=C1)C1=CC(=NN1C1=CC=C(C=C1)S(N)(=O)=O)C(F)(F)F",
-            modality=Modality.SEQUENCE,
+            modality=Modality.MOLECULE,
         )
         result = dataset.query([celecoxib])
         assert len(result) == 1
@@ -1604,7 +1604,7 @@ class TestGuacaMolBenchmarkTaskLoad:
         (tmp_path / FILENAME_ALL).write_text("c1ccccc1\nCCO\n")
         config = _base_config(data_dir=tmp_path, target_property="celecoxib_rediscovery")
         dataset = GuacaMol(config)
-        cand = Candidate(data="c1ccccc1", modality=Modality.SEQUENCE, features={"custom": 42.0})
+        cand = Candidate(data="c1ccccc1", modality=Modality.MOLECULE, features={"custom": 42.0})
         result = dataset.query([cand])
         assert result.candidates[0] is cand
 
@@ -1613,7 +1613,7 @@ class TestGuacaMolBenchmarkTaskLoad:
         (tmp_path / FILENAME_ALL).write_text("c1ccccc1\n")
         config = _base_config(data_dir=tmp_path, target_property="celecoxib_rediscovery")
         dataset = GuacaMol(config)
-        bad = Candidate(data="NOTSMILES!!!", modality=Modality.SEQUENCE)
+        bad = Candidate(data="NOTSMILES!!!", modality=Modality.MOLECULE)
         with pytest.raises(ValueError, match="invalid SMILES"):
             dataset.query([bad])
 
@@ -1623,7 +1623,7 @@ class TestLabelSmiles:
 
     def test_returns_tuple_of_lc_and_matrix(self):
         """_label_smiles returns (LabelledCandidates, np.ndarray)."""
-        result = _label_smiles(["c1ccccc1", "CCO"], ["TPSA", "MolWt"], "TPSA", Modality.SEQUENCE)
+        result = _label_smiles(["c1ccccc1", "CCO"], ["TPSA", "MolWt"], "TPSA", Modality.MOLECULE)
         assert isinstance(result, tuple)
         assert len(result) == 2
         lc, mat = result
@@ -1632,33 +1632,33 @@ class TestLabelSmiles:
 
     def test_property_matrix_shape(self):
         """Property matrix shape is (N_valid, len(properties))."""
-        lc, mat = _label_smiles(["c1ccccc1", "CCO"], ["TPSA", "MolWt"], "TPSA", Modality.SEQUENCE)
+        lc, mat = _label_smiles(["c1ccccc1", "CCO"], ["TPSA", "MolWt"], "TPSA", Modality.MOLECULE)
         assert mat.shape == (2, 2)
 
     def test_property_matrix_values_match_compute_properties(self):
         """Matrix row values match _compute_properties for each SMILES."""
         smiles = "c1ccccc1"
-        lc, mat = _label_smiles([smiles], ["TPSA", "MolWt"], "TPSA", Modality.SEQUENCE)
+        lc, mat = _label_smiles([smiles], ["TPSA", "MolWt"], "TPSA", Modality.MOLECULE)
         expected = _compute_properties(smiles, ["TPSA", "MolWt"])
         assert mat[0, 0] == pytest.approx(expected["TPSA"])
         assert mat[0, 1] == pytest.approx(expected["MolWt"])
 
     def test_candidate_features_are_empty(self):
         """Corpus candidates have empty features dicts."""
-        lc, mat = _label_smiles(["c1ccccc1", "CCO"], ["TPSA", "MolWt"], "TPSA", Modality.SEQUENCE)
+        lc, mat = _label_smiles(["c1ccccc1", "CCO"], ["TPSA", "MolWt"], "TPSA", Modality.MOLECULE)
         for cand in lc.candidates:
             assert cand.features == {}
 
     def test_invalid_smiles_excluded_from_matrix(self):
         """Invalid SMILES are excluded from both LabelledCandidates and the matrix."""
         lc, mat = _label_smiles(
-            ["c1ccccc1", "NOTVALID", "CCO"], ["TPSA"], "TPSA", Modality.SEQUENCE
+            ["c1ccccc1", "NOTVALID", "CCO"], ["TPSA"], "TPSA", Modality.MOLECULE
         )
         assert len(lc.candidates) == 2
         assert mat.shape == (2, 1)
 
     def test_empty_smiles_list_returns_empty_matrix(self):
         """Empty input produces empty LabelledCandidates and (0, P) matrix."""
-        lc, mat = _label_smiles([], ["TPSA", "MolWt"], "TPSA", Modality.SEQUENCE)
+        lc, mat = _label_smiles([], ["TPSA", "MolWt"], "TPSA", Modality.MOLECULE)
         assert len(lc.candidates) == 0
         assert mat.shape == (0, 2)

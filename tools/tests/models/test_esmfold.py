@@ -425,7 +425,7 @@ class TestESMFoldModelEdgeCases:
 
     def test_predict_wrong_modality_raises(self, mock_components, default_model):
         """Candidate with modality != SEQUENCE raises ValueError."""
-        cand = Candidate(data="ACDE", modality="graph")
+        cand = Candidate(data="ACDE", modality="molecule")
         with pytest.raises(ValueError, match="Modality.SEQUENCE"):
             default_model.predict([cand])
 

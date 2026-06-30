@@ -25,7 +25,7 @@ SMILES = ["C", "CC", "CCC", "c1ccccc1", "CCO", "CC(=O)O"]
 
 
 def _make_labelled(smiles: list[str], labels: list[float]) -> LabelledCandidates:
-    candidates = [Candidate(data=smi, modality="graph") for smi in smiles]
+    candidates = [Candidate(data=smi, modality="molecule") for smi in smiles]
     return LabelledCandidates(candidates, np.array(labels))
 
 
@@ -96,7 +96,7 @@ class TestFeaturise:
 
     def test_featurise_list_of_candidates(self, fast_model: ChempropModel) -> None:
         """featurise() should extract SMILES from a plain list of Candidate objects."""
-        candidates = [Candidate(data=smi, modality="graph") for smi in SMILES]
+        candidates = [Candidate(data=smi, modality="molecule") for smi in SMILES]
         assert fast_model.featurise(candidates) == SMILES
 
 
@@ -105,7 +105,7 @@ class TestGuards:
 
     def test_predict_before_train_raises(self, fast_model: ChempropModel) -> None:
         """predict() should raise RuntimeError when called before train()."""
-        candidates = [Candidate(data="C", modality="graph")]
+        candidates = [Candidate(data="C", modality="molecule")]
         with pytest.raises(RuntimeError, match="train"):
             fast_model.predict(candidates)
 
@@ -123,7 +123,7 @@ class TestTrainAndPredict:
     ) -> None:
         """train() then predict() should return Predictions with correct shape and no variances."""
         fast_model.train(train_data)
-        candidates = [Candidate(data=smi, modality="graph") for smi in SMILES]
+        candidates = [Candidate(data=smi, modality="molecule") for smi in SMILES]
         predictions = fast_model.predict(candidates)
         assert isinstance(predictions, Predictions)
         assert predictions.means.shape == (len(SMILES),)
@@ -137,7 +137,7 @@ class TestTrainAndPredict:
             device="cpu",
         )
         model.train(train_data)
-        candidates = [Candidate(data=smi, modality="graph") for smi in SMILES]
+        candidates = [Candidate(data=smi, modality="molecule") for smi in SMILES]
         predictions = model.predict(candidates)
         assert predictions.means.shape == (len(SMILES),)
 
@@ -220,7 +220,7 @@ class TestWeightInit:
         train_config = ChempropTrainConfig(batch_size=4, num_epochs=2, weight_init=weight_init)  # type: ignore[arg-type]
         model = ChempropModel(model_config=model_config, train_config=train_config, device="cpu")
         model.train(train_data)
-        candidates = [Candidate(data=smi, modality="graph") for smi in SMILES]
+        candidates = [Candidate(data=smi, modality="molecule") for smi in SMILES]
         predictions = model.predict(candidates)
         assert predictions.means.shape == (len(SMILES),)
 
@@ -282,7 +282,7 @@ class TestSeed:
         model_a = ChempropModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
         model_b = ChempropModel(model_config=model_cfg, train_config=train_cfg, device="cpu")
 
-        candidates = [Candidate(data=smi, modality="graph") for smi in SMILES]
+        candidates = [Candidate(data=smi, modality="molecule") for smi in SMILES]
         model_a.train(train_data)
         model_b.train(train_data)
 

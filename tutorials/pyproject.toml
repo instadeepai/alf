@@ -14,7 +14,6 @@ dependencies = [
     "umap-learn>=0.5.0",
     "llvmlite>=0.39.0",
     "ipykernel>=6.25.0",
-    "pyrosetta-installer",
     "seaborn>=0.12.0",
 ]
 
@@ -36,7 +35,14 @@ dev = [
     "nbconvert>=7.17.1",
 ]
 
-# Optional extras for individual tutorials, mirroring the alf_tools extras so the
-# `uv sync --group <name>` commands in the tutorials also work from `tutorials/`.
+# Optional extras for individual tutorials, mirroring the root pyproject groups so the
+# `uv sync --group <name>` commands in the Installation Guide also work from `tutorials/`.
+# Example: `uv sync --group esm2` for the ESM-2 tutorial.
+esm2 = ["alf_tools[esm2]"]
+chemprop = ["alf_tools[chemprop]"]
+guacamol = ["alf_tools[guacamol]"]
+protein = ["alf_tools[protein]"]    # esm2 + esmfold
+molecule = ["alf_tools[molecule]"]  # chemprop + guacamol
+
 # MLIP tutorial needs the mlip package (MACE force field). Install with: uv sync --group mlip
 mlip = ["alf_tools[mlip]"]
