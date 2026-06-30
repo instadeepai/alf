@@ -3,6 +3,7 @@
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://instadeepai.github.io/alf/)
 [![Core Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/surana01/114eb5680493468e40f5a528c08f1888/raw/alf-core-coverage.json)](https://github.com/instadeepai/alf/tree/main/core)
 [![Tools Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/surana01/25ce4b64d5b9cda177203366146f5bf0/raw/alf-tools-coverage.json)](https://github.com/instadeepai/alf/tree/main/tools)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
@@ -10,6 +11,10 @@
 
 **ALF** is an active learning framework for iterative optimisation in computational science, designed to optimize high-dimensional and combinatorially vast search spaces where data acquisition is expensive, from wet-lab experiments and physical measurements to costly simulations. ALF accelerates discovery of optimal designs (proteins, molecules, materials) through intelligent candidate selection, adaptive modelling, and efficient evaluation strategies. It provides modular components for candidate search, surrogate modelling, and acquisition, enabling efficient discovery across expensive, high-dimensional search spaces such
 as protein sequences and small molecules.
+
+<div align="center">
+  <img src="docs/imgs/alf_main_figure.png" alt="ALF active-learning loop overview" width="70%">
+</div>
 
 ## Why ALF?
 
@@ -36,16 +41,10 @@ ALF is split into two packages:
 
 ```bash
 # Core package only (no PyTorch required)
-pip install git+https://github.com/instadeepai/alf.git#subdirectory=core
+pip install alf-core
 
 # Tools package (includes PyTorch, models, and datasets)
-pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
-```
-
-**Authentication:** add your GitHub credentials to `~/.netrc`:
-
-```
-machine github.com login <USERNAME> password <TOKEN>
+pip install alf-tools
 ```
 
 For GPU support, optional extras (ESM2, Chemprop), and development setup, see the [Installation Guide](https://instadeepai.github.io/alf/installation.html).
@@ -54,6 +53,7 @@ For GPU support, optional extras (ESM2, Chemprop), and development setup, see th
 
 ```python
 from alf_core import (
+    BaseDatasetConfig,
     DatasetSearch,
     DesignTask,
     Optimizer,
@@ -65,8 +65,19 @@ from alf_tools.datasets.gfp import GFP
 from alf_tools.models.cnn import CNNModel
 from alf_tools.optimizer.acquisition_functions.greedy import Greedy
 
-# A dataset wraps your candidates and their known labels
-dataset = GFP(name="gfp", modality="sequence", seed=42)
+# A dataset wraps your candidates and their known labels. A small train_ratio
+# leaves a large candidate pool for the active-learning loop to acquire from.
+config = BaseDatasetConfig(
+    name="gfp",
+    modality="sequence",
+    seed=42,
+    train_ratio=0.1,
+    validation_frac=0.5,
+    test_ratio=0.2,
+    split_type="random",
+    problem_type="regression",
+)
+dataset = GFP(config)
 
 # The surrogate is a cheap probabilistic model trained on observed labels
 surrogate = Surrogate(model=CNNModel())

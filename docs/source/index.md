@@ -66,16 +66,10 @@ API reference generated from docstrings, plus a glossary of ALF terms.
 
 ```bash
 # Core package (minimal dependencies, no PyTorch required)
-pip install git+https://github.com/instadeepai/alf.git#subdirectory=core
+pip install alf-core
 
 # Tools package (includes PyTorch, models, and datasets)
-pip install git+https://github.com/instadeepai/alf.git#subdirectory=tools
-```
-
-Add your GitHub credentials to `~/.netrc` for authentication:
-
-```text
-machine github.com login <USERNAME> password <TOKEN>
+pip install alf-tools
 ```
 
 For GPU support, optional extras, and development setup, see the
@@ -95,6 +89,7 @@ What each component does:
 
 ```python
 from alf_core import (
+    BaseDatasetConfig,
     DatasetSearch,
     DesignTask,
     Optimizer,
@@ -106,8 +101,19 @@ from alf_tools.datasets.gfp import GFP
 from alf_tools.models.cnn import CNNModel
 from alf_tools.optimizer.acquisition_functions.greedy import Greedy
 
-# A dataset wraps your candidates and their known labels
-dataset = GFP(name="gfp", modality="sequence", seed=42)
+# A dataset wraps your candidates and their known labels. A small train_ratio
+# leaves a large candidate pool for the active-learning loop to acquire from.
+config = BaseDatasetConfig(
+    name="gfp",
+    modality="sequence",
+    seed=42,
+    train_ratio=0.1,
+    validation_frac=0.5,
+    test_ratio=0.2,
+    split_type="random",
+    problem_type="regression",
+)
+dataset = GFP(config)
 
 # The surrogate is a cheap probabilistic model trained on observed labels
 surrogate = Surrogate(model=CNNModel())
