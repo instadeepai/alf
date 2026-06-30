@@ -26,6 +26,7 @@ from alf_core import (
     BaseTrainConfig,
     Candidate,
     LabelledCandidates,
+    Modality,
     Predictions,
     ProblemType,
     Results,
@@ -174,10 +175,17 @@ class ChempropModel(BaseModel):
 
         Returns:
             List of SMILES strings.
+
+        Raises:
+            ValueError: If any candidate is not of MOLECULE modality.
         """
-        if isinstance(inputs, LabelledCandidates):
-            return [str(c.data) for c in inputs.candidates]
-        return [str(c.data) for c in inputs]
+        candidates = inputs.candidates if isinstance(inputs, LabelledCandidates) else inputs
+        for c in candidates:
+            if c.modality != Modality.MOLECULE:
+                raise ValueError(
+                    f"ChempropModel only accepts Modality.MOLECULE candidates, got {c.modality}"
+                )
+        return [str(c.data) for c in candidates]
 
     def _build_dataloader(
         self,

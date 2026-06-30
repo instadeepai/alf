@@ -48,11 +48,22 @@ except ImportError:
 
 
 class Modality(Enum):
-    """Enum for different data modalities."""
+    """The *kind* of candidate — used to match datasets with compatible models and metrics.
+
+    It is the data's domain where one exists, not how the data is stored. This is why a
+    protein sequence and a SMILES string are distinct modalities (``SEQUENCE`` vs
+    ``MOLECULE``) even though both are stored as ``str``: they pair with different models
+    and metrics. Storage type is never encoded here — it is inferred from ``type(data)``
+    (see :meth:`Candidate.to_serializable`).
+
+    Members:
+        SEQUENCE: Biological sequences (protein / nucleotide), as strings.
+        MOLECULE: Small molecules, as SMILES strings.
+        TABULAR: Domain-agnostic numeric feature vectors (arrays, tensors, scalars, dicts).
+    """
 
     SEQUENCE = "sequence"
-    GRAPH = "graph"
-    STRUCTURE = "structure"
+    MOLECULE = "molecule"
     TABULAR = "tabular"
 
 
@@ -61,8 +72,10 @@ class Candidate:
     """A candidate is a data point with a modality and features.
 
     Attributes:
-        data: The raw data of the candidate (e.g., sequence string, graph, image).
-        modality: The type/modality of the data (e.g., "sequence", "graph").
+        data: The raw data of the candidate (e.g., a sequence string, a SMILES string,
+            a feature vector).
+        modality: The data's domain (see :class:`Modality`) — what it represents, e.g.
+            ``"sequence"`` or ``"molecule"``. Not its storage type.
         features: Optional dictionary of precomputed features for the candidate.
     """
 
@@ -93,24 +106,6 @@ class Candidate:
             A string representation showing the candidate's data, modality, and features.
         """
         return f"Candidate(data={self.data}, modality={self.modality}, features={self.features})"
-
-    def _convert_data_to_npy(self, accepted_description: str) -> np.ndarray:
-        """Convert data to a numpy array if it is a torch tensor or numpy array.
-
-        Args:
-            accepted_description: Description of accepted types, used in the TypeError message.
-
-        Returns:
-            numpy array representation of the data.
-
-        Raises:
-            TypeError: If data is neither a numpy array nor a torch tensor.
-        """
-        if HAS_TORCH and isinstance(self.data, torch.Tensor):
-            return self.data.cpu().numpy()
-        if isinstance(self.data, np.ndarray):
-            return self.data
-        raise TypeError(f"{accepted_description} Got: {type(self.data).__name__}")
 
     def _safe_equal(self, a: Any, b: Any) -> bool:
         """Compare two values, handling numpy arrays and nested structures.
@@ -184,90 +179,63 @@ class Candidate:
     def to_serializable(self) -> DataFrameCompatible | None:
         """Convert candidate data to a format suitable for pandas DataFrame storage.
 
-        This method transforms the candidate's data into a format that can be efficiently
-        stored in a pandas DataFrame column. The conversion strategy varies by modality:
+        Dispatch is based on the **type** of ``data``, not on :attr:`modality`. Modality
+        describes the data's domain (see :class:`Modality`); how it is stored — and
+        therefore how it is serialised — is determined by its Python type:
 
-        - SEQUENCE: Returns stringified data for efficient string storage
-        - TABULAR: Validates and returns data (scalar, dict, numpy array, pandas Series,
-          list, tuple, or torch tensor). Torch tensors are converted to numpy arrays.
-        - STRUCTURE: Converts torch tensors/arrays to numpy arrays; strings are passed
-          through as-is to support serialised representations (e.g. JSON-encoded crystal
-          structures); ASE Atoms are serialised losslessly to a JSON string
-        - GRAPH: Not yet supported (raises NotImplementedError)
+        - ``str`` (sequences, SMILES, JSON-encoded payloads): returned unchanged.
+        - ``torch.Tensor``: converted to a numpy array for compact storage.
+        - numpy array, scalar (Python ``int``/``float``/``bool`` or a numpy scalar such
+          as ``np.int64``), ``dict``, ``list``, ``tuple``, pandas ``Series``: returned
+          unchanged.
+        - ASE ``Atoms``: serialised losslessly to a JSON string.
+        - ``None``: returned as ``None``.
 
         Returns:
             DataFrameCompatible: The candidate data in a DataFrame-compatible format.
                 Common types include str, dict, np.ndarray, pd.Series, or torch.Tensor.
 
         Raises:
-            NotImplementedError: If modality is GRAPH (not yet supported).
-            ValueError: If modality is unknown or not recognized.
-            TypeError: If TABULAR or STRUCTURE modality data is not a supported
-                DataFrame-compatible type.
+            TypeError: If the data type is not DataFrame-compatible.
 
         Examples:
-            >>> # Sequence modality
-            >>> candidate = Candidate(data="ACDEFG", modality=Modality.SEQUENCE)
-            >>> candidate.to_serializable()
+            >>> # A sequence or SMILES string is stored as-is
+            >>> Candidate(data="ACDEFG", modality=Modality.SEQUENCE).to_serializable()
             'ACDEFG'
 
-            >>> # Structure modality with JSON-encoded crystal structure
-            >>> json_str = '{"lattice": [[3.84, 0, 0], [0, 3.84, 0], [0, 0, 3.84]]}'
-            >>> candidate = Candidate(data=json_str, modality=Modality.STRUCTURE)
-            >>> candidate.to_serializable()
-            '{"lattice": [[3.84, 0, 0], [0, 3.84, 0], [0, 0, 3.84]]}'
+            >>> Candidate(data="CC(=O)O", modality=Modality.MOLECULE).to_serializable()
+            'CC(=O)O'
 
-            >>> # Tabular modality
-            >>> candidate = Candidate(data={"age": 32, "height": 178}, modality=Modality.TABULAR)
-            >>> candidate.to_serializable()
+            >>> # A feature dict is stored as-is
+            >>> c = Candidate(data={"age": 32, "height": 178}, modality=Modality.TABULAR)
+            >>> c.to_serializable()
             {'age': 32, 'height': 178}
         """
-        # Handle None data
-        if self.data is None:
+        data = self.data
+        if data is None:
             return None
-        if self.modality == Modality.SEQUENCE:
-            return str(self.data)  # Efficient string storage
+        # Strings (sequences, SMILES, JSON-encoded payloads) are stored as-is.
+        if isinstance(data, str):
+            return data
+        # Torch tensors are converted to numpy arrays for compact storage.
+        if HAS_TORCH and isinstance(data, torch.Tensor):
+            return data.cpu().numpy()
+        # numpy arrays, scalars (incl. numpy scalars like np.int64), and standard
+        # containers are stored as-is.
+        if isinstance(data, (int, float, bool, np.generic, dict, np.ndarray, list, tuple)):
+            return data
+        # pandas Series (checked without importing pandas).
+        if data.__class__.__name__ == "Series":
+            return data
 
-        elif self.modality == Modality.TABULAR:
-            # Validate and return tabular data
-            # Acceptable types: scalar values, dict, numpy arrays, pandas Series, lists/tuples
-            if isinstance(self.data, (str, int, float, bool, dict, np.ndarray, list, tuple)):
-                return self.data
+        # ASE Atoms are serialised losslessly to a JSON string.
+        if HAS_ASE and isinstance(data, _AseAtoms):
+            buffer = io.StringIO()
+            _ase_write(buffer, data, format="json")
+            return buffer.getvalue()
 
-            # Check for pandas Series (without requiring pandas import)
-            if hasattr(self.data, "__class__") and self.data.__class__.__name__ == "Series":
-                return self.data
-
-            # Check for torch tensor - convert to numpy
-            if HAS_TORCH and isinstance(self.data, torch.Tensor):
-                return self.data.cpu().numpy()
-
-            # If we reach here, the type is not supported
-            raise TypeError(
-                f"TABULAR modality data must be a scalar (str, int, float, bool), "
-                f"dict, numpy array, pandas Series, list, or tuple. "
-                f"Got: {type(self.data).__name__}"
-            )
-
-        elif self.modality == Modality.STRUCTURE:
-            # Strings are passed through to support serialised representations
-            # (e.g. JSON-encoded crystal structures); arrays/tensors are converted to numpy;
-            # ASE Atoms are serialised losslessly to a JSON string.
-            if isinstance(self.data, str):
-                return self.data
-            if isinstance(self.data, np.ndarray):
-                return self.data
-            if HAS_TORCH and isinstance(self.data, torch.Tensor):
-                return self.data.cpu().numpy()
-            if HAS_ASE and isinstance(self.data, _AseAtoms):
-                buffer = io.StringIO()
-                _ase_write(buffer, self.data, format="json")
-                return buffer.getvalue()
-            raise TypeError(
-                "STRUCTURE modality data must be a string, numpy array, torch tensor, or ASE Atoms."
-            )
-
-        elif self.modality == Modality.GRAPH:
-            raise NotImplementedError("Graph datatype not supported yet")
-
-        raise ValueError(f"Unknown modality: {self.modality}")
+        raise TypeError(
+            f"Cannot serialise candidate data of type {type(data).__name__}. Supported "
+            f"types: str, int, float, bool, dict, list, tuple, numpy.ndarray, "
+            f"pandas.Series, ASE Atoms, or torch.Tensor."
+        )
