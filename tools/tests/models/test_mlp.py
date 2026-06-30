@@ -33,6 +33,13 @@ def tabular_candidates():
 
 
 @pytest.fixture
+def embedding_candidates():
+    """Return 8 random vector Candidates with feature dimension 4."""
+    rng = np.random.RandomState(1)
+    return [Candidate(data=rng.randn(4).astype(np.float32), modality="tabular") for _ in range(8)]
+
+
+@pytest.fixture
 def labelled_tabular(tabular_candidates):
     """Return LabelledCandidates wrapping tabular_candidates with random labels."""
     rng = np.random.RandomState(2)
@@ -224,6 +231,12 @@ class TestMLPModelFeaturise:
         assert x.shape == (8, 4)
         assert x.dtype == torch.float32
 
+    def test_featurise_embedding_list(self, mlp_model, embedding_candidates):
+        """List of EMBEDDING candidates must produce a (8, 4) float32 tensor."""
+        x = mlp_model.featurise(embedding_candidates)
+        assert x.shape == (8, 4)
+        assert x.dtype == torch.float32
+
     def test_featurise_labelled_candidates(self, mlp_model, labelled_tabular):
         """LabelledCandidates input must produce a (8, 4) tensor."""
         x = mlp_model.featurise(labelled_tabular)
@@ -235,9 +248,9 @@ class TestMLPModelFeaturise:
         with pytest.raises(ValueError, match="TABULAR"):
             mlp_model.featurise(candidates)
 
-    def test_featurise_rejects_structure_modality(self, mlp_model):
-        """STRUCTURE modality must raise ValueError."""
-        candidates = [Candidate(data=np.zeros((3, 4), dtype=np.float32), modality="structure")]
+    def test_featurise_rejects_molecule_modality(self, mlp_model):
+        """MOLECULE modality must raise ValueError."""
+        candidates = [Candidate(data="CCO", modality="molecule")]
         with pytest.raises(ValueError, match="TABULAR"):
             mlp_model.featurise(candidates)
 

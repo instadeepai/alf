@@ -156,9 +156,9 @@ def test_tensor_to_candidates_custom_modality():
     """Test conversion with custom modality."""
     X = torch.tensor([[1.0, 2.0]])
 
-    candidates = tensor_to_candidates(X, modality=Modality.STRUCTURE)
+    candidates = tensor_to_candidates(X, modality=Modality.MOLECULE)
 
-    assert candidates[0].modality == Modality.STRUCTURE
+    assert candidates[0].modality == Modality.MOLECULE
 
 
 def test_predictions_to_posterior_basic():
