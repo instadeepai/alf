@@ -103,13 +103,13 @@ class TestIntraBatchDiversityEdgeCases:
         with pytest.raises(ValueError, match="same modality"):
             intra_batch_diversity(mixed)
 
-    def test_unsupported_modality_raises(self):
-        """Unsupported modality raises ValueError."""
+    def test_molecule_raises_not_implemented(self):
+        """MOLECULE candidates are not yet supported and raise NotImplementedError."""
         candidates = [
-            Candidate(data=np.zeros((4, 4)), modality=Modality.STRUCTURE),
-            Candidate(data=np.zeros((4, 4)), modality=Modality.STRUCTURE),
+            Candidate(data="CCO", modality=Modality.MOLECULE),
+            Candidate(data="c1ccccc1", modality=Modality.MOLECULE),
         ]
-        with pytest.raises(ValueError, match="does not support"):
+        with pytest.raises(NotImplementedError, match="MOLECULE"):
             intra_batch_diversity(candidates)
 
     def test_zero_vector_embedding_raises(self):

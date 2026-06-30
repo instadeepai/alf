@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import networkx as nx
 import numpy as np
 import pytest
 from alf_core.dataclasses.candidate import Candidate, Modality
@@ -400,8 +399,7 @@ def test_labelled_candidates_length_consistency(n_candidates):
     "modality,data_factory",
     [
         (Modality.SEQUENCE, lambda: "ATCGATCG"),
-        (Modality.GRAPH, lambda: nx.path_graph(5)),
-        (Modality.STRUCTURE, lambda: np.random.rand(10, 3)),
+        (Modality.MOLECULE, lambda: "CC(=O)O"),
         (Modality.TABULAR, lambda: {"feature1": 1, "feature2": 2}),
     ],
 )
