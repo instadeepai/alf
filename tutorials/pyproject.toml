@@ -24,6 +24,9 @@ esm2 = ["alf_tools[esm2]"]
 # MLIP tutorial needs the mlip package, exposed via alf_tools' mlip extra.
 # Install with: uv sync --extra mlip
 mlip = ["alf_tools[mlip]"]
+# Chemprop tutorial needs the chemprop package, exposed via alf_tools' chemprop extra.
+# Install with: uv sync --extra chemprop
+chemprop = ["alf_tools[chemprop]"]
 
 [tool.setuptools]
 packages = []  # No Python packages, just notebooks

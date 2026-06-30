@@ -58,6 +58,7 @@ tutorials = [
     "matplotlib>=3.7.0",
     "umap-learn>=0.5.12",
     "llvmlite>=0.39.0",
+    "jupyterlab>=4.0.0",
 ]
 
 transformers = ["alf_tools[transformers]"]
