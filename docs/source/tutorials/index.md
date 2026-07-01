@@ -27,7 +27,6 @@ and what its uncertainty estimates look like.
 - [Ensemble Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/ensemble_tutorial.ipynb): seed ensembles, MC dropout, and combined ensembles for uncertainty-aware prediction. Useful when you need calibrated uncertainty without a full Bayesian model.
 - [ESM-2 Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/esm2_tutorial.ipynb): using a protein language model as a surrogate or zero-shot scorer. Useful when sequence context matters and you have limited labelled data.
 - [Chemprop MPNN Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/chemprop_tutorial.ipynb): active learning for small molecules using SMILES inputs and the Chemprop message-passing neural network. The right choice when working with molecular graphs rather than sequences.
-- [MLIP Tutorial](https://github.com/instadeepai/alf/blob/main/tutorials/models/mlip_design_tutorial.ipynb): a machine-learned interatomic potential surrogate over atomistic systems, using a pretrained MACE model as the example and predicting per-structure energies from dict-backed structure candidates. The right choice when designing over 3D molecular or crystal structures.
 
 ## 🗄️ Go deeper on datasets
 

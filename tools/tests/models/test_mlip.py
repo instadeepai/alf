@@ -344,7 +344,10 @@ class TestModelTypeConfig:
         """Unknown architecture names fail before model loading or training."""
         with pytest.raises(ValueError, match="Unsupported MLIP model_type"):
             MLIPModel(
-                model_config=MLIPModelConfig(model_path=None, model_type="not-a-model"),
+                model_config=MLIPModelConfig(
+                    model_path=None,
+                    model_type="not-a-model",  # type: ignore[arg-type]
+                ),
                 train_config=_train_config(),
             )
 
@@ -379,10 +382,10 @@ class TestModelTypeConfig:
 class TestPredict:
     """Tests for MLIP prediction payloads."""
 
-    def test_empty_candidates_returns_empty(self) -> None:
-        """No candidates follows the core Predictions non-empty contract."""
+    def test_empty_candidates_raises_value_error(self) -> None:
+        """No candidates raises before constructing invalid Predictions."""
         model = _scratch_model()
-        with pytest.raises(AssertionError):
+        with pytest.raises(ValueError, match="at least one candidate"):
             model.predict([])
 
     def test_unpacks_energies(self, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -14,7 +14,7 @@
 
 """MLIP model for active learning over atomistic systems.
 
-Implements the ALF BaseModel interface around mlip-jax force fields, supporting
+Implements the ALF BaseModel interface around mlip force fields, supporting
 both training from scratch and finetuning from pretrained models.
 """
 
@@ -268,7 +268,9 @@ class MLIPModel(BaseModel):
             if test_set is not None:
                 training_loop.test(test_set)
         else:
-            logger.warning("Training loop returned invalid model, keeping previous model")
+            logger.warning(
+                "Training loop returned invalid model, keeping initial model for this run"
+            )
 
         self._last_training_metrics = {
             "train_size": current_train_size,
@@ -323,11 +325,11 @@ class MLIPModel(BaseModel):
 
         Raises:
             RuntimeError: If the model has not been trained yet.
-            ValueError: If any candidate is a single-atom system (unsupported by
-                mlip's batched inference).
+            ValueError: If no candidates are provided, or if any candidate is a
+                single-atom system (unsupported by mlip's batched inference).
         """
         if not candidate_points:
-            return Predictions(means=np.array([]))
+            raise ValueError("MLIPModel.predict requires at least one candidate")
 
         mlip_predictions = self._run_inference(candidate_points)
         return Predictions(means=np.array([p.energy for p in mlip_predictions]))

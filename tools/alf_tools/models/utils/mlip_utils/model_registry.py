@@ -15,12 +15,14 @@
 """Model-type registry and loading helpers for mlip force fields."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 from mlip.models import Esen, ForceField, Mace, Nequip, Visnet
 from mlip.models.model_io import load_model_from_zip
 
-MODEL_TYPES: dict[str, type[Any]] = {
+MLIPModelType = Literal["esen", "mace", "nequip", "visnet"]
+
+MODEL_TYPES: dict[MLIPModelType, type[Any]] = {
     "esen": Esen,
     "mace": Mace,
     "nequip": Nequip,
@@ -34,13 +36,14 @@ def resolve_mlip_model_cls(model_type: str) -> type[Any]:
     Raises:
         ValueError: If the model type is unsupported.
     """
-    try:
-        return MODEL_TYPES[model_type]
-    except KeyError as exc:
+    if model_type in MODEL_TYPES:
+        return MODEL_TYPES[cast(MLIPModelType, model_type)]
+
+    else:
         supported = ", ".join(sorted(MODEL_TYPES))
         raise ValueError(
             f"Unsupported MLIP model_type {model_type!r}; supported values are: {supported}"
-        ) from exc
+        )
 
 
 def load_mlip_force_field(model_type: str, model_path: str | Path) -> ForceField:

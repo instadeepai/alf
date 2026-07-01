@@ -14,7 +14,7 @@
 
 """Configuration dataclasses for the ALF MLIP wrapper."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from alf_core import BaseTrainConfig
@@ -22,6 +22,8 @@ from mlip.models.config import MLIPNetworkConfig
 from mlip.models.loss import Loss, MSELoss
 from mlip.training import TrainingLoop
 from mlip.training.optimizer_config import OptimizerConfig
+
+from alf_tools.models.utils.mlip_utils.model_registry import MLIPModelType
 
 
 @dataclass
@@ -40,7 +42,7 @@ class MLIPModelConfig:
     """
 
     model_path: str | Path | None = None
-    model_type: str = "mace"
+    model_type: MLIPModelType = "mace"
     network_config: MLIPNetworkConfig | None = None
     graph_cutoff_angstrom: float = 5.0
 
@@ -61,4 +63,4 @@ class MLIPTrainConfig(BaseTrainConfig):
     training_loop_config: TrainingLoop.Config
     batch_size: int = 8
     inference_batch_size: int | None = None
-    loss: Loss = MSELoss()
+    loss: Loss = field(default_factory=MSELoss)

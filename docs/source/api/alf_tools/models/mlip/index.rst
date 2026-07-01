@@ -1,10 +1,10 @@
 MLIP Model
 ==========
 
-A machine-learned interatomic potential (MLIP) surrogate built around
-``mlip-jax`` force fields. Accepts structure dictionaries stored in
-``Candidate.data`` and predicts per-structure energies, making it suitable
-for active learning over atomistic systems.
+A machine-learned interatomic potential (MLIP) surrogate built around the
+open-source `mlip <https://github.com/instadeepai/mlip>`_ package. Accepts
+structure dictionaries stored in ``Candidate.data`` and predicts per-structure
+energies, making it suitable for active learning over atomistic systems.
 
 With ``MLIPModelConfig.model_path=None`` the model trains from scratch. Set
 ``model_path`` to a pretrained checkpoint to finetune. ``MLIPModelConfig.model_type``
@@ -36,11 +36,18 @@ Key properties:
 
 .. note::
 
-   This model requires the optional ``mlip`` dependency. Install it with the ``[mlip]`` extra:
+   This model requires the optional ``mlip`` dependency. Install the CPU/default
+   build with the ``[mlip]`` extra:
 
    .. code-block:: bash
 
       pip install "alf-tools[mlip]"
+
+   To opt into the CUDA 13 build, use the ``[mlip-cuda13]`` extra instead:
+
+   .. code-block:: bash
+
+      pip install "alf-tools[mlip-cuda13]"
 
    or from source:
 

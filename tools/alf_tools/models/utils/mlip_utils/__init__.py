@@ -27,6 +27,7 @@ from alf_tools.models.utils.mlip_utils.data import (
 )
 from alf_tools.models.utils.mlip_utils.model_registry import (
     MODEL_TYPES,
+    MLIPModelType,
     load_mlip_force_field,
     resolve_mlip_model_cls,
 )
