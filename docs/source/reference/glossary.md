@@ -40,8 +40,10 @@ ECE
   predicted confidence and observed accuracy across confidence bins.
 
 Modality
-  The representation of a candidate, e.g. a protein `sequence` or a small-molecule SMILES string.
-  Determines which `Model` and `Dataset` implementations are compatible.
+  The *kind* of a candidate — used to match datasets with compatible `Model`s and to pick a
+  metric, not how the data is stored. It is the data's domain where one exists (`SEQUENCE`,
+  `MOLECULE`), with `TABULAR` the domain-agnostic case for raw numeric feature vectors.
+  Storage type (used for serialisation) is inferred separately from `type(data)`.
 
 Model
   A learnable predictor with a common interface: `featurise`, `train`, `predict`, `sample`. Base

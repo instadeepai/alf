@@ -18,6 +18,7 @@ from typing import Any, Union
 
 import numpy as np
 import pandas as pd
+
 from alf_core.dataclasses.candidate import Candidate
 
 
@@ -75,8 +76,8 @@ class LabelledCandidates:
         """Return the raw data of each candidate.
 
         Returns:
-            A list containing the raw data (sequence, graph, image, etc.)
-            of each candidate in the collection.
+            A list containing the raw data (e.g. a sequence string, a SMILES string,
+            a feature vector) of each candidate in the collection.
         """
         return [cand.data for cand in self.candidates]
 
