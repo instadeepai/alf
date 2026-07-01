@@ -42,7 +42,6 @@ from mlip.training.training_loggers import log_metrics_to_line
 from alf_tools.models.utils.mlip_utils import (
     MLIPModelConfig,
     MLIPTrainConfig,
-    build_finetuning_graph_datasets,
     build_graph_dataset,
     build_graph_datasets,
     candidate_to_chemical_system,
@@ -190,9 +189,15 @@ class MLIPModel(BaseModel):
 
         pretrained = self._pretrained_force_field
         pretrained_dataset_info = None
+        validate_total_charges = False
         if pretrained is not None:
             pretrained_dataset_info = pretrained.dataset_info
             cutoff = pretrained_dataset_info.graph_cutoff_angstrom
+            pretrained_network = getattr(pretrained.predictor, "mlip_network", None)
+            pretrained_config = getattr(pretrained_network, "config", None)
+            validate_total_charges = bool(
+                getattr(pretrained_config, "use_total_charge_embedding", False)
+            )
         else:
             cutoff = self.model_config.graph_cutoff_angstrom
 
@@ -203,18 +208,13 @@ class MLIPModel(BaseModel):
         if self._test_data is not None and len(self._test_data) > 0:
             systems_by_split["test"] = labelled_candidates_to_chemical_systems(self._test_data)
 
-        if pretrained_dataset_info is None:
-            datasets, dataset_info = build_graph_datasets(
-                systems_by_split,
-                cutoff,
-                effective_batch_size,
-            )
-        else:
-            datasets, dataset_info = build_finetuning_graph_datasets(
-                systems_by_split,
-                pretrained_dataset_info,
-                effective_batch_size,
-            )
+        datasets, dataset_info = build_graph_datasets(
+            systems_by_split,
+            cutoff,
+            effective_batch_size,
+            pretrained_dataset_info=pretrained_dataset_info,
+            validate_total_charges=validate_total_charges,
+        )
         train_set = datasets["train"]
         val_set = datasets["valid"]
         test_set = datasets.get("test")

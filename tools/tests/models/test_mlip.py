@@ -205,7 +205,7 @@ class TestGraphDatasetConstruction:
         assert dataset_info.available_total_charges == [0]
 
     def test_build_finetuning_graph_datasets_uses_target_train_e0s(self) -> None:
-        """Finetuning graph building reuses mlip's MULTI dataset-info merge."""
+        """Finetuning graph building merges target-train E0s with pretrained E0s."""
         hydrogen = ChemicalSystem(
             **_diatomic(1),
             energy=2.0,
@@ -297,6 +297,29 @@ class TestGraphDatasetConstruction:
                 {"train": [hydrogen], "valid": [hydrogen]},
                 pretrained_dataset_info=pretrained_info,
                 batch_size=2,
+            )
+
+    def test_build_finetuning_graph_datasets_rejects_charges_absent_from_pretrained(
+        self,
+    ) -> None:
+        """Charge-embedding finetuning validates target charges before JAX training."""
+        charged_hydrogen = ChemicalSystem(
+            **(_diatomic(1) | {"charge": 1}),
+            energy=2.0,
+            forces=np.zeros((2, 3)),
+        )
+        pretrained_info = DatasetInfo(
+            atomic_energies_map={1: -1.0},
+            total_charge_set={0},
+            graph_cutoff_angstrom=5.0,
+        )
+
+        with pytest.raises(ValueError, match="pretrained total-charge table"):
+            build_finetuning_graph_datasets(
+                {"train": [charged_hydrogen], "valid": [charged_hydrogen]},
+                pretrained_dataset_info=pretrained_info,
+                batch_size=2,
+                validate_total_charges=True,
             )
 
 
@@ -483,7 +506,7 @@ class TestTrainFromScratch:
         monkeypatch.setattr(
             mlip_module,
             "build_graph_datasets",
-            lambda systems_by_split, cutoff, batch_size: (
+            lambda systems_by_split, cutoff, batch_size, **_: (
                 {
                     "train": {
                         "systems": systems_by_split["train"],
@@ -660,7 +683,10 @@ class TestFinetuning:
             params={"source": True},
             predictor=FakePredictor(
                 mlip_network=FakeNetwork(
-                    config=SimpleNamespace(name="config"),
+                    config=SimpleNamespace(
+                        name="config",
+                        use_total_charge_embedding=True,
+                    ),
                     dataset_info=pretrained_info,
                 )
             ),
@@ -675,14 +701,19 @@ class TestFinetuning:
         )
         model._pretrained_force_field = pretrained
 
-        def fake_build_finetuning_graph_datasets(
+        def fake_build_graph_datasets(
             systems_by_split,
-            pretrained_dataset_info_arg,
+            cutoff,
             batch_size,
+            *,
+            pretrained_dataset_info,
+            validate_total_charges,
         ):
             captured["systems_by_split"] = systems_by_split
-            captured["pretrained_dataset_info"] = pretrained_dataset_info_arg
+            captured["cutoff"] = cutoff
+            captured["pretrained_dataset_info"] = pretrained_dataset_info
             captured["batch_size"] = batch_size
+            captured["validate_total_charges"] = validate_total_charges
             return (
                 {
                     "train": "train-dataset",
@@ -693,8 +724,8 @@ class TestFinetuning:
 
         monkeypatch.setattr(
             mlip_module,
-            "build_finetuning_graph_datasets",
-            fake_build_finetuning_graph_datasets,
+            "build_graph_datasets",
+            fake_build_graph_datasets,
         )
         monkeypatch.setattr(mlip_module.jax, "device_put", lambda params: params)
 
@@ -734,7 +765,9 @@ class TestFinetuning:
         model.train(train_data, val_data=self._labelled(1))
 
         initial_force_field = captured["training_loop_kwargs"]["force_field"]
+        assert captured["cutoff"] == pretrained_info.graph_cutoff_angstrom
         assert captured["pretrained_dataset_info"] is pretrained_info
+        assert captured["validate_total_charges"] is True
         assert captured["batch_size"] == model.train_config.batch_size
         assert len(captured["systems_by_split"]["train"]) == 2
         assert pretrained_info.atomic_energies_map[1] == -1.0

@@ -28,10 +28,9 @@ Key properties:
   the default is ``MSELoss``.
 - **Architectures**: MACE, NequIP, ViSNet, and eSEN via ``MLIPModelConfig.model_type``.
 - **Reference energies**: Scratch training computes per-element reference energies
-  from the training split. Finetuning uses ``mlip``'s ``MULTI`` dataset builder to
-  derive target-domain reference energies from the training split and merge them
-  with the pretrained species table so checkpoint parameter shapes remain compatible
-  while the absolute energy zero is retargeted.
+  from the training split. Finetuning derives target-domain reference energies from
+  the training split and merges them with the pretrained species table so checkpoint
+  parameter shapes remain compatible while the absolute energy zero is retargeted.
 - **Sampling**: Not supported — raises ``NotImplementedError``.
 
 .. note::
