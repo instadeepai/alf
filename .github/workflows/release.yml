@@ -42,11 +42,11 @@ jobs:
         run: |
           cd core
           uv build
-          uv publish --token ${{secrets.PYPI_TOKEN}}
+          uv publish --token ${{secrets.CORE_PYPI_TOKEN}}
 
           cd ../tools
           uv build
-          uv publish --token ${{secrets.PYPI_TOKEN}}
+          uv publish --token ${{secrets.TOOLS_PYPI_TOKEN}}
           cd ..
 
       - name: Create tag
