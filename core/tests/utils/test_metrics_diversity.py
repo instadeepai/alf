@@ -25,7 +25,7 @@ def _seq(s: str) -> Candidate:
 
 
 def _emb(arr: np.ndarray) -> Candidate:
-    return Candidate(data=arr, modality=Modality.EMBEDDING)
+    return Candidate(data=arr, modality=Modality.TABULAR)
 
 
 class TestIntraBatchDiversitySequence:
@@ -60,8 +60,8 @@ class TestIntraBatchDiversitySequence:
         assert isinstance(result["intra_batch_diversity"], float)
 
 
-class TestIntraBatchDiversityEmbedding:
-    """Tests for intra_batch_diversity with EMBEDDING candidates."""
+class TestIntraBatchDiversityTabular:
+    """Tests for intra_batch_diversity with TABULAR candidates."""
 
     def test_identical_embeddings_zero_cosine_distance(self):
         """Identical embeddings give 0.0 cosine distance."""
@@ -103,13 +103,13 @@ class TestIntraBatchDiversityEdgeCases:
         with pytest.raises(ValueError, match="same modality"):
             intra_batch_diversity(mixed)
 
-    def test_unsupported_modality_raises(self):
-        """Unsupported modality raises ValueError."""
+    def test_molecule_raises_not_implemented(self):
+        """MOLECULE candidates are not yet supported and raise NotImplementedError."""
         candidates = [
-            Candidate(data=np.zeros((4, 4)), modality=Modality.IMAGE),
-            Candidate(data=np.zeros((4, 4)), modality=Modality.IMAGE),
+            Candidate(data="CCO", modality=Modality.MOLECULE),
+            Candidate(data="c1ccccc1", modality=Modality.MOLECULE),
         ]
-        with pytest.raises(ValueError, match="does not support"):
+        with pytest.raises(NotImplementedError, match="MOLECULE"):
             intra_batch_diversity(candidates)
 
     def test_zero_vector_embedding_raises(self):

@@ -8,6 +8,18 @@ version = "0.1.0"
 description = "A Python package with tools for performing active learning experiments."
 readme = "README.md"
 requires-python = ">=3.12"
+license = {text = "Apache-2.0"}
+authors = [{name = "InstaDeep Ltd"}]
+keywords = ["active learning", "bayesian optimization", "machine learning", "scientific discovery", "pytorch"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
 dependencies = [
     "alf_core",
     "requests>=2.25.0",
@@ -19,6 +31,12 @@ dependencies = [
     "scipy>=1.9.0",
     "botorch>=0.17.0,<1.0",
 ]
+
+[project.urls]
+Homepage = "https://instadeepai.github.io/alf/"
+Repository = "https://github.com/instadeepai/alf"
+Documentation = "https://instadeepai.github.io/alf/"
+"Bug Tracker" = "https://github.com/instadeepai/alf/issues"
 
 [project.optional-dependencies]
 # Shared base extra — single source of truth for the transformers pin, reused
