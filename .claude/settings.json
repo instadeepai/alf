@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(python -m pytest tools/tests/ -x --tb=short -q --ignore=tools/tests/e2e_experiments)"
-    ]
-  }
-}

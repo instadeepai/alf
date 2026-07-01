@@ -152,3 +152,6 @@ core/coverage-tools.xml
 
 # MLIP pretrained-model download cache
 tools/alf_tools/models/models/
+
+# Claude Code local tooling (project instructions, skills, settings)
+.claude/
