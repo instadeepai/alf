@@ -1,6 +1,6 @@
 [project]
 name = "alf"
-version = "0.1.0"
+version = "0.1.0a0"
 description = "Active Learning Framework (ALF) - A comprehensive framework for active learning experiments"
 readme = "README.md"
 requires-python = ">=3.12,<3.14.1"
