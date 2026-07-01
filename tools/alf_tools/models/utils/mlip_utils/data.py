@@ -170,6 +170,11 @@ def build_finetuning_graph_datasets(
 ) -> tuple[dict[str, GraphDataset], DatasetInfo]:
     """Build finetuning datasets and scalar target DatasetInfo via mlip MULTI mode.
 
+    This reuses mlip's multi-dataset finetuning path to recompute target-domain
+    E0s and merge them with the pretrained z-table. ALF still exposes a
+    single-head force field, so the target E0s are unwrapped back into a scalar
+    DatasetInfo before returning.
+
     Returns:
         A mapping of split names to graph datasets and the retargeted DatasetInfo.
 
@@ -190,6 +195,10 @@ def build_finetuning_graph_datasets(
         for split, systems in systems_by_split.items()
         if len(systems) > 0
     }
+    # MULTI mode is intentional here: mlip's multi-head finetuning builder owns
+    # the E0 merge logic we need. The replay slot is empty because ALF only
+    # builds target-domain graphs, but MULTI still expects replay and target
+    # reader entries to derive the retargeted DatasetInfo.
     builder = GraphDatasetBuilder(
         readers={
             _REPLAY_DATASET_KEY: {},
