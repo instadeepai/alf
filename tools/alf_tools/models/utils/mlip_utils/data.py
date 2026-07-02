@@ -191,7 +191,7 @@ def build_graph_datasets(
 ) -> tuple[dict[str, GraphDataset], DatasetInfo]:
     """Build graph datasets and dataset info with mlip's dataset builder.
 
-    Passing ``pretrained_dataset_info`` enables the single-head finetuning path:
+    Passing `pretrained_dataset_info` enables the single-head finetuning path:
     target-domain E0s are computed from the target train split, and
     the returned DatasetInfo keeps pretrained species
     and charge metadata while replacing E0s for target train species.

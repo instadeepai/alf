@@ -56,7 +56,7 @@ class MLIPTrainConfig(BaseTrainConfig):
         inference_batch_size: Batch size for prediction. Defaults to batch_size when None.
         optimizer_config: Required native mlip optimizer config.
         training_loop_config: Required native mlip training loop config.
-        loss: Optional native mlip loss. Defaults to ``MSELoss``.
+        loss: Optional native mlip loss. Defaults to `MSELoss`.
     """
 
     optimizer_config: OptimizerConfig

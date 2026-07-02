@@ -158,7 +158,7 @@ class MLIPModel(BaseModel):
 
         Args:
             train_data: Training structures with energy labels and optional force
-                labels in ``Candidate.features["forces"]``.
+                labels in `Candidate.features["forces"]`.
             val_data: Validation structures with the same label convention. Required
                 by this model — it is declared optional only to conform to `BaseModel.train`,
                 and a `ValueError` is raised when it is `None`.
@@ -321,7 +321,7 @@ class MLIPModel(BaseModel):
             candidate_points: Candidates whose .data are ChemicalSystem kwargs.
 
         Returns:
-            Predictions with ``means`` as predicted energies.
+            Predictions with `means` as predicted energies.
 
         Raises:
             RuntimeError: If the model has not been trained yet.
