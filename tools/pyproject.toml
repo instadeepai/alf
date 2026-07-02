@@ -53,10 +53,12 @@ esmfold = [
     "accelerate>=0.26.0",
 ]
 guacamol = ["rdkit>=2022.9.0"]
+mlip = ["mlip>=0.2.0"]
+mlip-cuda13 = ["mlip[cuda13]>=0.2.0"]
 
 # Workflow umbrellas — install everything for an expected workflow at once.
 protein = ["alf_tools[esm2,esmfold]"]
-molecule = ["alf_tools[chemprop,guacamol]"]
+molecule = ["alf_tools[chemprop,guacamol,mlip]"]
 
 [tool.setuptools.packages.find]
 where = ["."]

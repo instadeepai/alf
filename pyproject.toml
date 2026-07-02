@@ -57,6 +57,7 @@ guacamol = ["alf_tools[guacamol]"]
 tutorials = [
     "matplotlib>=3.7.0",
     "umap-learn>=0.5.0",
+    "llvmlite>=0.47.0",
     "jupyterlab>=4.0.0",
 ]
 
@@ -64,6 +65,8 @@ transformers = ["alf_tools[transformers]"]
 esm2 = ["alf_tools[esm2]"]
 esmfold = ["alf_tools[esmfold]"]
 chemprop = ["alf_tools[chemprop]"]
+mlip = ["alf_tools[mlip]"]
+mlip-cuda13 = ["alf_tools[mlip-cuda13]"]
 
 # Workflow umbrellas (mirror the alf_tools extras of the same name).
 protein = ["alf_tools[protein]"]
