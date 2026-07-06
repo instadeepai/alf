@@ -9,7 +9,7 @@ jobs:
   linters:
     runs-on: instadeep-ci
     container:
-      image: python:3.12-bullseye
+      image: python:3.12-slim-bullseye
 
     steps:
       - name: Git setup
@@ -35,7 +35,7 @@ jobs:
       env:
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       container:
-        image: python:3.11-bullseye
+        image: python:3.12-slim-bullseye
 
       steps:
         - name: Git setup

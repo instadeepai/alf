@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -404,25 +402,6 @@ class TestCandidateToSerializable:
         candidate = Candidate(data={1, 2, 3}, modality=Modality.TABULAR)  # set is unsupported
         with pytest.raises(TypeError, match="Cannot serialise candidate data of type set"):
             candidate.to_serializable()
-
-    def test_to_serializable_structure_ase_atoms_roundtrip(self):
-        """Test to_serializable with structure modality serialises ASE Atoms losslessly."""
-        ase = pytest.importorskip("ase")
-        ase_io = pytest.importorskip("ase.io")
-        atoms = ase.Atoms(
-            "H2O",
-            positions=[[0, 0, 0], [0, 0, 1], [0, 1, 0]],
-            cell=[5, 5, 5],
-            pbc=True,
-        )
-        candidate = Candidate(data=atoms, modality=Modality.MOLECULE)
-        result = candidate.to_serializable()
-
-        assert isinstance(result, str)
-        restored = ase_io.read(io.StringIO(result), format="json")
-        assert list(restored.symbols) == list(atoms.symbols)
-        assert np.allclose(restored.get_positions(), atoms.get_positions())
-        assert np.allclose(restored.get_cell(), atoms.get_cell())
 
     def test_to_serializable_preserves_features(self):
         """Test that to_serializable doesn't modify candidate features."""

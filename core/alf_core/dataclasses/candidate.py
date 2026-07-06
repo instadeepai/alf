@@ -13,7 +13,6 @@
 # limitations under the License.
 
 
-import io
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any, TypeAlias, Union
@@ -37,14 +36,6 @@ try:
     HAS_TORCH = True
 except ImportError:
     HAS_TORCH = False
-
-try:
-    from ase import Atoms as _AseAtoms
-    from ase.io import write as _ase_write
-
-    HAS_ASE = True
-except ImportError:
-    HAS_ASE = False
 
 
 class Modality(Enum):
@@ -188,7 +179,6 @@ class Candidate:
         - numpy array, scalar (Python ``int``/``float``/``bool`` or a numpy scalar such
           as ``np.int64``), ``dict``, ``list``, ``tuple``, pandas ``Series``: returned
           unchanged.
-        - ASE ``Atoms``: serialised losslessly to a JSON string.
         - ``None``: returned as ``None``.
 
         Returns:
@@ -228,14 +218,8 @@ class Candidate:
         if data.__class__.__name__ == "Series":
             return data
 
-        # ASE Atoms are serialised losslessly to a JSON string.
-        if HAS_ASE and isinstance(data, _AseAtoms):
-            buffer = io.StringIO()
-            _ase_write(buffer, data, format="json")
-            return buffer.getvalue()
-
         raise TypeError(
             f"Cannot serialise candidate data of type {type(data).__name__}. Supported "
             f"types: str, int, float, bool, dict, list, tuple, numpy.ndarray, "
-            f"pandas.Series, ASE Atoms, or torch.Tensor."
+            f"pandas.Series, or torch.Tensor."
         )

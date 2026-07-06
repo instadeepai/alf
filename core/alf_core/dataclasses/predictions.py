@@ -19,7 +19,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from alf_core.dataclasses.candidate import Candidate
+from alf_core.dataclasses.candidate import Candidate, DataFrameCompatible
 from alf_core.utils.enums import ProblemType
 
 logger = logging.getLogger("alf-core")
@@ -97,7 +97,7 @@ class Predictions:
         is_classification = problem_type in [ProblemType.BINARY, ProblemType.MULTICLASS]
 
         for i in range(len(self.means)):
-            record_i: dict[str, object] = {
+            record_i: dict[str, DataFrameCompatible | None] = {
                 "data": candidates[i].to_serializable(),
                 "targets": targets[i],
             }

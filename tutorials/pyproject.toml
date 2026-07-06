@@ -12,6 +12,7 @@ dependencies = [
     "alf_tools",
     "matplotlib>=3.3.0",
     "umap-learn>=0.5.0",
+    "llvmlite>=0.47.0",
     "ipykernel>=6.25.0",
     "seaborn>=0.12.0",
 ]
@@ -35,6 +36,11 @@ dev = [
 esm2 = ["alf_tools[esm2]"]
 chemprop = ["alf_tools[chemprop]"]
 guacamol = ["alf_tools[guacamol]"]
-mlip = ["alf_tools[mlip]"]
 protein = ["alf_tools[protein]"]    # esm2 + esmfold
 molecule = ["alf_tools[molecule]"]  # chemprop + guacamol
+
+# MLIP tutorial needs the mlip package (MACE force field). Install the CPU/default
+# build with `uv sync --group mlip`, or opt into CUDA 13 with
+# `uv sync --group mlip-cuda13`.
+mlip = ["alf_tools[mlip]"]
+mlip-cuda13 = ["alf_tools[mlip-cuda13]"]
