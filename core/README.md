@@ -1,6 +1,7 @@
 <div align="center">
   <img src="../docs/imgs/alf_cover.svg" alt="ALF cover" width="50%">
 </div>
+
 # alf-core
 
 [![PyPI](https://img.shields.io/pypi/v/alf-core.svg)](https://pypi.org/project/alf-core/)
