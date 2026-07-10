@@ -1,4 +1,6 @@
-# <img src="https://raw.githubusercontent.com/instadeepai/alf/main/docs/imgs/alf_cover.svg" alt="ALF" height="40" align="middle"> alf-core
+<img src="../docs/imgs/alf_cover.svg" alt="ALF" height="50" align="center"> 
+
+# alf-core
 
 [![PyPI](https://img.shields.io/pypi/v/alf-core.svg)](https://pypi.org/project/alf-core/)
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
