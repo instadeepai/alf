@@ -28,7 +28,7 @@ jobs:
       - name: Lint
         run: |
           uv sync
-          uv run --no-sync pre-commit run --all-files --verbose
+          uv run --no-sync pre-commit run --all-files --verbose --show-diff-on-failure
 
   tests:
       runs-on: ubuntu-latest
