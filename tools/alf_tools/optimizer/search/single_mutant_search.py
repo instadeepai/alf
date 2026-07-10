@@ -34,7 +34,6 @@ class SingleMutantSearch(SearchProtocol):
         Returns:
             A list of candidates.
         """
-        # TODO: Add features to the candidates
         train_dataset = state.dataset.train_dataset
         best_id = train_dataset.labels.argmax()
         best_sequence = train_dataset.candidates[best_id].data
