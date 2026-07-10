@@ -1,4 +1,4 @@
-# alf-tools
+# <img src="https://raw.githubusercontent.com/instadeepai/alf/main/docs/imgs/alf_cover.svg" alt="ALF" height="40" align="top"> alf-tools
 
 [![PyPI](https://img.shields.io/pypi/v/alf-tools.svg)](https://pypi.org/project/alf-tools/)
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)

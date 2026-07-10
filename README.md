@@ -1,4 +1,6 @@
-# ALF (Active Learning Framework)
+<div align="center">
+  <img src="docs/imgs/alf_cover.svg" alt="ALF cover" width="60%">
+</div>
 
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
@@ -8,6 +10,8 @@
 [![Tools Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/surana01/25ce4b64d5b9cda177203366146f5bf0/raw/alf-tools-coverage.json)](https://github.com/instadeepai/alf/tree/main/tools)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 [![Tests and Linters 🧪](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml/badge.svg?branch=main)](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml)
+
+> ⚠️ **Please note:** this is a beta release, the main release will follow shortly.
 
 **ALF** is an active learning framework for optimising expensive, high-dimensional search spaces in computational science — settings where every label costs a wet-lab experiment, a physical measurement, or a long simulation, and the candidate space (protein sequences, small molecules, materials) is far too large to screen exhaustively. It runs the full loop of search, surrogate modelling, and acquisition through modular components you can swap independently.
 
