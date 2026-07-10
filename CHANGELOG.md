@@ -1,8 +1,9 @@
 # Changelog
 
-## Release 0.1.0
+## Release 0.1.0b0
 
-- Released ALF as an open-source project under the Apache 2.0 license.
+- Released ALF as beta version under the Apache 2.0 license. First stable release
+  will follow shortly.
 - Introduced `alf_core`, a lightweight framework package providing base classes,
   core data structures (`Candidate`, `LabelledCandidates`, `Predictions`,
   `State`), and an active learning loop abstraction with no ML-framework

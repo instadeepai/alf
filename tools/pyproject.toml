@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "alf_tools"
-version = "0.1.0"
+version = "0.1.0b0"
 description = "A Python package with tools for performing active learning experiments."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.14.1"
 license = {text = "Apache-2.0"}
 authors = [{name = "InstaDeep Ltd"}]
 keywords = ["active learning", "bayesian optimization", "machine learning", "scientific discovery", "pytorch"]
