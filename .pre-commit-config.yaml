@@ -58,16 +58,16 @@ repos:
             ".git/COMMIT_EDITMSG",
           ]
 
-
-  - repo: https://github.com/kynan/nbstripout
-    rev: 0.9.1
-    hooks:
-      - id: nbstripout
-        args:
-          - --extra-keys
-          - metadata.kernelspec.name
-          - metadata.kernelspec.display_name
-          - metadata.language_info.name
+  # TODO: enable this again once develop is ready to be merged
+  # - repo: https://github.com/kynan/nbstripout
+  #   rev: 0.9.1
+  #   hooks:
+  #     - id: nbstripout
+  #       args:
+  #         - --extra-keys
+  #         - metadata.kernelspec.name
+  #         - metadata.kernelspec.display_name
+  #         - metadata.language_info.name
 
   - repo: https://github.com/Lucas-C/pre-commit-hooks
     rev: v1.4.0
