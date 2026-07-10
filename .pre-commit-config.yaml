@@ -65,8 +65,8 @@ repos:
       - id: nbstripout
         args:
           - --extra-keys
-          - metadata.kernelspec.name 
-          - metadata.kernelspec.display_name 
+          - metadata.kernelspec.name
+          - metadata.kernelspec.display_name
           - metadata.language_info.name
 
   - repo: https://github.com/Lucas-C/pre-commit-hooks
