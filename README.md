@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/imgs/alf_cover.png" alt="ALF cover" width="90%">
+  <img src="docs/imgs/alf_cover.png" alt="ALF cover" width="100%">
 </div>
 
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
