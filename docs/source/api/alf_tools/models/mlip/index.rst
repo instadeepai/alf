@@ -1,7 +1,7 @@
 MLIP Model
 ==========
 
-A machine-learned interatomic potential (MLIP) surrogate built around the
+A machine learning interatomic potential (MLIP) surrogate built around the
 open-source `mlip <https://github.com/instadeepai/mlip>`_ package. Accepts
 structure dictionaries stored in `Candidate.data` and predicts per-structure
 energies, making it suitable for active learning over atomistic systems.
