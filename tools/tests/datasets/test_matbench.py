@@ -34,13 +34,18 @@ from pymatgen.core import Composition, Lattice, Structure  # noqa: E402
 # ---------------------------------------------------------------------------
 
 
-def _composition(n_fe: int) -> Composition:
-    """Build a distinct, valid pymatgen Composition.
+def _composition(n_fe: int) -> str:
+    """Build a distinct, valid chemical-formula string.
+
+    Real Matbench composition columns are plain chemical-formula strings (e.g.
+    "Fe0.62C0.01..."), not pymatgen Composition objects — confirmed against real
+    downloaded data (matbench_steels), which contradicted the `matbench` package's
+    own docstring ("Inputs, either compositions or pymatgen structure objects").
 
     Returns:
-        A Composition with a varying Fe count so each call is distinct.
+        A formula string with a varying Fe count so each call is distinct.
     """
-    return Composition({"Fe": n_fe + 1, "O": 1})
+    return Composition({"Fe": n_fe + 1, "O": 1}).formula.replace(" ", "")
 
 
 def _structure(scale: float) -> Structure:
@@ -268,13 +273,12 @@ class TestMatbenchFoldMode:
             for candidate in instance._raw_dataset.candidates:
                 assert candidate.modality == Modality.TABULAR
 
-    def test_composition_serialised_as_json_string(self):
-        """Composition inputs should be stored as JSON strings, round-trippable via MontyDecoder."""
+    def test_composition_stored_as_formula_string(self):
+        """Composition inputs should be stored as-is (they are already formula strings)."""
         instance = _make_matbench_instance(_make_fake_fold_task(input_type="composition"))
         candidate = instance._raw_dataset.candidates[0]
         assert isinstance(candidate.data, str)
-        restored = json.loads(candidate.data, cls=MontyDecoder)
-        assert isinstance(restored, Composition)
+        assert Composition(candidate.data) == Composition("Fe1O1")
 
     def test_structure_serialised_as_json_string(self):
         """Structure inputs should be stored as JSON strings, round-trippable via MontyDecoder."""

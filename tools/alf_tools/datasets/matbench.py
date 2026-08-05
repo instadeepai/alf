@@ -184,9 +184,13 @@ class Matbench(BaseDataset):
         labels: list[float] = []
 
         def _add(value: Any, target: Any, fold_id: int, extra_features: dict) -> None:
+            # Composition inputs are plain chemical-formula strings (e.g. "Fe0.62C0.01..."),
+            # used as-is; structure inputs are pymatgen Structure objects, serialised via
+            # their MSONable .to_json() into an equivalent JSON string.
+            data = value if isinstance(value, str) else value.to_json()
             candidates.append(
                 Candidate(
-                    data=value.to_json(),
+                    data=data,
                     modality=Modality.TABULAR,
                     features={"fold_id": fold_id, **extra_features},
                 )
