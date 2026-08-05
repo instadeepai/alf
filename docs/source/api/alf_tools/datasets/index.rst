@@ -12,3 +12,4 @@ experimental data for protein engineering tasks.
    ProteinGym Dataset <proteingym/index>
    FLIP Dataset <flip/index>
    GuacaMol Dataset <guacamol/index>
+   Matbench Dataset <matbench/index>
