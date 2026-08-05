@@ -4,18 +4,61 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "alf_tools"
-version = "0.1.0"
+version = "0.1.0b0"
 description = "A Python package with tools for performing active learning experiments."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.14.1"
+license = {text = "Apache-2.0"}
+authors = [{name = "InstaDeep Ltd"}]
+keywords = ["active learning", "bayesian optimization", "machine learning", "scientific discovery", "pytorch"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
 dependencies = [
     "alf_core",
     "requests>=2.25.0",
-    "huggingface_hub==0.27.0",
+    "huggingface_hub>=0.27.0,<2.0",
+    "pyarrow>=22.0.0",
     "jaxtyping>=0.3.5",
     "torch>=2.10.0",
-    "gpytorch>=1.9.0",
+    "gpytorch>=1.9.0,<2.0",
+    "scipy>=1.9.0",
+    "botorch>=0.17.0,<1.0",
 ]
+
+[project.urls]
+Homepage = "https://instadeepai.github.io/alf/"
+Repository = "https://github.com/instadeepai/alf"
+Documentation = "https://instadeepai.github.io/alf/"
+"Bug Tracker" = "https://github.com/instadeepai/alf/issues"
+
+[project.optional-dependencies]
+# Shared base extra — single source of truth for the transformers pin, reused
+# by every model that needs it (esm2, esmfold).
+transformers = ["transformers>=4.36.0"]
+
+# Per-model extras
+chemprop = [
+    "chemprop>=2.0.0,<3.0.0",
+]
+esm2 = ["alf_tools[transformers]"]
+esmfold = [
+    "alf_tools[transformers]",
+    "accelerate>=0.26.0",
+]
+guacamol = ["rdkit>=2022.9.0"]
+mlip = ["mlip>=0.2.0"]
+mlip-cuda13 = ["mlip[cuda13]>=0.2.0"]
+
+# Workflow umbrellas — install everything for an expected workflow at once.
+protein = ["alf_tools[esm2,esmfold]"]
+molecule = ["alf_tools[chemprop,guacamol,mlip]"]
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -35,4 +78,14 @@ explicit = true
 alf_core = { path = "../core", editable = true }
 torch = [
   { index = "pytorch-cpu" },
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests requiring the real model (deselect with '-m not integration')",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
 ]

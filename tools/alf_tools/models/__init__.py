@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,11 @@
 # limitations under the License.
 
 from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
+from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, SubsampleConfig
+from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
+from alf_tools.models.mlp import MLP, MLPModel, MLPModelConfig, MLPTrainConfig
 from alf_tools.models.utils import (
+    build_from_target,
     create_char_to_idx_mapping,
     extract_sequences_from_inputs,
     get_device,
@@ -21,11 +25,77 @@ from alf_tools.models.utils import (
 )
 
 __all__ = [
+    "build_from_target",
     "CNNModel",
     "CNNModelConfig",
     "CNNTrainConfig",
     "create_char_to_idx_mapping",
     "extract_sequences_from_inputs",
+    "FeaturizerConfig",
     "get_device",
+    "GPModel",
+    "GPModelConfig",
+    "GPTrainConfig",
     "one_hot_encode",
+    "EnsembleWrapper",
+    "EnsembleWrapperConfig",
+    "SubsampleConfig",
+    "MLP",
+    "MLPModel",
+    "MLPModelConfig",
+    "MLPTrainConfig",
 ]
+
+
+try:
+    from alf_tools.models.esmfold import ESMFoldModel, ESMFoldModelConfig
+
+    _esmfold_available = True
+except ImportError:
+    _esmfold_available = False
+
+if _esmfold_available:
+    __all__ += ["ESMFoldModelConfig", "ESMFoldModel"]
+
+_chemprop_available = False
+try:
+    import chemprop as _chemprop  # noqa: F401
+
+    _chemprop_available = True
+except ImportError:
+    pass
+
+if _chemprop_available:
+    from alf_tools.models.chemprop import ChempropModel, ChempropModelConfig, ChempropTrainConfig
+
+    __all__ += ["ChempropModel", "ChempropModelConfig", "ChempropTrainConfig"]
+
+_esm2_available = False
+try:
+    import transformers as _transformers  # noqa: F401
+
+    _esm2_available = True
+except ImportError:
+    pass
+
+if _esm2_available:
+    from alf_tools.models.esm2 import ESM2Model, ESM2ModelConfig, ESM2TrainConfig
+
+    __all__ += ["ESM2Model", "ESM2ModelConfig", "ESM2TrainConfig"]
+
+_mlip_available = False
+try:
+    import mlip as _mlip  # noqa: F401
+
+    _mlip_available = True
+except ImportError:
+    pass
+
+if _mlip_available:
+    from alf_tools.models.mlip import (
+        MLIPModel,
+        MLIPModelConfig,
+        MLIPTrainConfig,
+    )
+
+    __all__ += ["MLIPModel", "MLIPModelConfig", "MLIPTrainConfig"]

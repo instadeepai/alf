@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -78,6 +78,7 @@ def _make_flip_config(**overrides) -> FLIPConfig:
         train_ratio=0.5,
         validation_frac=0.2,
         test_ratio=1.0,
+        problem_type="regression",
     )
     defaults.update(overrides)
     return FLIPConfig(**defaults)

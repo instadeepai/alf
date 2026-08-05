@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ from alf_core import (
     Surrogate,
     TerminalStateLogger,
 )
+from alf_core.utils.enums import ProblemType
 from alf_tools.datasets import GFP
 from alf_tools.optimizer.acquisition_functions import Greedy
 
@@ -44,6 +45,7 @@ def gfp_dataset():
         validation_frac=0.2,
         test_ratio=0.2,
         split_type="random",
+        problem_type=ProblemType.REGRESSION,
     )
     return GFP(config)
 
@@ -248,7 +250,10 @@ class TestDesignGFPRandomSurrogate:
     def _assert_dataset_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert dataset metrics."""
         for metric_name, expected_values in expected.items():
-            actual_values = metrics[f"dataset/{metric_name}"].tolist()
+            # Per-round values only; summary metrics (auc_top_k) live in
+            # summary.csv, not metrics.csv. dropna() guards against any
+            # round that does not populate this column.
+            actual_values = metrics[f"dataset/{metric_name}"].dropna().tolist()
             assert np.isclose(actual_values, expected_values, atol=1e-10).all(), (
                 f"Dataset metric {metric_name} mismatch: expected {expected_values}, "
                 f"got {actual_values}"
@@ -257,7 +262,9 @@ class TestDesignGFPRandomSurrogate:
     def _assert_acquired_candidates_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert acquired candidates metrics."""
         for metric_name, expected_values in expected.items():
-            actual_values = metrics[f"acquired_candidates/{metric_name}"].tolist()[1:]
+            # dropna() removes round 0 (no acquisition yet), leaving one
+            # value per acquisition round.
+            actual_values = metrics[f"acquired_candidates/{metric_name}"].dropna().tolist()
             assert np.isclose(actual_values, expected_values, atol=1e-10).all(), (
                 f"Acquired candidates metric {metric_name} mismatch: expected {expected_values}, "
                 f"got {actual_values}"
@@ -266,7 +273,9 @@ class TestDesignGFPRandomSurrogate:
     def _assert_surrogate_metrics(self, metrics: pd.DataFrame, expected: dict):
         """Assert surrogate model performance metrics."""
         for metric_name, expected_values in expected.items():
-            actual_values = metrics[f"surrogate/{metric_name}"].tolist()
+            # Per-round values only; summary metrics (auc_top_k) live in
+            # summary.csv, not metrics.csv.
+            actual_values = metrics[f"surrogate/{metric_name}"].dropna().tolist()
             assert np.isclose(actual_values, expected_values, atol=1e-10).all(), (
                 f"Surrogate metric {metric_name} mismatch: expected {expected_values}, "
                 f"got {actual_values}"

@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Tuple, Union
 
 import numpy as np
 from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions
+from alf_core.utils.enums import ProblemType
 
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
@@ -66,6 +67,7 @@ class PyRosetta(BaseModel):
         self.average_fn_over_repeats = average_fn_over_repeats
         self.alphabet = alphabet
         self.seed = seed
+        self.problem_type = ProblemType.REGRESSION
 
         # Initialize PyRosetta
         pyrosetta.init(f"-constant_seed -jran {self.seed}")
@@ -161,11 +163,23 @@ class PyRosetta(BaseModel):
         """Mutates the wild-type structure to the given sequence and relaxes the structure.
 
         Args:
-            sequence: Sequence to mutate the wild-type structure to.
+            sequence: Sequence to mutate the wild-type structure to. Must have the
+                same length as the wild-type sequence (only point substitutions are
+                supported; insertions/deletions are not).
 
         Returns:
             Score of the relaxed structure.
+
+        Raises:
+            ValueError: If sequence length differs from the wild-type sequence.
         """
+        if len(sequence) != len(self.wt_sequence):
+            raise ValueError(
+                "sequence length must match the wild-type sequence "
+                f"({len(self.wt_sequence)}), got {len(sequence)}. Only point "
+                "substitutions are supported (no insertions/deletions)."
+            )
+
         pose = self.pose.clone()
 
         mutants = [(i, b) for i, (a, b) in enumerate(zip(self.wt_sequence, sequence)) if a != b]
@@ -188,7 +202,7 @@ class PyRosetta(BaseModel):
     def train(
         self,
         train_data: LabelledCandidates,
-        val_data: LabelledCandidates | None = None,
+        val_data: LabelledCandidates,
     ) -> None:
         """Training is not implemented for this model.
 
@@ -226,7 +240,10 @@ class PyRosetta(BaseModel):
             elif self.average_fn_over_repeats == "median":
                 score = np.median(np.array(scores))
             else:
-                raise ValueError(f"Invalid average function: {self.average_fn_over_repeats}")
+                raise ValueError(
+                    f"Invalid average_fn_over_repeats: {self.average_fn_over_repeats!r}. "
+                    f"Expected 'mean' or 'median'."
+                )
             fitness_scores.append(score)
             if self.repeats_per_prediction > 1:
                 variances.append(np.var(scores))

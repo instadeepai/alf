@@ -1,319 +1,92 @@
-# ALF Core
+# <img src="https://raw.githubusercontent.com/instadeepai/alf/main/docs/imgs/alf_cover_gradient.png" alt="ALF" height="40" align="top"> alf-core
 
-This document provides an overview of the core components in the ALF (Active Learning
-Framework) library, describes the different task types, and explains how components
-interact during execution.
+[![PyPI](https://img.shields.io/pypi/v/alf-core.svg)](https://pypi.org/project/alf-core/)
+[![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](https://github.com/instadeepai/alf/blob/main/LICENSE)
+[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/surana01/114eb5680493468e40f5a528c08f1888/raw/alf-core-coverage.json)](https://github.com/instadeepai/alf/tree/main/core)
+[![Docs](https://img.shields.io/badge/docs-instadeepai.github.io%2Falf-blue)](https://instadeepai.github.io/alf/)
+
+**The lightweight, dependency-minimal foundation of ALF (Active Learning Framework).**
+
+`alf-core` provides the base classes, core data structures, and the active-learning loop
+for iterative optimisation in computational science — optimising high-dimensional,
+combinatorially vast search spaces where each label is expensive (wet-lab assays,
+simulations, measurements). It ships with no ML-framework dependencies (only numpy,
+pandas, scipy), so it is standalone and domain-agnostic. For ready-to-use models,
+datasets, and acquisition functions, install
+[alf-tools](https://github.com/instadeepai/alf/blob/main/tools/README.md).
 
 <div align="center">
-  <img src="../docs/imgs/alf_components.svg" alt="ALF Components" width="70%">
+  <img src="https://raw.githubusercontent.com/instadeepai/alf/main/docs/imgs/alf_components.svg" alt="ALF Components" width="70%">
 </div>
 
-## Overview
-
-This README is organized into the following sections:
-
-### Core Components
-- **[1. Dataset (`BaseDataset`)](#1-dataset-basedataset)** - Data loading, splitting, and querying
-- **[2. Model (`BaseModel`)](#2-model-basemodel)** - Abstract base class for all models
-- **[3. Surrogate (`Surrogate`)](#3-surrogate-surrogate)** - Approximates expensive
-  experimental evaluation
-- **[4. Oracle (`Oracle`)](#4-oracle-oracle)** - Provides ground-truth labels for candidates
-- **[5. Optimizer (`Optimizer`)](#5-optimizer-optimizer)** - Orchestrates the active learning loop
-- **[6. Acquisition Function (`AcquisitionFunction`)](#6-acquisition-function-acquisitionfunction)**
-  - Scores candidates for acquisition
-- **[7. Search Strategy (`BaseSearch`)](#7-search-strategy-basesearch)** - Defines the
-  candidate pool
-- **[8. State (`State`)](#8-state-state)** - Tracks the state of active
-  learning tasks
-
-### Task Types
-- **[1. Design Task (`DesignTask`)](#1-design-task-designtask)** - Multi-round optimisation loop
-- **[2. Supervised Task (`SupervisedTask`)](#2-supervised-task-supervisedtask)** - Train and
-  evaluate on fixed data
-- **[3. Zero-Shot Task (`ZeroShotTask`)](#3-zero-shot-task-zeroshottask)** - Evaluate
-  pre-trained models
-
-### Component Flow
-- **[Design Task Flow](#design-task-flow)**
-- **[Supervised Task Flow](#supervised-task-flow)**
-- **[Zero-Shot Task Flow](#zero-shot-task-flow)**
-
-### Evaluation Utilities
-- **[Evaluation Metrics](#evaluation-metrics)** - Metrics for predictions of the surrogate model
-
-## Core Components
-
-### 1. Dataset (`BaseDataset`)
-
-The `BaseDataset` class manages data loading, splitting, and querying. It handles:
-
-- **Data Loading**: Loads raw labelled data through the abstract `load_dataset()` method
-- **Data Splitting**: Splits data into train, validation, test, and candidate_pool sets
-- **Split Updates**: Distributes newly acquired data into existing data splits
-- **Querying**: Provides labels for candidates from the original dataset (used by the
-  oracle in offline settings)
-
-**Key Methods:**
-- `load_dataset()`: Every child class needs to implement how to load the dataset and
-  return it as `LabelledCamdidates`
-- `_split_dataset()`: Splits the dataset based on the split config, which specifies the
-  ratio of data points in train/val/test/candidate_pool sets and the splitting method
-  (random or low_vs_high)
-- `update_splits()`: Updates train/validation splits with newly acquired candidates
-- `query()`: Returns labels for given candidates (for offline evaluation)
-
-### 2. Model (`BaseModel`)
-
-The `BaseModel` is an abstract base class that defines the interface for all models in
-the framework. Models can serve multiple roles depending on the context:
-
-- **Surrogate Model**: Wrapped by `Surrogate` to approximate expensive experimental evaluations
-- **Oracle Model**: Wrapped by by `Oracle` for online evaluation (simulating real experiments)
-- **Generator Model**: Wrapped by `GeneratorSearch` to sample candidate sequences from the model
-
-**Key Abstract Methods:**
-- `featurise()`: Converts inputs (candidates or labelled data) into features suitable for the model
-- `train()`: Trains the model on labelled training and validation data
-- `predict()`: Generates predictions (means and uncertainties) for candidate sequences
-- `sample()`: Samples new candidate sequences from the model (used for generative search strategies)
-
-**Optional Methods:**
-- `get_training_summary_metrics()`: Returns training metrics (e.g., loss, accuracy) -
-  defaults to empty dict
-- `cleanup()`: Cleans up temporary files, checkpoints, or other resources - defaults to no-op
-
-**Implementation Notes:**
-- All concrete model implementations must inherit from `BaseModel` and implement all
-  abstract methods, in case a particular method cannot be implemented (e.g., train for
-  an oracle model) it should raise a NotImplementedError describing the reason
-- The `predict()` method should return a `Predictions` object containing both mean
-  predictions and uncertainty estimates
-- The `sample()` method is particularly important for generative search strategies,
-  where the model generates the candidate pool
-
-### 3. Surrogate (`Surrogate`)
-
-The surrogate approximates the expensive experimental evaluation. It wraps a `BaseModel`
-and provides:
-
-- **Training**: Fits the model on labelled training data
-- **Prediction**: Makes predictions on candidate sequences
-- **Metrics**: Tracks training metrics and performance
-
-**Key Methods:**
-- `fit()`: Trains the surrogate on train/validation data
-- `predict()`: Generates predictions (means and uncertainties) for candidates
-- `get_training_summary_metrics()`: Returns training metrics
-
-### 4. Oracle (`Oracle`)
-
-The oracle provides ground-truth labels for candidates. It can be:
-
-- **Offline**: Uses a `BaseDataset` to query labels from existing data
-- **Online**: Uses a `BaseModel` to generate labels (simulating real experiments)
-
-**Key Methods:**
-- `evaluate()`: Evaluates candidates and returns labeled results
-
-### 5. Optimizer (`Optimizer`)
-
-The optimizer orchestrates the active learning loop through the ask-tell interface:
-
-- **Ask**: Proposes the next batch of candidates to evaluate
-- **Tell**: Updates the surrogate with newly acquired data
-
-**Components:**
-- **Acquisition Function**: Scores candidates based on surrogate predictions
-- **Search Strategy**: Defines the pool of candidates to acquire from
-
-**Key Methods:**
-- `ask()`: Returns the next acquired batch of candidates to evaluate
-- `tell()`: Trains the surrogate on updated newly acquired data and returns metrics
-
-### 6. Acquisition Function (`AcquisitionFunction`)
-
-Acquisition functions determine which candidates are most promising to evaluate. They
-score candidates based on:
-
-- Surrogate model predictions (means and uncertainties)
-- Current task state (training data, round number, etc.)
-
-**Common Acquisition Functions:**
-- **Greedy**: Selects candidates with highest predicted values
-- **UCB (Upper Confidence Bound)**: Balances exploitation and exploration
-- **Expected Improvement**: Selects candidates with highest expected improvement
-- **Thompson Sampling**: Uses Bayesian sampling for exploration
-
-### 7. Search Strategy (`BaseSearch`)
-
-Search strategies define the candidate pool available for acquisition. Types include:
-
-- **DatasetSearch**: Uses the candidate pool from the dataset (offline experiments)
-- **GeneratorSearch**: Samples candidates from a generative model
-- **ProtocolSearch**: Uses a custom protocol to generate candidates
-- **ModelProtocolSearch**: Combines a model with a protocol
-
-**Key Methods:**
-- `__call__()`: Returns the list of candidates to search over
-- `get_metrics()`: Returns search-specific metrics (e.g., recall, regret)
-
-### 8. State (`State`)
-
-The `State` dataclass tracks the complete state of an active learning task:
-
-- **Components**: Dataset, surrogate model, current round
-- **History**: Records all acquired candidates per round
-- **Metrics**: Tracks performance metrics for each round
-- **Configuration**: Acquisition batch size, number of rounds, etc.
-
-**Key Methods:**
-- `update()`: Adds newly acquired candidates to history, updates dataset splits, and increments the round counter
-
-## Task Types
-
-### 1. Design Task (`DesignTask`)
-
-The design task implements a multi-round active learning loop for optimizing sequences:
-
-**Workflow:**
-1. **Initialization**: Setup dataset and surrogate
-2. **For each round:**
-   - **Ask**: Optimizer proposes candidates using search + acquisition
-   - **Evaluate**: Oracle labels the candidates
-   - **Update**: Add labeled candidates to training data
-   - **Tell**: Retrain surrogate on updated data
-   - **Evaluate**: Assess surrogate performance on test set
-   - **Log**: Record metrics and save results
-
-**Use Case**: Iteratively improve sequences by actively selecting and evaluating
-promising candidates.
-
-**Components Required:**
-- Dataset
-- Surrogate model
-- Optimizer (with acquisition function and search strategy)
-- Oracle
-- Logger
-
-### 2. Supervised Task (`SupervisedTask`)
-
-The supervised task trains a model on fixed training data and evaluates it:
-
-**Workflow:**
-1. **Setup**: Initialize dataset and surrogate
-2. **Train**: Fit surrogate on train/validation splits
-3. **Evaluate**: Assess performance on test set
-4. **Save**: Save predictions and metrics
-
-**Use Case**: Evaluate model performance on a fixed dataset split (no active learning).
-
-**Components Required:**
-- Dataset
-- Surrogate model
-- Logger
-
-### 3. Zero-Shot Task (`ZeroShotTask`)
-
-The zero-shot task evaluates a pre-trained or untrained model without training:
-
-**Workflow:**
-1. **Setup**: Initialize dataset and surrogate
-2. **Evaluate**: Make predictions on test set (no training)
-3. **Save**: Save predictions and metrics
-
-**Use Case**: Evaluate pre-trained models or baseline performance without training.
-
-**Components Required:**
-- Dataset
-- Surrogate model (pre-trained)
-- Logger
-
-## Component Flow
-
-### Design Task Flow
-1. **Setup Phase**:
-   ```
-   Task.setup(dataset, surrogate) → State
-   ```
-
-2. **Round Loop** (for each acquisition round):
-   ```
-   a. Optimizer.ask(state) → candidates
-      ├─ Search(state) → search_candidates
-      ├─ Surrogate.predict(search_candidates) → predictions
-      └─ Acquisition(predictions) → top_k candidates
-
-   b. Oracle.evaluate(candidates, state) → labeled_candidates
-
-   c. State.update(labeled_candidates)
-      └─ Dataset.update_splits(labeled_candidates)
-
-   d. Optimizer.tell(state, logger) → updated_state
-      └─ Surrogate.fit(train_data, val_data)
-
-   e. Task.evaluate(state) → updated_state
-      ├─ Surrogate.predict(test_data) → predictions
-      ├─ Results(predictions, targets) → metrics
-      └─ State.save(metrics, history)
-   ```
-
-### Supervised Task Flow
-1. **Setup Phase**:
-   ```
-   Task.setup(dataset, surrogate) → State
-   ```
-
-2. **Training Phase**:
-   ```
-   Surrogate.fit(train_data, val_data, logger)
-   ```
-
-3. **Evaluation Phase**:
-   ```
-   Task.evaluate(state)
-   ├─ Surrogate.predict(test_data) → predictions
-   ├─ Results(predictions, targets) → metrics
-   └─ State.save(metrics)
-   ```
-
-### Zero-Shot Task Flow
-1. **Setup Phase**:
-   ```
-   Task.setup(dataset, surrogate) → State
-   ```
-
-2. **Evaluation Phase** (no training):
-   ```
-   Task.evaluate(state)
-   ├─ Surrogate.predict(test_data) → predictions
-   ├─ Results(predictions, targets) → metrics
-   └─ State.save(metrics)
-   ```
-
-## Evaluation Metrics
-
-ALF provides comprehensive utilities for evaluating surrogate model predictions through metrics (see `utils/metrics.py`). Metrics are automatically added to the regsistry and categorized by whether variance is needed in the calculation of the metric:
-
-**Accuracy Metrics** (no variance required):
-- **MSE**: Mean Squared Error between predictions and targets
-- **Pearson**: Pearson correlation between predictions and targets
-- **Spearman**: Spearman correlation between predictions and targets
-- **Pairwise XEnt**: Ranking loss for pairwise classification
-
-**Calibration Metrics** (variance required):
-- **ECE** (Expected Calibration Error): Area between observed coverage and ideal calibration curve (see [this](https://arxiv.org/abs/1706.04599) paper for more details)
-- **Rank ECE**: ECE computed in rank space using Monte Carlo ranking
-- **Coverage**: Percentage of targets falling within confidence intervals at a given alpha level
-- **Rank Coverage**: Coverage computed in rank space
-- **Width**: Average confidence interval width normalized by dataset range
-- **Rank Width**: Width computed in rank space
-
-**Uncertainty Quantification (UQ) Metrics** (variance required):
-- **Residual Spearman**: Spearman correlation between absolute residuals and predicted variances
-- **Residual Pearson**: Pearson correlation between absolute residuals and standard deviations
-
-**Acquisition Performance Metrics** (variance required):
-- **Regret UCB Alpha**: UCB acquisition regret comparing selected vs optimal candidates
-- **Regret UCB Alpha Sweep**: UCB regret computed across multiple alpha exploration parameters
-
-All metrics accept predictions (means, variances, targets) and return a dictionary of computed values. Metrics requiring variance will validate that uncertainty estimates are provided.
+## Installation
+
+```bash
+pip install alf-core
+```
+
+## Quick start
+
+`alf-core` is the framework layer: you supply your own `BaseDataset` and `BaseModel`
+subclasses (or install [alf-tools](https://github.com/instadeepai/alf/blob/main/tools/README.md)
+for ready-made ones), then wire them into the active-learning loop.
+
+```python
+from alf_core import (
+    DatasetSearch,
+    DesignTask,
+    Optimizer,
+    Oracle,
+    Surrogate,
+    TerminalStateLogger,
+)
+
+# Bring your own BaseDataset, BaseModel, and AcquisitionFunction subclasses
+dataset = MyDataset(...)
+surrogate = Surrogate(model=MyModel())
+optimizer = Optimizer(acquisition_fn=MyAcquisition(), search_fn=DatasetSearch())
+oracle = Oracle(scorer=dataset)
+
+# Run the active-learning loop for 5 rounds, acquiring 100 candidates per round
+task = DesignTask(num_acq_rounds=5, acq_batch_size=100)
+state = task.setup(dataset=dataset, surrogate=surrogate)
+task.run(
+    state=state,
+    state_loggers=[TerminalStateLogger()],
+    optimizer=optimizer,
+    oracle=oracle,
+)
+```
+
+For a complete, runnable `alf-core`-only example (a bootstrap-ensemble surrogate and a
+Probability of Improvement acquisition function built from scratch with numpy/scipy), see the
+[ALF Core Quickstart notebook](https://github.com/instadeepai/alf/blob/main/tutorials/alf_core_quickstart.ipynb).
+
+## Key concepts
+
+ALF runs the active-learning loop over a small set of swappable components:
+
+- **Dataset** (`BaseDataset`) — loads, splits, and queries candidate data
+- **Model** (`BaseModel`) — the surrogate/oracle/generator backbone you implement
+- **Surrogate** (`Surrogate`) — wraps a model to predict fitness and uncertainty
+- **Oracle** (`Oracle`) — returns ground-truth labels (offline pool or live scorer)
+- **Optimizer** (`Optimizer`) — proposes the next batch via acquisition + search
+- **Acquisition function** (`AcquisitionFunction`) — scores candidates to acquire
+- **Search strategy** (`BaseSearch`) — defines the candidate pool to score
+- **State** (`State`) — tracks rounds, history, and metrics across the loop
+- **Tasks** (`DesignTask`, `SupervisedTask`, `ZeroShotTask`) — drive the multi-round
+  loop, fixed-data training, or no-train evaluation
+
+## Documentation
+
+- **Core concepts:** [how the components fit together](https://instadeepai.github.io/alf/explanation/core-concepts.html)
+- **API reference:** [every class and method](https://instadeepai.github.io/alf/api/alf_core/index.html)
+- **Glossary:** [terms and benchmark metrics](https://instadeepai.github.io/alf/reference/glossary.html)
+- **Tutorials:** [tutorials/](https://github.com/instadeepai/alf/tree/main/tutorials)
+- **Full documentation:** [instadeepai.github.io/alf](https://instadeepai.github.io/alf/)
+- **Ready-to-use tools:** [alf-tools](https://github.com/instadeepai/alf/blob/main/tools/README.md)
+
+## License
+
+Apache License 2.0 — see [LICENSE](https://github.com/instadeepai/alf/blob/main/LICENSE).

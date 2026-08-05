@@ -33,8 +33,8 @@ exclude = [
 line-length = 100
 indent-width = 4
 
-# Assume Python 3.11
-target-version = "py311"
+# Assume Python 3.12
+target-version = "py312"
 
 [lint]
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
@@ -47,7 +47,9 @@ target-version = "py311"
 # pydocstyle - D
 # pydoclint - DOC
 select = ["E", "F", "D", "W", "I", "PLC", "PLE", "PLW", "A", "D", "DOC"]
-ignore = ["D100", "D205", "DOC502"]
+# F722: Syntax error in forward annotation (jaxtyping uses strings with spaces)
+# F821: Undefined name in annotation (jaxtyping dimension names are not actual variables)
+ignore = ["D100", "D205", "DOC502", "F722", "F821"]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
@@ -92,4 +94,5 @@ preview = true
 
 [lint.per-file-ignores]
 "__init__.py" = ["F401", "D104"]
-"tests/*" = ["DOC"]
+"**/tests/**" = ["DOC"]
+"tutorials/**/*.ipynb" = ["D", "E501", "W293", "DOC"]

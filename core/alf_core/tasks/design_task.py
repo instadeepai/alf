@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,9 +16,11 @@ import logging
 from typing import Any
 
 from alf_core.dataclasses import State
+from alf_core.dataclasses.round_metrics import RoundMetrics
 from alf_core.optimizer.optimizer import Optimizer
 from alf_core.oracle.oracle import Oracle
 from alf_core.tasks.base_task import BaseTask
+from alf_core.utils.metrics.aggregate import compute_experiment_summary
 from alf_core.utils.state_logger import StateLogger
 
 logger = logging.getLogger("alf-core")
@@ -49,12 +51,15 @@ class DesignTask(BaseTask):
             Updated state with surrogate fine-tuned on the train and validation sets.
         """
         logger.info("Running initial round of surrogate model fine-tuning on the train dataset ...")
-        state.surrogate.fit(
+        # Construct RoundMetrics before fit() so state is always typed, even on failure
+        state.round_metrics = RoundMetrics(round=0)
+        state.metrics_history.append(state.round_metrics)
+        epoch_metrics = state.surrogate.fit(
             train_data=state.dataset.train_dataset,
             val_data=state.dataset.validation_dataset,
         )
-        state.round_metrics = {"round": 0}
-        self.evaluate(state=state)
+        state.round_metrics.training_history = epoch_metrics
+        state = self.evaluate(state=state)
         for state_logger in state_loggers:
             state_logger.log(state, round_name="initial_train_round")
         return state
@@ -77,6 +82,9 @@ class DesignTask(BaseTask):
 
         The loop continues for num_acq_rounds or until termination conditions are met.
 
+        After all rounds complete, logs end-of-experiment aggregate metrics under
+        the round name `experiment_summary`.
+
         Args:
             state: Initial task state with dataset and surrogate.
             state_loggers: List of StateLogger for recording the state.
@@ -91,14 +99,24 @@ class DesignTask(BaseTask):
             state = self.run_initial_train_round(state, state_loggers)
 
         for round_i in range(1, self.num_acq_rounds + 1):
-            state.round_metrics = {"round": round_i}
+            state.round_metrics = RoundMetrics(round=round_i)
             acquired_candidates, state = optimizer.ask(state)
             labelled_candidates, state = oracle.evaluate(acquired_candidates, state)
             state.update(labelled_candidates)
-            state = optimizer.tell(state=state)
-
+            state = optimizer.tell(state=state)  # populates round_metrics.training_history
             state = self.evaluate(state=state)
             for state_logger in state_loggers:
                 state_logger.log(state)
+
+        experiment_metrics = compute_experiment_summary(state)
+        if experiment_metrics:
+            for state_logger in state_loggers:
+                state_logger.log_summary(experiment_metrics, round_name="experiment_summary")
+        else:
+            logger.info(
+                "No aggregate experiment-summary metrics computed, so no "
+                "experiment_summary was logged (e.g. fewer than 2 rounds, or a "
+                "non-positive best_value for a regression task)."
+            )
 
         return

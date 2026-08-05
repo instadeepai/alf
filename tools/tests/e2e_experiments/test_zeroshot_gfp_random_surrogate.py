@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ def gfp_dataset():
         validation_frac=0.0,
         test_ratio=1.0,
         split_type="random",
+        problem_type="regression",
     )
     return GFP(config)
 

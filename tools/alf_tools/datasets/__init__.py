@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,3 +15,14 @@
 from alf_tools.datasets.flip import FLIP, FLIPConfig
 from alf_tools.datasets.gfp import GFP
 from alf_tools.datasets.proteingym import ProteinGym
+
+try:
+    from alf_tools.datasets.guacamol import (
+        GuacaMol,
+        GuacaMolConfig,
+        GuacaMolFileInfo,
+        download_guacamol,
+        get_task_scorer,
+    )
+except ImportError:
+    pass

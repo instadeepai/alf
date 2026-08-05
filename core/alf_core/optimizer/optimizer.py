@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ class Optimizer:
         acquisition_candidates = self.acquisition_fn(search_candidates, state)
         acquired_candidates = acquisition_candidates.get_top_k(state.acq_batch_size).candidates
         t1 = time.perf_counter()
-        state.round_metrics.update({"ask_time": t1 - t0})
+        state.round_metrics.metrics["ask_time"] = t1 - t0
         return acquired_candidates, state
 
     def tell(
@@ -77,20 +77,20 @@ class Optimizer:
 
         Args:
             state: Current task state with updated dataset.
-            logger: Optional logger for recording training metrics.
 
         Returns:
-            Updated state with tell_time and optimizer metrics.
+            Updated state with tell_time, training_history, and optimizer metrics.
         """
         t0 = time.perf_counter()
-        state.surrogate.fit(
+        epoch_metrics = state.surrogate.fit(
             train_data=state.dataset.train_dataset,
             val_data=state.dataset.validation_dataset,
         )
         t1 = time.perf_counter()
 
-        state.round_metrics.update({"tell_time": t1 - t0})
-        state.round_metrics.update(self.get_metrics(state))
+        state.round_metrics.training_history = epoch_metrics  # full replacement, not append
+        state.round_metrics.metrics["tell_time"] = t1 - t0
+        state.round_metrics.metrics.update(self.get_metrics(state))
 
         return state
 

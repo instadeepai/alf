@@ -1,6 +1,6 @@
 [project]
 name = "alf"
-version = "0.1.0"
+version = "0.1.0b0"
 description = "Active Learning Framework (ALF) - A comprehensive framework for active learning experiments"
 readme = "README.md"
 requires-python = ">=3.12,<3.14.1"
@@ -39,8 +39,6 @@ extraPaths = ["core", "tools", "tutorials"]
 dev = [
     "pytest>=6.2.0",
     "pytest-cov>=2.12.0",
-    "black>=21.0.0",
-    "flake8>=3.9.0",
     "mypy>=0.910",
     "pre-commit>=4.1.0",
 ]
@@ -50,6 +48,32 @@ docs = [
     "furo>=2023.0.0",
     "myst-parser>=2.0.0",
     "sphinx-autodoc-typehints>=1.24.0",
+    "sphinx-design>=0.5.0",
+]
+guacamol = ["alf_tools[guacamol]"]
+
+tutorials = [
+    "matplotlib>=3.7.0",
+    "umap-learn>=0.5.0",
+    "llvmlite>=0.47.0",
+    "jupyterlab>=4.0.0",
+]
+
+transformers = ["alf_tools[transformers]"]
+esm2 = ["alf_tools[esm2]"]
+esmfold = ["alf_tools[esmfold]"]
+chemprop = ["alf_tools[chemprop]"]
+mlip = ["alf_tools[mlip]"]
+mlip-cuda13 = ["alf_tools[mlip-cuda13]"]
+
+# Workflow umbrellas (mirror the alf_tools extras of the same name).
+protein = ["alf_tools[protein]"]
+molecule = ["alf_tools[molecule]"]
+
+# Dependencies for the benchmark_examples/ taster scripts: plotting + ESM2 (transformers).
+benchmark = [
+    "matplotlib>=3.7.0",
+    "alf_tools[esm2]",
 ]
 
 [tool.uv]
@@ -61,3 +85,11 @@ packages = []  # No Python packages at root level - just a meta-package
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_configs = true
+# Disable name-defined errors for jaxtyping dimension names
+disable_error_code = ["name-defined"]
+# Use explicit package bases to avoid duplicate conftest.py module errors
+explicit_package_bases = true

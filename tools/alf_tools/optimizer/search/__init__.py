@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,4 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from alf_tools.optimizer.search.botorch_continuous_search import (
+    BotorchContinuousSearch,
+)
 from alf_tools.optimizer.search.single_mutant_search import SingleMutantSearch
+
+__all__ = ["BotorchContinuousSearch", "SingleMutantSearch"]

@@ -7,7 +7,7 @@ on:
 
 jobs:
   linters:
-    runs-on: instadeep-ci
+    runs-on: ubuntu-latest
     container:
       image: python:3.12-slim-bullseye
 
@@ -28,14 +28,14 @@ jobs:
       - name: Lint
         run: |
           uv sync
-          uv run --no-sync pre-commit run --all-files --verbose
+          uv run --no-sync pre-commit run --all-files --verbose --show-diff-on-failure
 
   tests:
-      runs-on: instadeep-ci-4
+      runs-on: ubuntu-latest
       env:
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       container:
-        image: python:3.11-slim-bullseye
+        image: python:3.12-slim-bullseye
 
       steps:
         - name: Git setup
@@ -56,7 +56,12 @@ jobs:
           uses: astral-sh/setup-uv@v6
 
         - name: Sync dependencies
-          run: uv sync
+          # --all-groups installs every dependency-group in the root pyproject,
+          # including docs/tutorials and the optional extras re-exposed as groups
+          # (guacamol, esm2, esmfold, chemprop). A new extra is picked up here
+          # automatically once it is re-exposed as a group in the root pyproject
+          # (`foo = ["alf_tools[foo]"]`); no workflow edit needed. See issue #120.
+          run: uv sync --all-groups
 
         - name: Run tests (core) 🧪
           run: |
@@ -74,7 +79,7 @@ jobs:
 
         - name: Pytest coverage comment (core) 💬
           id: coverageCommentCore
-          uses: MishaKav/pytest-coverage-comment@main
+          uses: MishaKav/pytest-coverage-comment@287292879eaaff04116f36d3eb1a670f6e5df1a4
           with:
             title: Core Coverage Report
             unique-id-for-comment: coverage-core
@@ -83,7 +88,7 @@ jobs:
 
         - name: Pytest coverage comment (tools) 💬
           id: coverageCommentTools
-          uses: MishaKav/pytest-coverage-comment@main
+          uses: MishaKav/pytest-coverage-comment@287292879eaaff04116f36d3eb1a670f6e5df1a4
           with:
             title: Tools Coverage Report
             unique-id-for-comment: coverage-tools
@@ -92,7 +97,7 @@ jobs:
 
         - name: Update core coverage badge 🏷️
           if: github.ref == 'refs/heads/main'
-          uses: schneegans/dynamic-badges-action@v1.7.0
+          uses: schneegans/dynamic-badges-action@e9a478b16159b4d31420099ba146cdc50f134483
           with:
             auth: ${{ secrets.GIST_SECRET }}
             gistID: 114eb5680493468e40f5a528c08f1888
@@ -104,7 +109,7 @@ jobs:
 
         - name: Update tools coverage badge 🏷️
           if: github.ref == 'refs/heads/main'
-          uses: schneegans/dynamic-badges-action@v1.7.0
+          uses: schneegans/dynamic-badges-action@e9a478b16159b4d31420099ba146cdc50f134483
           with:
             auth: ${{ secrets.GIST_SECRET }}
             gistID: 25ce4b64d5b9cda177203366146f5bf0

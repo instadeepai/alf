@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,8 @@
 # limitations under the License.
 
 # This file makes alf_core a Python package
+import importlib.metadata
+
 from alf_core.dataclasses import (
     Candidate,
     LabelledCandidates,
@@ -20,9 +22,16 @@ from alf_core.dataclasses import (
     Predictions,
     Results,
     State,
+    SurrogateEpochMetrics,
 )
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
-from alf_core.model.base_model import BaseModel
+from alf_core.model.base_model import BaseModel, BaseTrainConfig
+from alf_core.model.normaliser import (
+    InputNormaliser,
+    InputStandardiser,
+    OutputStandardiser,
+    make_input_transform,
+)
 from alf_core.optimizer.acquisition_function import AcquisitionFunction
 from alf_core.optimizer.optimizer import Optimizer
 from alf_core.optimizer.search import (
@@ -39,8 +48,11 @@ from alf_core.tasks.base_task import BaseTask
 from alf_core.tasks.design_task import DesignTask
 from alf_core.tasks.supervised_task import SupervisedTask
 from alf_core.tasks.zeroshot_task import ZeroShotTask
+from alf_core.utils.enums import ProblemType
 from alf_core.utils.state_logger import (
     FileStateLogger,
     StateLogger,
     TerminalStateLogger,
 )
+
+__version__ = importlib.metadata.version("alf-core")

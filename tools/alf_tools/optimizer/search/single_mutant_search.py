@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,7 +34,6 @@ class SingleMutantSearch(SearchProtocol):
         Returns:
             A list of candidates.
         """
-        # TODO: Add features to the candidates
         train_dataset = state.dataset.train_dataset
         best_id = train_dataset.labels.argmax()
         best_sequence = train_dataset.candidates[best_id].data

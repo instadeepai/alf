@@ -8,6 +8,9 @@ promising for evaluation.
 .. toctree::
    :maxdepth: 1
 
+   BoTorch Acquisition Wrapper <botorch_acquisition/index>
+   BoTorch MC Samplers <botorch_samplers/index>
+   CoreSet <core_set/index>
    Expected Improvement <expected_improvement/index>
    Greedy <greedy/index>
    Thompson Sampling <thompson_sampling/index>

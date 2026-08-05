@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,8 +14,11 @@
 
 import numpy as np
 import pytest
+import torch
 from alf_core.dataclasses.candidate import Candidate, Modality
 from alf_core.dataclasses.predictions import Predictions
+from alf_core.utils.enums import ProblemType
+from beartype.roar import BeartypeCallHintParamViolation
 
 
 class TestPredictionsInitialization:
@@ -71,6 +74,30 @@ class TestPredictionsInitialization:
         np.testing.assert_array_equal(predictions.empirical_dist, empirical_dist)
 
 
+class TestPredictionsNumpyTypeValidation:
+    """Test cases for numpy type validation in Predictions."""
+
+    def test_torch_means_raises_type_error(self):
+        """Test that torch tensor means raises BeartypeCallHintParamViolation."""
+        means = torch.tensor([1.0, 2.0, 3.0])
+        with pytest.raises(BeartypeCallHintParamViolation):
+            Predictions(means=means)
+
+    def test_torch_variances_raises_type_error(self):
+        """Test that torch tensor variances raises BeartypeCallHintParamViolation."""
+        means = np.array([1.0, 2.0, 3.0])
+        variances = torch.tensor([0.1, 0.2, 0.3])
+        with pytest.raises(BeartypeCallHintParamViolation):
+            Predictions(means=means, variances=variances)
+
+    def test_torch_empirical_dist_raises_type_error(self):
+        """Test that torch tensor empirical_dist raises BeartypeCallHintParamViolation."""
+        means = np.array([1.0, 2.0, 3.0])
+        empirical_dist = torch.randn(3, 2)
+        with pytest.raises(BeartypeCallHintParamViolation):
+            Predictions(means=means, empirical_dist=empirical_dist)
+
+
 class TestPredictionsValidation:
     """Test cases for Predictions validation and error handling."""
 
@@ -116,20 +143,40 @@ class TestPredictionsToDataFrame:
         targets = np.array([1.1, 2.1, 3.1])
 
         # Convert to DataFrame
-        df = predictions.to_dataframe(candidates, targets)
+        df = predictions.to_dataframe(candidates, targets, problem_type=ProblemType.REGRESSION)
 
         # Verify DataFrame structure
         assert len(df) == 3
-        assert "sequence" in df.columns
+        assert "data" in df.columns
         assert "mean" in df.columns
         assert "variance" in df.columns
         assert "targets" in df.columns
 
         # Check values
-        np.testing.assert_array_equal(df["sequence"].values, ["seq1", "seq2", "seq3"])
+        np.testing.assert_array_equal(df["data"].values, ["seq1", "seq2", "seq3"])
         np.testing.assert_array_almost_equal(df["mean"].values, [1.0, 2.0, 3.0])
         np.testing.assert_array_almost_equal(df["variance"].values, [0.1, 0.2, 0.3])
         np.testing.assert_array_almost_equal(df["targets"].values, [1.1, 2.1, 3.1])
+
+    def test_to_dataframe_uses_data_column_for_non_sequence_modality(self):
+        """Candidate data is stored under a modality-agnostic 'data' column.
+
+        Regression test: the column was previously hardcoded to 'sequence',
+        which was misleading for non-sequence modalities (e.g. tabular).
+        """
+        means = np.array([1.0, 2.0])
+        predictions = Predictions(means=means)
+        candidates = [
+            Candidate(data=0.5, modality=Modality.TABULAR),
+            Candidate(data=0.7, modality=Modality.TABULAR),
+        ]
+        targets = np.array([0.4, 0.8])
+
+        df = predictions.to_dataframe(candidates, targets, problem_type=ProblemType.REGRESSION)
+
+        assert "data" in df.columns
+        assert "sequence" not in df.columns
+        np.testing.assert_array_almost_equal(df["data"].values, [0.5, 0.7])
 
     def test_to_dataframe_with_empirical_dist(self):
         """Test to_dataframe with empirical distribution."""
@@ -146,7 +193,7 @@ class TestPredictionsToDataFrame:
         targets = np.array([1.1, 2.1])
 
         # Convert to DataFrame
-        df = predictions.to_dataframe(candidates, targets)
+        df = predictions.to_dataframe(candidates, targets, problem_type=ProblemType.REGRESSION)
 
         # Check ensemble prediction columns
         assert "ensemble_pred_0" in df.columns
@@ -172,7 +219,7 @@ class TestPredictionsToDataFrame:
         targets = np.array([1.1, 2.1, 3.1])
 
         # Convert to DataFrame
-        df = predictions.to_dataframe(candidates, targets)
+        df = predictions.to_dataframe(candidates, targets, problem_type=ProblemType.REGRESSION)
 
         # Check that variances are set to 0
         np.testing.assert_array_equal(df["variance"].values, [0, 0, 0])
@@ -191,8 +238,80 @@ class TestPredictionsToDataFrame:
         targets = np.array([1.1, 2.1])
 
         # Convert to DataFrame
-        df = predictions.to_dataframe(candidates, targets)
+        df = predictions.to_dataframe(candidates, targets, problem_type=ProblemType.REGRESSION)
 
         # Check that no ensemble columns exist
         ensemble_cols = [col for col in df.columns if col.startswith("ensemble_pred_")]
         assert len(ensemble_cols) == 0
+
+
+class TestPredictionsToDataframeClassification:
+    """Predictions.to_dataframe() expands 2D means into prob_class_N columns."""
+
+    def _make_candidates(self, n: int):
+        """Create n dummy sequence candidates.
+
+        Returns:
+            List of n Candidate objects with sequence modality.
+        """
+        return [Candidate(data=f"SEQ{i}", modality=Modality.SEQUENCE) for i in range(n)]
+
+    def test_binary_columns(self):
+        """Test that binary 2D means produce prob_class_0 and prob_class_1 columns."""
+        probs = np.array([[0.8, 0.2], [0.3, 0.7], [0.9, 0.1], [0.2, 0.8]])
+        targets = np.array([0.0, 1.0, 0.0, 1.0])
+        preds = Predictions(means=probs)
+        df = preds.to_dataframe(self._make_candidates(4), targets, problem_type=ProblemType.BINARY)
+        assert "prob_class_0" in df.columns
+        assert "prob_class_1" in df.columns
+        assert "mean" not in df.columns
+        assert "variance" not in df.columns
+
+    def test_multiclass_columns(self):
+        """Test that multiclass 2D means produce one prob_class_N column per class."""
+        probs = np.array([[0.7, 0.2, 0.1], [0.1, 0.7, 0.2], [0.1, 0.2, 0.7]])
+        targets = np.array([0.0, 1.0, 2.0])
+        preds = Predictions(means=probs)
+        df = preds.to_dataframe(
+            self._make_candidates(3), targets, problem_type=ProblemType.MULTICLASS
+        )
+        assert "prob_class_0" in df.columns
+        assert "prob_class_1" in df.columns
+        assert "prob_class_2" in df.columns
+
+    def test_regression_columns_unchanged(self):
+        """Test that 1D regression means still produce mean and variance columns."""
+        means = np.array([1.0, 2.0, 3.0])
+        targets = np.array([1.1, 1.9, 3.1])
+        preds = Predictions(means=means)
+        df = preds.to_dataframe(
+            self._make_candidates(3), targets, problem_type=ProblemType.REGRESSION
+        )
+        assert "mean" in df.columns
+        assert "variance" in df.columns
+        assert "prob_class_0" not in df.columns
+
+    def test_prob_values_correct(self):
+        """Test that probability values are correctly mapped to their columns."""
+        probs = np.array([[0.3, 0.7], [0.8, 0.2]])
+        targets = np.array([1.0, 0.0])
+        preds = Predictions(means=probs)
+        df = preds.to_dataframe(self._make_candidates(2), targets, problem_type=ProblemType.BINARY)
+        assert df["prob_class_0"].tolist() == pytest.approx([0.3, 0.8])
+        assert df["prob_class_1"].tolist() == pytest.approx([0.7, 0.2])
+
+    def test_override_to_regression_with_problem_type(self):
+        """Test that passing problem_type=REGRESSION forces regression output even for 2D means."""
+        probs = np.array([[0.8, 0.2], [0.3, 0.7]])
+        targets = np.array([0.0, 1.0])
+        preds = Predictions(means=probs)
+        df = preds.to_dataframe(
+            self._make_candidates(2), targets, problem_type=ProblemType.REGRESSION
+        )
+        # Should have mean and variance columns, not prob_class
+        assert "mean" in df.columns
+        assert "variance" in df.columns
+        assert "prob_class_0" not in df.columns
+        assert "prob_class_1" not in df.columns
+        # mean should be the array
+        assert len(df["mean"].iloc[0]) == 2  # array of length 2

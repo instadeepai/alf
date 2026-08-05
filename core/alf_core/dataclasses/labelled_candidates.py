@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ from typing import Any, Union
 
 import numpy as np
 import pandas as pd
+
 from alf_core.dataclasses.candidate import Candidate
 
 
@@ -40,7 +41,8 @@ class LabelledCandidates:
             AssertionError: If the length of candidates and labels don't match.
         """
         assert len(self.candidates) == len(self.labels), (
-            "Candidates and labels must have the same length"
+            f"Candidates and labels must have the same length, "
+            f"got {len(self.candidates)} candidates and {len(self.labels)} labels"
         )
 
     def __len__(self) -> int:
@@ -63,7 +65,7 @@ class LabelledCandidates:
             The candidates and labels at the specified index or slice.
         """
         if isinstance(index, int):
-            return ([self.candidates[index]], [self.labels[index]])
+            return ([self.candidates[index]], np.array([self.labels[index]]))
         elif isinstance(index, np.ndarray):
             return ([self.candidates[i] for i in index], self.labels[index])
         else:
@@ -74,8 +76,8 @@ class LabelledCandidates:
         """Return the raw data of each candidate.
 
         Returns:
-            A list containing the raw data (sequence, graph, image, etc.)
-            of each candidate in the collection.
+            A list containing the raw data (e.g. a sequence string, a SMILES string,
+            a feature vector) of each candidate in the collection.
         """
         return [cand.data for cand in self.candidates]
 
@@ -100,8 +102,14 @@ class LabelledCandidates:
             self.candidates.extend(candidates.candidates)
             self.labels = np.concatenate((self.labels, candidates.labels), axis=0)
         else:
-            assert labels is not None and len(candidates) == len(labels), (
-                "Candidates and labels must have the same length"
+            assert labels is not None, (
+                "Labels must be provided when appending a list of Candidates "
+                "(pass a LabelledCandidates instead to append "
+                "without providing labels separately)"
+            )
+            assert len(candidates) == len(labels), (
+                f"Candidates and labels must have the same length, "
+                f"got {len(candidates)} candidates and {len(labels)} labels"
             )
             self.candidates.extend(candidates)
             self.labels = np.concatenate((self.labels, labels), axis=0)

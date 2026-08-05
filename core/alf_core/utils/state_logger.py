@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,17 +20,40 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
-from alf_core.dataclasses import Candidate, LabelledCandidates, Predictions, State
+from alf_core.dataclasses import (
+    Candidate,
+    LabelledCandidates,
+    Predictions,
+    State,
+    SurrogateEpochMetrics,
+)
+from alf_core.utils.enums import ProblemType
 
 logger = logging.getLogger("alf-core")
 
 
 class StateLogger(abc.ABC):
-    """Abstract base class for state loggers."""
+    """Abstract base class for state loggers.
+
+    Subclasses must implement :meth:`log`. They may also override
+    :meth:`_log_training_history` to capture per-epoch training metrics.
+
+    Per-epoch metrics are available as `state.round_metrics.training_history`,
+    a `list[SurrogateEpochMetrics]` populated by the surrogate's
+    `get_epoch_metrics()` after each training round.  `SurrogateEpochMetrics`
+    carries `epoch`, `train_loss`, and `val_loss`, plus an
+    `additional_metrics` dict for model-specific metrics (e.g. `train_spearman`,
+    `val_spearman`, `train_mse`, `val_mse`).  The list is empty when the
+    surrogate does not override `get_epoch_metrics()`.
+    """
 
     @abc.abstractmethod
     def log(self, state: State, round_name: str | None = None) -> None:
         """Log data from the task state to the logger destination.
+
+        `state.round_metrics.training_history` contains a
+        `list[SurrogateEpochMetrics]` with per-epoch training metrics for this round.
+        Override :meth:`_log_training_history` to capture them.
 
         Args:
             state: State object to log
@@ -40,9 +63,61 @@ class StateLogger(abc.ABC):
         """
         pass
 
+    @abc.abstractmethod
+    def log_summary(self, metrics: dict[str, float], round_name: str) -> None:
+        """Log a set of end-of-experiment summary metrics.
+
+        Unlike :meth:`log`, this records only the given scalar metrics (e.g. the
+        aggregate `experiment_summary` emitted by `DesignTask`) and does not
+        touch round-level state such as predictions or acquisition batches.
+
+        Args:
+            metrics: Mapping of summary metric name to value.
+            round_name: Label for the summary entry, e.g. "experiment_summary".
+        """
+        pass
+
+    def _log_training_history(
+        self, training_history: list[SurrogateEpochMetrics], round_num: int | None = None
+    ) -> None:
+        """Optionally log per-epoch training metrics for the current round.
+
+        This is a no-op by default. Override in a subclass to capture
+        `SurrogateEpochMetrics` from `state.round_metrics.training_history`.
+
+        `SurrogateEpochMetrics` fields: `epoch`, `train_loss`, `val_loss`, and
+        `additional_metrics` (a dict for model-specific metrics such as
+        `train_spearman`, `val_spearman`, `train_mse`, `val_mse`). Use
+        `epoch_metrics.to_metrics_dict()` to get a flat `dict[str, float]`
+        with `None` fields omitted.
+
+        Args:
+            training_history: List of SurrogateEpochMetrics from
+                state.round_metrics.training_history. May be empty if the
+                surrogate does not override get_epoch_metrics().
+            round_num: The round number. Available for subclasses that need it
+                (e.g. to name output files); can be ignored otherwise.
+        """
+
 
 class TerminalStateLogger(StateLogger):
     """Logger that outputs metrics to the terminal."""
+
+    def _log_training_history(
+        self, training_history: list[SurrogateEpochMetrics], round_num: int | None = None
+    ) -> None:
+        """Log per-epoch metrics for a single round to the terminal. training_history is
+        logged at DEBUG level to avoid cluttering the terminal output, which is typically
+        reserved for round-level metrics.
+
+        Args:
+            training_history: List of SurrogateEpochMetrics from
+                state.round_metrics.training_history.
+            round_num: Unused; present for signature compatibility with the base class.
+        """
+        for epoch_metrics in training_history:
+            metrics = [f"{k}: {v:.3f}" for k, v in epoch_metrics.to_metrics_dict().items()]
+            logger.debug("  Epoch %d: %s", epoch_metrics.epoch, ", ".join(metrics))
 
     def log(
         self,
@@ -58,10 +133,22 @@ class TerminalStateLogger(StateLogger):
                 or the round number for design tasks.
         """
         if round_name is None:
-            round_name = str(state.round)
-        metrics = [f"{key}: {value:.3f}" for key, value in state.round_metrics.items()]
+            round_name = str(state.round_metrics.round)
+        metrics = [f"{key}: {value:.3f}" for key, value in state.round_metrics.metrics.items()]
         message = "\n".join(metrics)
-        logger.info("Round %s:\n%s", round_name, message)
+        logger.info(f"Round {round_name}:\n{message}")
+        logger.debug(f"Training history for round {round_name}:")
+        self._log_training_history(state.round_metrics.training_history)
+
+    def log_summary(self, metrics: dict[str, float], round_name: str) -> None:
+        """Log summary metrics to the terminal.
+
+        Args:
+            metrics: Mapping of summary metric name to value.
+            round_name: Label for the summary entry, e.g. "experiment_summary".
+        """
+        message = "\n".join(f"{key}: {value:.3f}" for key, value in metrics.items())
+        logger.info(f"Round {round_name}:\n{message}")
 
 
 class FileStateLogger(StateLogger):
@@ -83,17 +170,62 @@ class FileStateLogger(StateLogger):
         self.upload_function = upload_function
         logger.info("Initializing FileStateLogger at %s", self.output_path)
 
-    def _log_metrics(self, metrics: dict[str, float]) -> None:
-        """Log metrics to file.
+    def _log_training_history(
+        self, training_history: list[SurrogateEpochMetrics], round_num: int | None = None
+    ) -> None:
+        """Write per-epoch metrics for a single round to training_history/round_N.csv.
+
+        Creates the `training_history/` subdirectory on first use. Each round
+        gets its own file so column schemas never conflict across rounds.
 
         Args:
-            metrics: Dictionary of metrics to log
+            training_history: List of SurrogateEpochMetrics from
+                state.round_metrics.training_history.
+            round_num: The round number, used as the filename suffix.
+
+        Raises:
+            ValueError: If round_num is None, since it's needed to name the output file.
         """
-        metrics_df = pd.DataFrame.from_records([metrics])
+        if not training_history:
+            return
+        if round_num is None:
+            raise ValueError(
+                "round_num must be provided to log training history in FileStateLogger"
+            )
+        training_history_dir = self.output_path / "training_history"
+        training_history_dir.mkdir(exist_ok=True)
+        rows = [em.to_metrics_dict() for em in training_history]
+        pd.DataFrame.from_records(rows).to_csv(
+            training_history_dir / f"round_{round_num}.csv", index=False
+        )
+
+    def _log_metrics(self, metrics: dict[str, float], round_num: int) -> None:
+        """Log per-round metrics to `metrics.csv` with `round` as the first column.
+
+        Args:
+            metrics: Dictionary of metrics to log.
+            round_num: Round number, written as the leading `round` column.
+        """
+        row: dict[str, object] = {"round": round_num}
+        row.update(metrics)
+        metrics_df = pd.DataFrame.from_records([row])
         if (self.output_path / "metrics.csv").exists():
             saved_df = pd.read_csv(self.output_path / "metrics.csv")
             metrics_df = pd.concat([saved_df, metrics_df])
         metrics_df.to_csv(self.output_path / "metrics.csv", index=False)
+
+    def _log_summary_metrics(self, metrics: dict[str, float]) -> None:
+        """Append summary metrics to `summary.csv`.
+
+        Args:
+            metrics: Mapping of summary metric name to value.
+        """
+        summary_df = pd.DataFrame.from_records([metrics])
+        summary_path = self.output_path / "summary.csv"
+        if summary_path.exists():
+            saved_df = pd.read_csv(summary_path)
+            summary_df = pd.concat([saved_df, summary_df])
+        summary_df.to_csv(summary_path, index=False)
 
     def _log_acquisition_batch(self, acq_batch: LabelledCandidates, acq_round: int) -> None:
         """Log the acquisition batch to file.
@@ -112,6 +244,7 @@ class FileStateLogger(StateLogger):
         candidates: list[Candidate],
         targets: np.ndarray,
         round_name: str,
+        problem_type: ProblemType = ProblemType.REGRESSION,
     ) -> None:
         """Log predictions to file.
 
@@ -122,9 +255,10 @@ class FileStateLogger(StateLogger):
             round_name: Name of the current round in the task, depending on the task type
                 e.g. "initial_train_round", "supervised evaluation", "zero-shot evaluation",
                 or the round number for design tasks.
+            problem_type: ProblemType to determine how predictions are formatted.
         """
         round_name = round_name.lower().replace(" ", "_")
-        predictions_df = predictions.to_dataframe(candidates, targets)
+        predictions_df = predictions.to_dataframe(candidates, targets, problem_type=problem_type)
         predictions_df.to_csv(self.output_path / f"{round_name}_predictions.csv", index=False)
 
     def log(self, state: State, round_name: str | None = None) -> None:
@@ -137,9 +271,10 @@ class FileStateLogger(StateLogger):
                 or the round number for design tasks.
         """
         if round_name is None:
-            round_name = "round_" + str(state.round)
+            round_name = "round_" + str(state.round_metrics.round)
 
-        self._log_metrics(state.round_metrics)
+        self._log_metrics(state.round_metrics.metrics, round_num=state.round_metrics.round)
+        self._log_training_history(state.round_metrics.training_history, state.round_metrics.round)
 
         if state.round_predictions is not None:
             self._log_predictions(
@@ -147,10 +282,30 @@ class FileStateLogger(StateLogger):
                 state.dataset.test_dataset.candidates,
                 state.dataset.test_dataset.labels,
                 round_name,
+                problem_type=state.problem_type,
             )
 
         if state.history:
             self._log_acquisition_batch(state.history[-1], state.round)
+
+        if self.upload_function is not None:
+            self.upload_function(self.output_path)
+
+    def log_summary(self, metrics: dict[str, float], round_name: str) -> None:
+        """Write summary metrics to `summary.csv`.
+
+        Unlike :meth:`log`, this does not add a `round` column because
+        summary rows are not associated with a specific acquisition round.
+        Summary metrics are written to a separate file so `metrics.csv`
+        stays single-schema (one round per row).
+
+        Args:
+            metrics: Mapping of summary metric name to value.
+            round_name: Label for the summary entry; unused by the file
+                logger but kept for interface symmetry with
+                `TerminalStateLogger`.
+        """
+        self._log_summary_metrics(metrics)
 
         if self.upload_function is not None:
             self.upload_function(self.output_path)

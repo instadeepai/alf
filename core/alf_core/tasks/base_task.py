@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -56,9 +56,18 @@ class BaseTask(abc.ABC):
             dataset: The dataset containing train/validation/test splits.
             surrogate: The surrogate model to use for predictions.
 
+        Raises:
+            RuntimeError: If dataset.setup() has not been called before this method.
+
         Returns:
             Initialized task state with the provided dataset and surrogate.
         """
+        if dataset._raw_dataset is None:
+            raise RuntimeError(
+                "dataset.setup() must be called before task.setup(). "
+                "Call dataset.setup() to load and split the data first."
+            )
+        surrogate.setup(dataset)
         return State(
             dataset=dataset,
             surrogate=surrogate,
@@ -88,23 +97,23 @@ class BaseTask(abc.ABC):
 
         Args:
             state: Current task state containing dataset and surrogate.
-            round_name: Name or number identifying the current round.
 
         Returns:
             Updated task state with evaluation metrics.
-
-        Raises:
-            AssertionError: If save_round_predictions is True but filename is empty.
         """
         if len(state.dataset.test_dataset) > 0:
             predictions = state.surrogate.predict(state.dataset.test_dataset.candidates)
-            results = Results(predictions=predictions, targets=state.dataset.test_dataset.labels)
+            results = Results(
+                predictions=predictions,
+                targets=state.dataset.test_dataset.labels,
+                problem_type=state.problem_type,
+            )
 
             state.round_predictions = predictions
-            state.round_metrics.update({
+            state.round_metrics.metrics.update({
                 f"surrogate/test_{key}": value for key, value in results.metrics.items()
             })
 
         dataset_metrics = state.dataset.get_metrics()
-        state.round_metrics.update({f"dataset/{k}": v for k, v in dataset_metrics.items()})
+        state.round_metrics.metrics.update({f"dataset/{k}": v for k, v in dataset_metrics.items()})
         return state

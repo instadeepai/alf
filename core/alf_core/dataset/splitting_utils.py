@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,12 +13,18 @@
 # limitations under the License.
 
 
+import warnings
+from typing import Literal, get_args
+
 import numpy as np
 from alf_core.dataclasses.labelled_candidates import LabelledCandidates
 
+SplitType = Literal["random", "low_vs_high", "stratified"]
+ALLOWED_SPLIT_TYPES = get_args(SplitType)
+
 
 def split_dataset(
-    split_type: str,
+    split_type: SplitType,
     dataset: LabelledCandidates,
     train_size: int,
     validation_size: int,
@@ -29,7 +35,7 @@ def split_dataset(
     """Split dataset into train, validation, test, and candidate pool.
 
     Args:
-        split_type: Type of split to perform ("random" or "low_vs_high").
+        split_type: Type of split to perform ("random", "low_vs_high", or "stratified").
         dataset: Dataset to split.
         train_size: Number of samples for training set.
         validation_size: Number of samples for validation set.
@@ -41,8 +47,12 @@ def split_dataset(
         Dictionary with keys "train", "validation", "test", and "candidate_pool".
 
     Raises:
-        ValueError: If split_type is not "random" or "low_vs_high".
+        ValueError: If split_type is not one of the supported split types.
     """
+    if split_type not in ALLOWED_SPLIT_TYPES:
+        raise ValueError(
+            f"Invalid split type: {split_type!r}. Expected one of {ALLOWED_SPLIT_TYPES}."
+        )
     if split_type == "random":
         return split_random(
             dataset, train_size, validation_size, test_size, candidate_pool_size, seed
@@ -51,8 +61,13 @@ def split_dataset(
         return split_low_vs_high(
             dataset, train_size, validation_size, test_size, candidate_pool_size, seed
         )
+    elif split_type == "stratified":
+        return split_stratified(
+            dataset, train_size, validation_size, test_size, candidate_pool_size, seed
+        )
     else:
-        raise ValueError(f"Invalid split type: {split_type}")
+        # This should never happen due to the earlier check, but we include it for completeness.
+        raise ValueError(f"Unsupported split type: {split_type!r}")
 
 
 def split_random(
@@ -151,4 +166,103 @@ def split_low_vs_high(
         "candidate_pool": LabelledCandidates(
             *shuffled_high[test_size : test_size + candidate_pool_size]
         ),
+    }
+
+
+def split_stratified(
+    dataset: LabelledCandidates,
+    train_size: int,
+    validation_size: int,
+    test_size: int,
+    candidate_pool_size: int,
+    seed: int,
+) -> dict[str, LabelledCandidates]:
+    """Split dataset preserving class proportions across all splits.
+
+    For each class in the dataset, samples are proportionally distributed
+    across train, validation, test, and candidate pool splits. Within each
+    class the samples are randomly shuffled before assignment.
+
+    Args:
+        dataset: Dataset to split. Labels must be integer class indices.
+        train_size: Total number of samples for training set.
+        validation_size: Total number of samples for validation set.
+        test_size: Total number of samples for test set.
+        candidate_pool_size: Total number of samples for candidate pool.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        Dictionary with keys "train", "validation", "test", and "candidate_pool".
+
+    Raises:
+        ValueError: If any split requests more samples than remain after earlier splits.
+    """
+    labels = dataset.labels.astype(float)
+    if np.any(np.isnan(labels)):
+        raise ValueError(
+            "split_stratified requires integer class labels, but labels contain NaN values."
+        )
+    non_integer_mask = ~np.isclose(labels, labels.round())
+    if non_integer_mask.any():
+        raise ValueError(
+            f"split_stratified requires integer class labels, "
+            f"got labels with fractional parts: {labels[non_integer_mask].tolist()}"
+        )
+    labels = labels.astype(int)
+    classes = np.unique(labels)
+    if len(classes) < 2:
+        raise ValueError(
+            f"split_stratified requires at least 2 distinct classes, "
+            f"got {len(classes)}: {classes.tolist()}. "
+            "Use 'random' split type for single-class datasets."
+        )
+    rng = np.random.RandomState(seed)
+    split_names = ["train", "validation", "test", "candidate_pool"]
+    split_sizes = [train_size, validation_size, test_size, candidate_pool_size]
+
+    # Ensure that split ratios do not leave out any samples.
+    # Shuffle each class's indices once, then track how many have been consumed.
+    cls_idxs = {cls: rng.permutation(np.where(labels == cls)[0]) for cls in classes}
+    cls_used = {cls: 0 for cls in classes}
+
+    split_indices: dict[str, list[int]] = {name: [] for name in split_names}
+
+    for name, S in zip(split_names, split_sizes):
+        # Remaining samples available per class at this point in the loop.
+        avail = [len(cls_idxs[cls]) - cls_used[cls] for cls in classes]
+        total_avail = sum(avail)
+
+        if S == 0:
+            continue
+        if total_avail < S:
+            raise ValueError(
+                f"split_stratified: requested {S} samples for '{name}' "
+                f"but only {total_avail} remain."
+            )
+
+        # Largest remainder method: allocate exactly S samples proportional to
+        # remaining class availability, guaranteeing no rounding waste within the split.
+        exact = [a / total_avail * S for a in avail]
+        alloc = [int(e) for e in exact]
+        remainders = [e - a for e, a in zip(exact, alloc)]
+        leftover = S - sum(alloc)
+        for i in sorted(range(len(classes)), key=lambda i: -remainders[i])[:leftover]:
+            alloc[i] += 1
+
+        for cls, avail_count, n in zip(classes, avail, alloc):
+            if avail_count > 0 and n == 0:
+                warnings.warn(
+                    f"split_stratified: class {cls} has {avail_count} "
+                    "available samples but received "
+                    f"0 in the '{name}' split due to rounding. "
+                    "Consider using a larger dataset or fewer splits.",
+                    stacklevel=2,
+                )
+            start = cls_used[cls]
+            split_indices[name].extend(cls_idxs[cls][start : start + n].tolist())
+            cls_used[cls] += n
+
+    return {
+        key: LabelledCandidates(*dataset[np.array(indices, dtype=int)])
+        for key, indices in split_indices.items()
     }

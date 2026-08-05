@@ -1,10 +1,10 @@
 Search
 ======
 
-The ``BaseSearch`` class defines the interface for search strategies that generate candidate pools
-for evaluation. Search strategies can operate on predefined datasets (``DatasetSearch``), generate
-new candidates using models (``GeneratorSearch``), or apply mutations to existing sequences
-(``MutationSearch``).
+The :class:`~alf_core.optimizer.search.BaseSearch` class defines the interface for search strategies that generate candidate pools
+for evaluation. Search strategies can operate on predefined datasets (:class:`~alf_core.optimizer.search.DatasetSearch`), generate
+new candidates using models (:class:`~alf_core.optimizer.search.GeneratorSearch`), or apply mutations to existing sequences
+(:class:`~alf_tools.optimizer.search.single_mutant_search.SingleMutantSearch`).
 
 .. automodule:: alf_core.optimizer.search
    :members:

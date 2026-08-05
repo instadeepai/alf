@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -97,7 +97,7 @@ class TestOracleEvaluate:
         labelled, new_state = model_oracle.evaluate(model_candidates, state)
         assert isinstance(labelled, LabelledCandidates)
         assert len(labelled.candidates) == len(model_candidates)
-        assert "oracle_time" in new_state.round_metrics
+        assert "oracle_time" in new_state.round_metrics.metrics
 
     def test_evaluate_with_dataset_scorer_returns_labelled_candidates(
         self, dataset_oracle, dataset_candidates, state
@@ -106,7 +106,7 @@ class TestOracleEvaluate:
         labelled, new_state = dataset_oracle.evaluate(dataset_candidates, state)
         assert isinstance(labelled, LabelledCandidates)
         assert len(labelled.candidates) == len(dataset_candidates)
-        assert "oracle_time" in new_state.round_metrics
+        assert "oracle_time" in new_state.round_metrics.metrics
 
     def test_evaluate_model_scorer_labels_are_ndarray(self, model_oracle, model_candidates, state):
         """Test that labels returned by evaluate() are a numpy array."""

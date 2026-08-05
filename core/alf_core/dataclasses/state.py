@@ -1,4 +1,4 @@
-# Copyright 2023 InstaDeep Ltd. All rights reserved.
+# Copyright 2026 InstaDeep Ltd. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import annotations
-
 import copy
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
 
-from alf_core.dataclasses import LabelledCandidates
-
-if TYPE_CHECKING:
-    from alf_core.dataclasses import Predictions
-    from alf_core.dataset.base_dataset import BaseDataset
-    from alf_core.surrogate.surrogate import Surrogate
+from alf_core.dataclasses import LabelledCandidates, Predictions
+from alf_core.dataclasses.round_metrics import RoundMetrics
+from alf_core.dataset.base_dataset import BaseDataset
+from alf_core.surrogate.surrogate import Surrogate
+from alf_core.utils.enums import ProblemType
 
 
 @dataclass
@@ -36,26 +32,41 @@ class State:
         round: Current round number in the active learning loop.
         acq_batch_size: Number of candidates to acquire per round.
         history: List of LabelledCandidates acquired in each round.
-        round_metrics: Dictionary of metrics computed for the current round.
+        round_metrics: RoundMetrics instance holding scalar metrics and per-epoch
+            training history for the current round.
+        metrics_history: RoundMetrics for every round run so far, in order.
+        round_predictions: Predictions on the test set for the current round.
     """
 
-    dataset: "BaseDataset"
-    surrogate: "Surrogate"
+    dataset: BaseDataset
+    surrogate: Surrogate
     round: int = 0
     acq_batch_size: int = 0
     history: list = field(default_factory=list)
-    round_metrics: dict[str, Any] = field(default_factory=dict)
-    round_predictions: "Predictions" | None = None
+    round_metrics: RoundMetrics = field(default_factory=lambda: RoundMetrics(round=0))
+    metrics_history: list[RoundMetrics] = field(default_factory=list)
+    round_predictions: Predictions | None = None
+
+    @property
+    def problem_type(self) -> "ProblemType":
+        """The problem type, as declared in the dataset configuration.
+
+        Returns:
+            ProblemType enum value from the dataset config.
+        """
+        return self.dataset.config.problem_type
 
     def update(self, acquired_candidates: LabelledCandidates) -> None:
         """Update the state with newly acquired candidates.
 
-        Adds the acquired candidates to history and updates the dataset splits.
-        Also increments the round counter.
+        Records the current round's metrics in `metrics_history`, adds the
+        acquired candidates to history and updates the dataset splits. Also
+        increments the round counter.
 
         Args:
             acquired_candidates: The newly acquired candidates with their labels.
         """
+        self.metrics_history.append(self.round_metrics)
         self.history.append(copy.copy(acquired_candidates))
         self.dataset.update_splits(acquired_candidates)
         self.round += 1
