@@ -60,6 +60,7 @@ from alf_tools.optimizer.acquisition_functions import (
     CoreSet,
     ExpectedImprovement,
     Greedy,
+    RandomAcquisition,
 )
 
 matplotlib.use("Agg")  # headless: write PNGs without a display
@@ -223,12 +224,13 @@ def build_esm(seed: int, epochs: int, model_id: str = DEFAULT_ESM_MODEL_ID) -> B
     )
 
 
-def build_acquisition(name: str, model_name: str):
+def build_acquisition(name: str, model_name: str, seed: int):
     """Build an acquisition function, validating it is compatible with the model.
 
     Args:
-        name: One of ``"greedy"``, ``"ucb"``, ``"ei"``, ``"core_set"``.
+        name: One of ``"greedy"``, ``"ucb"``, ``"ei"``, ``"core_set"``, ``"random"``.
         model_name: Surrogate short name, for the compatibility check.
+        seed: Seed for acquisition functions that need their own RNG (e.g. ``"random"``).
 
     Returns:
         The constructed acquisition function.
@@ -251,6 +253,8 @@ def build_acquisition(name: str, model_name: str):
         return ExpectedImprovement()
     if name == "core_set":
         return CoreSet()
+    if name == "random":
+        return RandomAcquisition(seed=seed)
     raise ValueError(f"Unknown acquisition: {name!r}.")
 
 
@@ -317,7 +321,7 @@ def run_al_experiment(
 
     surrogate = Surrogate(model=build_model(seed, epochs))
     optimizer = Optimizer(
-        acquisition_fn=build_acquisition(acquisition, model_name), search_fn=DatasetSearch()
+        acquisition_fn=build_acquisition(acquisition, model_name, seed), search_fn=DatasetSearch()
     )
     oracle = Oracle(scorer=dataset)
 
