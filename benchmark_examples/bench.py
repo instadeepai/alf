@@ -136,7 +136,7 @@ def build_dataset(name: str, seed: int) -> BaseDataset:
                 modality=Modality.SEQUENCE,
                 seed=seed,
                 flip_dataset="gb1",
-                flip_split="one_vs_rest",
+                flip_split="low_vs_high",
                 train_ratio=0.4,
                 validation_frac=0.1,
                 test_ratio=0.4,
