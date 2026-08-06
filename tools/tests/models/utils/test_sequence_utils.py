@@ -139,3 +139,80 @@ class TestSequenceUtils:
         for i in range(3):
             for pos in range(3):
                 assert encoded[i, :, pos].sum() == 1
+
+    def test_one_hot_encode_mixed_length_sequences(self):
+        """Test one-hot encoding with a batch of mixed-length sequences.
+
+        Regression test: previously seq_length was taken from sequences[0]
+        only, so a later, longer sequence in the batch raised an IndexError.
+        Shorter sequences must be zero-padded rather than crashing or
+        reusing another amino acid's slot.
+        """
+        sequences = ["AC", "ACDEFG", "ACD"]  # lengths 2, 6, 3
+        char_to_idx = create_char_to_idx_mapping(PROTEIN_ALPHABET)
+
+        encoded = one_hot_encode(
+            sequences,
+            char_to_idx,
+            len(PROTEIN_ALPHABET),
+            flatten=False,
+        )
+
+        # seq_length must be the max length in the batch (6), not len(sequences[0]).
+        assert encoded.shape == (3, 20, 6)
+
+        # Real positions still have exactly one hot bit each.
+        assert encoded[0, char_to_idx["A"], 0] == 1
+        assert encoded[0, char_to_idx["C"], 1] == 1
+        assert encoded[1, char_to_idx["A"], 0] == 1
+        assert encoded[1, char_to_idx["C"], 1] == 1
+        assert encoded[1, char_to_idx["D"], 2] == 1
+        assert encoded[1, char_to_idx["E"], 3] == 1
+        assert encoded[1, char_to_idx["F"], 4] == 1
+        assert encoded[1, char_to_idx["G"], 5] == 1
+        assert encoded[2, char_to_idx["A"], 0] == 1
+        assert encoded[2, char_to_idx["C"], 1] == 1
+        assert encoded[2, char_to_idx["D"], 2] == 1
+
+        # Padded positions (beyond each sequence's real length) must be
+        # all-zero columns: no amino acid channel is set.
+        for pos in range(2, 6):  # "AC" has real length 2
+            assert encoded[0, :, pos].sum() == 0
+        for pos in range(3, 6):  # "ACD" has real length 3
+            assert encoded[2, :, pos].sum() == 0
+        # The longest sequence has no padding at all.
+        for pos in range(6):
+            assert encoded[1, :, pos].sum() == 1
+
+    def test_one_hot_encode_mixed_length_flattened(self):
+        """Test that flatten=True works correctly with mixed-length sequences."""
+        sequences = ["A", "AB"]
+        alphabet = "AB"
+        char_to_idx = create_char_to_idx_mapping(alphabet)
+
+        encoded = one_hot_encode(sequences, char_to_idx, len(alphabet), flatten=True)
+
+        # seq_length is max(1, 2) = 2, so flat_features = 2 * 2 = 4.
+        assert encoded.shape == (2, 4)
+
+    def test_one_hot_encode_same_length_unaffected(self):
+        """Test that same-length batches keep producing seq_length == len(sequences[0]).
+
+        Regression guard to ensure the fix (max over batch) does not change
+        behaviour for the common case where all sequences share one length,
+        e.g. GB1 and most ProteinGym assays.
+        """
+        sequences = ["ACD", "DEF", "GHI", "KLM"]
+        char_to_idx = create_char_to_idx_mapping(PROTEIN_ALPHABET)
+
+        encoded = one_hot_encode(
+            sequences,
+            char_to_idx,
+            len(PROTEIN_ALPHABET),
+            flatten=False,
+        )
+
+        assert encoded.shape == (4, 20, 3)
+        for i in range(4):
+            for pos in range(3):
+                assert encoded[i, :, pos].sum() == 1
