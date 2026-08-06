@@ -127,6 +127,24 @@ class BaseModel(abc.ABC):
         self.problem_type = dataset.config.problem_type
         self.output_dim = dataset.num_classes if self.problem_type == ProblemType.MULTICLASS else 1
 
+    def embed(self, inputs: list[Candidate]) -> Any:
+        """Compute numeric embeddings for the given candidates.
+
+        Used by embedding-based acquisition functions (e.g. CoreSet) that need a
+        2-D numeric array of shape (n_inputs, d), as opposed to featurise(), whose
+        output format is unconstrained and may not be a numeric embedding at all
+        (e.g. ESM2Model.featurise() returns tokenized input tensors, not embeddings).
+
+        Args:
+            inputs: List of Candidate objects to embed.
+
+        Returns:
+            Numeric embedding array of shape (n_inputs, d). Defaults to the output
+            of featurise(); subclasses whose featurise() does not already return
+            embeddings in this format should override this method.
+        """
+        return self.featurise(inputs)
+
     def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
         """Return per-epoch training metrics from the most recent train() call.
 
