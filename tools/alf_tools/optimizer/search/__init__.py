@@ -18,3 +18,10 @@ from alf_tools.optimizer.search.botorch_continuous_search import (
 from alf_tools.optimizer.search.single_mutant_search import SingleMutantSearch
 
 __all__ = ["BotorchContinuousSearch", "SingleMutantSearch"]
+
+try:
+    from alf_tools.optimizer.search.smiles_mutation_search import SmilesMutationSearch
+
+    __all__ += ["SmilesMutationSearch"]
+except ImportError:
+    pass

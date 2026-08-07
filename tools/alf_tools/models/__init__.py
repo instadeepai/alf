@@ -99,3 +99,16 @@ if _mlip_available:
     )
 
     __all__ += ["MLIPModel", "MLIPModelConfig", "MLIPTrainConfig"]
+
+_rdkit_available = False
+try:
+    import rdkit as _rdkit  # noqa: F401
+
+    _rdkit_available = True
+except ImportError:
+    pass
+
+if _rdkit_available:
+    from alf_tools.models.guacamol_oracle import GuacaMolOracleModel, GuacaMolOracleModelConfig
+
+    __all__ += ["GuacaMolOracleModel", "GuacaMolOracleModelConfig"]
