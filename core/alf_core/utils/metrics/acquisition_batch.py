@@ -62,13 +62,13 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
       distance over raw SMILES is not chemically meaningful — two strings denoting the
       *same* molecule (e.g. ``"CCO"`` and ``"OCC"``) would score as dissimilar.
       Fingerprint-based Tanimoto distance is a planned follow-up.
-    - **TABULAR**: cosine distance computed via
-      :func:`scipy.spatial.distance.pdist`.  Candidates are flattened to 1-D
-      feature vectors before comparison.
     - **MATERIALS**: not yet supported (raises :class:`NotImplementedError`). Edit
       distance over a raw composition formula string or a JSON-serialized
       ``Structure`` blob is not physically meaningful, for the same reason as
       MOLECULE.
+    - **TABULAR**: cosine distance computed via
+      :func:`scipy.spatial.distance.pdist`.  Candidates are flattened to 1-D
+      feature vectors before comparison.
 
     The average of all pairwise dissimilarities is returned.
 
@@ -84,7 +84,7 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
 
     Raises:
         ValueError: If candidates span multiple modalities, if the modality
-            is not one of SEQUENCE, MOLECULE, TABULAR, or MATERIALS, or if any
+            is not one of SEQUENCE, MOLECULE, MATERIALS, or TABULAR, or if any
             candidate has an all-zero feature vector (cosine distance undefined).
         NotImplementedError: If the modality is MOLECULE or MATERIALS (not yet
             supported).
@@ -101,14 +101,6 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
 
     modality = candidates[0].modality
 
-    if modality == Modality.MOLECULE:
-        raise NotImplementedError(
-            "intra_batch_diversity does not yet support MOLECULE candidates. A "
-            "fingerprint-based Tanimoto distance is a planned follow-up; edit distance "
-            "over raw SMILES is not chemically meaningful (e.g. 'CCO' and 'OCC' denote "
-            "the same molecule but would score as dissimilar)."
-        )
-
     if modality == Modality.SEQUENCE:
         pairs = []
         for ci, cj in combinations(candidates, 2):
@@ -117,6 +109,22 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
             dist = 0.0 if max_len == 0 else _levenshtein(a, b) / max_len
             pairs.append(dist)
         return {"intra_batch_diversity": float(np.mean(pairs))}
+
+    if modality == Modality.MOLECULE:
+        raise NotImplementedError(
+            "intra_batch_diversity does not yet support MOLECULE candidates. A "
+            "fingerprint-based Tanimoto distance is a planned follow-up; edit distance "
+            "over raw SMILES is not chemically meaningful (e.g. 'CCO' and 'OCC' denote "
+            "the same molecule but would score as dissimilar)."
+        )
+
+    if modality == Modality.MATERIALS:
+        raise NotImplementedError(
+            "intra_batch_diversity does not yet support MATERIALS candidates. Edit "
+            "distance over a raw composition formula string or a JSON-serialized "
+            "Structure blob is not physically meaningful, for the same reason as "
+            "MOLECULE (see above)."
+        )
 
     if modality == Modality.TABULAR:
         try:
@@ -133,17 +141,9 @@ def intra_batch_diversity(candidates: list[Candidate]) -> dict[str, float]:
         distances = pdist(features, metric="cosine")
         return {"intra_batch_diversity": float(np.mean(distances))}
 
-    if modality == Modality.MATERIALS:
-        raise NotImplementedError(
-            "intra_batch_diversity does not yet support MATERIALS candidates. Edit "
-            "distance over a raw composition formula string or a JSON-serialized "
-            "Structure blob is not physically meaningful, for the same reason as "
-            "MOLECULE (see above)."
-        )
-
     raise ValueError(
         f"intra_batch_diversity does not support modality '{modality}'. "
-        f"Supported modalities: SEQUENCE, MOLECULE, TABULAR, MATERIALS."
+        f"Supported modalities: SEQUENCE, MOLECULE, MATERIALS, TABULAR."
     )
 
 
