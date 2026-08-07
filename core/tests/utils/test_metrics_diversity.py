@@ -112,6 +112,15 @@ class TestIntraBatchDiversityEdgeCases:
         with pytest.raises(NotImplementedError, match="MOLECULE"):
             intra_batch_diversity(candidates)
 
+    def test_materials_raises_not_implemented(self):
+        """MATERIALS candidates are not yet supported and raise NotImplementedError."""
+        candidates = [
+            Candidate(data="Fe0.62C0.01Mn0.37", modality=Modality.MATERIALS),
+            Candidate(data="Fe0.5C0.2Mn0.3", modality=Modality.MATERIALS),
+        ]
+        with pytest.raises(NotImplementedError, match="MATERIALS"):
+            intra_batch_diversity(candidates)
+
     def test_zero_vector_embedding_raises(self):
         """All-zero embedding raises ValueError (cosine distance undefined)."""
         candidates = [_emb(np.zeros(4)), _emb(np.array([1.0, 0.0, 0.0, 0.0]))]

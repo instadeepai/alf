@@ -28,9 +28,12 @@ logger = logging.getLogger("alf-tools")
 class MatbenchConfig(BaseDatasetConfig):
     """Configuration for Matbench benchmark datasets.
 
-    Both composition and structure task inputs are stored under `Modality.TABULAR` —
+    Both composition and structure task inputs are stored under `Modality.MATERIALS` —
     Matbench has no data that needs any other modality, so `modality` is fixed and
-    should not be overridden. `problem_type` is likewise auto-set from `task_name`
+    should not be overridden. Since `MATERIALS` covers both a composition formula
+    string and a JSON-serialised crystal structure, every candidate's
+    `features["input_type"]` records which one (`"composition"` or `"structure"`) its
+    `data` string actually holds. `problem_type` is likewise auto-set from `task_name`
     (`REGRESSION` for Matbench regression tasks, `BINARY` for Matbench classification
     tasks) and should not be set explicitly.
 
@@ -81,7 +84,7 @@ class MatbenchConfig(BaseDatasetConfig):
     task_name: str
     fold_number: int | None = None
     split_type: Literal["random", "low_vs_high"] = "random"
-    modality: Modality = Modality.TABULAR
+    modality: Modality = Modality.MATERIALS
     problem_type: ProblemType = ProblemType.REGRESSION  # overwritten in validate_config
 
     @model_validator(mode="after")
@@ -171,7 +174,9 @@ class Matbench(BaseDataset):
         loaded (each candidate tagged with a `matbench_split` feature of "train" or
         "test" for use by `_split_dataset`). In merged mode, all rows across all 5
         folds are loaded. In both modes, every candidate's `features["fold_id"]`
-        records which Matbench fold it belongs to.
+        records which Matbench fold it belongs to, and `features["input_type"]`
+        records whether `data` is a composition formula string or a serialised
+        structure (constant across a given task's candidates).
 
         Returns:
             LabelledCandidates with JSON-string composition/structure data and
@@ -179,6 +184,7 @@ class Matbench(BaseDataset):
         """
         task = self._load_task()
         is_classification = task.metadata.task_type == "classification"
+        input_type = task.metadata.input_type  # "composition" or "structure"; fixed per task
 
         candidates: list[Candidate] = []
         labels: list[float] = []
@@ -186,13 +192,15 @@ class Matbench(BaseDataset):
         def _add(value: Any, target: Any, fold_id: int, extra_features: dict) -> None:
             # Composition inputs are plain chemical-formula strings (e.g. "Fe0.62C0.01..."),
             # used as-is; structure inputs are pymatgen Structure objects, serialised via
-            # their MSONable .to_json() into an equivalent JSON string.
+            # their MSONable .to_json() into an equivalent JSON string. `input_type` records
+            # which of the two a MATERIALS candidate's `data` string holds, since MATERIALS
+            # covers both shapes and Candidate.data alone can't distinguish them.
             data = value if isinstance(value, str) else value.to_json()
             candidates.append(
                 Candidate(
                     data=data,
-                    modality=Modality.TABULAR,
-                    features={"fold_id": fold_id, **extra_features},
+                    modality=Modality.MATERIALS,
+                    features={"fold_id": fold_id, "input_type": input_type, **extra_features},
                 )
             )
             labels.append(float(target) if is_classification else target)

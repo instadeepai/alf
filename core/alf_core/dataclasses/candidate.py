@@ -51,11 +51,14 @@ class Modality(Enum):
         SEQUENCE: Biological sequences (protein / nucleotide), as strings.
         MOLECULE: Small molecules, as SMILES strings.
         TABULAR: Domain-agnostic numeric feature vectors (arrays, tensors, scalars, dicts).
+        MATERIALS: Materials-science candidates (chemical composition formula strings or
+            serialized crystal structure), as strings.
     """
 
     SEQUENCE = "sequence"
     MOLECULE = "molecule"
     TABULAR = "tabular"
+    MATERIALS = "materials"
 
 
 @dataclass(eq=False, unsafe_hash=False)

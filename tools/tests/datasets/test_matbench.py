@@ -194,12 +194,12 @@ class TestMatbenchConfig:
         config = _make_matbench_config(fold_number=None)
         assert config.fold_number is None
 
-    def test_modality_defaults_to_tabular(self):
-        """Modality should default to TABULAR regardless of task input type."""
+    def test_modality_defaults_to_materials(self):
+        """Modality should default to MATERIALS regardless of task input type."""
         config = _make_matbench_config(task_name="matbench_mp_e_form")  # structure task
-        assert config.modality == Modality.TABULAR
+        assert config.modality == Modality.MATERIALS
         config = _make_matbench_config(task_name="matbench_steels")  # composition task
-        assert config.modality == Modality.TABULAR
+        assert config.modality == Modality.MATERIALS
 
     def test_problem_type_auto_set_regression(self):
         """Regression tasks should auto-set problem_type to REGRESSION."""
@@ -266,12 +266,19 @@ class TestMatbenchFoldMode:
             for candidate in getattr(instance, split).candidates:
                 assert candidate.features["fold_id"] == 2
 
-    def test_candidates_are_tabular_modality(self):
-        """All candidates should carry Modality.TABULAR regardless of input_type."""
+    def test_candidates_are_materials_modality(self):
+        """All candidates should carry Modality.MATERIALS regardless of input_type."""
         for input_type in ("composition", "structure"):
             instance = _make_matbench_instance(_make_fake_fold_task(input_type=input_type))
             for candidate in instance._raw_dataset.candidates:
-                assert candidate.modality == Modality.TABULAR
+                assert candidate.modality == Modality.MATERIALS
+
+    def test_input_type_stored_on_all_candidates(self):
+        """Every candidate should carry features['input_type'] matching the task's input_type."""
+        for input_type in ("composition", "structure"):
+            instance = _make_matbench_instance(_make_fake_fold_task(input_type=input_type))
+            for candidate in instance._raw_dataset.candidates:
+                assert candidate.features["input_type"] == input_type
 
     def test_composition_stored_as_formula_string(self):
         """Composition inputs should be stored as-is (they are already formula strings)."""
@@ -339,6 +346,15 @@ class TestMatbenchMergedMode:
         fold_ids = {c.features["fold_id"] for c in instance._raw_dataset.candidates}
         assert fold_ids == {0, 1, 2, 3, 4}
 
+    def test_input_type_stored_on_all_candidates(self):
+        """Merged-mode candidates should also carry features['input_type']."""
+        instance = _make_matbench_instance(
+            _make_fake_merged_task(input_type="structure", n_per_fold=2, n_folds=5),
+            fold_number=None,
+        )
+        for candidate in instance._raw_dataset.candidates:
+            assert candidate.features["input_type"] == "structure"
+
     def test_ratio_based_split_applies(self):
         """Standard train/validation/test/candidate_pool ratios should apply."""
         instance = _make_matbench_instance(
@@ -355,14 +371,14 @@ class TestMatbenchMergedMode:
         assert len(instance.test_dataset) == 3
         assert len(instance.candidate_pool) == 2
 
-    def test_candidates_are_tabular_modality(self):
-        """Merged-mode candidates should also carry Modality.TABULAR."""
+    def test_candidates_are_materials_modality(self):
+        """Merged-mode candidates should also carry Modality.MATERIALS."""
         instance = _make_matbench_instance(
             _make_fake_merged_task(input_type="structure", n_per_fold=2, n_folds=5),
             fold_number=None,
         )
         for candidate in instance._raw_dataset.candidates:
-            assert candidate.modality == Modality.TABULAR
+            assert candidate.modality == Modality.MATERIALS
 
     def test_classification_labels_cast_to_float(self):
         """Merged-mode boolean labels should be cast to float 0.0/1.0."""
@@ -390,9 +406,9 @@ class TestMatbenchInitialisation:
         assert instance.config.task_name == "matbench_steels"
 
     def test_modality(self):
-        """Modality should be TABULAR."""
+        """Modality should be MATERIALS."""
         instance = _make_matbench_instance(_make_fake_fold_task())
-        assert instance.modality == Modality.TABULAR
+        assert instance.modality == Modality.MATERIALS
 
     def test_repr(self):
         """Repr should include task_name and fold_number for quick identification."""

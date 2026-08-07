@@ -6,12 +6,11 @@ Matbench provides 13 materials-property prediction tasks with predefined 5-fold
 cross-validation splits, covering both composition-based (chemical formula) and
 structure-based (crystal structure) inputs.
 
-Both input kinds are stored under the ``TABULAR`` :term:`modality <Modality>` —
-composition and structure values are `pymatgen <https://pymatgen.org/>`_
-``Composition`` and ``Structure`` objects respectively, and both are serialised
-identically to a JSON string (via their shared ``MSONable`` interface) before being
-stored in ``Candidate.data``. Which pymatgen type a given task uses only affects how
-that JSON string round-trips (``Composition`` vs. ``Structure``), not how ALF handles it.
+Both input kinds are stored under the ``MATERIALS`` :term:`modality <Modality>`.
+Composition values are plain chemical-formula strings (e.g. ``"Fe0.62C0.01Mn0.37"``),
+used as-is. Structure values are `pymatgen <https://pymatgen.org/>`_ ``Structure``
+objects, serialised to an equivalent JSON string via their ``MSONable``
+``.to_json()`` interface before being stored in ``Candidate.data``.
 
 **Supported tasks:**
 
