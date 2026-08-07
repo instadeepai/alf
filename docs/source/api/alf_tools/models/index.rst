@@ -17,4 +17,5 @@ prediction, and sampling.
    MLIP Model <mlip/index>
    PyRosetta Model <pyrosetta/index>
    Ensemble Wrapper <ensemble/index>
+   GuacaMol Oracle Model <guacamol_oracle/index>
    Utilities <utils/index>
