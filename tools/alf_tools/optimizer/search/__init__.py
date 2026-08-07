@@ -19,9 +19,15 @@ from alf_tools.optimizer.search.single_mutant_search import SingleMutantSearch
 
 __all__ = ["BotorchContinuousSearch", "SingleMutantSearch"]
 
+_rdkit_available = False
 try:
+    import rdkit as _rdkit  # noqa: F401
+
+    _rdkit_available = True
+except ImportError:
+    pass
+
+if _rdkit_available:
     from alf_tools.optimizer.search.smiles_mutation_search import SmilesMutationSearch
 
     __all__ += ["SmilesMutationSearch"]
-except ImportError:
-    pass

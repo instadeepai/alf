@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 from alf_core import Candidate, LabelledCandidates, Modality, ProtocolSearch, State
@@ -171,6 +173,22 @@ class TestSmilesMutationSearch:
         candidates = search_fn(state)
         assert len(candidates) > 0
         assert all(isinstance(c, Candidate) for c in candidates)
+
+    def test_empty_train_dataset_raises_clear_error(self):
+        """An empty training set should raise a clear ValueError, not crash downstream."""
+        fake_state = SimpleNamespace(
+            dataset=SimpleNamespace(
+                train_dataset=SimpleNamespace(candidates=[], labels=np.array([]))
+            )
+        )
+        with pytest.raises(ValueError, match="at least one training candidate"):
+            SmilesMutationSearch()(fake_state)
+
+    def test_no_valid_mutations_raises_clear_error(self):
+        """If every mutation is invalid/degenerate, raise instead of returning an empty pool."""
+        state = _make_state(best_smiles="C", other_smiles=[])
+        with pytest.raises(ValueError, match="no valid, novel"):
+            SmilesMutationSearch(alphabet="C")(state)
 
 
 class TestSmilesMutationSearchTopK:
