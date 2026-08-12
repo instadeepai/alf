@@ -86,6 +86,22 @@ class Surrogate:
         """
         return self.model.featurise(inputs)
 
+    def embed(self, inputs: list[Candidate]) -> Any:
+        """Compute numeric embeddings for the given inputs using the surrogate model.
+
+        Args:
+            inputs: List of Candidate objects or a LabelledCandidates instance
+                to embed.
+
+        Returns:
+            Numeric embedding representation from the underlying model, typically
+            an np.ndarray or torch.Tensor of shape (n_inputs, d).
+
+        Raises:
+            NotImplementedError: If the underlying model does not override embed().
+        """
+        return self.model.embed(inputs)
+
     def get_training_summary_metrics(self) -> dict[str, Union[float, int, np.number]]:
         """Get summary metrics from the most recent training run.
 
