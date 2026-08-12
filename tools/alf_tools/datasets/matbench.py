@@ -22,6 +22,14 @@ from alf_core import BaseDataset, BaseDatasetConfig, Candidate, LabelledCandidat
 from alf_core.dataclasses.candidate import Modality
 from pydantic import model_validator
 
+try:
+    from matbench.bench import MatbenchBenchmark
+    from matbench.metadata import mbv01_metadata
+
+    _MATBENCH_AVAILABLE = True
+except ImportError:
+    _MATBENCH_AVAILABLE = False
+
 logger = logging.getLogger("alf-tools")
 
 
@@ -102,10 +110,15 @@ class MatbenchConfig(BaseDatasetConfig):
             The validated configuration instance.
 
         Raises:
+            ImportError: If the `matbench` package is not installed.
             ValueError: If `task_name` is not a recognised Matbench task, or if
                 `fold_number` is not `None` and not in `0-4`.
         """
-        from matbench.metadata import mbv01_metadata  # noqa: PLC0415
+        if not _MATBENCH_AVAILABLE:
+            raise ImportError(
+                "The 'matbench' package is required to use Matbench datasets. "
+                "Install it with: pip install alf_tools[matbench]"
+            )
 
         if self.task_name not in mbv01_metadata:
             raise ValueError(
@@ -130,8 +143,9 @@ class Matbench(BaseDataset):
     structure-based inputs. Composition and structure inputs (pymatgen `Composition`
     and `Structure` objects respectively) are both MSONable, so both are serialised
     identically via `.to_json()` into a JSON string stored in `Candidate.data`; no
-    `alf_core` changes are needed. `pymatgen`/`matbench` are lazily imported so that
-    `alf_tools` can be used without the `matbench` extras installed.
+    `alf_core` changes are needed. `pymatgen`/`matbench` are optional: importing this
+    module never requires them, and constructing a `MatbenchConfig` raises a clear
+    `ImportError` if they're missing (see `MatbenchConfig.validate_config`).
     """
 
     config: MatbenchConfig  # narrows the inherited BaseDatasetConfig type
@@ -160,8 +174,6 @@ class Matbench(BaseDataset):
         Returns:
             The loaded MatbenchTask for `self.config.task_name`.
         """
-        from matbench.bench import MatbenchBenchmark  # noqa: PLC0415
-
         benchmark = MatbenchBenchmark(autoload=False, subset=[self.config.task_name])
         task = next(iter(benchmark.tasks))
         task.load()
