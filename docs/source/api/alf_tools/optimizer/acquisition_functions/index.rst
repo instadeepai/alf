@@ -13,5 +13,6 @@ promising for evaluation.
    CoreSet <core_set/index>
    Expected Improvement <expected_improvement/index>
    Greedy <greedy/index>
+   Random <random_acquisition/index>
    Thompson Sampling <thompson_sampling/index>
    Upper Confidence Bound (UCB) <ucb/index>
