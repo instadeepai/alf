@@ -46,10 +46,13 @@ class MatbenchConfig(BaseDatasetConfig):
     tasks) and should not be set explicitly.
 
     When `fold_number` is set (0-4), the predefined Matbench train/test split for that
-    fold is used: `train_ratio` controls what fraction of the Matbench train set forms
-    the initial labelled training set (the remainder becomes `candidate_pool`, same as
-    FLIP); `test_ratio` and `split_type` are ignored and the full Matbench test set for
-    that fold is used directly. Matbench's predefined folds use a fixed internal seed
+    fold is used. Of the Matbench train pool, `train_ratio` sets aside a slice for
+    `train` + `validation` combined; `validation_frac` then carves `validation` out of
+    *that slice* (not out of the whole Matbench train pool, and not out of the total
+    dataset) — the rest of the slice becomes `train`. Whatever remains of the Matbench
+    train pool beyond that slice becomes `candidate_pool` (same denominator FLIP uses).
+    `test_ratio` and `split_type` are ignored; the full Matbench test set for that fold
+    is used directly as `test`. Matbench's predefined folds use a fixed internal seed
     (`18012019`) that cannot be overridden.
 
     When `fold_number` is `None`, all 5 folds are merged into a single dataset and
@@ -253,11 +256,15 @@ class Matbench(BaseDataset):
     def _split_fold_mode(self) -> dict[str, LabelledCandidates]:
         """Split using the predefined Matbench train/test pools for the configured fold.
 
-        The Matbench train pool is shuffled, then partitioned using `train_ratio` and
-        `validation_frac`; the remainder becomes the candidate pool (capped at
-        `max_candidate_pool`). The full Matbench test pool is used directly as "test"
-        (`test_ratio` is ignored — Matbench's predefined test set must be used as-is
-        for benchmark-comparable results).
+        The Matbench train pool is shuffled, then a `train_ratio` slice of it
+        (`train_plus_val_size`) is set aside for train + validation combined.
+        `validation_frac` scales *that slice*, not the whole Matbench train pool or the
+        total dataset: `validation_size = train_plus_val_size * validation_frac`, and
+        `train_size = train_plus_val_size - validation_size`. Whatever remains of the
+        Matbench train pool beyond `train_plus_val_size` becomes the candidate pool
+        (capped at `max_candidate_pool`). The full Matbench test pool is used directly
+        as "test" (`test_ratio` is ignored — Matbench's predefined test set must be
+        used as-is for benchmark-comparable results).
 
         Returns:
             Dictionary with keys "train", "validation", "test", and "candidate_pool".
