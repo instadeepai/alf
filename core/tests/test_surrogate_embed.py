@@ -22,7 +22,7 @@ from alf_core import BaseModel, Candidate, LabelledCandidates, Predictions, Surr
 
 
 class _FeaturiseOnlyModel(BaseModel):
-    """Model that only implements featurise(); embed() should default to it."""
+    """Model that only implements featurise(); embed() is not overridden."""
 
     def featurise(self, inputs: list[Candidate] | LabelledCandidates) -> np.ndarray:
         """Return a (n, 2) array of ones for the given inputs.
@@ -62,6 +62,21 @@ class _FeaturiseOnlyModel(BaseModel):
             NotImplementedError: Always.
         """
         raise NotImplementedError
+
+
+class _EmbedEqualsFeaturiseModel(_FeaturiseOnlyModel):
+    """Model that opts in to embed() by explicitly delegating to featurise()."""
+
+    def embed(self, inputs: list[Candidate] | LabelledCandidates) -> np.ndarray:
+        """Return featurise()'s output as the embedding.
+
+        Args:
+            inputs: Candidates or labelled candidates to embed.
+
+        Returns:
+            Array of shape (n, 2) filled with ones (featurise()'s output).
+        """
+        return self.featurise(inputs)
 
 
 class _TokenizingModel(_FeaturiseOnlyModel):
@@ -122,19 +137,27 @@ def _make_candidates(n: int = 2) -> list[Candidate]:
     return [Candidate(data=f"seq_{i}", modality="sequence") for i in range(n)]
 
 
-def test_base_model_embed_defaults_to_featurise() -> None:
-    """BaseModel.embed() defaults to featurise() output when not overridden."""
+def test_base_model_embed_raises_not_implemented_by_default() -> None:
+    """BaseModel.embed() raises NotImplementedError unless a subclass overrides it."""
     model = _FeaturiseOnlyModel()
     candidates = _make_candidates(3)
-    result = model.embed(candidates)
-    assert isinstance(result, np.ndarray)
-    assert result.shape == (3, 2)
-    assert np.all(result == 1.0)
+    with pytest.raises(NotImplementedError, match="does not implement embed"):
+        model.embed(candidates)
 
 
-def test_surrogate_embed_delegates_to_model() -> None:
-    """Surrogate.embed() returns whatever the underlying model's embed() returns."""
+def test_surrogate_embed_propagates_not_implemented_by_default() -> None:
+    """Surrogate.embed() propagates the model's default NotImplementedError."""
     surrogate = Surrogate(model=_FeaturiseOnlyModel())
+    candidates = _make_candidates(3)
+    with pytest.raises(NotImplementedError, match="does not implement embed"):
+        surrogate.embed(candidates)
+
+
+def test_surrogate_embed_delegates_to_model_opt_in() -> None:
+    """Surrogate.embed() returns whatever the underlying model's embed() returns,
+    once the model explicitly opts in by overriding embed().
+    """
+    surrogate = Surrogate(model=_EmbedEqualsFeaturiseModel())
     candidates = _make_candidates(3)
     result = surrogate.embed(candidates)
     assert isinstance(result, np.ndarray)

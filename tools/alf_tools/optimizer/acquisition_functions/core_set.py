@@ -41,8 +41,8 @@ def _to_numpy(features: np.ndarray | torch.Tensor) -> np.ndarray:
         raise ValueError(
             "embed returned a dict, not a numeric embedding array. CoreSet requires the "
             "surrogate's embed() to return a 2-D array of shape (n_inputs, d); override "
-            "embed() on the model if its featurise() output (used as the default embed() "
-            "implementation) is not already in that format."
+            "embed() on the model to return a numeric embedding instead of raw "
+            "featurise() output."
         )
     try:
         return np.asarray(features)

@@ -95,9 +95,10 @@ class Surrogate:
 
         Returns:
             Numeric embedding representation from the underlying model, typically
-            an np.ndarray or torch.Tensor of shape (n_inputs, d). Defaults to the
-            model's featurise() output; models whose featurise() does not return
-            embeddings directly override embed() to provide a compatible one.
+            an np.ndarray or torch.Tensor of shape (n_inputs, d).
+
+        Raises:
+            NotImplementedError: If the underlying model does not override embed().
         """
         return self.model.embed(inputs)
 

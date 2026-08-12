@@ -135,15 +135,25 @@ class BaseModel(abc.ABC):
         output format is unconstrained and may not be a numeric embedding at all
         (e.g. ESM2Model.featurise() returns tokenized input tensors, not embeddings).
 
+        Not implemented by default: a model must explicitly opt in to support
+        embedding-based acquisition functions. If featurise() already returns a
+        numeric (n_inputs, d) embedding, override with `return self.featurise(inputs)`.
+
         Args:
             inputs: List of Candidate objects to embed.
 
         Returns:
-            Numeric embedding array of shape (n_inputs, d). Defaults to the output
-            of featurise(); subclasses whose featurise() does not already return
-            embeddings in this format should override this method.
+            Numeric embedding array of shape (n_inputs, d).
+
+        Raises:
+            NotImplementedError: Always, unless overridden by a subclass.
         """
-        return self.featurise(inputs)
+        raise NotImplementedError(
+            f"{type(self).__name__} does not implement embed(). Override embed() to "
+            "support embedding-based acquisition functions such as CoreSet -- if "
+            "featurise() already returns a numeric (n_inputs, d) embedding, override "
+            "with `return self.featurise(inputs)`."
+        )
 
     def get_epoch_metrics(self) -> list[SurrogateEpochMetrics]:
         """Return per-epoch training metrics from the most recent train() call.
