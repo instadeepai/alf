@@ -2,7 +2,7 @@
 
 An acquisition function scores candidates by their *expected value to the search*, trading off
 exploitation against exploration. Subclass {py:class}`AcquisitionFunction <alf_core.optimizer.acquisition_function.AcquisitionFunction>` to add a new scoring rule
-(alongside the built-in Greedy, UCB, Expected Improvement, Thompson Sampling, and CoreSet).
+(alongside the built-in Greedy, UCB, Expected Improvement, Thompson Sampling, CoreSet, and Random).
 
 **Base class:** {py:class}`AcquisitionFunction <alf_core.optimizer.acquisition_function.AcquisitionFunction>`. **Key method:** `__call__`.
 

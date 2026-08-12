@@ -12,7 +12,7 @@ single round of the [ask/tell loop](intro-to-active-learning.md). All of these l
 | `Model` | A learnable predictor with `featurise` / `train` / `predict` / `sample` | {py:class}`BaseModel <alf_core.model.base_model.BaseModel>` |
 | `Surrogate` | Wraps a model; the *cheap* approximation retrained each round on acquired data | {py:class}`Surrogate <alf_core.surrogate.surrogate.Surrogate>` |
 | `Oracle` | Wraps a scorer (a model **or** a dataset); returns the *true* label for a batch | {py:class}`Oracle <alf_core.oracle.oracle.Oracle>` |
-| `Acquisition function` | Scores candidates by expected value (e.g. Greedy, UCB, EI, Thompson, CoreSet) | {py:class}`AcquisitionFunction <alf_core.optimizer.acquisition_function.AcquisitionFunction>` |
+| `Acquisition function` | Scores candidates by expected value (e.g. Greedy, UCB, EI, Thompson, CoreSet, Random) | {py:class}`AcquisitionFunction <alf_core.optimizer.acquisition_function.AcquisitionFunction>` |
 | `Search function` | Generates the candidate pool to score (e.g. from a dataset or a generator) | {py:class}`BaseSearch <alf_core.optimizer.search.BaseSearch>` |
 | `Optimizer` | Bundles an acquisition + search function; implements `ask` and `tell` | {py:class}`Optimizer <alf_core.optimizer.optimizer.Optimizer>` |
 | `Task` | Orchestrates the loop end to end (`setup` → `run`) | {py:class}`BaseTask <alf_core.tasks.base_task.BaseTask>` |
