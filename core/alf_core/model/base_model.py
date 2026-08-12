@@ -131,13 +131,10 @@ class BaseModel(abc.ABC):
         """Compute numeric embeddings for the given candidates.
 
         Used by embedding-based acquisition functions (e.g. CoreSet) that need a
-        2-D numeric array of shape (n_inputs, d), as opposed to featurise(), whose
-        output format is unconstrained and may not be a numeric embedding at all
-        (e.g. ESM2Model.featurise() returns tokenized input tensors, not embeddings).
+        2-D numeric array of shape (n_inputs, d).
 
         Not implemented by default: a model must explicitly opt in to support
-        embedding-based acquisition functions. If featurise() already returns a
-        numeric (n_inputs, d) embedding, override with `return self.featurise(inputs)`.
+        embedding-based acquisition functions.
 
         Args:
             inputs: List of Candidate objects to embed.
