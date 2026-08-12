@@ -20,6 +20,7 @@ from alf_tools.optimizer.acquisition_functions.botorch_samplers import BoTorchMC
 from alf_tools.optimizer.acquisition_functions.core_set import CoreSet
 from alf_tools.optimizer.acquisition_functions.expected_improvement import ExpectedImprovement
 from alf_tools.optimizer.acquisition_functions.greedy import Greedy
+from alf_tools.optimizer.acquisition_functions.random_acquisition import RandomAcquisition
 from alf_tools.optimizer.acquisition_functions.thompson_sampling import ThompsonSampling
 from alf_tools.optimizer.acquisition_functions.ucb import UCB
 
@@ -30,6 +31,7 @@ __all__ = [
     "CoreSet",
     "ExpectedImprovement",
     "Greedy",
+    "RandomAcquisition",
     "ThompsonSampling",
     "UCB",
 ]

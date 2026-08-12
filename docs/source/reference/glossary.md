@@ -11,7 +11,8 @@ Active learning
 Acquisition function
   The rule that scores candidates by their *expected value to the search* and decides which to
   pick next, trading off exploitation (high predicted value) against exploration (high
-  uncertainty). Built-in examples: Greedy, UCB, Expected Improvement, Thompson Sampling, CoreSet.
+  uncertainty). Built-in examples: Greedy, UCB, Expected Improvement, Thompson Sampling, CoreSet,
+  Random.
   Distinct from a `Search function`, which produces the pool the acquisition function scores.
 
 Best-found
