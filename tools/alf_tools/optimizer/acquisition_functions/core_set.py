@@ -21,26 +21,34 @@ _CDIST_CHUNK_SIZE = 512
 
 
 def _to_numpy(features: np.ndarray | torch.Tensor) -> np.ndarray:
-    """Convert model features to a numpy array.
+    """Convert model embeddings to a numpy array.
 
     Args:
-        features: Feature output from a model's featurise method.
+        features: Embedding output from a model's embed() method.
 
     Returns:
         Numpy array representation of the features.
 
     Raises:
-        ValueError: If features is None or cannot be converted to a numpy array.
+        ValueError: If features is None, a dict, or cannot be converted to a
+            2-D numpy array.
     """
     if features is None:
-        raise ValueError("featurise returned None; expected a numpy array or torch.Tensor")
+        raise ValueError("embed returned None; expected a numpy array or torch.Tensor")
     if isinstance(features, torch.Tensor):
         return features.detach().cpu().numpy()
+    if isinstance(features, dict):
+        raise ValueError(
+            "embed returned a dict, not a numeric embedding array. CoreSet requires the "
+            "surrogate's embed() to return a 2-D array of shape (n_inputs, d); override "
+            "embed() on the model to return a numeric embedding instead of raw "
+            "featurise() output."
+        )
     try:
         return np.asarray(features)
     except (TypeError, ValueError) as e:
         raise ValueError(
-            f"featurise returned a value that cannot be converted to a numpy array: {e}"
+            f"embed returned a value that cannot be converted to a numpy array: {e}"
         ) from e
 
 
@@ -53,8 +61,8 @@ class CoreSet(AcquisitionFunction):
     Candidates are scored by their selection rank (n_select - step), so the
     first selected candidate receives the highest score and the last receives 1.
     Unselected candidates receive a score of 0.
-    This is a maximising acquisition function that uses features as a
-    2-D array of shape (n_inputs, d).
+    This is a maximising acquisition function that uses embeddings as a
+    2-D array of shape (n_inputs, d), obtained from the surrogate's embed() method.
     """
 
     def __call__(
@@ -63,28 +71,28 @@ class CoreSet(AcquisitionFunction):
         state: State,
     ) -> LabelledCandidates:
         """Compute CoreSet acquisition values for unlabelled candidates.
-        The model's featurise() must return a 2-D array of shape (n_inputs, d).
+        The model's embed() must return a 2-D array of shape (n_inputs, d).
 
         Args:
             search_candidates: List of unlabelled candidates to score.
             state: The task state containing the current datasets and surrogate model.
 
-        Raises:
-            ValueError: If featurise returns None or a non-array-like object.
-
         Returns:
             LabelledCandidates with CoreSet acquisition values.
+
+        Raises:
+            ValueError: If embed returns None, a dict, or a non-array-like object.
         """
         if not search_candidates:
             return LabelledCandidates(candidates=[], labels=np.zeros(0))
 
         training_candidates = state.dataset.train_dataset.candidates
-        features = state.surrogate.featurise(training_candidates + search_candidates)
+        features = state.surrogate.embed(training_candidates + search_candidates)
         embeddings = _to_numpy(features)
 
         if embeddings.ndim != 2:
             raise ValueError(
-                "featurise must return a 2-D array of shape (n_inputs, d), "
+                "embed must return a 2-D array of shape (n_inputs, d), "
                 f"got shape {embeddings.shape}"
             )
 
@@ -93,7 +101,7 @@ class CoreSet(AcquisitionFunction):
 
         if len(embeddings) != n_train + n_cands:
             raise ValueError(
-                f"featurise returned {len(embeddings)} rows for "
+                f"embed returned {len(embeddings)} rows for "
                 f"{n_train} training + {n_cands} candidates (expected {n_train + n_cands})"
             )
 
