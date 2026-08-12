@@ -26,3 +26,8 @@ try:
     )
 except ImportError:
     pass
+
+try:
+    from alf_tools.datasets.matbench import Matbench, MatbenchConfig
+except ImportError:
+    pass
