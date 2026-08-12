@@ -22,15 +22,19 @@ class ModelWithoutEmbed(BaseModel):
     """Satisfies BaseModel's abstract contract without overriding embed()."""
 
     def featurise(self, inputs: list[Candidate] | LabelledCandidates) -> Any:
+        """Unused by this test."""
         raise NotImplementedError
 
     def predict(self, candidate_points: list[Candidate]) -> Predictions:
+        """Unused by this test."""
         raise NotImplementedError
 
     def train(self, train_data: LabelledCandidates, val_data: Any = None) -> None:
+        """Unused by this test."""
         raise NotImplementedError
 
     def sample(self, condition: Any = None) -> list[Candidate]:
+        """Unused by this test."""
         raise NotImplementedError
 
 
