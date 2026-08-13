@@ -115,6 +115,7 @@ def _make_fake_merged_task(
 
     n_total = n_per_fold * n_folds
     ids = [f"mb-id-{i:03d}" for i in range(n_total)]
+    targets: list[bool] | list[float]
     if task_type == "classification":
         targets = [bool(i % 2) for i in range(n_total)]
     else:

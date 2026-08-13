@@ -22,6 +22,14 @@ from alf_core import BaseDataset, BaseDatasetConfig, Candidate, LabelledCandidat
 from alf_core.dataclasses.candidate import Modality
 from pydantic import model_validator
 
+try:
+    from matbench.bench import MatbenchBenchmark
+    from matbench.metadata import mbv01_metadata
+
+    _MATBENCH_AVAILABLE = True
+except ImportError:
+    _MATBENCH_AVAILABLE = False
+
 logger = logging.getLogger("alf-tools")
 
 
@@ -38,10 +46,13 @@ class MatbenchConfig(BaseDatasetConfig):
     tasks) and should not be set explicitly.
 
     When `fold_number` is set (0-4), the predefined Matbench train/test split for that
-    fold is used: `train_ratio` controls what fraction of the Matbench train set forms
-    the initial labelled training set (the remainder becomes `candidate_pool`, same as
-    FLIP); `test_ratio` and `split_type` are ignored and the full Matbench test set for
-    that fold is used directly. Matbench's predefined folds use a fixed internal seed
+    fold is used. Of the Matbench train pool, `train_ratio` sets aside a slice for
+    `train` + `validation` combined; `validation_frac` then carves `validation` out of
+    *that slice* (not out of the whole Matbench train pool, and not out of the total
+    dataset) — the rest of the slice becomes `train`. Whatever remains of the Matbench
+    train pool beyond that slice becomes `candidate_pool` (same denominator FLIP uses).
+    `test_ratio` and `split_type` are ignored; the full Matbench test set for that fold
+    is used directly as `test`. Matbench's predefined folds use a fixed internal seed
     (`18012019`) that cannot be overridden.
 
     When `fold_number` is `None`, all 5 folds are merged into a single dataset and
@@ -102,10 +113,15 @@ class MatbenchConfig(BaseDatasetConfig):
             The validated configuration instance.
 
         Raises:
+            ImportError: If the `matbench` package is not installed.
             ValueError: If `task_name` is not a recognised Matbench task, or if
                 `fold_number` is not `None` and not in `0-4`.
         """
-        from matbench.metadata import mbv01_metadata  # noqa: PLC0415
+        if not _MATBENCH_AVAILABLE:
+            raise ImportError(
+                "The 'matbench' package is required to use Matbench datasets. "
+                "Install it with: pip install alf_tools[matbench]"
+            )
 
         if self.task_name not in mbv01_metadata:
             raise ValueError(
@@ -130,8 +146,9 @@ class Matbench(BaseDataset):
     structure-based inputs. Composition and structure inputs (pymatgen `Composition`
     and `Structure` objects respectively) are both MSONable, so both are serialised
     identically via `.to_json()` into a JSON string stored in `Candidate.data`; no
-    `alf_core` changes are needed. `pymatgen`/`matbench` are lazily imported so that
-    `alf_tools` can be used without the `matbench` extras installed.
+    `alf_core` changes are needed. `pymatgen`/`matbench` are optional: importing this
+    module never requires them, and constructing a `MatbenchConfig` raises a clear
+    `ImportError` if they're missing (see `MatbenchConfig.validate_config`).
     """
 
     config: MatbenchConfig  # narrows the inherited BaseDatasetConfig type
@@ -160,8 +177,6 @@ class Matbench(BaseDataset):
         Returns:
             The loaded MatbenchTask for `self.config.task_name`.
         """
-        from matbench.bench import MatbenchBenchmark  # noqa: PLC0415
-
         benchmark = MatbenchBenchmark(autoload=False, subset=[self.config.task_name])
         task = next(iter(benchmark.tasks))
         task.load()
@@ -241,11 +256,15 @@ class Matbench(BaseDataset):
     def _split_fold_mode(self) -> dict[str, LabelledCandidates]:
         """Split using the predefined Matbench train/test pools for the configured fold.
 
-        The Matbench train pool is shuffled, then partitioned using `train_ratio` and
-        `validation_frac`; the remainder becomes the candidate pool (capped at
-        `max_candidate_pool`). The full Matbench test pool is used directly as "test"
-        (`test_ratio` is ignored — Matbench's predefined test set must be used as-is
-        for benchmark-comparable results).
+        The Matbench train pool is shuffled, then a `train_ratio` slice of it
+        (`train_plus_val_size`) is set aside for train + validation combined.
+        `validation_frac` scales *that slice*, not the whole Matbench train pool or the
+        total dataset: `validation_size = train_plus_val_size * validation_frac`, and
+        `train_size = train_plus_val_size - validation_size`. Whatever remains of the
+        Matbench train pool beyond `train_plus_val_size` becomes the candidate pool
+        (capped at `max_candidate_pool`). The full Matbench test pool is used directly
+        as "test" (`test_ratio` is ignored — Matbench's predefined test set must be
+        used as-is for benchmark-comparable results).
 
         Returns:
             Dictionary with keys "train", "validation", "test", and "candidate_pool".
