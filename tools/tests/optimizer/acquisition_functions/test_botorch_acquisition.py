@@ -862,6 +862,93 @@ def test_acquisition_type_in_sync_with_valid_types():
 # =============================================================================
 
 
+def _sequence_length_featurizer(sequences: list[str]) -> torch.Tensor:
+    """Trivial custom featurizer: maps each sequence to [length, vowel_count]."""
+    rows = [[float(len(seq)), float(sum(c in "AEIOU" for c in seq))] for seq in sequences]
+    return torch.tensor(rows, dtype=torch.float64)
+
+
+@pytest.fixture
+def custom_featurized_state():
+    """Task state for a GP with a non-numeric (custom-featurized) sequence domain.
+
+    Regression fixture for the bug where `_score_candidates` and the qNEI/
+    `log_noisy_expected_improvement` X_baseline path called `candidates_to_tensor`
+    directly on raw `Candidate.data`, which fails for string payloads that only
+    become numeric once routed through the surrogate's `featurise()`.
+
+    Uses a MagicMock `State` (as other model-wrapping tests in this file do)
+    rather than a real `State`, since `state.dataset` here is a stand-in that
+    only needs to expose `train_dataset.candidates`/`.labels`, not satisfy the
+    full `BaseDataset` contract.
+    """
+    sequences = ["AC", "GT", "AAG", "CCT", "TAG"]
+    labels = np.array([1.0, 2.0, 1.5, 1.8, 0.5])
+    train_candidates = [Candidate(data=seq, modality=Modality.SEQUENCE) for seq in sequences]
+    train_data = LabelledCandidates(candidates=train_candidates, labels=labels)
+
+    gp_model = GPModel(
+        train_config=GPTrainConfig(num_iterations=5),
+        featurizer_config=FeaturizerConfig(
+            featurizer_type="custom", custom_featurizer=_sequence_length_featurizer
+        ),
+        device="cpu",
+    )
+    surrogate = Surrogate(model=gp_model)
+    surrogate.fit(train_data, train_data)
+
+    state = MagicMock()
+    state.surrogate = surrogate
+    state.dataset.train_dataset.candidates = train_candidates
+    state.dataset.train_dataset.labels.max.return_value = float(labels.max())
+
+    return state
+
+
+@pytest.mark.parametrize(
+    "acquisition_type",
+    ["probability_of_improvement", "upper_confidence_bound", "log_expected_improvement"],
+)
+def test_score_candidates_custom_featurizer(custom_featurized_state, acquisition_type):
+    """Discrete scoring featurises raw (string) Candidate.data via the surrogate.
+
+    Covers the reported crash: BoTorchAcquisition used to call
+    `candidates_to_tensor` directly on candidates whose `.data` is a raw
+    sequence string, which raises before the model's custom featurizer ever
+    runs. Any discrete-scoring acquisition type exercises the same code path.
+    """
+    acq_fn = BoTorchAcquisition(acquisition_type=acquisition_type, batch_size=1)
+    candidates = [
+        Candidate(data="ACGT", modality=Modality.SEQUENCE),
+        Candidate(data="TTGA", modality=Modality.SEQUENCE),
+    ]
+
+    labelled = acq_fn(search_candidates=candidates, state=custom_featurized_state)
+
+    assert len(labelled) == 2
+    assert all(np.isfinite(labelled.labels))
+
+
+def test_score_candidates_qnei_custom_featurizer(custom_featurized_state):
+    """QNEI featurises both the scored candidates and the X_baseline training data.
+
+    Covers the second occurrence of the bug: the X_baseline built from
+    `state.dataset.train_dataset.candidates` for qNEI/log_noisy_expected_improvement
+    must also go through the surrogate's featurizer, not `candidates_to_tensor`
+    directly.
+    """
+    acq_fn = BoTorchAcquisition(acquisition_type="qNEI", batch_size=1)
+    candidates = [
+        Candidate(data="ACGT", modality=Modality.SEQUENCE),
+        Candidate(data="TTGA", modality=Modality.SEQUENCE),
+    ]
+
+    labelled = acq_fn(search_candidates=candidates, state=custom_featurized_state)
+
+    assert len(labelled) == 2
+    assert all(np.isfinite(labelled.labels))
+
+
 def test_custom_optimization_config(task_state, simple_dataset):
     """Custom BoTorchAcquisitionOptConfig is respected during continuous optimization."""
     bounds = [[b[0], b[1]] for b in simple_dataset.bounds.T]
