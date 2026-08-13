@@ -20,7 +20,7 @@ from alf_core.surrogate.surrogate import Surrogate
 from alf_core.utils.enums import ProblemType
 
 from alf_tools.datasets.guacamol.guacamol_scoring import osimertinib_mpo
-from alf_tools.models.guacamol_oracle import GuacaMolOracleModel, GuacaMolOracleModelConfig
+from alf_tools.models.guacamol_oracle import GuacaMolOracle, GuacaMolOracleConfig
 
 _OSIMERTINIB_SMILES = "COc1cc(N(C)CCN(C)C)c(NC(=O)C=C)cc1Nc2nccc(n2)c3cn(C)c4ccccc34"
 _VALID_SMILES = [_OSIMERTINIB_SMILES, "CC(=O)O", "c1ccccc1"]
@@ -32,17 +32,17 @@ def _candidates(smiles_list: list[str]) -> list[Candidate]:
 
 
 @pytest.fixture
-def oracle_model() -> GuacaMolOracleModel:
-    """GuacaMolOracleModel targeting osimertinib_mpo.
+def oracle_model() -> GuacaMolOracle:
+    """GuacaMolOracle targeting osimertinib_mpo.
 
     Returns:
-        A configured GuacaMolOracleModel instance.
+        A configured GuacaMolOracle instance.
     """
-    return GuacaMolOracleModel(GuacaMolOracleModelConfig(task_name="osimertinib_mpo"))
+    return GuacaMolOracle(GuacaMolOracleConfig(task_name="osimertinib_mpo"))
 
 
-class TestGuacaMolOracleModelPredict:
-    """Tests for GuacaMolOracleModel.predict()."""
+class TestGuacaMolOraclePredict:
+    """Tests for GuacaMolOracle.predict()."""
 
     def test_predict_matches_direct_scorer_call(self, oracle_model):
         """predict() means should match calling osimertinib_mpo directly per SMILES."""
@@ -72,13 +72,13 @@ class TestGuacaMolOracleModelPredict:
         """A different task_name should use that task's scorer, not osimertinib_mpo."""
         from alf_tools.datasets.guacamol.guacamol_scoring import ranolazine_mpo
 
-        model = GuacaMolOracleModel(GuacaMolOracleModelConfig(task_name="ranolazine_mpo"))
+        model = GuacaMolOracle(GuacaMolOracleConfig(task_name="ranolazine_mpo"))
         predictions = model.predict(_candidates(_VALID_SMILES))
         expected = np.array([ranolazine_mpo(s) for s in _VALID_SMILES])
         np.testing.assert_allclose(predictions.means, expected)
 
 
-class TestGuacaMolOracleModelNoOps:
+class TestGuacaMolOracleNoOps:
     """Tests for the no-op / unsupported parts of the BaseModel contract."""
 
     def test_train_is_a_no_op(self, oracle_model):
@@ -130,12 +130,12 @@ def state() -> State:
     )
     dataset = _TinyMoleculeDataset(config)
     dataset.setup()
-    surrogate = Surrogate(model=GuacaMolOracleModel(GuacaMolOracleModelConfig(task_name="osimertinib_mpo")))
+    surrogate = Surrogate(model=GuacaMolOracle(GuacaMolOracleConfig(task_name="osimertinib_mpo")))
     return State(dataset=dataset, surrogate=surrogate)
 
 
-class TestGuacaMolOracleModelViaOracle:
-    """Tests for GuacaMolOracleModel wrapped in the Oracle interface."""
+class TestGuacaMolOracleViaOracle:
+    """Tests for GuacaMolOracle wrapped in the Oracle interface."""
 
     def test_evaluate_returns_labelled_candidates_and_records_time(self, oracle_model, state):
         """Oracle.evaluate() should return LabelledCandidates and record oracle_time."""

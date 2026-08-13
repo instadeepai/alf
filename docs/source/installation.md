@@ -34,7 +34,7 @@ umbrella:
 | `esm2` | `transformers` | `ESM2Model` |
 | `esmfold` | `transformers`, `accelerate` | `ESMFoldModel` |
 | `chemprop` | `chemprop` | `ChempropModel` |
-| `guacamol` | `rdkit` | GuacaMol dataset/scoring, `GuacaMolOracleModel`, `SmilesMutationSearch` |
+| `guacamol` | `rdkit` | GuacaMol dataset/scoring, `GuacaMolOracle`, `SmilesMutationSearch` |
 | `protein` | `esm2` + `esmfold` | protein workflow |
 | `molecule` | `chemprop` + `guacamol` | small-molecule workflow |
 

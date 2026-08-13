@@ -30,7 +30,7 @@ from alf_core.dataclasses.candidate import Candidate, Modality
 from alf_core.dataclasses.labelled_candidates import LabelledCandidates
 from alf_core.dataset.base_dataset import BaseDataset
 from alf_tools.models import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
-from alf_tools.models.guacamol_oracle import GuacaMolOracleModel, GuacaMolOracleModelConfig
+from alf_tools.models.guacamol_oracle import GuacaMolOracle, GuacaMolOracleConfig
 from alf_tools.optimizer.acquisition_functions.greedy import Greedy
 from alf_tools.optimizer.search.smiles_mutation_search import SmilesMutationSearch
 from rdkit import Chem
@@ -85,7 +85,7 @@ class _SeedMoleculeDataset(BaseDataset):
 
     Used only to bootstrap the online loop's initial train/test splits — unlike
     GuacaMol(BaseDataset), nothing here is looked up during acquisition; every
-    acquired candidate is scored live by GuacaMolOracleModel instead.
+    acquired candidate is scored live by GuacaMolOracle instead.
     """
 
     def load_dataset(self) -> LabelledCandidates:
@@ -94,7 +94,7 @@ class _SeedMoleculeDataset(BaseDataset):
         Returns:
             LabelledCandidates over the seed SMILES.
         """
-        scorer = GuacaMolOracleModel(GuacaMolOracleModelConfig(task_name="osimertinib_mpo"))
+        scorer = GuacaMolOracle(GuacaMolOracleConfig(task_name="osimertinib_mpo"))
         candidates = [Candidate(data=s, modality=Modality.MOLECULE) for s in _SEED_SMILES]
         labels = scorer.predict(candidates).means
         return LabelledCandidates(candidates=candidates, labels=labels)
@@ -166,9 +166,9 @@ def online_oracle() -> Oracle:
     """Online oracle scoring arbitrary SMILES via osimertinib_mpo.
 
     Returns:
-        Oracle wrapping GuacaMolOracleModel.
+        Oracle wrapping GuacaMolOracle.
     """
-    return Oracle(scorer=GuacaMolOracleModel(GuacaMolOracleModelConfig(task_name="osimertinib_mpo")))
+    return Oracle(scorer=GuacaMolOracle(GuacaMolOracleConfig(task_name="osimertinib_mpo")))
 
 
 class TestDesignOnlineMoleculeOracle:
@@ -185,7 +185,7 @@ class TestDesignOnlineMoleculeOracle:
         """Runs a 2-round online DesignTask and checks it produces sane metrics.
 
         Candidates are generated fresh each round by SmilesMutationSearch (not
-        drawn from a fixed pool) and scored live by GuacaMolOracleModel (not
+        drawn from a fixed pool) and scored live by GuacaMolOracle (not
         looked up from precomputed labels) — this is the online counterpart to
         the offline GuacaMol(BaseDataset) usage.
         """

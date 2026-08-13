@@ -16,7 +16,6 @@ from alf_tools.models.cnn import CNNModel, CNNModelConfig, CNNTrainConfig
 from alf_tools.models.ensemble import EnsembleWrapper, EnsembleWrapperConfig, SubsampleConfig
 from alf_tools.models.gp import FeaturizerConfig, GPModel, GPModelConfig, GPTrainConfig
 from alf_tools.models.mlp import MLP, MLPModel, MLPModelConfig, MLPTrainConfig
-from alf_tools.models.molecule_oracle import MoleculeOracleModel
 from alf_tools.models.utils import (
     build_from_target,
     create_char_to_idx_mapping,
@@ -37,7 +36,6 @@ __all__ = [
     "GPModel",
     "GPModelConfig",
     "GPTrainConfig",
-    "MoleculeOracleModel",
     "one_hot_encode",
     "EnsembleWrapper",
     "EnsembleWrapperConfig",
@@ -111,6 +109,6 @@ except ImportError:
     pass
 
 if _rdkit_available:
-    from alf_tools.models.guacamol_oracle import GuacaMolOracleModel, GuacaMolOracleModelConfig
+    from alf_tools.models.guacamol_oracle import GuacaMolOracle, GuacaMolOracleConfig
 
-    __all__ += ["GuacaMolOracleModel", "GuacaMolOracleModelConfig"]
+    __all__ += ["GuacaMolOracle", "GuacaMolOracleConfig"]

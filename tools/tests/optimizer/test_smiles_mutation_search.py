@@ -22,7 +22,7 @@ from alf_core.surrogate.surrogate import Surrogate
 from alf_core.utils.enums import ProblemType
 from rdkit import Chem
 
-from alf_tools.models.guacamol_oracle import GuacaMolOracleModel, GuacaMolOracleModelConfig
+from alf_tools.models.guacamol_oracle import GuacaMolOracle, GuacaMolOracleConfig
 from alf_tools.optimizer.search.smiles_mutation_search import SmilesMutationSearch
 
 _BENZENE = "c1ccccc1"
@@ -69,7 +69,7 @@ def _make_state(best_smiles: str, other_smiles: list[str]) -> State:
     )
     dataset = _TinyMoleculeDataset(config, best_smiles=best_smiles, other_smiles=other_smiles)
     dataset.setup()
-    surrogate = Surrogate(model=GuacaMolOracleModel(GuacaMolOracleModelConfig(task_name="osimertinib_mpo")))
+    surrogate = Surrogate(model=GuacaMolOracle(GuacaMolOracleConfig(task_name="osimertinib_mpo")))
     return State(dataset=dataset, surrogate=surrogate)
 
 
@@ -110,7 +110,7 @@ def _make_ranked_state(ranked_smiles: list[str]) -> State:
     )
     dataset = _RankedMoleculeDataset(config, ranked_smiles=ranked_smiles)
     dataset.setup()
-    surrogate = Surrogate(model=GuacaMolOracleModel(GuacaMolOracleModelConfig(task_name="osimertinib_mpo")))
+    surrogate = Surrogate(model=GuacaMolOracle(GuacaMolOracleConfig(task_name="osimertinib_mpo")))
     return State(dataset=dataset, surrogate=surrogate)
 
 
