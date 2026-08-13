@@ -7,8 +7,8 @@ Unlike the regression and classification registries, these metrics operate on
 :class:`~alf_core.dataclasses.LabelledCandidates` rather than prediction arrays.
 
 :func:`~alf_core.utils.metrics.acquisition_batch.intra_batch_diversity` measures how spread out the acquired batch is in design space,
-using normalised Levenshtein distance for SEQUENCE candidates and cosine distance for
-TABULAR candidates (MOLECULE is not yet supported). :func:`~alf_core.utils.metrics.acquisition_batch.compute_recall` and :func:`~alf_core.utils.metrics.acquisition_batch.compute_regret` measure
+using normalised Levenshtein distance for SEQUENCE candidates (MOLECULE and MATERIALS are
+not yet supported) and cosine distance for TABULAR candidates. :func:`~alf_core.utils.metrics.acquisition_batch.compute_recall` and :func:`~alf_core.utils.metrics.acquisition_batch.compute_regret` measure
 the quality of the acquired set relative to the full candidate pool.
 
 .. automodule:: alf_core.utils.metrics.acquisition_batch

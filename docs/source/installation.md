@@ -35,8 +35,10 @@ umbrella:
 | `esmfold` | `transformers`, `accelerate` | `ESMFoldModel` |
 | `chemprop` | `chemprop` | `ChempropModel` |
 | `guacamol` | `rdkit` | GuacaMol dataset/scoring, `GuacaMolOracle`, `SmilesMutationSearch` |
+| `matbench` | `matbench`, `pymatgen` | Matbench dataset |
 | `protein` | `esm2` + `esmfold` | protein workflow |
 | `molecule` | `chemprop` + `guacamol` | small-molecule workflow |
+| `materials` | `matbench` | materials workflow |
 
 ```bash
 # ESM2 — protein language model (for ESM2Model)
@@ -47,6 +49,9 @@ pip install "alf-tools[chemprop]"
 
 # Whole protein workflow (esm2 + esmfold)
 pip install "alf-tools[protein]"
+
+# Matbench — materials-property benchmark dataset
+pip install "alf-tools[matbench]"
 
 # Several extras together
 pip install "alf-tools[esm2,chemprop]"
@@ -130,7 +135,9 @@ with `--group` (not `--extra`):
 ```bash
 uv sync --group esm2
 uv sync --group chemprop
+uv sync --group matbench
 uv sync --group protein              # esm2 + esmfold
 uv sync --group molecule             # chemprop + guacamol
+uv sync --group materials            # matbench
 uv sync --group esm2 --group chemprop
 ```
