@@ -18,8 +18,7 @@ from alf_core import Candidate, LabelledCandidates, Modality, Oracle, Prediction
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.surrogate.surrogate import Surrogate
 from alf_core.utils.enums import ProblemType
-
-from alf_tools.datasets.guacamol.guacamol_scoring import osimertinib_mpo
+from alf_tools.datasets.guacamol.guacamol_scoring import osimertinib_mpo, ranolazine_mpo
 from alf_tools.models.guacamol_oracle import GuacaMolOracle, GuacaMolOracleConfig
 
 _OSIMERTINIB_SMILES = "COc1cc(N(C)CCN(C)C)c(NC(=O)C=C)cc1Nc2nccc(n2)c3cn(C)c4ccccc34"
@@ -70,8 +69,6 @@ class TestGuacaMolOraclePredict:
 
     def test_task_name_is_configurable(self):
         """A different task_name should use that task's scorer, not osimertinib_mpo."""
-        from alf_tools.datasets.guacamol.guacamol_scoring import ranolazine_mpo
-
         model = GuacaMolOracle(GuacaMolOracleConfig(task_name="ranolazine_mpo"))
         predictions = model.predict(_candidates(_VALID_SMILES))
         expected = np.array([ranolazine_mpo(s) for s in _VALID_SMILES])

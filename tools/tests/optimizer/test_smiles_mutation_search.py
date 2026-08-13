@@ -20,10 +20,9 @@ from alf_core import Candidate, LabelledCandidates, Modality, ProtocolSearch, St
 from alf_core.dataset.base_dataset import BaseDataset, BaseDatasetConfig
 from alf_core.surrogate.surrogate import Surrogate
 from alf_core.utils.enums import ProblemType
-from rdkit import Chem
-
 from alf_tools.models.guacamol_oracle import GuacaMolOracle, GuacaMolOracleConfig
 from alf_tools.optimizer.search.smiles_mutation_search import SmilesMutationSearch
+from rdkit import Chem
 
 _BENZENE = "c1ccccc1"
 _ASPIRIN = "CC(=O)Oc1ccccc1C(=O)O"
@@ -156,11 +155,15 @@ class TestSmilesMutationSearch:
         """Mutants should be neighbours of the best-labelled SMILES, not the others."""
         aspirin_best_pool = {
             Chem.MolToSmiles(Chem.MolFromSmiles(c.data))
-            for c in SmilesMutationSearch()(_make_state(best_smiles=_ASPIRIN, other_smiles=[_BENZENE]))
+            for c in SmilesMutationSearch()(
+                _make_state(best_smiles=_ASPIRIN, other_smiles=[_BENZENE])
+            )
         }
         benzene_best_pool = {
             Chem.MolToSmiles(Chem.MolFromSmiles(c.data))
-            for c in SmilesMutationSearch()(_make_state(best_smiles=_BENZENE, other_smiles=[_ASPIRIN]))
+            for c in SmilesMutationSearch()(
+                _make_state(best_smiles=_BENZENE, other_smiles=[_ASPIRIN])
+            )
         }
         # Swapping which molecule has the highest label should swap which
         # molecule gets mutated, so the two candidate pools must differ.
