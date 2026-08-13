@@ -37,10 +37,14 @@ class GuacaMolOracleConfig:
 class GuacaMolOracle(BaseModel):
     """Online oracle that scores arbitrary SMILES via a GuacaMol composite/MPO task.
 
-    Unlike GuacaMol(BaseDataset), which scores a fixed corpus once and stores the
-    results as static labels, this model calls the RDKit-based scorer fresh on
-    every predict() call, so it can evaluate any SMILES a search protocol
-    proposes — including molecules that never appeared in any corpus.
+    For benchmark tasks, GuacaMol(BaseDataset).query() computes scores the same way —
+    there's no corpus lookup for that mode either, every SMILES is re-scored by the task
+    function. What this class avoids is everything else that comes with
+    GuacaMol(BaseDataset): constructing one downloads and RDKit-scores the entire
+    ~1.6M-molecule corpus up front, even if that corpus is never otherwise used, and it
+    makes Oracle classify the scorer as offline by type. This is a plain BaseModel — no
+    corpus, near-instant to construct, and it degrades gracefully on invalid SMILES
+    (returns 0.0) rather than raising, unlike GuacaMol.query()'s benchmark-task path.
     """
 
     def __init__(self, config: GuacaMolOracleConfig) -> None:

@@ -34,13 +34,17 @@ class SmilesMutationSearch(SearchProtocol):
     This is the online, generative counterpart to SingleMutantSearch for molecules:
     for each of the top-K training candidates, it enumerates single-character
     substitutions of that SMILES string (mirroring SingleMutantSearch's
-    enumerate-all-single-point-mutations shape), then keeps only the mutations
-    RDKit can parse as valid molecules, deduplicated by canonical SMILES across
-    the whole pool. Unlike protein sequences, most single-character SMILES edits
-    are structurally invalid, so this filtering step is required.
+    enumerate-all-single-point-mutations shape), then keeps only mutations RDKit can
+    parse as valid molecules and that haven't already been evaluated in this run —
+    whether as one of this round's bases or acquired in any previous round — deduplicated
+    by canonical SMILES. Unlike protein sequences, most single-character SMILES edits are
+    structurally invalid, so the validity filter is required; the already-evaluated filter
+    is required because, unlike DatasetSearch, there is no candidate_pool to physically
+    remove acquired candidates from, so nothing else stops the same mutant from being
+    regenerated and re-acquired every round once it reaches the top of train_dataset.
 
     Mutating only the single current best (top_k=1) makes the search a pure
-    hill-climb: once no neighbour of the incumbent beats it, the same
+    hill-climb: once no unseen neighbour of the incumbent beats it, the same
     neighbourhood is regenerated every round and the loop stalls in that local
     optimum. Mutating several top candidates each round keeps multiple regions
     of the space under active exploration simultaneously, so a stall in one
@@ -67,7 +71,7 @@ class SmilesMutationSearch(SearchProtocol):
         self.top_k = top_k
 
     def __call__(self, state: State) -> List[Candidate]:
-        """Generate valid single-character mutants of the top-K training SMILES.
+        """Generate valid, not-yet-evaluated mutants of the top-K training SMILES.
 
         Args:
             state: The task state containing the dataset and surrogate model.
@@ -76,7 +80,7 @@ class SmilesMutationSearch(SearchProtocol):
             A list of candidates with novel, valid, deduplicated SMILES.
 
         Raises:
-            ValueError: If the training set is empty, or if no valid, novel
+            ValueError: If the training set is empty, or if no valid, unseen
                 mutation of the top-K training SMILES was found.
         """
         train_dataset = state.dataset.train_dataset
@@ -96,10 +100,16 @@ class SmilesMutationSearch(SearchProtocol):
         # call only, since disabling it at import time would silence RDKit's logger
         # process-wide for any other code sharing the interpreter.
         with BlockLogs():
+            # Seed with every molecule already evaluated in this run (train + validation,
+            # not just this round's top-K bases), so nothing already acquired can be
+            # regenerated and proposed again.
+            already_evaluated = list(train_dataset.candidates) + list(
+                state.dataset.validation_dataset.candidates
+            )
             seen = set()
-            for base_smiles in base_smiles_list:
-                base_mol = Chem.MolFromSmiles(base_smiles)
-                seen.add(Chem.MolToSmiles(base_mol) if base_mol is not None else base_smiles)
+            for candidate in already_evaluated:
+                mol = Chem.MolFromSmiles(candidate.data)
+                seen.add(Chem.MolToSmiles(mol) if mol is not None else candidate.data)
 
             mutant_pool = []
             for base_smiles in base_smiles_list:
@@ -119,9 +129,10 @@ class SmilesMutationSearch(SearchProtocol):
 
         if not mutant_pool:
             raise ValueError(
-                f"SmilesMutationSearch found no valid, novel single-character mutation of "
+                f"SmilesMutationSearch found no valid, unseen single-character mutation of "
                 f"the top-{num_bases} training SMILES {base_smiles_list!r} using alphabet "
-                f"{self.alphabet!r}. Try a larger alphabet or a higher top_k."
+                f"{self.alphabet!r}. Try a larger alphabet, a higher top_k, or check whether "
+                "this neighbourhood has already been fully explored."
             )
 
         if self.max_candidates is not None:

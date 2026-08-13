@@ -152,12 +152,15 @@ def gp_surrogate() -> Surrogate:
 def molecule_optimizer() -> Optimizer:
     """Greedy acquisition over candidates from SmilesMutationSearch.
 
+    top_k=2 keeps two neighbourhoods under exploration rather than one, so a
+    single exhausted local optimum doesn't starve the search across many rounds.
+
     Returns:
         Optimizer generating and scoring novel SMILES each round.
     """
     return Optimizer(
         acquisition_fn=Greedy(),
-        search_fn=ProtocolSearch(protocol=SmilesMutationSearch(max_candidates=30)),
+        search_fn=ProtocolSearch(protocol=SmilesMutationSearch(max_candidates=30, top_k=2)),
     )
 
 
@@ -182,12 +185,15 @@ class TestDesignOnlineMoleculeOracle:
         online_oracle,
         tmp_path,
     ):
-        """Runs a 2-round online DesignTask and checks it produces sane metrics.
+        """Runs a 5-round online DesignTask and checks it produces sane metrics.
 
         Candidates are generated fresh each round by SmilesMutationSearch (not
         drawn from a fixed pool) and scored live by GuacaMolOracle (not
         looked up from precomputed labels) — this is the online counterpart to
-        the offline GuacaMol(BaseDataset) usage.
+        the offline GuacaMol(BaseDataset) usage. 5 rounds (not the bare minimum)
+        because a duplicate-acquisition bug in SmilesMutationSearch (regenerating
+        and re-acquiring the same molecule every round) was previously invisible
+        at 2 rounds and only showed up once the loop ran long enough to repeat.
         """
         save_path = tmp_path / "online_molecule_e2e"
         save_path.mkdir()
@@ -198,7 +204,9 @@ class TestDesignOnlineMoleculeOracle:
         ]
 
         seed_dataset.setup()
-        task = DesignTask(num_acq_rounds=2, acq_batch_size=3)
+        num_acq_rounds = 5
+        acq_batch_size = 3
+        task = DesignTask(num_acq_rounds=num_acq_rounds, acq_batch_size=acq_batch_size)
         state = task.setup(dataset=seed_dataset, surrogate=gp_surrogate)
         initial_num_train = len(state.dataset.train_dataset)
 
@@ -213,13 +221,16 @@ class TestDesignOnlineMoleculeOracle:
         assert metrics_file.exists(), "metrics.csv must be created"
 
         metrics = pd.read_csv(metrics_file)
-        assert len(metrics) == 3, f"Expected round 0 + 2 acquisition rounds, got {len(metrics)}"
+        assert len(metrics) == num_acq_rounds + 1, (
+            f"Expected round 0 + {num_acq_rounds} acquisition rounds, got {len(metrics)}"
+        )
         assert "dataset/num_train" in metrics.columns
         assert "acquired_candidates/round_mean" in metrics.columns
 
         # validation_frac=0.0, so every acquired candidate goes to train.
-        acq_batch_size = 3
-        expected_num_train = [initial_num_train + i * acq_batch_size for i in range(3)]
+        expected_num_train = [
+            initial_num_train + i * acq_batch_size for i in range(num_acq_rounds + 1)
+        ]
         actual_num_train = metrics["dataset/num_train"].dropna().astype(int).tolist()
         assert actual_num_train == expected_num_train
 
@@ -227,4 +238,13 @@ class TestDesignOnlineMoleculeOracle:
         assert np.all(np.isfinite(round_means)), "All round_mean values must be finite"
         assert np.all(round_means >= 0.0) and np.all(round_means <= 1.0), (
             "osimertinib_mpo scores must stay within [0, 1]"
+        )
+
+        # No molecule should be acquired twice across the whole run — SmilesMutationSearch
+        # has no candidate_pool to physically remove acquired candidates from, so this only
+        # holds if the search itself excludes everything already in train_dataset.
+        train_smiles = [c.data for c in state.dataset.train_dataset.candidates]
+        canonical_smiles = [Chem.MolToSmiles(Chem.MolFromSmiles(s)) for s in train_smiles]
+        assert len(canonical_smiles) == len(set(canonical_smiles)), (
+            "train_dataset contains duplicate molecules after acquisition"
         )

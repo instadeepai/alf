@@ -187,8 +187,41 @@ class TestSmilesMutationSearch:
     def test_no_valid_mutations_raises_clear_error(self):
         """If every mutation is invalid/degenerate, raise instead of returning an empty pool."""
         state = _make_state(best_smiles="C", other_smiles=[])
-        with pytest.raises(ValueError, match="no valid, novel"):
+        with pytest.raises(ValueError, match="no valid, unseen"):
             SmilesMutationSearch(alphabet="C")(state)
+
+    def test_excludes_candidates_already_in_train_dataset(self):
+        """A molecule already acquired in a previous round must not be re-proposed.
+
+        Regression test: without this exclusion, SmilesMutationSearch regenerates
+        the same mutant of an unchanging incumbent-best molecule every round, and a
+        deterministic acquisition function re-acquires it every time, silently
+        duplicating it into train_dataset with zero learning progress.
+        """
+        # A real single-character mutation of aspirin (position 0, 'C' -> 'N'), as
+        # SmilesMutationSearch itself would generate.
+        already_acquired = Chem.MolToSmiles(Chem.MolFromSmiles("N" + _ASPIRIN[1:]))
+        state = _make_state(best_smiles=_ASPIRIN, other_smiles=[_BENZENE, already_acquired])
+        pool = _canonical_set(SmilesMutationSearch()(state))
+        assert already_acquired not in pool
+
+    def test_excludes_candidates_already_in_validation_dataset(self):
+        """A molecule sitting in validation_dataset must also not be re-proposed."""
+        already_acquired = Chem.MolToSmiles(Chem.MolFromSmiles("N" + _ASPIRIN[1:]))
+        fake_state = SimpleNamespace(
+            dataset=SimpleNamespace(
+                train_dataset=SimpleNamespace(
+                    candidates=[Candidate(data=_ASPIRIN, modality=Modality.MOLECULE)],
+                    labels=np.array([1.0]),
+                ),
+                validation_dataset=SimpleNamespace(
+                    candidates=[Candidate(data=already_acquired, modality=Modality.MOLECULE)],
+                    labels=np.array([0.1]),
+                ),
+            )
+        )
+        pool = _canonical_set(SmilesMutationSearch()(fake_state))
+        assert already_acquired not in pool
 
 
 class TestSmilesMutationSearchTopK:
