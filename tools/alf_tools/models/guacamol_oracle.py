@@ -60,7 +60,7 @@ class GuacaMolOracle(BaseModel):
         """No-op — the scorer computes RDKit descriptors internally per SMILES.
 
         Args:
-            inputs: Candidates to featurize (unused).
+            inputs: Candidates to featurise (unused).
         """
 
     def train(
