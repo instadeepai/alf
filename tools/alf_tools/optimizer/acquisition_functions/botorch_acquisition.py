@@ -66,6 +66,41 @@ AcquisitionType = Literal[
 ]
 
 
+def _featurise_candidates(
+    state: State, candidates: list[Candidate], dtype: torch.dtype
+) -> torch.Tensor:
+    """Convert candidates to a tensor, featurising via the surrogate where needed.
+
+    `Candidate.data` may hold raw, non-numeric payloads (sequences, SMILES,
+    JSON-serialized structures) that only become numeric feature tensors once
+    routed through the surrogate's `featurise()` (which dispatches on
+    `featurizer_type`). That only applies to ALF models with a genuine
+    joint-posterior BoTorch model (e.g. a trained `GPModel`), which were
+    trained in that featurized space.
+
+    Native BoTorch models, and marginal-only ALF models scored through
+    `BotorchModelWrapper` (whose `posterior()` round-trips the tensor back to
+    `Candidate.data` via `tensor_to_candidates` before calling `predict()`),
+    require the tensor to already match `Candidate.data` directly — for
+    those, `candidates_to_tensor` is used as before.
+
+    Args:
+        state: Task state holding the surrogate to featurise with.
+        candidates: Candidates to featurise.
+        dtype: Desired dtype of the output tensor.
+
+    Returns:
+        Feature tensor of shape (n, d) with the given dtype.
+    """
+    model = state.surrogate.model
+    if isinstance(model, BotorchModel) or resolve_botorch_model(model) is None:
+        return candidates_to_tensor(candidates, dtype=dtype)
+    features = state.surrogate.featurise(candidates)
+    if not isinstance(features, torch.Tensor):
+        features = torch.as_tensor(features)
+    return features.to(dtype=dtype)
+
+
 def _infer_model_dtype(model: BotorchModel) -> torch.dtype:
     """Infer a model's tensor dtype, defaulting to float64 when it has no parameters.
 
@@ -396,15 +431,15 @@ class BoTorchAcquisition(AcquisitionFunction):
         # Get training data for qNEI / log_noisy_expected_improvement
         X_baseline = None
         if self.acquisition_type in ("qNEI", "log_noisy_expected_improvement"):
-            X_baseline = candidates_to_tensor(
-                state.dataset.train_dataset.candidates, dtype=infer_dtype
+            X_baseline = _featurise_candidates(
+                state, state.dataset.train_dataset.candidates, infer_dtype
             )
 
         acq_fn = self._create_acquisition_function(wrapped_model, best_f, X_baseline)
 
         # Evaluate acquisition function
         # For discrete scoring, evaluate each candidate independently
-        X = candidates_to_tensor(candidates, dtype=infer_dtype)
+        X = _featurise_candidates(state, candidates, infer_dtype)
 
         if self.batch_size > X.shape[0]:
             raise ValueError("batch_size(q) greater than the length of candidates")
@@ -474,8 +509,8 @@ class BoTorchAcquisition(AcquisitionFunction):
         # Get training data for qNEI / log_noisy_expected_improvement
         X_baseline = None
         if self.acquisition_type in ("qNEI", "log_noisy_expected_improvement"):
-            X_baseline = candidates_to_tensor(
-                state.dataset.train_dataset.candidates, dtype=model_dtype
+            X_baseline = _featurise_candidates(
+                state, state.dataset.train_dataset.candidates, model_dtype
             )
 
         acq_fn = self._create_acquisition_function(model, best_f, X_baseline)
