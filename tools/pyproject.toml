@@ -44,8 +44,9 @@ Documentation = "https://instadeepai.github.io/alf/"
 transformers = ["transformers>=4.36.0"]
 
 # Per-model extras
+# Capped below 2.3: that release requires cuik_molmaker, whose X11 libs slim images lack.
 chemprop = [
-    "chemprop>=2.0.0,<3.0.0",
+    "chemprop>=2.0.0,<2.3.0",
 ]
 esm2 = ["alf_tools[transformers]"]
 esmfold = [
