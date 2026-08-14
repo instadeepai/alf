@@ -66,7 +66,7 @@ _SEED_SMILES = [
 ]
 
 
-def _morgan_featurizer(smiles_list: list[str]) -> torch.Tensor:
+def _morgan_featuriser(smiles_list: list[str]) -> torch.Tensor:
     """Featurise SMILES as 128-bit Morgan fingerprints for the GP surrogate.
 
     Returns:
@@ -134,15 +134,15 @@ def gp_surrogate() -> Surrogate:
         optimizer_type="adam",
         log_frequency=50,
     )
-    featurizer_config = FeaturizerConfig(
+    featuriser_config = FeaturizerConfig(
         featurizer_type="custom",
-        custom_featurizer=_morgan_featurizer,
+        custom_featurizer=_morgan_featuriser,
     )
     gp = GPModel(
         name="gp_molecule_e2e",
         model_config=model_config,
         train_config=train_config,
-        featurizer_config=featurizer_config,
+        featurizer_config=featuriser_config,
         device="cpu",
     )
     return Surrogate(model=gp)
