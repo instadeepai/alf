@@ -102,11 +102,7 @@ class TestSingleMutantSearchTopK:
         assert default_pool == explicit_pool
 
     def test_top_k_one_reproduces_legacy_argmax_selection(self):
-        """top_k=1 must seed from the same sequence that labels.argmax() would pick.
-
-        Guards the tie-break contract: argsort(labels)[::-1] reverses tied runs and
-        would seed from the *last* best-labelled sequence instead.
-        """
+        """top_k=1 must seed from the same sequence that labels.argmax() would pick."""
         sequences = ["AAA", "BBB", "CCC", "ABC"]
         labels = [1.0, 3.0, 2.0, 3.0]
         state = _make_state(sequences, labels)

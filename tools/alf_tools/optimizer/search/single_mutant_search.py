@@ -49,9 +49,6 @@ class SingleMutantSearch(SearchProtocol):
     def __call__(self, state: State) -> List[Candidate]:
         """Apply the search protocol to return a pool of candidates.
 
-        Seeds are ranked by ``LabelledCandidates.get_top_k``, which breaks label ties by
-        training-set position, so ``top_k=1`` selects the same seed as ``labels.argmax()``.
-
         Args:
             state: The task state containing the dataset and surrogate model.
 
