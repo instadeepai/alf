@@ -24,15 +24,7 @@ _ABC = "ABC"
 
 
 def _make_state(sequences: list[str], labels: list[float]) -> SimpleNamespace:
-    """Build a minimal state exposing only what SingleMutantSearch reads.
-
-    Args:
-        sequences: Training sequences, in training-set order.
-        labels: Label for each sequence, in the same order.
-
-    Returns:
-        A stand-in state with a train_dataset of candidates and labels.
-    """
+    """Build a minimal stand-in state exposing only what SingleMutantSearch reads."""
     return SimpleNamespace(
         dataset=SimpleNamespace(
             train_dataset=SimpleNamespace(
@@ -44,15 +36,7 @@ def _make_state(sequences: list[str], labels: list[float]) -> SimpleNamespace:
 
 
 def _single_mutants(sequence: str, alphabet: str) -> list[str]:
-    """Enumerate every single-position substitution of a sequence, in generation order.
-
-    Args:
-        sequence: The sequence to mutate.
-        alphabet: Characters substituted in at each position.
-
-    Returns:
-        The single-mutant neighbourhood of the sequence.
-    """
+    """Enumerate every single-position substitution of a sequence, in generation order."""
     return [
         sequence[:i] + character + sequence[i + 1 :]
         for i in range(len(sequence))
@@ -120,9 +104,8 @@ class TestSingleMutantSearchTopK:
     def test_top_k_one_reproduces_legacy_argmax_selection(self):
         """top_k=1 must seed from the same sequence that labels.argmax() would pick.
 
-        Guards the tie-breaking contract: a descending sort implemented as
-        argsort(labels)[::-1] reverses tied runs and would seed from the *last*
-        best-labelled sequence, silently changing behaviour for existing callers.
+        Guards the tie-break contract: argsort(labels)[::-1] reverses tied runs and
+        would seed from the *last* best-labelled sequence instead.
         """
         sequences = ["AAA", "BBB", "CCC", "ABC"]
         labels = [1.0, 3.0, 2.0, 3.0]

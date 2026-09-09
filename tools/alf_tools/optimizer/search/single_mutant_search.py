@@ -23,19 +23,10 @@ class SingleMutantSearch(SearchProtocol):
     """Search protocol that enumerates single-point mutants of the top-K training sequences.
 
     For each of the ``top_k`` highest-labelled training sequences, every single-position
-    substitution over ``alphabet`` is enumerated, and the resulting neighbourhoods are
-    unioned into one deduplicated candidate pool.
-
-    Seeding from only the single best sequence (``top_k=1``, the default) makes the search
-    a pure hill-climb: it explores exactly one neighbourhood, so it can only ever refine
-    the current incumbent and stalls once no neighbour of it improves. Raising ``top_k``
-    keeps several local optima under exploration at once, so a stall in one neighbourhood
-    does not stall the whole search.
-
-    Neighbourhoods of nearby seeds overlap — a mutant of one seed can equal another seed
-    or a mutant of another seed — so the pool is deduplicated by sequence. Deduplication
-    preserves first-generated order rather than iterating a set, keeping the returned pool
-    deterministic across runs and interpreter sessions.
+    substitution over ``alphabet`` is enumerated. Seed neighbourhoods overlap, so the
+    union is deduplicated by sequence in generation order (not via set iteration) to keep
+    the pool deterministic. ``top_k=1``, the default, is a pure hill-climb on a single
+    neighbourhood; higher values keep several local optima under exploration at once.
     """
 
     def __init__(self, alphabet: str = PROTEIN_ALPHABET, top_k: int = 1):
@@ -43,9 +34,9 @@ class SingleMutantSearch(SearchProtocol):
 
         Args:
             alphabet: Characters substituted in at each position of each seed sequence.
-            top_k: Number of best-labelled training sequences to mutate from. Defaults to
-                1, which reproduces single-best hill-climbing. Values exceeding the
-                training set size are clamped to it.
+            top_k: Number of best-labelled training sequences to mutate from. 1
+                reproduces single-best hill-climbing; values above the training set
+                size are clamped to it.
 
         Raises:
             ValueError: If ``top_k`` is less than 1.
@@ -58,17 +49,14 @@ class SingleMutantSearch(SearchProtocol):
     def __call__(self, state: State) -> List[Candidate]:
         """Apply the search protocol to return a pool of candidates.
 
-        Ties in labels are broken by training-set position: among equally-labelled
-        sequences the earliest-indexed one ranks higher. This matches the tie-breaking of
-        ``labels.argmax()``, so ``top_k=1`` selects the same seed as single-best selection
-        even when the best label is duplicated.
+        Label ties are broken by training-set position, matching ``labels.argmax()``.
 
         Args:
             state: The task state containing the dataset and surrogate model.
 
         Returns:
-            A deduplicated list of candidates, ordered by seed rank and then by mutation
-            position and alphabet order within each seed's neighbourhood.
+            A deduplicated list of candidates, ordered by seed rank then by mutation
+            position and alphabet order.
 
         Raises:
             ValueError: If the training set is empty, or if the training labels have more
@@ -83,11 +71,9 @@ class SingleMutantSearch(SearchProtocol):
             )
 
         labels = np.asarray(train_dataset.labels)
-        # A trailing singleton axis (shape (n, 1)) is just a column vector of scalar
-        # labels, so squeeze it. Anything genuinely multi-output cannot be ranked without
-        # an objective/scalarisation, and silently ranking it would be worse than failing:
-        # argmax/argsort on a 2D array operate on flattened or per-row indices that do not
-        # line up with `candidates` at all, mis-selecting the seeds without any error.
+        # Shape (n, 1) is a column vector of scalar labels, so squeeze it. Genuinely
+        # multi-output labels can't be ranked without a scalarisation, and argsort would
+        # return indices that don't line up with `candidates` — so fail instead.
         if labels.ndim > 1:
             squeezable = [axis for axis in range(1, labels.ndim) if labels.shape[axis] == 1]
             labels = labels.reshape(labels.shape[0], -1).squeeze(axis=1) if squeezable else labels
@@ -99,10 +85,10 @@ class SingleMutantSearch(SearchProtocol):
                 "using this search protocol."
             )
 
-        # `kind="stable"` on negated labels sorts descending while keeping equally-labelled
-        # candidates in training-set order, so the top-1 seed is exactly `labels.argmax()`.
-        # The plainer `argsort(labels)[::-1]` would instead reverse tied runs, changing which
-        # seed `top_k=1` picks whenever the best label is duplicated.
+        # Stable sort on negated labels keeps tied candidates in training-set order, so
+        # the top-1 seed is exactly `labels.argmax()`. Do not "simplify" to
+        # `argsort(labels)[::-1]`: it reverses tied runs, silently changing which seed
+        # `top_k=1` picks when the best label is duplicated.
         ranked_indices = np.argsort(-labels, kind="stable")[:num_seeds]
 
         single_mutant_pool: List[Candidate] = []
