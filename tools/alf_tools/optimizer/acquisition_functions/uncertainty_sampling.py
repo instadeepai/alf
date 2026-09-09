@@ -49,16 +49,12 @@ class UncertaintySampling(AcquisitionFunction):
             LabelledCandidates with predictive standard deviation as acquisition values.
         """
         predictions = state.surrogate.predict(search_candidates)
-        # Unlike Expected Improvement and Thompson Sampling, which check `empirical_dist`
-        # first because they need the full sample distribution, this one only needs a
-        # scalar spread. Ensemble surrogates already reduce their members to `variances`,
-        # so reading that directly is equivalent and skips the redundant reduction.
+        # EI and Thompson Sampling check `empirical_dist` first as they need the full
+        # sample distribution; a scalar spread is enough here, so prefer `variances`.
         if predictions.variances is not None:
-            # Clip negatives: some surrogates return tiny negative variances from
-            # numerical error, and np.sqrt would turn those into NaNs.
+            # Clip: tiny negative variances from numerical error would sqrt to NaN.
             acquisition_values = np.sqrt(np.maximum(predictions.variances, 0.0))
         elif predictions.empirical_dist is not None:
-            # Ensemble path: uncertainty is the disagreement between members.
             acquisition_values = predictions.empirical_dist.std(axis=-1)
         else:
             raise ValueError(
