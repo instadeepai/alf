@@ -1,6 +1,8 @@
 <div align="center">
-  <img src="docs/imgs/alf_cover_gradient.png" alt="ALF cover" width="100%">
+  <img src="docs/imgs/alf_cover.svg" alt="ALF cover" width="50%">
 </div>
+
+# Active Learning Framework for Scientific Discovery
 
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
