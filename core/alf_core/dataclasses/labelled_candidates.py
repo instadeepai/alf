@@ -29,15 +29,11 @@ def _descending_order(labels: np.ndarray) -> np.ndarray:
         labels: One label per candidate.
 
     Returns:
-        Indices of ``labels`` in descending order, with equally-labelled entries left
-        in their original relative order.
+        Indices of ``labels`` in descending order, ties in original order.
     """
-    # Negating and stable-sorting gives descending order while keeping tied entries in
-    # their original order. The obvious `argsort(labels)[::-1]` is wrong twice over: it
-    # reverses tied runs, and numpy's default sort is unstable, so the order within a
-    # tie is unspecified and varies with array size. Ties are routine here — rank-based
-    # and batch-replicated acquisition scores produce them by construction — so this
-    # has to be deterministic.
+    # Not `argsort(labels)[::-1]`: that reverses tied runs, and numpy's default sort is
+    # unstable so tie order varies with array size. Ties are routine — rank-based and
+    # batch-replicated acquisition scores produce them by construction.
     return np.argsort(-labels, kind="stable")
 
 
@@ -158,9 +154,8 @@ class LabelledCandidates:
                 Defaults to True.
 
         Returns:
-            A new LabelledCandidates object with candidates and labels sorted
-            by label values. Equally-labelled candidates keep their original
-            relative order.
+            A new LabelledCandidates object with candidates and labels sorted by
+            label values, ties left in their original order.
         """
         sorted_indices = (
             np.argsort(self.labels, kind="stable") if ascending else _descending_order(self.labels)
@@ -217,9 +212,8 @@ class LabelledCandidates:
 
         Returns:
             New LabelledCandidates object containing the top k candidates sorted
-            by label values (highest first). Ties are broken by position, so the
-            earliest-indexed of several equally-labelled candidates ranks higher.
-            ``k`` above the collection size returns every candidate.
+            by label values (highest first), ties broken by position. ``k`` above
+            the collection size returns every candidate.
         """
         top_k_indices = _descending_order(self.labels)[:k]
         top_k_candidates = [self.candidates[i] for i in top_k_indices]
