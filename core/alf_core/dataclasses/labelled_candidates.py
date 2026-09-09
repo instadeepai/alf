@@ -22,6 +22,25 @@ import pandas as pd
 from alf_core.dataclasses.candidate import Candidate
 
 
+def _descending_order(labels: np.ndarray) -> np.ndarray:
+    """Return indices ordering ``labels`` highest-first, breaking ties by position.
+
+    Args:
+        labels: One label per candidate.
+
+    Returns:
+        Indices of ``labels`` in descending order, with equally-labelled entries left
+        in their original relative order.
+    """
+    # Negating and stable-sorting gives descending order while keeping tied entries in
+    # their original order. The obvious `argsort(labels)[::-1]` is wrong twice over: it
+    # reverses tied runs, and numpy's default sort is unstable, so the order within a
+    # tie is unspecified and varies with array size. Ties are routine here — rank-based
+    # and batch-replicated acquisition scores produce them by construction — so this
+    # has to be deterministic.
+    return np.argsort(-labels, kind="stable")
+
+
 @dataclass(eq=False, unsafe_hash=False)
 class LabelledCandidates:
     """A collection of candidates paired with their labels.
@@ -140,11 +159,12 @@ class LabelledCandidates:
 
         Returns:
             A new LabelledCandidates object with candidates and labels sorted
-            by label values.
+            by label values. Equally-labelled candidates keep their original
+            relative order.
         """
-        sorted_indices = np.argsort(self.labels)
-        if not ascending:
-            sorted_indices = sorted_indices[::-1]
+        sorted_indices = (
+            np.argsort(self.labels, kind="stable") if ascending else _descending_order(self.labels)
+        )
         return LabelledCandidates(
             candidates=[self.candidates[i] for i in sorted_indices],
             labels=self.labels[sorted_indices],
@@ -197,9 +217,11 @@ class LabelledCandidates:
 
         Returns:
             New LabelledCandidates object containing the top k candidates sorted
-            by label values (highest first).
+            by label values (highest first). Ties are broken by position, so the
+            earliest-indexed of several equally-labelled candidates ranks higher.
+            ``k`` above the collection size returns every candidate.
         """
-        top_k_indices = self.labels.argsort()[::-1][:k]
+        top_k_indices = _descending_order(self.labels)[:k]
         top_k_candidates = [self.candidates[i] for i in top_k_indices]
         top_k_labels = self.labels[top_k_indices]
         return LabelledCandidates(candidates=top_k_candidates, labels=top_k_labels)
