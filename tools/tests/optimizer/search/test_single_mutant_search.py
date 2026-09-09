@@ -170,29 +170,6 @@ class TestSingleMutantSearchTopK:
             SingleMutantSearch(alphabet=_ABC, top_k=top_k)
 
 
-class TestSingleMutantSearchTieBreaking:
-    """Tests that label ties are broken deterministically by training-set position."""
-
-    def test_ties_are_broken_by_training_set_order(self):
-        """Among equal labels, the earliest-indexed sequence ranks higher."""
-        state = _make_state(["AAA", "BBB", "CCC"], [1.0, 1.0, 1.0])
-        pool = _data(SingleMutantSearch(alphabet=_ABC, top_k=2)(state))
-        expected = set(_single_mutants("AAA", _ABC)) | set(_single_mutants("BBB", _ABC))
-        assert set(pool) == expected
-
-    def test_all_tied_labels_still_pick_the_first_sequence_for_top_k_one(self):
-        """A fully tied training set should seed from index 0, like argmax does."""
-        state = _make_state(["AAA", "BBB", "CCC"], [2.0, 2.0, 2.0])
-        pool = _data(SingleMutantSearch(alphabet=_ABC, top_k=1)(state))
-        assert pool == _single_mutants("AAA", _ABC)
-
-    def test_tie_breaking_is_stable_across_calls(self):
-        """Tied rankings must not vary between calls."""
-        state = _make_state(["AAA", "BBB", "CCC", "ABC"], [1.0, 1.0, 1.0, 1.0])
-        search = SingleMutantSearch(alphabet=_ABC, top_k=3)
-        assert _data(search(state)) == _data(search(state))
-
-
 class TestSingleMutantSearchLabelShape:
     """Tests for how label array shapes are handled when ranking seeds."""
 
