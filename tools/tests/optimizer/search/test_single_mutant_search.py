@@ -16,7 +16,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
-from alf_core import Candidate, Modality
+from alf_core import Candidate, LabelledCandidates, Modality
 from alf_tools.optimizer.search.single_mutant_search import SingleMutantSearch
 
 # A tiny alphabet keeps the enumerated neighbourhoods small enough to assert on exactly.
@@ -27,7 +27,7 @@ def _make_state(sequences: list[str], labels: list[float]) -> SimpleNamespace:
     """Build a minimal stand-in state exposing only what SingleMutantSearch reads."""
     return SimpleNamespace(
         dataset=SimpleNamespace(
-            train_dataset=SimpleNamespace(
+            train_dataset=LabelledCandidates(
                 candidates=[Candidate(data=s, modality=Modality.SEQUENCE) for s in sequences],
                 labels=np.array(labels),
             )

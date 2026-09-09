@@ -15,7 +15,7 @@
 from typing import List
 
 import numpy as np
-from alf_core import Candidate, Modality, SearchProtocol, State
+from alf_core import Candidate, LabelledCandidates, Modality, SearchProtocol, State
 from alf_tools.utils.constants import PROTEIN_ALPHABET
 
 
@@ -49,7 +49,8 @@ class SingleMutantSearch(SearchProtocol):
     def __call__(self, state: State) -> List[Candidate]:
         """Apply the search protocol to return a pool of candidates.
 
-        Label ties are broken by training-set position, matching ``labels.argmax()``.
+        Seeds are ranked by ``LabelledCandidates.get_top_k``, which breaks label ties by
+        training-set position, so ``top_k=1`` selects the same seed as ``labels.argmax()``.
 
         Args:
             state: The task state containing the dataset and surrogate model.
@@ -63,38 +64,36 @@ class SingleMutantSearch(SearchProtocol):
                 than one meaningful dimension.
         """
         train_dataset = state.dataset.train_dataset
-        num_seeds = min(self.top_k, len(train_dataset.candidates))
-        if num_seeds == 0:
+        if len(train_dataset.candidates) == 0:
             raise ValueError(
                 "SingleMutantSearch requires at least one training candidate to mutate, "
                 "but state.dataset.train_dataset is empty."
             )
 
         labels = np.asarray(train_dataset.labels)
-        # Shape (n, 1) is a column vector of scalar labels, so squeeze it. Genuinely
-        # multi-output labels can't be ranked without a scalarisation, and argsort would
-        # return indices that don't line up with `candidates` — so fail instead.
+        # Shape (n, 1) is a column vector of scalar labels, so squeeze it before ranking.
+        # Genuinely multi-output labels can't be ranked without a scalarisation, and
+        # get_top_k would sort along the wrong axis and mis-select seeds, so fail instead.
         if labels.ndim > 1:
             squeezable = [axis for axis in range(1, labels.ndim) if labels.shape[axis] == 1]
-            labels = labels.reshape(labels.shape[0], -1).squeeze(axis=1) if squeezable else labels
-        if labels.ndim > 1:
-            raise ValueError(
-                f"SingleMutantSearch ranks training candidates by a single scalar label per "
-                f"candidate, but got labels with shape {np.asarray(train_dataset.labels).shape}. "
-                "Reduce multi-output labels to one objective (e.g. by scalarising them) before "
-                "using this search protocol."
+            if not squeezable:
+                raise ValueError(
+                    "SingleMutantSearch ranks training candidates by a single scalar label "
+                    f"per candidate, but got labels with shape {labels.shape}. Reduce "
+                    "multi-output labels to one objective (e.g. by scalarising them) before "
+                    "using this search protocol."
+                )
+            train_dataset = LabelledCandidates(
+                candidates=train_dataset.candidates,
+                labels=labels.reshape(labels.shape[0], -1).squeeze(axis=1),
             )
 
-        # Stable sort on negated labels keeps tied candidates in training-set order, so
-        # the top-1 seed is exactly `labels.argmax()`. Do not "simplify" to
-        # `argsort(labels)[::-1]`: it reverses tied runs, silently changing which seed
-        # `top_k=1` picks when the best label is duplicated.
-        ranked_indices = np.argsort(-labels, kind="stable")[:num_seeds]
+        seeds = train_dataset.get_top_k(self.top_k).candidates
 
         single_mutant_pool: List[Candidate] = []
         seen: set = set()
-        for index in ranked_indices:
-            seed_sequence = train_dataset.candidates[index].data
+        for seed in seeds:
+            seed_sequence = seed.data
             for i in range(len(seed_sequence)):
                 for character in self.alphabet:
                     if seed_sequence[i] == character:
