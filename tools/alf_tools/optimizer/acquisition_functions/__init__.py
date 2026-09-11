@@ -23,6 +23,7 @@ from alf_tools.optimizer.acquisition_functions.greedy import Greedy
 from alf_tools.optimizer.acquisition_functions.random_acquisition import RandomAcquisition
 from alf_tools.optimizer.acquisition_functions.thompson_sampling import ThompsonSampling
 from alf_tools.optimizer.acquisition_functions.ucb import UCB
+from alf_tools.optimizer.acquisition_functions.uncertainty_sampling import UncertaintySampling
 
 __all__ = [
     "BoTorchAcquisition",
@@ -34,4 +35,5 @@ __all__ = [
     "RandomAcquisition",
     "ThompsonSampling",
     "UCB",
+    "UncertaintySampling",
 ]
