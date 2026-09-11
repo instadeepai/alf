@@ -22,7 +22,7 @@ import pandas as pd
 from alf_core.dataclasses.candidate import Candidate
 
 
-def _descending_order(labels: np.ndarray) -> np.ndarray:
+def _stable_argsort_descending(labels: np.ndarray) -> np.ndarray:
     """Return indices ordering ``labels`` highest-first, breaking ties by position.
 
     Args:
@@ -158,7 +158,9 @@ class LabelledCandidates:
             label values, ties left in their original order.
         """
         sorted_indices = (
-            np.argsort(self.labels, kind="stable") if ascending else _descending_order(self.labels)
+            np.argsort(self.labels, kind="stable")
+            if ascending
+            else _stable_argsort_descending(self.labels)
         )
         return LabelledCandidates(
             candidates=[self.candidates[i] for i in sorted_indices],
@@ -215,7 +217,7 @@ class LabelledCandidates:
             by label values (highest first), ties broken by position. ``k`` above
             the collection size returns every candidate.
         """
-        top_k_indices = _descending_order(self.labels)[:k]
+        top_k_indices = _stable_argsort_descending(self.labels)[:k]
         top_k_candidates = [self.candidates[i] for i in top_k_indices]
         top_k_labels = self.labels[top_k_indices]
         return LabelledCandidates(candidates=top_k_candidates, labels=top_k_labels)
