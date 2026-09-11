@@ -23,10 +23,11 @@ class SingleMutantSearch(SearchProtocol):
     """Search protocol that enumerates single-point mutants of the top-K training sequences.
 
     For each of the ``top_k`` highest-labelled training sequences, every single-position
-    substitution over ``alphabet`` is enumerated. Seed neighbourhoods overlap, so the
-    union is deduplicated by sequence in generation order (not via set iteration) to keep
-    the pool deterministic. ``top_k=1``, the default, is a pure hill-climb on a single
-    neighbourhood; higher values keep several local optima under exploration at once.
+    substitution over ``alphabet`` is enumerated. Different seeds can produce the same
+    mutant, so duplicates are dropped while keeping the first one generated, which makes
+    the pool order deterministic. ``top_k=1``, the default, is a pure hill-climb on a
+    single neighbourhood; higher values keep several local optima under exploration at
+    once.
     """
 
     def __init__(self, alphabet: str = PROTEIN_ALPHABET, top_k: int = 1):
