@@ -1,34 +1,29 @@
 Element Substitution Search
 ===========================
 
-The materials-domain counterpart to :doc:`SMILES Mutation Search </api/alf_tools/optimizer/search/smiles_mutation_search/index>`:
-a search protocol that proposes novel crystals each round by making single-species swaps on the
-best-labelled training structures. Candidate swaps come from the Hautier et al. (2011) lambda
-table mined from the ICSD, so only substitutions with real precedent in known chemistry are
-proposed, and each parent is decorated with oxidation states by bond-valence analysis first.
-Charge balance is enforced during prediction: for rocksalt LiF this cuts 481 raw species maps
-down to 65.
+Element Substitution Search generates candidate crystals by swapping one element for another in
+the best-labelled training structures. Swaps are drawn from the Hautier et al. (2011)
+substitution table, data-mined from the ICSD, so only pairs with precedent in known chemistry
+are proposed, and only charge-balanced results are kept. Candidates are returned ordered by
+substitution probability, most plausible first, and anything already evaluated in the run is
+filtered out.
 
-Parent selection walks the *entire* label-descending ranking rather than taking a fixed top-k
-slice, because the aim is ``top_k`` **usable** parents. Oxidation-state decoration fails on
-exactly the structures the loop drives toward — bond-valence parameters are missing for Ac, Th
-and several other actinides, which a scoring model such as MACE rates happily — so undecorable
-structures accumulate at the top of the ranking. A parent counts toward the quota only if it
-contributed at least one novel child, which stops exhausted parents from ending the walk with
-most of the ranking unexamined.
+``allowed_elements`` lists the element symbols the oracle can score, and is required. The
+substitution table reaches further up the periodic table than most scoring models, and a
+candidate the oracle cannot score returns NaN, which propagates into the training labels and
+costs a round.
 
-``allowed_elements`` is required rather than optional: the lambda table covers 230 species
-including Am, Cm and Cf, while a model such as MACE-MPA-0 stops at Z=94. A child the oracle
-cannot score costs a whole round, since the resulting NaN reaches the training labels and the
-next surrogate fit is rejected.
+``top_k`` sets how many training structures are used as parents, counting only those that
+actually yield new candidates. Structures are tried in label order, skipping any that cannot be
+assigned oxidation states — bond-valence analysis has no parameters for some elements, notably
+several actinides — and any whose substitutions have all been proposed before. Such structures
+tend to cluster at the top of the ranking, so a fixed top-k slice would stall on them.
 
-Two limitations are worth knowing before reaching for this search. Species count is preserved —
-the lambda table maps one species onto another, so a binary parent yields binary children and the
-reachable space is bounded by the stoichiometries in the seed set. And the lattice is not
-relaxed: species are swapped onto the parent's fixed lattice, so bond lengths are the parent's
-and physically wrong for the new chemistry. The latter costs nothing when the downstream
-featurizer reduces a structure to its composition, but a structural featurizer would need volume
-rescaling or a relaxation first.
+Two limits are worth knowing. The number of distinct elements is preserved, so a binary parent
+gives binary children and the reachable space is bounded by the stoichiometries already present
+in the training set. And substitution reuses the parent's lattice without relaxing it, leaving
+bond lengths that are wrong for the new chemistry; this is harmless when the featuriser uses
+only composition, but a structural featuriser needs a volume rescaling or relaxation first.
 
 Requires the ``matbench`` extra, which supplies ``pymatgen``.
 
