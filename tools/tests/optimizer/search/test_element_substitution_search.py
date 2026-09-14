@@ -27,9 +27,12 @@ from alf_tools.optimizer.search.element_substitution_search import (
 )
 from pymatgen.core import Lattice, Structure
 
-# A generous allowlist covering the light main-group and 3d chemistry reachable from
-# the tiny rocksalt parents used below. Deliberately excludes the actinides and heavy
-# species the lambda table would otherwise happily propose.
+# Stands in for a real oracle's scoring range, which is narrower than the substitution
+# table's. pymatgen covers 230 species including Am, Cm and Cf, but scoring models stop
+# well short -- MACE-MPA-0 ends at Z=94 -- and a candidate the oracle cannot score returns
+# NaN that reaches the training labels. So this covers the light main-group and 3d
+# chemistry reachable from the rocksalt parents below, and excludes the heavy species the
+# table would otherwise happily propose.
 ALLOWED = frozenset({
     "H",
     "Li",

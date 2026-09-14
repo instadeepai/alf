@@ -19,11 +19,13 @@ assigned oxidation states — bond-valence analysis has no parameters for some e
 several actinides — and any whose substitutions have all been proposed before. Such structures
 tend to cluster at the top of the ranking, so a fixed top-k slice would stall on them.
 
-Two limits are worth knowing. The number of distinct elements is preserved, so a binary parent
-gives binary children and the reachable space is bounded by the stoichiometries already present
-in the training set. And substitution reuses the parent's lattice without relaxing it, leaving
-bond lengths that are wrong for the new chemistry; this is harmless when the featuriser uses
-only composition, but a structural featuriser needs a volume rescaling or relaxation first.
+Two limits are worth knowing:
+
+- The number of distinct elements is preserved, so a binary parent gives binary children and
+  the reachable space is bounded by the stoichiometries already present in the training set.
+- The parent's lattice is reused without relaxation, leaving bond lengths that are wrong for
+  the new chemistry. Harmless when the featuriser uses only composition, but a structural
+  featuriser needs a volume rescaling or relaxation first.
 
 Requires the ``matbench`` extra, which supplies ``pymatgen``.
 

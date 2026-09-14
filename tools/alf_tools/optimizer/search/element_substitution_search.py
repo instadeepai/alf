@@ -79,11 +79,14 @@ class ElementSubstitutionSearch(SearchProtocol):
     than top-ranked ones, so parents that cannot be assigned oxidation states or whose
     substitutions are exhausted are skipped instead of consuming the quota.
 
-    Two limits are worth knowing. The number of distinct elements is preserved, so a
-    binary parent yields binary children and the reachable space is bounded by the
-    stoichiometries already in the training set. And the parent's lattice is reused
-    without relaxation, which is harmless when the featuriser uses only composition but
-    leaves bond lengths wrong for a structural one.
+    Two limits are worth knowing:
+
+    - The number of distinct elements is preserved, so a binary parent yields binary
+      children and the reachable space is bounded by the stoichiometries already in the
+      training set.
+    - The parent's lattice is reused without relaxation, leaving bond lengths wrong for
+      the new chemistry. Harmless when the featuriser uses only composition, not for a
+      structural one.
     """
 
     def __init__(
