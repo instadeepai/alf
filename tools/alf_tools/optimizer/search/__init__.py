@@ -31,3 +31,18 @@ if _rdkit_available:
     from alf_tools.optimizer.search.smiles_mutation_search import SmilesMutationSearch
 
     __all__ += ["SmilesMutationSearch"]
+
+_pymatgen_available = False
+try:
+    import pymatgen as _pymatgen  # noqa: F401
+
+    _pymatgen_available = True
+except ImportError:
+    pass
+
+if _pymatgen_available:
+    from alf_tools.optimizer.search.element_substitution_search import (
+        ElementSubstitutionSearch,
+    )
+
+    __all__ += ["ElementSubstitutionSearch"]
