@@ -165,8 +165,7 @@ class TestElementSubstitutionSearch:
         """Overlapping neighbourhoods must not double-propose a shared child.
 
         LiF and NaCl both reach a large shared region of alkali-halide space, so
-        without claiming each identity as it is accepted the same formula would be
-        emitted by both parents.
+        without claiming each identity as it is accepted, both would emit it.
         """
         state = _make_state([_rocksalt("Li", "F"), _rocksalt("Na", "Cl", a=5.64)])
         formulas = _formulas(ElementSubstitutionSearch(allowed_elements=ALLOWED, top_k=2)(state))
@@ -236,9 +235,8 @@ class TestRankingWalk:
     def test_walks_past_an_undecorable_parent(self):
         """An undecorable top-ranked parent must not abort or empty the round.
 
-        Elemental fcc copper cannot be assigned valences by BVAnalyzer, but it
-        outranks the decorable LiF below it. A fixed top-1 slice would return
-        nothing; the walk must step past it.
+        BVAnalyzer cannot assign valences to elemental fcc copper, which outranks the
+        decorable LiF below it. A fixed top-1 slice would return nothing.
         """
         state = _make_state([_fcc_metal("Cu"), _rocksalt("Li", "F")], labels=[1.0, 0.5])
         candidates = ElementSubstitutionSearch(allowed_elements=ALLOWED, top_k=1)(state)
@@ -250,9 +248,8 @@ class TestRankingWalk:
     def test_exhausted_parent_does_not_consume_the_quota(self):
         """A parent that decorates but yields nothing novel must not count as usable.
 
-        This is the shard-killing bug: counting a parent merely for decorating
-        successfully lets exhausted parents satisfy `top_k`, stopping the walk early
-        with most of the ranking unexamined.
+        Counting it would let exhausted parents satisfy `top_k`, stopping the walk
+        early with most of the ranking unexamined.
         """
         # Rank an exhausted parent first: LiF decorates fine, but every one of its
         # children is pre-registered in validation, so it contributes nothing novel.
@@ -323,9 +320,8 @@ class TestOrderingAndCapping:
     def test_ordering_is_reproducible_across_processes(self):
         """Output order must survive a different PYTHONHASHSEED.
 
-        pymatgen's `composition_prediction` returns predictions in a hash-seed
-        dependent order, so this is the case the identity tie-break exists for. A
-        subprocess with an explicit, different seed must produce the same ordering.
+        This is the case the identity tie-break exists for: `composition_prediction`
+        returns predictions in a hash-seed dependent order.
         """
         script = (
             "import warnings; warnings.filterwarnings('ignore')\n"
@@ -354,24 +350,18 @@ class TestOrderingAndCapping:
     def test_probability_ties_are_broken_by_identity(self):
         """Equal-probability children must be ordered by identity string.
 
-        The tie-break has to make the order *total*, not merely stable: pymatgen
-        yields predictions in a process-dependent order, so a sort keyed on
-        probability alone would return tied children in whatever order they happened
-        to be generated. This drives the same tied pair in from both input orders and
-        requires the same output, which a stability-only sort cannot satisfy.
+        Feeding the same tied entries in from both input orders must give the same
+        output, which a stability-only sort (probability alone) cannot satisfy.
         """
         search = ElementSubstitutionSearch(allowed_elements=ALLOWED, top_k=1)
         parent = _rocksalt("Li", "F")
         scored = search._children_of(parent, set())
 
-        # Exact float ties are rare in the real table, so force one: flatten every
-        # probability to a single value. The identity tie-break in the production
-        # sort key is then the only thing that can determine the order.
+        # Exact float ties are rare in the real table, so force one by flattening every
+        # probability: the identity tie-break is then all that can fix the order.
         entries = [(1.0, identity, structure) for _, identity, structure in scored]
         assert len(entries) > 1
 
-        # Feeding the same entries in opposite input orders must give the same
-        # result. A stability-only sort (probability alone) would not.
         forward = [identity for _, identity, _ in sorted(entries, key=_ranking_key)]
         backward = [identity for _, identity, _ in sorted(entries[::-1], key=_ranking_key)]
         assert forward == backward
