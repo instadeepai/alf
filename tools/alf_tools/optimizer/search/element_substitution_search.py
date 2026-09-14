@@ -35,9 +35,9 @@ DEFAULT_SUBSTITUTION_THRESHOLD = 1e-3
 def _ranking_key(item: tuple[float, str, Structure]) -> tuple[float, str]:
     """Sort key ordering children by descending probability, then by identity.
 
-    The identity component makes the order *total* rather than merely stable:
-    pymatgen returns predictions in a hash-seed dependent order, so probability alone
-    would leave tied children ordered differently between processes.
+    The identity component makes the order total rather than merely stable: pymatgen's
+    prediction order is hash-seed dependent, so probability alone would order tied
+    children differently between processes.
 
     Args:
         item: A ``(probability, identity, structure)`` tuple.
@@ -52,12 +52,10 @@ def _ranking_key(item: tuple[float, str, Structure]) -> tuple[float, str]:
 def _identity(structure: Structure) -> str:
     """Return the deduplication identity of a structure.
 
-    The oxidation-state-stripped reduced formula, which lets a freshly decorated
-    child match an undecorated parent from a dataset such as Matbench. A
-    ``StructureMatcher`` would be more rigorous but is a pairwise geometric
-    comparison against the whole evaluated set every round; skipping it is safe
-    here because substitution never alters geometry, so same-formula candidates
-    are the same material rather than distinct polymorphs.
+    The oxidation-state-stripped reduced formula, so a freshly decorated child matches
+    an undecorated parent from a dataset such as Matbench. A geometric
+    ``StructureMatcher`` is unnecessary because substitution never alters geometry:
+    same-formula candidates are the same material, not distinct polymorphs.
 
     Args:
         structure: Structure to identify.
@@ -69,41 +67,23 @@ def _identity(structure: Structure) -> str:
 
 
 class ElementSubstitutionSearch(SearchProtocol):
-    """Search protocol that makes single-species swaps on the best-scoring crystals.
+    """Search protocol that swaps single elements in the best-labelled crystals.
 
-    The materials analogue of :class:`SmilesMutationSearch`: single-species swaps on a
-    crystal instead of single-character string edits, keeping only those the Hautier
-    et al. (2011) lambda table (Inorg. Chem. 50(2):656-663, mined from the ICSD) rates
-    as chemically plausible.
+    Parents are taken from the training structures in label order and one element is
+    swapped for another, using the Hautier et al. (2011) substitution table
+    (Inorg. Chem. 50(2):656-663, mined from the ICSD) to keep only swaps with precedent
+    in known chemistry. Children are charge-balanced, restricted to ``allowed_elements``,
+    deduplicated against everything already evaluated, and returned most-plausible first.
 
-    Each parent is decorated with oxidation states by bond-valence analysis, then
-    :meth:`SubstitutionPredictor.composition_prediction` runs *outward* from that
-    composition (``to_this_composition=False``). The direction matters: the
-    alternative, ``Substitutor.pred_from_structures``, is a retrieval API needing the
-    target chemistry up front -- backwards when not knowing the target chemistry is the
-    whole problem -- and it silently returns an empty list for an undecorated parent.
-    ``composition_prediction`` also applies the charge-balance filter itself (for
-    rocksalt LiF, 481 raw species maps down to 65).
+    ``top_k`` counts *usable* parents -- those yielding at least one new child -- rather
+    than top-ranked ones, so parents that cannot be assigned oxidation states or whose
+    substitutions are exhausted are skipped instead of consuming the quota.
 
-    Parent selection walks the *entire* label-descending ranking rather than a fixed
-    top-k slice, because the goal is ``top_k`` **usable** parents. Decoration fails on
-    exactly the structures the loop drives toward: ``BVAnalyzer`` lacks bond-valence
-    parameters for Ac, Th and several other actinides, which a model such as MACE rates
-    happily, so they accumulate at the top of the ranking. A parent counts as usable
-    only if it contributed at least one novel child; counting it for merely decorating
-    lets exhausted parents satisfy the quota and stop the walk early.
-
-    Limitations:
-
-    - **Species count is preserved.** The lambda table maps one species onto another, so
-      a binary parent yields binary children. The reachable space is bounded by the
-      stoichiometries in the initial training set: this search can never introduce a
-      ternary if the seed set holds only binaries.
-    - **The lattice is not relaxed.** Species are swapped onto the parent's fixed
-      lattice, so bond lengths are the parent's and physically wrong for the new
-      chemistry. This costs nothing when the downstream featurizer reduces a structure
-      to its composition, but a structural featurizer would need volume rescaling
-      (e.g. ``DLSVolumePredictor``) or a relaxation first.
+    Two limits are worth knowing. The number of distinct elements is preserved, so a
+    binary parent yields binary children and the reachable space is bounded by the
+    stoichiometries already in the training set. And the parent's lattice is reused
+    without relaxation, which is harmless when the featuriser uses only composition but
+    leaves bond lengths wrong for a structural one.
     """
 
     def __init__(
@@ -117,11 +97,10 @@ class ElementSubstitutionSearch(SearchProtocol):
 
         Args:
             allowed_elements: Element symbols the downstream oracle can score; children
-                using anything else are discarded. Required, not optional hygiene: the
-                lambda table covers 230 species including Am, Cm and Cf, while a model
-                such as MACE-MPA-0 stops at Z=94, and an unscoreable child costs a whole
-                round (the oracle returns NaN, the NaN reaches the training labels, and
-                the next surrogate fit is rejected).
+                using anything else are discarded. Required: the substitution table
+                reaches further up the periodic table than most scoring models, and an
+                unscoreable child returns NaN, which reaches the training labels and
+                costs the round.
             threshold: Minimum lambda-table probability for a substitution to be
                 considered plausible.
             top_k: Number of *usable* parents to draw children from each round. A parent
@@ -137,14 +116,13 @@ class ElementSubstitutionSearch(SearchProtocol):
 
     @property
     def predictor(self) -> SubstitutionPredictor:
-        """The lambda-table substitution predictor, constructed lazily and reused.
-
-        Constructing the predictor parses the lambda table and precomputes a 230x230
-        species normalisation, so it is built once and shared across rounds.
+        """The substitution table predictor, built lazily and reused.
 
         Returns:
             The cached :class:`SubstitutionPredictor`.
         """
+        # Construction parses the table and precomputes a 230x230 species
+        # normalisation, so build once and share across rounds.
         if self._predictor is None:
             self._predictor = SubstitutionPredictor(threshold=self.threshold)
         return self._predictor
@@ -165,21 +143,25 @@ class ElementSubstitutionSearch(SearchProtocol):
 
         Args:
             parent: Parent structure to substitute species on.
-            seen: Identities already evaluated or already accepted this round. Mutated
-                in place as children are accepted, so two parents cannot both propose
-                the same child in one round.
+            seen: Identities already evaluated or accepted this round. Mutated in place,
+                so two parents cannot both propose the same child.
 
         Returns:
             List of ``(probability, identity, structure)`` tuples for accepted children.
 
         Raises:
-            ValueError: If oxidation-state decoration of the parent fails. Bond-valence
-                analysis raises for metallic elements and for anything lacking BV
-                parameters.
+            ValueError: If oxidation-state decoration of the parent fails.
         """
-        # Raises for undecorable parents (metals, actinides without BV parameters); the
-        # caller records the failure and walks on to the next parent in the ranking.
+        # Bond-valence analysis raises for metals and anything lacking BV parameters
+        # (notably several actinides); the caller records it and walks on.
         decorated = AutoOxiStateDecorationTransformation().apply_transformation(parent)
+
+        # Predict *outward* from the parent (`to_this_composition=False`). The
+        # alternative, `Substitutor.pred_from_structures`, is a retrieval API needing the
+        # target chemistry up front -- backwards here, where not knowing the target
+        # chemistry is the whole problem -- and it silently returns an empty list for an
+        # undecorated parent. This call also applies the charge-balance filter itself
+        # (for rocksalt LiF, 481 raw species maps down to 65).
         predictions = self.predictor.composition_prediction(
             decorated.composition, to_this_composition=False
         )
@@ -217,19 +199,18 @@ class ElementSubstitutionSearch(SearchProtocol):
         return children
 
     def __call__(self, state: State) -> List[Candidate]:
-        """Generate novel, charge-balanced single-species substitutions of top parents.
+        """Generate novel, charge-balanced single-element substitutions of top parents.
 
         Args:
             state: The task state containing the dataset and surrogate model.
 
         Returns:
-            A list of candidates holding serialized structures, sorted by descending
-            substitution probability and truncated to ``max_candidates``.
+            Candidates holding serialized structures, most plausible first and truncated
+            to ``max_candidates``.
 
         Raises:
-            ValueError: If the training set is empty, or if no parent in the entire
-                ranking yielded a novel child. The per-parent outcomes are attached to
-                the error so the round's failure is legible.
+            ValueError: If the training set is empty, or if no parent yielded a novel
+                child. The per-parent outcomes are attached so the failure is legible.
         """
         train_dataset = state.dataset.train_dataset
         if len(train_dataset.candidates) == 0:
@@ -246,9 +227,9 @@ class ElementSubstitutionSearch(SearchProtocol):
         failures: list[str] = []
         usable_parents = 0
 
-        # pymatgen's valence analysis and transformations warn liberally and a good
-        # fraction of parents trigger them. Suppress only inside the generation block:
-        # a global filter would silence warnings for any other code sharing the process.
+        # pymatgen's valence analysis and transformations warn liberally. Suppress only
+        # inside the generation block: a global filter would silence warnings for any
+        # other code sharing the process.
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
 
