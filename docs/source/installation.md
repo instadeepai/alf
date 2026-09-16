@@ -35,7 +35,7 @@ umbrella:
 | `esmfold` | `transformers`, `accelerate` | `ESMFoldModel` |
 | `chemprop` | `chemprop` | `ChempropModel` |
 | `guacamol` | `rdkit` | GuacaMol dataset/scoring, `GuacaMolOracle`, `SmilesMutationSearch` |
-| `matbench` | `matbench`, `pymatgen` | Matbench dataset |
+| `matbench` | `matbench`, `pymatgen` | Matbench dataset, `ElementSubstitutionSearch` |
 | `protein` | `esm2` + `esmfold` | protein workflow |
 | `molecule` | `chemprop` + `guacamol` | small-molecule workflow |
 | `materials` | `matbench` | materials workflow |
