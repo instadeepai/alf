@@ -16,7 +16,7 @@
 
 > ⚠️ **Please note:** this is a beta release, the main release will follow shortly.
 
-**ALF** is an active learning framework for optimising expensive, high-dimensional search spaces in computational science — settings where every label costs a wet-lab experiment, a physical measurement, or a long simulation, and the candidate space (protein sequences, small molecules, materials) is far too large to screen exhaustively. It runs the full loop of search, surrogate modelling, and acquisition through modular components you can swap independently.
+**ALF** is an active learning framework for optimising expensive, high-dimensional search spaces in computational science — settings where every label costs a wet-lab experiment, a physical measurement, or a long simulation, and the candidate space (protein sequences, small molecules, materials) is far too large to screen exhaustively. It runs the full loop of search, surrogate modelling, and acquisition through modular components you can swap independently. The framework is described in our paper, [*ALF: An Active Learning Framework for Scientific Discovery*](https://arxiv.org/abs/2609.31197).
 
 <div align="center">
   <img src="docs/imgs/alf_main_figure.png" alt="ALF active-learning loop overview" width="70%">
