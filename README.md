@@ -8,6 +8,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://instadeepai.github.io/alf/)
+[![arXiv](https://img.shields.io/badge/arXiv-2609.31197-b31b1b.svg)](https://arxiv.org/abs/2609.31197)
 [![Core Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/surana01/114eb5680493468e40f5a528c08f1888/raw/alf-core-coverage.json)](https://github.com/instadeepai/alf/tree/main/core)
 [![Tools Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/surana01/25ce4b64d5b9cda177203366146f5bf0/raw/alf-tools-coverage.json)](https://github.com/instadeepai/alf/tree/main/tools)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
@@ -33,6 +34,7 @@ In scientific discovery, the bottleneck is rarely compute—it's the **experimen
 
 - 📥 [Installation Guide](https://instadeepai.github.io/alf/installation.html)
 - 🛠️ [Contributing Guide](docs/CONTRIBUTING.md)
+- 📄 [Paper](https://arxiv.org/abs/2609.31197) — *ALF: An Active Learning Framework for Scientific Discovery* (arXiv:2609.31197)
 
 ## 📦 Package Architecture
 
@@ -184,6 +186,21 @@ See [core/README.md](core/README.md) and [tools/README.md](tools/README.md) for 
 uv sync --group docs
 uv run sphinx-build -b html docs/source docs/build/html
 open docs/build/html/index.html  # macOS
+```
+
+## 📝 Citation
+
+If you use ALF in your research, please cite:
+
+```bibtex
+@article{surana2026alf,
+  title   = {ALF: An Active Learning Framework for Scientific Discovery},
+  author  = {Surana, Shikha and Hawkins-Hooker, Alex and Gallup, Olivia and
+             Brunken, Christoph and Tilly, Jules and Duckworth, Paul},
+  journal = {arXiv preprint arXiv:2609.31197},
+  year    = {2026},
+  url     = {https://arxiv.org/abs/2609.31197}
+}
 ```
 
 ## 📄 License

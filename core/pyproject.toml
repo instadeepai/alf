@@ -34,6 +34,7 @@ dependencies = [
 Homepage = "https://instadeepai.github.io/alf/"
 Repository = "https://github.com/instadeepai/alf"
 Documentation = "https://instadeepai.github.io/alf/"
+Paper = "https://arxiv.org/abs/2609.31197"
 "Bug Tracker" = "https://github.com/instadeepai/alf/issues"
 
 [tool.setuptools.packages.find]
