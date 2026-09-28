@@ -65,10 +65,12 @@ esmfold = ["alf_tools[esmfold]"]
 chemprop = ["alf_tools[chemprop]"]
 mlip = ["alf_tools[mlip]"]
 mlip-cuda13 = ["alf_tools[mlip-cuda13]"]
+matbench = ["alf_tools[matbench]"]
 
 # Workflow umbrellas (mirror the alf_tools extras of the same name).
 protein = ["alf_tools[protein]"]
 molecule = ["alf_tools[molecule]"]
+materials = ["alf_tools[materials]"]
 
 # Dependencies for the benchmark_examples/ taster scripts: plotting + ESM2 (transformers).
 benchmark = [
@@ -78,6 +80,16 @@ benchmark = [
 
 [tool.uv]
 default-groups = ["dev"]
+# matbench (PyPI 0.6) hard-pins matminer==0.7.4, scipy==1.7.3, monty==2022.4.26,
+# and scikit-learn==1.0.1, none of which build on Python 3.12 (they pull an old
+# numpy that needs the removed `distutils`). Override with modern, compatible
+# versions — matbench itself only uses stable, long-unchanged parts of their APIs.
+override-dependencies = [
+    "matminer>=0.9",
+    "scipy>=1.11",
+    "monty>=2024.1.1",
+    "scikit-learn>=1.3",
+]
 
 [tool.setuptools]
 packages = []  # No Python packages at root level - just a meta-package

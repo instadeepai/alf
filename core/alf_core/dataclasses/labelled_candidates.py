@@ -22,6 +22,21 @@ import pandas as pd
 from alf_core.dataclasses.candidate import Candidate
 
 
+def _stable_argsort_descending(labels: np.ndarray) -> np.ndarray:
+    """Return indices ordering ``labels`` highest-first, breaking ties by position.
+
+    Args:
+        labels: One label per candidate.
+
+    Returns:
+        Indices of ``labels`` in descending order, ties in original order.
+    """
+    # Not `argsort(labels)[::-1]`: that reverses tied runs, and numpy's default sort is
+    # unstable so tie order varies with array size. Ties are routine — rank-based and
+    # batch-replicated acquisition scores produce them by construction.
+    return np.argsort(-labels, kind="stable")
+
+
 @dataclass(eq=False, unsafe_hash=False)
 class LabelledCandidates:
     """A collection of candidates paired with their labels.
@@ -139,12 +154,14 @@ class LabelledCandidates:
                 Defaults to True.
 
         Returns:
-            A new LabelledCandidates object with candidates and labels sorted
-            by label values.
+            A new LabelledCandidates object with candidates and labels sorted by
+            label values, ties left in their original order.
         """
-        sorted_indices = np.argsort(self.labels)
-        if not ascending:
-            sorted_indices = sorted_indices[::-1]
+        sorted_indices = (
+            np.argsort(self.labels, kind="stable")
+            if ascending
+            else _stable_argsort_descending(self.labels)
+        )
         return LabelledCandidates(
             candidates=[self.candidates[i] for i in sorted_indices],
             labels=self.labels[sorted_indices],
@@ -197,9 +214,10 @@ class LabelledCandidates:
 
         Returns:
             New LabelledCandidates object containing the top k candidates sorted
-            by label values (highest first).
+            by label values (highest first), ties broken by position. ``k`` above
+            the collection size returns every candidate.
         """
-        top_k_indices = self.labels.argsort()[::-1][:k]
+        top_k_indices = _stable_argsort_descending(self.labels)[:k]
         top_k_candidates = [self.candidates[i] for i in top_k_indices]
         top_k_labels = self.labels[top_k_indices]
         return LabelledCandidates(candidates=top_k_candidates, labels=top_k_labels)
