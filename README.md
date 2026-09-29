@@ -1,19 +1,20 @@
 <div align="center">
-  <img src="docs/imgs/alf_cover_gradient.png" alt="ALF cover" width="100%">
+  <img src="docs/imgs/alf_cover.svg" alt="ALF cover" width="50%">
 </div>
+
+# Active Learning Framework for Scientific Discovery
 
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://instadeepai.github.io/alf/)
+[![arXiv](https://img.shields.io/badge/arXiv-2609.31197-b31b1b.svg)](https://arxiv.org/abs/2609.31197)
 [![Core Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/surana01/114eb5680493468e40f5a528c08f1888/raw/alf-core-coverage.json)](https://github.com/instadeepai/alf/tree/main/core)
 [![Tools Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/surana01/25ce4b64d5b9cda177203366146f5bf0/raw/alf-tools-coverage.json)](https://github.com/instadeepai/alf/tree/main/tools)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 [![Tests and Linters 🧪](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml/badge.svg?branch=main)](https://github.com/instadeepai/alf/actions/workflows/tests_and_linters.yaml)
 
-> ⚠️ **Please note:** this is a beta release, the main release will follow shortly.
-
-**ALF** is an active learning framework for optimising expensive, high-dimensional search spaces in computational science — settings where every label costs a wet-lab experiment, a physical measurement, or a long simulation, and the candidate space (protein sequences, small molecules, materials) is far too large to screen exhaustively. It runs the full loop of search, surrogate modelling, and acquisition through modular components you can swap independently.
+**ALF** is an active learning framework for optimising expensive, high-dimensional search spaces in computational science — settings where every label costs a wet-lab experiment, a physical measurement, or a long simulation, and the candidate space (protein sequences, small molecules, materials) is far too large to screen exhaustively. It runs the full loop of search, surrogate modelling, and acquisition through modular components you can swap independently. The framework is described in our paper, [*ALF: An Active Learning Framework for Scientific Discovery*](https://arxiv.org/abs/2609.31197).
 
 <div align="center">
   <img src="docs/imgs/alf_main_figure.png" alt="ALF active-learning loop overview" width="70%">
@@ -31,6 +32,7 @@ In scientific discovery, the bottleneck is rarely compute—it's the **experimen
 
 - 📥 [Installation Guide](https://instadeepai.github.io/alf/installation.html)
 - 🛠️ [Contributing Guide](docs/CONTRIBUTING.md)
+- 📄 [Paper](https://arxiv.org/abs/2609.31197) — *ALF: An Active Learning Framework for Scientific Discovery* (arXiv:2609.31197)
 
 ## 📦 Package Architecture
 
@@ -182,6 +184,21 @@ See [core/README.md](core/README.md) and [tools/README.md](tools/README.md) for 
 uv sync --group docs
 uv run sphinx-build -b html docs/source docs/build/html
 open docs/build/html/index.html  # macOS
+```
+
+## 📝 Citation
+
+If you use ALF in your research, please cite:
+
+```bibtex
+@article{surana2026alf,
+  title   = {ALF: An Active Learning Framework for Scientific Discovery},
+  author  = {Surana, Shikha and Hawkins-Hooker, Alex and Gallup, Olivia and
+             Brunken, Christoph and Tilly, Jules and Duckworth, Paul},
+  journal = {arXiv preprint arXiv:2609.31197},
+  year    = {2026},
+  url     = {https://arxiv.org/abs/2609.31197}
+}
 ```
 
 ## 📄 License

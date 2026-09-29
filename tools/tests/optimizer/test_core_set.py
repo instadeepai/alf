@@ -91,6 +91,17 @@ class EmbeddingModel(_BaseTestModel):
         indices = [int(c.data.split("_")[1]) for c in candidates]
         return self._embeddings[indices]
 
+    def embed(self, inputs: LabelledCandidates | list[Candidate]) -> np.ndarray:
+        """Opt in to embedding-based acquisition by delegating to featurise().
+
+        Args:
+            inputs: Candidates to embed.
+
+        Returns:
+            Embedding array of shape (n, d), same as featurise().
+        """
+        return self.featurise(inputs)
+
 
 class MockDataset(BaseDataset):
     """Minimal dataset subclass exposing only train_dataset for testing."""
@@ -259,6 +270,9 @@ class TestCoreSet:
                 n = len(inputs) if isinstance(inputs, list) else len(inputs.candidates)
                 return np.ones(n)  # 1-D, not 2-D
 
+            def embed(self, inputs: LabelledCandidates | list[Candidate]) -> np.ndarray:
+                return self.featurise(inputs)
+
         dataset = MockDataset(train_candidates=[], train_labels=np.zeros(0))
         surrogate = Surrogate(model=FlatModel())
         state = State(dataset=dataset, surrogate=surrogate, acq_batch_size=1)
@@ -272,6 +286,9 @@ class TestCoreSet:
         class NoneModel(_BaseTestModel):
             def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> None:
                 return None
+
+            def embed(self, inputs: LabelledCandidates | list[Candidate]) -> None:
+                return self.featurise(inputs)
 
         dataset = MockDataset(train_candidates=[], train_labels=np.zeros(0))
         surrogate = Surrogate(model=NoneModel())
@@ -309,6 +326,81 @@ class TestCoreSet:
         assert result.labels[expected_best] == pytest.approx(1.0)
         assert all(result.labels[i] == 0.0 for i in range(n_cands) if i != expected_best)
 
+    def test_embed_returning_dict_raises_clear_value_error(self) -> None:
+        """A model whose embed() returns raw tokenized inputs (e.g. one that mistakenly
+        delegates to a featurise() like ESM2Model's) raises a clear ValueError naming the
+        dict mismatch, instead of collapsing to a confusing 0-d shape error.
+        """
+
+        class TokenizingModel(_BaseTestModel):
+            def featurise(
+                self, inputs: LabelledCandidates | list[Candidate]
+            ) -> dict[str, torch.Tensor]:
+                n = len(inputs) if isinstance(inputs, list) else len(inputs.candidates)
+                return {"input_ids": torch.zeros(n, 4), "attention_mask": torch.ones(n, 4)}
+
+            def embed(
+                self, inputs: LabelledCandidates | list[Candidate]
+            ) -> dict[str, torch.Tensor]:
+                return self.featurise(inputs)
+
+        dataset = MockDataset(train_candidates=[], train_labels=np.zeros(0))
+        surrogate = Surrogate(model=TokenizingModel())
+        state = State(dataset=dataset, surrogate=surrogate, acq_batch_size=1)
+        cands = [Candidate(data="x", modality="sequence")]
+        with pytest.raises(ValueError, match="dict"):
+            CoreSet()(cands, state)
+
+    def test_model_without_embed_override_raises_not_implemented_error(self) -> None:
+        """A model that only implements featurise() and never opts in via embed()
+        fails fast with NotImplementedError instead of silently using featurise() output.
+        """
+
+        class FeaturiseOnlyModel(_BaseTestModel):
+            def featurise(self, inputs: LabelledCandidates | list[Candidate]) -> np.ndarray:
+                n = len(inputs) if isinstance(inputs, list) else len(inputs.candidates)
+                return np.ones((n, 2))
+
+        dataset = MockDataset(train_candidates=[], train_labels=np.zeros(0))
+        surrogate = Surrogate(model=FeaturiseOnlyModel())
+        state = State(dataset=dataset, surrogate=surrogate, acq_batch_size=1)
+        cands = [Candidate(data="x", modality="sequence")]
+        with pytest.raises(NotImplementedError, match="does not implement embed"):
+            CoreSet()(cands, state)
+
+    def test_model_with_embed_override_uses_embed_not_featurise(self) -> None:
+        """A model like ESM2Model, whose featurise() returns tokenized inputs but whose
+        embed() returns proper embeddings, is scored correctly by CoreSet via embed().
+        """
+
+        class TokenizingModelWithEmbed(_BaseTestModel):
+            def __init__(self, embeddings: np.ndarray) -> None:
+                self._embeddings = embeddings
+
+            def featurise(
+                self, inputs: LabelledCandidates | list[Candidate]
+            ) -> dict[str, torch.Tensor]:
+                n = len(inputs) if isinstance(inputs, list) else len(inputs.candidates)
+                return {"input_ids": torch.zeros(n, 4), "attention_mask": torch.ones(n, 4)}
+
+            def embed(self, inputs: LabelledCandidates | list[Candidate]) -> np.ndarray:
+                candidates = inputs if isinstance(inputs, list) else inputs.candidates
+                indices = [int(c.data.split("_")[1]) for c in candidates]
+                return self._embeddings[indices]
+
+        embeddings = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 3.0]], dtype=np.float32)
+        train_cands = [Candidate(data="emb_0", modality="sequence")]
+        search_cands = [
+            Candidate(data="emb_1", modality="sequence"),
+            Candidate(data="emb_2", modality="sequence"),
+        ]
+        dataset = MockDataset(train_candidates=train_cands, train_labels=np.zeros(1))
+        surrogate = Surrogate(model=TokenizingModelWithEmbed(embeddings))
+        state = State(dataset=dataset, surrogate=surrogate, acq_batch_size=1)
+        result = CoreSet()(search_cands, state)
+        # emb_2 at (0, 3) is farther from training point (0, 0) than emb_1 at (1, 0)
+        assert result.labels[1] > result.labels[0]
+
     def test_featurise_returning_torch_tensor_produces_correct_scores(self) -> None:
         """_to_numpy correctly handles a torch.Tensor returned by featurise."""
 
@@ -320,6 +412,9 @@ class TestCoreSet:
                 candidates = inputs if isinstance(inputs, list) else inputs.candidates
                 indices = [int(c.data.split("_")[1]) for c in candidates]
                 return torch.tensor(self._embeddings[indices])
+
+            def embed(self, inputs: LabelledCandidates | list[Candidate]) -> "torch.Tensor":
+                return self.featurise(inputs)
 
         embeddings = np.array([[0.0, 0.0], [1.0, 0.0], [0.0, 3.0]], dtype=np.float32)
         train_cands = [Candidate(data="emb_0", modality="sequence")]

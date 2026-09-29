@@ -593,3 +593,84 @@ class TestLabelledCandidatesEquality:
         lc1_shuffled = lc1.shuffle(seed=42)
         lc2_shuffled = lc2.shuffle(seed=42)
         assert lc1_shuffled == lc2_shuffled  # Same shuffle seed produces equal results
+
+
+def _lc(labels: list[float]) -> LabelledCandidates:
+    """Build a collection whose candidate data records each label's original index."""
+    return LabelledCandidates(
+        candidates=[
+            Candidate(data=f"c{i}", modality=Modality.SEQUENCE) for i in range(len(labels))
+        ],
+        labels=np.array(labels),
+    )
+
+
+class TestGetTopK:
+    """Test cases for get_top_k, including its tie-breaking contract."""
+
+    def test_returns_k_highest_labelled_candidates_highest_first(self):
+        """Top k should be ordered by descending label."""
+        top = _lc([0.1, 0.9, 0.5, 0.7]).get_top_k(3)
+        assert [c.data for c in top.candidates] == ["c1", "c3", "c2"]
+        np.testing.assert_array_equal(top.labels, np.array([0.9, 0.7, 0.5]))
+
+    def test_ties_are_broken_by_position(self):
+        """Among equal labels the earliest-indexed candidate ranks higher."""
+        top = _lc([1.0, 1.0, 1.0]).get_top_k(2)
+        assert [c.data for c in top.candidates] == ["c0", "c1"]
+
+    def test_top_one_of_tied_best_matches_argmax(self):
+        """get_top_k(1) must agree with argmax when the best label is duplicated."""
+        labels = [1.0, 3.0, 2.0, 3.0]
+        top = _lc(labels).get_top_k(1)
+        assert top.candidates[0].data == f"c{int(np.array(labels).argmax())}"
+
+    @pytest.mark.parametrize("size", [8, 40, 2000])
+    def test_tie_order_does_not_depend_on_collection_size(self, size):
+        """A fully tied collection must always yield the earliest indices.
+
+        numpy's default sort is unstable, so the pre-fix implementation returned a
+        size-dependent, effectively arbitrary subset here.
+        """
+        top = _lc([1.0] * size).get_top_k(3)
+        assert [c.data for c in top.candidates] == ["c0", "c1", "c2"]
+
+    def test_integer_labels_tie_deterministically(self):
+        """Rank-based acquisition scores are integers and tie by construction."""
+        top = LabelledCandidates(
+            candidates=[Candidate(data=f"c{i}", modality=Modality.SEQUENCE) for i in range(5)],
+            labels=np.array([3, 5, 5, 1, 5]),
+        ).get_top_k(3)
+        assert [c.data for c in top.candidates] == ["c1", "c2", "c4"]
+
+    def test_repeated_calls_are_identical(self):
+        """Selection must be reproducible across calls."""
+        collection = _lc([2.0, 2.0, 2.0, 1.0])
+        first = [c.data for c in collection.get_top_k(2).candidates]
+        assert first == [c.data for c in collection.get_top_k(2).candidates]
+
+    def test_k_above_size_returns_everything(self):
+        """K larger than the collection should not crash or pad."""
+        top = _lc([0.2, 0.8]).get_top_k(10)
+        assert [c.data for c in top.candidates] == ["c1", "c0"]
+
+    def test_does_not_mutate_the_original(self):
+        """get_top_k should return a new collection, leaving the receiver untouched."""
+        collection = _lc([0.1, 0.9])
+        collection.get_top_k(1)
+        np.testing.assert_array_equal(collection.labels, np.array([0.1, 0.9]))
+        assert [c.data for c in collection.candidates] == ["c0", "c1"]
+
+
+class TestSortTieBreaking:
+    """Test cases for sort's tie-breaking contract."""
+
+    def test_descending_sort_keeps_ties_in_original_order(self):
+        """Descending sort must not reverse tied runs."""
+        result = _lc([1.0, 2.0, 2.0, 0.5]).sort(ascending=False)
+        assert [c.data for c in result.candidates] == ["c1", "c2", "c0", "c3"]
+
+    def test_ascending_sort_keeps_ties_in_original_order(self):
+        """Ascending sort must preserve original order within ties."""
+        result = _lc([2.0, 1.0, 1.0]).sort(ascending=True)
+        assert [c.data for c in result.candidates] == ["c1", "c2", "c0"]

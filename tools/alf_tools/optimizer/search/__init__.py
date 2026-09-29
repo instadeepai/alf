@@ -18,3 +18,31 @@ from alf_tools.optimizer.search.botorch_continuous_search import (
 from alf_tools.optimizer.search.single_mutant_search import SingleMutantSearch
 
 __all__ = ["BotorchContinuousSearch", "SingleMutantSearch"]
+
+_rdkit_available = False
+try:
+    import rdkit as _rdkit  # noqa: F401
+
+    _rdkit_available = True
+except ImportError:
+    pass
+
+if _rdkit_available:
+    from alf_tools.optimizer.search.smiles_mutation_search import SmilesMutationSearch
+
+    __all__ += ["SmilesMutationSearch"]
+
+_pymatgen_available = False
+try:
+    import pymatgen as _pymatgen  # noqa: F401
+
+    _pymatgen_available = True
+except ImportError:
+    pass
+
+if _pymatgen_available:
+    from alf_tools.optimizer.search.element_substitution_search import (
+        ElementSubstitutionSearch,
+    )
+
+    __all__ += ["ElementSubstitutionSearch"]

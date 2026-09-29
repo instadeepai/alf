@@ -1,5 +1,44 @@
 # Changelog
 
+## Release 0.1.0
+
+### Added
+
+- `RandomAcquisition` and `UncertaintySampling` acquisition functions, giving a
+  random baseline and a pure-exploration strategy.
+- `Matbench` dataset and `Modality.MATERIALS`, behind a new optional
+  `matbench`/`materials` extra.
+- `SmilesMutationSearch` and `ElementSubstitutionSearch`, search protocols that
+  propose novel molecules and crystals each round.
+- `GuacaMolOracle`, for scoring arbitrary SMILES in online loops.
+- `top_k` on `SingleMutantSearch`, to seed mutants from more than just the
+  single best sequence.
+- `BaseModel.embed()` and `Surrogate.embed()`, giving embeddings a contract
+  separate from `featurise()`.
+
+### Changed
+
+- **`CoreSet` now calls `embed()` instead of `featurise()`.** `BaseModel.embed()`
+  raises `NotImplementedError` by default, so a custom model that relied on
+  `featurise()` returning a 2-D embedding must now override `embed()` —
+  `return self.featurise(inputs)` restores the previous behaviour.
+- **Tied labels in `LabelledCandidates.get_top_k` and `sort` now break by
+  position**, rather than in an unspecified order that varied with array size.
+  Ties are routine, so benchmark numbers may shift and reference results may
+  need regenerating.
+- **`SingleMutantSearch` now deduplicates its proposals**, so the pool it
+  returns can be smaller than before. It also rejects empty training sets and
+  multi-output labels instead of silently mis-selecting.
+- `chemprop` is capped below 2.3.0, and `uv` overrides raise the `matminer`,
+  `scipy`, `monty` and `scikit-learn` floors workspace-wide.
+
+### Fixed
+
+- `one_hot_encode()` pads variable-length batches instead of raising
+  `IndexError`.
+- `BoTorchAcquisition` featurises candidates, fixing GP models whose
+  `Candidate.data` is not already numeric.
+
 ## Release 0.1.0b0
 
 - Released ALF as beta version under the Apache 2.0 license. First stable release

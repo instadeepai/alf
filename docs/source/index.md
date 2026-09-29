@@ -28,6 +28,23 @@ modular, swappable components so you can change any one part without rewriting t
 
 → See [Why ALF?](explanation/why-alf.md) for the full motivation and design rationale.
 
+## 📄 Paper
+
+ALF is described in [*ALF: An Active Learning Framework for Scientific
+Discovery*](https://arxiv.org/abs/2609.31197) (arXiv:2609.31197). If you use ALF in your
+research, please cite it:
+
+```bibtex
+@article{surana2026alf,
+  title   = {ALF: An Active Learning Framework for Scientific Discovery},
+  author  = {Surana, Shikha and Hawkins-Hooker, Alex and Gallup, Olivia and
+             Brunken, Christoph and Tilly, Jules and Duckworth, Paul},
+  journal = {arXiv preprint arXiv:2609.31197},
+  year    = {2026},
+  url     = {https://arxiv.org/abs/2609.31197}
+}
+```
+
 ## 🗺️ Start here
 
 ::::{grid} 1 2 2 2

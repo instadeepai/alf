@@ -24,8 +24,11 @@ Key Functionality:
     - One-hot encoding of sequences with configurable output shape
 
 Note:
-    All sequences in a batch must have the same length for one-hot encoding.
-    Characters not present in the alphabet will raise a ValueError.
+    Sequences in a batch may have different lengths. Shorter sequences are
+    zero-padded (on the right) to the length of the longest sequence in the
+    batch when one-hot encoding; padded positions have no bit set in any
+    amino acid channel. Characters not present in the alphabet will raise a
+    ValueError.
 """
 
 from typing import Literal, Union, overload
@@ -98,6 +101,11 @@ def one_hot_encode(
 ):
     """One-hot encode sequences.
 
+    Sequences may have different lengths. Shorter sequences are zero-padded
+    (on the right) up to the length of the longest sequence in the batch;
+    padded positions have no bit set in any channel (they are all-zero
+    columns), so padding never fabricates a real amino acid.
+
     Args:
         sequences: List of sequences as strings.
         char_to_idx: Mapping from characters to indices.
@@ -109,12 +117,14 @@ def one_hot_encode(
         One-hot encoded tensor. Shape depends on flatten parameter:
         - If flatten=True: (batch_size, alphabet_size * seq_length)
         - If flatten=False: (batch_size, alphabet_size, seq_length)
+        `seq_length` is the length of the longest sequence in the batch;
+        shorter sequences are zero-padded to this length.
 
     Raises:
         ValueError: If sequences contain characters not in char_to_idx.
     """
     batch_size = len(sequences)
-    seq_length = len(sequences[0])
+    seq_length = max(len(sequence) for sequence in sequences)
 
     one_hot = torch.zeros(batch_size, alphabet_size, seq_length)
 

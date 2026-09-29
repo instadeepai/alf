@@ -6,10 +6,12 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: pypi
     container:
       image: ubuntu:latest
 
@@ -42,11 +44,11 @@ jobs:
         run: |
           cd core
           uv build
-          uv publish --token ${{secrets.CORE_PYPI_TOKEN}}
+          uv publish --trusted-publishing always
 
           cd ../tools
           uv build
-          uv publish --token ${{secrets.TOOLS_PYPI_TOKEN}}
+          uv publish --trusted-publishing always
           cd ..
 
       - name: Create tag
